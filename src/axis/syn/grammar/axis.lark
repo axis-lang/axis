@@ -1,0 +1,85 @@
+%import common.CNAME -> ID
+%import common.NUMBER -> NAT
+%import common.WS
+%ignore WS
+
+?expr: opchain{application{primary}}
+
+id: ID
+nat: NAT
+
+//range{x}: x ".." x
+?item{x}: x | pair{x} | spread{x}
+pair{x}: id ":" x
+spread{x}: ".." x
+
+?literal: nat
+
+?collection: tuple{expr}
+tuple{x}: _parentheses{item{x}}
+
+?value: literal | collection
+
+
+
+?primary.1: id
+    | literal
+    | collection
+    | field{primary}
+    | member{primary}
+    | primary _parentheses{ item{expr} } -> call
+    | primary _square{ item{expr} } -> index
+    //| primary _curly{element{expr}} -> object
+field{x}: x "." id
+member{x}: x "::" id
+
+
+?application{x}: x
+    | x application{x} -> apply
+
+
+// Operators
+?opchain{next}: logic{comparison{bitwise{addition{product{power{unary{next}}}}}}}
+
+?logic{next}: next
+    | logic{next} "and" next -> logic_and
+    | logic{next} "or" next -> logic_or
+
+?comparison{next}: next
+    | comparison{next} "==" next -> eq
+    | comparison{next} "!=" next -> neq
+    | comparison{next} "<" next -> lt
+    | comparison{next} ">" next -> gt
+    | comparison{next} "<=" next -> le
+    | comparison{next} ">=" next -> ge
+
+?bitwise{next}: next
+    | bitwise{next} "&" next -> bitwise_and
+    | bitwise{next} "|" next -> bitwise_or
+    | bitwise{next} "^" next -> bitwise_xor
+
+?addition{next}: next
+    | addition{next} "+" next -> add
+    | addition{next} "-" next -> sub
+
+?product{next}: next
+    | product{next} "*" next -> mul
+    | product{next} "/" next -> div
+    | product{next} "%" next -> mod
+
+?power{next}: next
+    | power{next} "**" next -> pow
+
+?unary{next}: next
+    | "-" unary{next} -> neg
+    | "!" unary{next} -> not
+
+// Comma separated
+_separated{x, sep}: x (sep x)* sep?
+
+// Wrapped
+_parentheses{x}: "(" _separated{x, ","} ")"
+_square{x}: "[" _separated{x, ","} "]"
+_curly{x}: "{" _separated{x, ","} "}"
+_angle{x}: "<" _separated{x, ","} ">"
+
