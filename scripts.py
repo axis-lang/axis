@@ -1,9 +1,10 @@
-from pathlib import Path
+import os
 import subprocess
 import time
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, DirModifiedEvent
+from pathlib import Path
 
+from watchdog.events import DirModifiedEvent, FileModifiedEvent, FileSystemEventHandler
+from watchdog.observers import Observer
 
 WATCH_DIRS = [Path("src"), Path("tests")]
 WATCH_SUFFIXES = [".py", ".lark"]
@@ -32,6 +33,7 @@ def run_test():
     """
     Runs the unit tests using the `unittest` module.
     """
+    os.system("clear && printf '\\e[3J'")
     subprocess.call("python -m unittest discover -s tests".split())
 
 
