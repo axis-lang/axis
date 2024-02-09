@@ -30,6 +30,8 @@ class Span(Base, AST):
 
 
 class Lit(Base, AST):
+    prior = 0
+
     value: Value
     span: Optional[Span] = None
 
@@ -39,6 +41,8 @@ class Lit(Base, AST):
 
 
 class Id(Base, AST):
+    prior = 0
+
     name: str
     span: Optional[Span] = None
 
@@ -47,15 +51,15 @@ class Id(Base, AST):
         return cls(name=intern(ast.value), span=Span.from_ast(ast))
 
 
+class Prefix(Base, AST):
+    rhs: Expr
+    op: op.Unary
+
+
 class Infix(Base, AST):
     lhs: Expr
     rhs: Expr
     op: op.Binary
-
-
-class Prefix(Base, AST):
-    rhs: Expr
-    op: op.Unary
 
 
 class Postfix(Base, AST):

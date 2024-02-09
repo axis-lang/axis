@@ -1,5 +1,5 @@
 import unittest
-from axis.syn.ast import Parser, Infix, Prefix, Lit, Id
+from axis.front.syn.ast import Parser, Infix, Prefix, Lit, Id
 from rich import print
 
 

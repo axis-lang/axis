@@ -11,6 +11,7 @@ class Unary(Base, traits.Inmutable, traits.Repr):
     name: str
     symbol: str
     eval: Callable[[Value], Value]
+    # priority: int
 
 
 class Binary(Base, traits.Inmutable, traits.Repr):

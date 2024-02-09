@@ -29,7 +29,7 @@ class Watcher(FileSystemEventHandler):
         run_test()
 
 
-def run_test():
+def run_tests():
     """
     Runs the unit tests using the `unittest` module.
     """
@@ -48,7 +48,7 @@ def run_dev():
     observer.start()
 
     try:
-        run_test()
+        run_tests()
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
