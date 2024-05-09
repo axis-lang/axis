@@ -1,0 +1,13 @@
+%import common.CNAME -> ID
+// Un modulo en una unidad logica que emplea programacion declarativa
+// 
+//
+
+id: ID
+?mod: item*
+
+?item: fn | type
+
+type: "type" id
+fn: "fn" id expr "->" expr "{" suite "}"
+

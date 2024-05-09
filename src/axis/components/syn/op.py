@@ -1,11 +1,11 @@
 from typing import Callable
 
-from protobase import Base, traits
+from protobase import Object, traits
 
-from axis.syn.val import Value
+from axis.front.syn.val import Value
 
 
-class Unary(Base, traits.Inmutable, traits.Repr):
+class Unary(Object, traits.Inmutable, traits.Repr):
     """An infix operator."""
 
     name: str
@@ -14,7 +14,7 @@ class Unary(Base, traits.Inmutable, traits.Repr):
     # priority: int
 
 
-class Binary(Base, traits.Inmutable, traits.Repr):
+class Binary(Object, traits.Inmutable, traits.Repr):
     """An infix operator."""
 
     name: str

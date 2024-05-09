@@ -1,0 +1,44 @@
+
+?operators{x}: logic{equal{comparison{bitwise{arithmetic{x}}}}}
+
+?logic{x}: x
+    | logic{x} "and" x -> logic_and
+    | logic{x} "or" x -> logic_or
+
+?equal{x}: x
+    | equal{x} "=" x -> equal
+
+?comparison{x}: x
+    | comparison{x} "==" x -> eq
+    | comparison{x} "!=" x -> neq
+    | comparison{x} "<>" x -> diff
+    | comparison{x} "<" x -> lt
+    | comparison{x} ">" x -> gt
+    | comparison{x} "<=" x -> le
+    | comparison{x} ">=" x -> ge
+
+?bitwise{x}: x
+    | bitwise{x} "&" x -> bitwise_and
+    | bitwise{x} "|" x -> bitwise_or
+    | bitwise{x} "^" x -> bitwise_xor
+
+
+// arithmetic
+?arithmetic{x}: addition{product{power{unary{x}}}}
+
+
+?addition{x}: x
+    | addition{x} "+" x -> add
+    | addition{x} "-" x -> sub
+
+?product{x}: x
+    | product{x} "*" x -> mul
+    | product{x} "/" x -> div
+    | product{x} "%" x -> mod
+
+?power{x}: x
+    | power{x} "**" x -> pow
+
+?unary{x}: x
+    | "-" unary{x} -> neg
+    | "!" unary{x} -> not

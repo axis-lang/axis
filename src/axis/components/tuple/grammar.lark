@@ -1,0 +1,9 @@
+%import common.ID
+%import common.WS
+%ignore WS
+
+?start: tuple{ID}
+
+tuple{x}: "("  ")"
+
+element{x}: [ID [("?"|"!")] ":"] x ["=" ]

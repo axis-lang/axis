@@ -1,0 +1,11 @@
+
+_separated_by{x, sep}: x (sep x)* sep?
+_delimited_by{x, left, right}: left x right
+
+_separated_and_delimited_by{x, sep, left, right}: _delimited_by{_separated_by{x, sep}, left, right}
+
+_separated_by_comma_delimited_by_parentheses{x}: _separated_and_delimited_by{x, ",", "(", ")"}
+_separated_by_comma_delimited_by_square_brackets{x}: _separated_and_delimited_by{x, ",", "[", "]"}
+_separated_by_comma_delimited_by_curly_brackets{x}: _separated_and_delimited_by{x, ",", "{", "}"}
+_separated_by_comma_delimited_by_angle_brackets{x}: _separated_and_delimited_by{x, ",", "<", ">"}
+

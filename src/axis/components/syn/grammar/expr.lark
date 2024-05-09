@@ -1,0 +1,61 @@
+%import common.CNAME -> ID
+%import common.NUMBER -> NAT
+%import .operators (operators)
+
+//?expr: constructs{operators{application{term}}}
+?expr: constructs{operators{application{term}}}
+
+?term: ID -> id
+    | NAT -> nat
+    //| term tuple{expr} -> call
+    //| term shape{expr} -> index
+
+// application es una construccion
+// un yield en realidad es una llamada, que rompe (deeestructura) el codigo.
+
+// rl_application{operators{lr_applications{term_constructions{}}}}
+
+// lr_application debe ser una construccion primaria, para poder hacer a(b).c 
+// Primary array (3+5)
+
+//lr_application:
+//rl_application:
+
+?application{x}: x
+    | tuple{expr} -> tuple
+    | shape{expr} -> list
+    | term "." ID -> field
+    | term "::" ID -> member
+    | x application{x} -> apply
+
+
+
+
+?constructs{x}: x
+
+lambda{x}: x "->" constructs{x}
+yield{x}: constructs{x} "<-" x
+range{x}: [constructs{x}] ".." [constructs{x}]
+tuple{x}: "(" element{x} ("," element{x})* ","? ")"
+shape{x}: "[" element{x} ("," element{x})* ","? "]"
+
+?element{x}: expr
+    | ":" -> placeholder
+    | ".." -> wild
+    | ".." x -> spread 
+    | x ":" x -> pair
+
+
+
+?item: expr
+    | "fn" ID lambda -> fn
+    | "def" ID 
+
+
+?suite: suite_element | ("{" suite_element* "}")
+?suite_element: statement | (expr ";")
+
+?statement: ";"
+    | "if" expr suite ["else" (statement|suite)]
+    | "for" expr "in" expr suite
+

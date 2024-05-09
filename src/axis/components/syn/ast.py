@@ -5,10 +5,10 @@ from sys import intern
 from typing import Callable, Optional
 
 import lark
-from protobase import Base, traits, fields_of
+from protobase import Object, traits, fields_of
 
-from axis.syn.val import Value
-from axis.syn import op
+from axis.front.syn.val import Value
+from axis.front.syn import op
 
 
 class AST(traits.Cmp, traits.Hash, traits.Inmutable, traits.Repr, traits.Init):
@@ -20,7 +20,7 @@ class AST(traits.Cmp, traits.Hash, traits.Inmutable, traits.Repr, traits.Init):
         return lambda _, children: cls(**dict(zip(fields, children)), **kwargs)
 
 
-class Span(Base, AST):
+class Span(Object, AST):
     start: int
     end: int
 
@@ -29,10 +29,10 @@ class Span(Base, AST):
         return cls(start=ast.start_pos, end=ast.end_pos)
 
 
-class Lit(Base, AST):
+class Lit[T](Object, AST):
     prior = 0
 
-    value: Value
+    value: T
     span: Optional[Span] = None
 
     @classmethod
@@ -40,7 +40,7 @@ class Lit(Base, AST):
         return cls(value=as_type(ast.value), span=Span.from_ast(ast))
 
 
-class Id(Base, AST):
+class Id(Object, AST):
     prior = 0
 
     name: str
@@ -51,23 +51,23 @@ class Id(Base, AST):
         return cls(name=intern(ast.value), span=Span.from_ast(ast))
 
 
-class Prefix(Base, AST):
+class Prefix(Object, AST):
     rhs: Expr
     op: op.Unary
 
 
-class Infix(Base, AST):
+class Infix(Object, AST):
     lhs: Expr
     rhs: Expr
     op: op.Binary
 
 
-class Postfix(Base, AST):
+class Postfix(Object, AST):
     lhs: Expr
     op: op.Unary
 
 
-class Call(Base, AST):
+class Call(Object, AST):
     function: Expr
     argument: tuple[Item, ...]
 
@@ -75,47 +75,43 @@ class Call(Base, AST):
         return f"{str(self.function)}({', '.join(map(str, self.argument))})"
 
 
-class Method(Base, AST):
+class Method(Object, AST):
     self: Expr
     method: Id
     argument: tuple[Item, ...]
 
 
-class Index(Base, AST):
+class Index(Object, AST):
     expr: Expr
     index: tuple[Item, ...]
 
 
-class GetAttr(Base, AST):
+class GetAttr(Object, AST):
     expr: Expr
     attr: Id
 
 
-class Member(Base, AST):
+class Member(Object, AST):
     expr: Expr
     field: Id
 
 
-class Range(Base, AST):
+class Range(Object, AST):
     start: Expr
     end: Expr
 
 
-class Pair(Base, AST):
+class Pair(Object, AST):
     key: str
     value: Expr
 
 
-class Spread(Base, AST):
+class Spread(Object, AST):
     expr: Expr
 
 
-type Expr = Value | Id | Infix | Prefix | Postfix
+type Expr = Value | Id | Infix | Prefix | Postfix | Range | Call | Method | Index | GetAttr | Member
 type Item = Expr | Pair | Spread
-
-
-def _ast_builder_method[T](cls: type[T], *args, **kwargs) -> Callable[[], T]:
-    return lambda _, children: cls(**dict(zip(args, children)), **kwargs)
 
 
 class Parser:
@@ -175,7 +171,7 @@ class Parser:
                 strict=True,
                 parser="lalr",
                 propagate_positions=True,
-                transformer=self.SyntaxTreeBuilder(),
+                # transformer=self.SyntaxTreeBuilder(),
                 import_paths=[str(path) for path in self.GRAMMAR_IMPORT_PATHS],
             )
 

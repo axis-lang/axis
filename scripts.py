@@ -1,5 +1,4 @@
-import os
-import subprocess
+from os import system
 import time
 from pathlib import Path
 
@@ -26,18 +25,19 @@ class Watcher(FileSystemEventHandler):
             case _:
                 return
 
-        run_test()
+        run_tests()
 
 
 def run_tests():
     """
     Runs the unit tests using the `unittest` module.
     """
-    os.system("clear && printf '\\e[3J'")
-    subprocess.call("python -m unittest discover -s tests".split())
+    system("clear && printf '\\e[3J'")
+    system("python -m unittest discover -p *.py -s src")
+    #system("python -m unittest discover -s tests ")
 
 
-def run_dev():
+def run_watch():
     """
     Run the unit tests when a file changes.
     """
