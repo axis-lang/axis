@@ -1,8 +1,12 @@
 # %%
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Optional
 from frozendict import frozendict
 from protobase import Object, traits
+
+__all__ = [
+    "Tuple",
+]
 
 
 class Tuple[T](Object, traits.Repr, traits.Consed):
@@ -19,7 +23,7 @@ class Tuple[T](Object, traits.Repr, traits.Consed):
         return f"{self.__class__.__name__}({dict(self._inner)})"
 
     def __iter__(self):
-        return iter(self._inner.values())
+        return self._inner.values()
 
     def __getitem__(self, key: str) -> T:
         return self._inner[key]
@@ -32,6 +36,15 @@ class Tuple[T](Object, traits.Repr, traits.Consed):
 
     def value_at(self, index: int) -> T:
         return self._inner.value(index)
+
+    def items(self):
+        return self._inner.items()
+
+    def keys(self):
+        return self._inner.keys()
+
+    def values(self):
+        return self._inner.values()
 
     def map[R](self, fn: Callable[[T], R]) -> Tuple[R]:
         cls = self.__class__
@@ -56,3 +69,21 @@ class Tuple[T](Object, traits.Repr, traits.Consed):
 
 
 t = Tuple.from_args(1, 2, x=3, y=4, z=5)
+
+
+class MatchPattern:
+    """
+    Matching puede ser tambien sore shapes
+    MatchPattern debe estar fuera de tuple
+
+    Un patron de matching puede reducirse a un conjunto de condiciones (guards)
+    que deben probarse para determinar si un objeto cumple con el patron.
+
+    """
+
+    def match(self, obj: Tuple) -> Optional[Tuple]: ...
+
+    # (..) MATCH_ALL default pattern, less specific
+
+
+class MatchDict[T]: ...
