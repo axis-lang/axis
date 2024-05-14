@@ -1,0 +1,62 @@
+%import common.WS
+%import common.CNAME -> ID
+%import common.NUMBER -> NAT
+%import .operators (operators)
+%ignore WS
+
+
+?expr: constructs{operators{application{expr}}}
+?simple_expr: operators{forward{expr}}
+
+?term{x}.0: ID -> id
+    | NAT -> nat
+    | tuple{x} -> tuple
+    | shape{x} -> shape
+    | if
+    //| suite -> suite
+
+?simple_term{x}.0: ID -> id
+    | NAT -> nat
+    | tuple{x} -> tuple
+    | shape{x} -> shape
+
+?application{x}.3: backward{x}
+    | application{x} suite -> apply
+    | application{x} "->" (suite | statement) -> lambda
+
+?forward{x}.1: term{x}
+    | forward{x} "." ID -> field
+    | forward{x} "::" ID -> member
+    | forward{x} tuple{x} -> apply
+    | forward{x} shape{x} -> apply
+
+
+?backward{x}.3: forward{x}
+    | forward{x} backward{x} -> apply_bw
+
+
+?constructs{x}: x 
+    | x ".." x -> range
+
+//?tuple{x}: "(" element{x} ("," element{x})* ","? ")"
+?tuple{x}: "(" (element{x} ("," element{x})* ","?)? ")"
+?shape{x}: "[" (element{x} ("," element{x})* ","?)? "]"
+
+?element{x}: x [":" x] ["=" x] -> element
+    | ":" -> placeholder
+    | ".." -> wild
+    | ".." x -> spread 
+
+
+
+?suite: "{" statement* expr?"}"
+//?suite_element:
+
+?statement: ";"
+    | expr ";" -> expr
+    // | "if" simple_expr suite ["else" suite] -> if
+    // | "for" expr "in" simple_expr suite -> for
+
+
+if: "if" simple_expr suite ["else" suite] -> if
+

@@ -1,21 +1,35 @@
+"""
+El chequeo de tipos no debe ser efectuaro por eval sino por analize.
+
+mientras que el proceso de evaluacion es apropiado para validar el
+comportamiento de un dfg el proceso de analisis se adapta mejor para
+visualizar el grafo.
+
+"""
+
 from __future__ import annotations
-from types import BuiltinFunctionType, BuiltinMethodType, FunctionType, MethodType
+
+from ast import Constant
+from contextlib import contextmanager
 from typing import Optional
-from .model import *
+
+import frozendict
+
 from ..tuple import Tuple
-from axis.components.entity import know
+from .model import Apply, Composition, Entity, Leaf, Loop, Node, Switch, Trunk, Use
 
+_analysis_context: AnalysisContext | None = None
 
-"""
-EVALUATTION
-"""
-_eval_context: EvaluationContext | None = None
+#
 
-
-class EvaluationContext[T]:
-    _parent_context: EvaluationContext[T] | None = None
+class AnalysisContext[T]:
+    _parent_context: AnalysisContext[T] | None = None
     _visited: dict[Node, T]
     _scope: dict[Entity, T]
+
+    @property
+    def subcontext_type(self) -> type[AnalysisContext[T]]:
+        return type(self)
 
     def __init__(self, argument: T, /, scope: Optional[dict[Entity, T]] = None):
         # self._parent_context = parent
@@ -29,14 +43,14 @@ class EvaluationContext[T]:
     # via apply
 
     def __enter__(self):
-        global _eval_context
-        self._parent_context = _eval_context
-        _eval_context = self
+        global _analysis_context
+        self._parent_context = _analysis_context
+        _analysis_context = self
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        global _eval_context
-        _eval_context = self._parent_context
+        global _analysis_context
+        _analysis_context = self._parent_context
         self._parent_context = None
 
     @property
@@ -60,42 +74,38 @@ class EvaluationContext[T]:
         if not isinstance(node, Leaf):
             self._visited[node] = result
 
-    def eval_leaf(self, leaf: Leaf) -> T:
+    def process_leaf(self, leaf: Leaf) -> T:
         return self._argument
 
-    def eval_use(self, use: Use) -> T:
+    def process_use(self, use: Use) -> T:
         for ctx in self.context_hierarchy_in_resolution_order():
             if use.entity in ctx._scope:
                 return ctx._scope[use.entity]
 
-        return self.missing_use(use)
+        return self.on_missing_use(use)
 
-    def missing_use(self, use: Use):
+    def on_missing_use(self, use: Use):
         raise NotImplementedError(f"Use {use.entity} not found in {self}")
 
-    def eval_constant(self, constant: Constant) -> T:
+    def process_constant(self, constant: Constant) -> T:
         return constant.value
 
-    def eval_composition(self, composition: Composition, inputs: Tuple[T]) -> T:
+    def process_composition(self, composition: Composition, inputs: Tuple[T]) -> T:
         return inputs
 
-    def eval_apply(self, apply: Apply, function: T, argument: T) -> T:
+    def process_apply(self, apply: Apply, function: T, argument: T) -> T:
         if isinstance(function, Trunk):
             return self.apply_trunk(apply, function, argument)
-        elif callable(function):
+        if callable(function):
             return self.apply_builtin(apply, function, argument)
 
         raise NotImplementedError(
             f"eval_apply for {function.__class__} is not implemented in {self.__class__}"
         )
 
-    @property
-    def apply_trunk_context_type(self):
-        return type(self)
-
     def apply_trunk(self, apply: Apply, trunk: Trunk, argument: T):
-        with self.apply_trunk_context_type(argument):
-            return eval(trunk)
+        with self.subcontext_type(argument):
+            return analyze(trunk)
 
     def apply_builtin(self, apply: Apply, function: Trunk, argument: T):
         if isinstance(argument, Tuple):
@@ -106,7 +116,23 @@ class EvaluationContext[T]:
             f"eval_builtin_apply for {argument.__class__} is not implemented in {self.__class__}"
         )
 
-    def eval_switch(self, switch: Switch, selector: T):
+    @contextmanager
+    def switch_context(self, switch: Switch):
+        def do_switch(selector: T, branches: frozendict[Switch.Match, T]):
+            branch = switch.branches.get(selector, None)
+            if branch is None:
+                branch = switch.branches.get(Switch.DEFAULT, None)
+            if branch is None:
+                raise ValueError(
+                    f"No branch matched in switch {switch} with selector {selector}"
+                )
+
+            return eval(branch)
+
+            return branches[selec]
+        yield do_switch
+
+    def process_switch(self, switch: Switch, selector: T):
         # branch matching
         branch = switch.branches.get(selector, None)
         if branch is None:
@@ -118,48 +144,21 @@ class EvaluationContext[T]:
 
         return eval(branch)
 
-    def eval_loop(self, loop: Loop):
+    def process_loop(self, loop: Loop):
         return
 
-    def eval_trunk(self, trunk: Trunk, result: T):
+    def process_trunk(self, trunk: Trunk, result: T):
         return result
 
 
-# _eval_context = EvaluationContext(
-#     None,
-#     scope={  # GLOBAL_SCOPE
-#         know.GET_ATTR: lambda x, y: x[y],
-#         know.ADD: lambda x, y: x + y,
-#         know.MUL: lambda x, y: x * y,
-#         know.GT: lambda x, y: x > y,
-#         know.LT: lambda x, y: x < y,
-#         know.EQ: lambda x, y: x == y,
-#         know.NE: lambda x, y: x != y,
-#         know.LE: lambda x, y: x <= y,
-#         know.GE: lambda x, y: x >= y,
-#         know.SUB: lambda x, y: x - y,
-#         know.TRUEDIV: lambda x, y: x / y,
-#         know.FLOORDIV: lambda x, y: x // y,
-#         know.MOD: lambda x, y: x % y,
-#         know.POW: lambda x, y: x**y,
-#         know.LSHIFT: lambda x, y: x << y,
-#         know.RSHIFT: lambda x, y: x >> y,
-#         know.AND: lambda x, y: x & y,
-#         know.OR: lambda x, y: x | y,
-#         know.XOR: lambda x, y: x ^ y,
-#         know.PRINT: lambda x: print(x),
-#     },
-# )
-
-
-def eval(node: Node):
+def analyze(node: Node):
     """
     Eval puede ser parametrizado via evaluation_context
     """
-    if (ctx := _eval_context) is None:
+    if (ctx := _analysis_context) is None:
         raise ValueError("DFG Evaluation context is not present.")
 
-    prev_result = _eval_context.check_visited(node)
+    prev_result = _analysis_context.check_visited(node)
 
     if prev_result is not None:
         return prev_result
@@ -167,29 +166,31 @@ def eval(node: Node):
     try:
         match node:
             case Leaf() as leaf:
-                result = ctx.eval_leaf(leaf)
+                result = ctx.process_leaf(leaf)
             case Use() as use:
-                result = ctx.eval_use(use)
+                result = ctx.process_use(use)
             case Constant() as constant:
-                result = ctx.eval_constant(constant)
+                result = ctx.process_constant(constant)
             case Composition() as composition:
                 inputs = composition.inputs.map(eval)
-                result = ctx.eval_composition(composition, inputs)
+                result = ctx.process_composition(composition, inputs)
             case Apply() as apply:
                 function = eval(apply.function)
                 argument = eval(apply.argument)
-                result = ctx.eval_apply(apply, function, argument)
+                result = ctx.process_apply(apply, function, argument)
             case Switch() as switch:
-                selector = eval(switch.selector)
-                result = ctx.eval_switch(switch, selector)
+                with ctx.switch_context(switch) as do_switch:
+                    selector = eval(switch.selector)
+                    branches = switch.branches.map(analyze)
+                    result = do_switch(selector, branches)
             case Loop() as loop:
                 # inputs = eval(loop.inputs)
-                result = ctx.eval_loop(loop)
+                result = ctx.process_loop(loop)
             case Trunk() as trunk:
                 for node in trunk.children:
                     eval(node)
                 result = eval(trunk.result)
-                result = ctx.eval_trunk(trunk, result)
+                result = ctx.process_trunk(trunk, result)
     except Exception:
         print("Error evaluating", node)
         raise

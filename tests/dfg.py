@@ -10,7 +10,7 @@ from typing import TypeAlias
 from rich import print
 
 from axis.components import dfg
-from axis.components.dfg.evaluation import EvaluationContext
+
 from axis.components.tuple import Tuple
 from axis.components.entity import know
 
@@ -52,23 +52,14 @@ def test_apply(x, y, z):
 
 @dfg.compile
 def test_max(a, b):
-    return dfg.Switch.build(
-        a > b,
-        {
-            True: a,
-            False: b,
-        },
-    )
+    return (a > b).switch({True: a, False: b})
 
 
-with EvaluationContext(Tuple(x=1, y=2, z=3), scope=GLOBALS):
-    print(dfg.eval(test_apply))
-
-with EvaluationContext(Tuple(a=10, b=5), scope=GLOBALS):
-    print(dfg.eval(test_max))
+print(dfg.eval(test_add, Tuple(a=10, b=5), scope=GLOBALS))
+print(dfg.eval(test_max, Tuple(a=10, b=5), scope=GLOBALS))
 
 
-with dfg.VisualizationContext(Tuple(x=1, y=2, z=3), scope=GLOBALS):
-    dfg.eval(test_apply)
+# with dfg.VisualizationContext(Tuple(a=10, b=5), scope=GLOBALS):
+#     dfg.eval(test_max)
 
 # vis.graph.render("max", format="png", view=True)

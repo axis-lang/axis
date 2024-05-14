@@ -1,17 +1,18 @@
 # %%
+from ast import Constant
+from lib2to3.pytree import Leaf
 from typing import Callable
 from graphviz import Digraph
 
-from axis.components.dfg.model import Apply, Node, Trunk
+from .model import Apply, Composition, Node, Switch, Trunk, Use
 
 from ..tuple import Tuple
-from .evaluation import *
-from .model import *
+from .processor import AnalysisContext, process
 
 cluster_count = 0
 
 
-class VisualizationContext(EvaluationContext[Node]):
+class VisualizationContext(AnalysisContext[Node]):
     graph: Digraph
 
     def __enter__(self):
@@ -77,7 +78,24 @@ class VisualizationContext(EvaluationContext[Node]):
 
         return result
 
+    def eval_switch(self, switch: Switch, selector: Node):
+        switch.branches.map
+
+        for match, branch in switch.branches.items():
+            if isinstance(match, Trunk):
+                with self.subcontext_type(None):
+                    eval(branch)
+
+        return super().eval_switch(switch, selector)
+
+    def switch_trunk(self, switch: Switch, match: Switch.Match, branch: Trunk): ...
+
     def eval_trunk(self, trunk: Trunk, result: Node):
         self.graph.node(trunk.ephimeral_id, label=trunk.leaf.name, shape="invhouse")
         self.graph.edge(trunk.result.ephimeral_id, trunk.ephimeral_id)
         return super().eval_trunk(trunk, result)
+
+
+def visualize(node: Node):
+    with VisualizationContext(None):
+        return process(node)

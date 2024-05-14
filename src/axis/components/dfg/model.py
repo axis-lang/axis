@@ -21,7 +21,7 @@ __all__ = [
     "Apply",
     "Loop",
     "Switch",
-    "BuildContext",
+    "ConstructionContext",
     "compile",
 ]
 
@@ -30,25 +30,25 @@ type Entity = str | FunctionType
 
 type Constant = str | int | float | bool
 
-_build_context = None
+_construction_context = None
 
 
-class BuildContext:
-    _parent_context: BuildContext | None = None
+class ConstructionContext:
+    _parent_context: ConstructionContext | None = None
     _nodes: list[Node]
 
     def __init__(self):
         self._nodes = []
 
     def __enter__(self):
-        global _build_context
-        self.prev = _build_context
-        _build_context = self
+        global _construction_context
+        self.prev = _construction_context
+        _construction_context = self
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        global _build_context
-        _build_context = self.prev
+        global _construction_context
+        _construction_context = self.prev
 
     def new_node(self, node: Node):
         self._nodes.append(node)
@@ -121,7 +121,7 @@ class Leaf(Object, Node):
 
     @classmethod
     def build(cls, name: str):
-        return _build_context.new_node(cls(name=name))
+        return _construction_context.new_node(cls(name=name))
 
 
 class Use(Object, Node):
@@ -138,7 +138,7 @@ class Use(Object, Node):
 
     @classmethod
     def build(cls, entity: Entity):
-        return _build_context.new_node(cls(entity=entity))
+        return _construction_context.new_node(cls(entity=entity))
 
 
 class Constant(Object, Node):
@@ -150,37 +150,17 @@ class Constant(Object, Node):
 
     @classmethod
     def build(cls, value: Constant):
-        return _build_context.new_node(cls(value=value))
-
-
-class Trunk(Object, Node):
-    """
-    the first children is the HeadNode of the region dominated by this Node
-    """
-
-    children: tuple[Node]
-    result: Node  # generalmente el del ultimo children?
-
-    @property
-    def leaf(self):
-        return self.children[0]
-
-    @classmethod
-    def build(cls, result: Node):
-        return cls(children=tuple(_build_context._nodes), result=result)
+        return _construction_context.new_node(cls(value=value))
 
 
 class Composition(Object, Node):
-    """
-    Tuple puede utilizarse para construir argumentos de llamada o contextos de cierre
-    DfgCompose
-    """
-
-    inputs: Tuple[Node]  # no es una lista de nodos, es un Tuple
+    inputs: Tuple[Node]
 
     @classmethod
     def build(cls, *args: tuple[Node, ...], **kwargs: Dict[str, Node]):
-        return _build_context.new_node(cls(inputs=Tuple.from_args(*args, **kwargs)))
+        inputs = Tuple.from_args(*args, **kwargs)
+        # check inputs...
+        return _construction_context.new_node(cls(inputs=inputs))
 
 
 class Apply(Object, Node):
@@ -189,16 +169,8 @@ class Apply(Object, Node):
 
     @classmethod
     def build(cls, function: Node, argument: Node):
-        return _build_context.new_node(cls(function=function, argument=argument))
-
-
-class Loop(Object, Node):
-    input: Optional[Node]
-    iteration: Trunk
-
-    @classmethod
-    def build(cls, input: Optional[Node], iteration: Trunk):
-        return _build_context.new_node(cls(iteration=iteration, input=input))
+        # check fn args
+        return _construction_context.new_node(cls(function=function, argument=argument))
 
 
 class Switch(Object, Node):
@@ -215,16 +187,42 @@ class Switch(Object, Node):
 
     @classmethod
     def build(cls, selector: Node, branches: dict[Match, Node], /, input: Node = None):
-        return _build_context.new_node(
+        return _construction_context.new_node(
             cls(input=input, selector=selector, branches=frozendict(branches))
         )
+
+
+class Loop(Object, Node):
+    input: Node
+    iteration: Trunk
+
+    @classmethod
+    def build(cls, input: Optional[Node], iteration: Trunk):
+        return _construction_context.new_node(cls(iteration=iteration, input=input))
+
+
+class Trunk(Object, Node):
+    """
+    the first children is the HeadNode of the region dominated by this Node
+    """
+
+    children: tuple[Node]
+    result: Node  # generalmente el del ultimo children?
+
+    @property
+    def leaf(self):
+        return self.children[0]
+
+    @classmethod
+    def build(cls, result: Node):
+        return cls(children=tuple(_construction_context._nodes), result=result)
 
 
 def compile(fn):
     fn_signature = inspect.signature(fn)
     fn_parameters = fn_signature.parameters
 
-    with BuildContext():
+    with ConstructionContext():
         leaf = Leaf.build(fn.__name__)
         params = [leaf.attr(p.name) for p in fn_parameters.values()]
         result = fn(*params)

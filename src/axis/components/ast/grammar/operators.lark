@@ -1,12 +1,13 @@
 
-?operators{x}: logic{equal{comparison{bitwise{arithmetic{x}}}}}
+?operators{x}: logic{comparison{bitwise{arithmetic{x}}}}
 
 ?logic{x}: x
     | logic{x} "and" x -> logic_and
     | logic{x} "or" x -> logic_or
 
-?equal{x}: x
-    | equal{x} "=" x -> equal
+// equal is a statement, not an expression
+// ?equal{x}: x
+//     | equal{x} "=" x -> equal
 
 ?comparison{x}: x
     | comparison{x} "==" x -> eq

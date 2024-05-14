@@ -1,0 +1,71 @@
+%import common.WS
+%import common.CNAME -> ID
+%import common.NUMBER -> NUM
+%import .operators (operators)
+%ignore WS
+
+?expr: complex_expr
+
+?complex_expr: construct{operators{complex_application}}
+?simple_expr: construct{operators{simple_application}}
+
+?term.0: ID -> id
+    | NUM -> num
+    | tuple
+    | shape
+    | if
+    | for
+
+?primary{x}.1: x
+    | primary{x} "?" -> check
+    | primary{x} "!" -> unwrap
+    | primary{x} "." ID -> field
+    | primary{x} "." tuple -> fields // field piking
+    | primary{x} "::" ID -> member
+    | primary{x} tuple -> apply
+    | primary{x} shape -> apply
+
+?backward_application{x}: primary{x}
+    | primary{x} backward_application{x} -> apply_bw
+
+?complex_application: backward_application{term} 
+    | primary{suite}
+    | backward_application{term} suite -> apply
+    // | complex_application suite -> apply // no recusivo
+
+?simple_application: backward_application{term}
+
+?construct{x}: x 
+    | x ".." x -> range // puede ir en una regla inferior
+    | [x] "->" construct{x} -> lambda
+    | x "=" construct{x} -> assign
+
+
+//?tuple{x}: "(" element{x} ("," element{x})* ","? ")"
+tuple: "(" (element ("," element)* ","?)? ")"
+shape: "[" (element ("," element)* ","?)? "]"
+
+//?element: expr [":" expr] ["=" expr] -> element
+?element: [expr ":"] expr -> element
+    | ".." [expr ":"] expr -> spread
+    | ":" -> placeholder
+    | ".." -> wild
+    //| ".." expr -> spread 
+
+
+
+suite: "{" statement* (element ("," element)* ","?)? "}"
+//?suite_element:
+
+// Para los terminos if y for no necesitamos ;
+// ; separa expresiones simples
+// {alpha}; {beta} 
+
+statement: ";"
+    | expr ";" -> expr
+    // | "if" simple_expr suite ["else" suite] -> if
+    // | "for" expr "in" simple_expr suite -> for
+
+
+if: "if" simple_expr suite ["else" suite]
+for: "for" expr "in" simple_expr suite

@@ -1,0 +1,11 @@
+outline-rules:
+  - name: axis/module
+    file-extension: .ax
+    keyword: mod
+    first-block: axis/module/header
+    block-processor: axis.syn.processor.ModuleProcessor
+    block-integrator: axis.syn.integrator.ModuleIntegrator
+
+  - name: axis/module/header
+  - name: axis/generic/parameter
+  - name: axis/generic/parameter
