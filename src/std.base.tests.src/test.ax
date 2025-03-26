@@ -1,0 +1,116 @@
+This is the heading of the unit 
+
+# this is a srcblock testing unit
+    fn askjlfaso
+    ...more text
+    # a nested documentation block
+
+
+def Vector[T]
+where:
+    val T: Number = Real
+
+as val: Tuple
+
+    val x: T
+    val y: T
+    val z: T
+
+as mod:
+    enum Properties
+        val x = 0
+        val y = 1
+        val z = 2
+
+    val Types = (T, T, T)
+
+
+val Vector::Attributes
+
+val PI = 3.14
+# Una famosa constante
+
+
+-- Seccion de datos
+
+fn init
+
+# initializes the application and 
+
+
+  sets up configurations.
+
+takes:
+    val config: Config
+    # Configuration object containing application settings.
+
+returns Void
+
+
+# No return value.
+
+suite:
+    ...
+
+
+fn compute
+#    Computes complex values based on an operation mode.
+takes:
+# aqui podemos ver valores
+
+    val a: Number
+    # The first operand.
+
+    val b: Number
+    # The second operand.
+
+    val mode: String
+    # Operation mode; valid values include "add", "subtract", "multiply".
+
+returns Number
+#   The computed result.
+suite:
+    if mode == "add":
+         return a + b
+    elif mode == "subtract":
+         return a - b
+    elif mode == "multiply":
+         return a * b
+    else:
+         error: Unsupported operation mode
+
+
+fn recursiveFactorial
+
+takes:
+    val n: Number
+        # A non-negative integer.
+
+returns Number
+# Factorial of n.
+
+suite:
+    if n <= 1:
+         return 1
+    else:
+         return n * recursiveFactorial(n - 1)
+
+
+fn divide
+#    Divides two numbers and handles division by zero.
+
+takes:
+    val numerator: Number
+    # The numerator.
+
+    val denominator: Number
+    # The denominator; must not be zero.
+    
+returns Number
+#    The result of the division.
+
+suite:
+    if denominator == 0:
+         error: Division by zero encountered.
+    else:
+         return numerator / denominator

@@ -1,0 +1,36 @@
+#   Collections
+
+    `Set V` es un Map[identity]
+    `Map[V -> K] V`
+    `Array[I] V`es uniforme
+
+    `Tuple[Map[K] -> Type]` ## no es un cualificador pero si una coleccion
+
+    Todas las colecciones se pueden indexar con:
+        - rangos: Array[0..4, 0..4]
+        - enums: Array[E]
+
+#   Methods
+
+    collection.get(K) -> V
+    collection.get(K) otherwise@{val: K -> D} -> V | D
+    collection.get(5) otherwise@{ _ -> () }
+
+    collections[offset] -> V
+
+
+def Set(sorted: bool) V:
+where:
+    gen V: Any
+
+alias-of Map[{}] V
+
+
+
+def Collection[offsets]
+
+
+def Collection.get
+takes:
+    val indices: K
+

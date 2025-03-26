@@ -1,0 +1,46 @@
+doc:
+  description: 'Documentation'
+  keyword: '#'
+
+doc > doc:
+
+unit:
+  description: 'Source unit'
+unit | doc:
+unit | fn:
+unit | val:
+unit | def:
+
+def:
+def | doc:
+def | as:
+def | where:
+
+as:
+as | doc:
+as > val:
+
+fn:
+fn | doc:
+fn | takes:
+fn | returns:
+fn | where:
+fn | suite:
+
+takes:
+takes | doc:
+takes > val:
+
+val:
+val | doc:
+
+where:
+
+returns:
+returns | doc:
+returns > val:
+
+suite:
+
+
+
