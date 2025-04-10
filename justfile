@@ -16,7 +16,7 @@ docs:
 
 
 gen-parser: 
-    just _antlr4 -visitor src/axislang/grammar/Axis.g4
+    just _antlr4 -visitor src/axis/codebase/grammar/Axis.g4
 
 _antlr4 *ARGS:
     poetry run antlr4 -Dlanguage=Python3 {{ARGS}}

@@ -1,0 +1,10 @@
+{
+	"nodes":[
+		{"id":"b482f840bb75f41a","x":-340,"y":-360,"width":340,"height":420,"type":"group","label":"Codebase"},
+		{"id":"da8f068b8562e1f2","x":-295,"y":-319,"width":250,"height":60,"type":"text","text":"File System Layer"},
+		{"id":"7480db3ebbcd710d","x":-295,"y":-233,"width":250,"height":60,"type":"text","text":"AST Layer"},
+		{"id":"febb0535206cbaea","x":-295,"y":-139,"width":250,"height":60,"type":"text","text":"Index Layer"},
+		{"id":"10927492dfe42904","x":-295,"y":-39,"width":250,"height":60,"type":"text","text":"Checking Layer"}
+	],
+	"edges":[]
+}

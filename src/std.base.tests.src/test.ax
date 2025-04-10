@@ -6,23 +6,20 @@ This is the heading of the unit
     # a nested documentation block
 
 
-def Vector[T]
-where:
-    val T: Number = Real
-
-as val: Tuple
-
+def Vector(x,y,z)
+takes:
     val x: T
     val y: T
     val z: T
+where:
+    val T: Number = Real
+with: 
+    fn longitude: T = sqrt(x*x + y*y + z*z)
 
-as mod:
-    enum Properties
-        val x = 0
-        val y = 1
-        val z = 2
 
-    val Types = (T, T, T)
+implements: 
+    Number
+
 
 
 val Vector::Attributes

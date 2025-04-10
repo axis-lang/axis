@@ -1,0 +1,189 @@
+{
+  "main": {
+    "id": "c7a636413f7a7d29",
+    "type": "split",
+    "children": [
+      {
+        "id": "6f19e22fb9b9fd10",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "260e59c5a4278e1f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "exo/DSign.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "DSign"
+            }
+          },
+          {
+            "id": "de0753372e33e191",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "PadihGPA.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "PadihGPA"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9c929a7f91af822f",
+    "type": "split",
+    "children": [
+      {
+        "id": "9f9567ff64668672",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "49f0784401951389",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "431c56cf35e4fe75",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "fd35fea48c0bc132",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "cd1c3fcfb16b9f65",
+    "type": "split",
+    "children": [
+      {
+        "id": "35cd1b9a98fd0e3d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a2cb108b68a428ea",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "exo/DSign.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for DSign"
+            }
+          },
+          {
+            "id": "cfbea2653f325836",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "exo/DSign.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from DSign"
+            }
+          },
+          {
+            "id": "180374a1388f76f2",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "4cc3bd55ec6667ea",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "exo/DSign.md"
+              },
+              "icon": "lucide-list",
+              "title": "Outline of DSign"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "de0753372e33e191",
+  "lastOpenFiles": [
+    "Untitled.canvas",
+    "PadihGPA.md",
+    "default.md",
+    "exo/DSign.md",
+    "exo"
+  ]
+}
