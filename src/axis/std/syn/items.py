@@ -1,41 +1,36 @@
 from __future__ import annotations
-from .abstract import Node
-from .expr import Expr
 
-class Item(Node, abstract=True):
-    #children: tuple[Item]
-    doc: tuple[Doc] = ()
+from enum import Enum
+from typing import Optional
 
-class Doc(Item): # ::Doc
-    content: str
+from .abstract import Item, Node
+from .expr import Expr, Call
+
+
+class Unit(Item):
+    """
+    """
+    
 
 class Val(Item):
-    id: str
-    bound: Expr
-    value: Expr
+    as_: Expr
+    bound: Optional[Expr] 
+    value: Optional[Expr]
 
-class Takes(Item): # ::Params
-    class Val(Val):
-        ...
-    values: tuple[Val]
-
-class Where(Item): # ::GenParams
-    class Val(Val):
-        ...
-    bounds: tuple[Val]
-
-class As(Item):
+class Def(Item):
+    """
+    Represents a 'def' entity:
+    
+    def Vector(..)
+    takes:
+        val x: N
+        val y: N
+    where:
+        val N: Number
+    """
     expr: Expr
 
-'''
-# Un SIEMPRE tuple es definido por otro tuple 
-# Tup[Tup] ...
+    class Kind(str, Enum):
+        CLASS = 'class'
+      
 
-el tuple externo define clave->valores y el interno clave -> tipo
-ambos comparten el mismo keymap
-
-el tuple interno es un TypedIndex o indice no uniforme
-UniformIndex
-NonUniformIndex
-
-'''

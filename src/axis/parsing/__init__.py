@@ -36,17 +36,23 @@ class Parser(Object):
         return outline.transform(self.process_outline)
 
     KNOW_ITEMS = {
+        'doc': (syn.Doc, lambda content: {'content': content}),
         'unit': (syn.Unit, None),
         'def': (syn.Def, ast_parser_for("defItem")),
-        #'val': (syn.Val, ast_parser_for("valItem")),
-        #'takes': (syn.Takes, ast_parser_for("takesBlock")),
-        #'where': (syn.Where, ast_parser_for("whereBlock")),
+        'val': (syn.Val, ast_parser_for("valItem")),
+        'takes': (syn.Takes, None),
+        'where': (syn.Where, None),
+        'returns': (syn.Returns, ast_parser_for('returnsBlock')),
+        'suite': (syn.Suite, ast_parser_for('suiteBlock')),
     }
 
 
     def process_outline(self, block: SrcBlock, children: list):
-        block_cls, parser = self.KNOW_ITEMS.get(block.type)
+        #print("--")
+        #print(block.content)
+        block_cls, parser = self.KNOW_ITEMS.get(block.type, (None, None))
+        if block_cls is None:
+            raise TypeError(f"Unknown block type {block.type}")
         attrs = parser(block.content) if parser else {}
-        print(attrs)
         return block_cls(tuple(children), **attrs)
 

@@ -1,4 +1,4 @@
-# Generated from src/axis/codebase/grammar/Axis.g4 by ANTLR 4.13.2
+# Generated from src/axis/parsing/grammar/Axis.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .AxisParser import AxisParser
@@ -7,15 +7,6 @@ else:
 
 # This class defines a complete listener for a parse tree produced by AxisParser.
 class AxisListener(ParseTreeListener):
-
-    # Enter a parse tree produced by AxisParser#suite.
-    def enterSuite(self, ctx:AxisParser.SuiteContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#suite.
-    def exitSuite(self, ctx:AxisParser.SuiteContext):
-        pass
-
 
     # Enter a parse tree produced by AxisParser#defItem.
     def enterDefItem(self, ctx:AxisParser.DefItemContext):
@@ -32,6 +23,33 @@ class AxisListener(ParseTreeListener):
 
     # Exit a parse tree produced by AxisParser#valItem.
     def exitValItem(self, ctx:AxisParser.ValItemContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#returnsBlock.
+    def enterReturnsBlock(self, ctx:AxisParser.ReturnsBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#returnsBlock.
+    def exitReturnsBlock(self, ctx:AxisParser.ReturnsBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#suiteBlock.
+    def enterSuiteBlock(self, ctx:AxisParser.SuiteBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#suiteBlock.
+    def exitSuiteBlock(self, ctx:AxisParser.SuiteBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#suite.
+    def enterSuite(self, ctx:AxisParser.SuiteContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#suite.
+    def exitSuite(self, ctx:AxisParser.SuiteContext):
         pass
 
 

@@ -28,15 +28,15 @@ def itertree(ctx: ParserRuleContext, fn):
 
     if isinstance(ctx, TerminalNodeImpl):
         return fn(ctx, ctx.getSymbol())
-    else:
-        return fn(
-            ctx,
-            *[
-                param
-                for child in ctx.getChildren()
-                if (param := itertree(child, fn)) is not IGNORE
-            ],
-        )
+
+    return fn(
+        ctx,
+        *[
+            param
+            for child in ctx.getChildren()
+            if (param := itertree(child, fn)) is not IGNORE
+        ],
+    )
 
 @singledispatch
 def build_ast(ctx, *values):
@@ -56,7 +56,8 @@ IGNORED_TOKENS = {
     ",",
     "=",
     "def",
-    "var",
+    "returns",
+    "val",
     "fn",
 }
 
@@ -84,8 +85,12 @@ def _terminal(ctx: TerminalNodeImpl, token: Token):
             | AxisLexer.GE
             | AxisLexer.AND
             | AxisLexer.OR
+            | AxisLexer.ASSIGN
+            | AxisLexer.COLON
         ):
             return intern(token.text)
+        case Token.EOF:
+            return IGNORE
         case _:
             if token.text in IGNORED_TOKENS:
                 return IGNORE
@@ -96,6 +101,28 @@ def _terminal(ctx: TerminalNodeImpl, token: Token):
 @build_ast.register
 def _def_item(_: AxisParser.DefItemContext, expr: syn.Expr):
     return dict(expr=expr)
+
+@build_ast.register
+def _val_item(_: AxisParser.ValItemContext, as_: syn.Expr, *more):
+    bound = None
+    value = None
+    for operator, operand in zip(more[::2], more[1::2]):
+        if operator == ':':
+            bound = operand
+        elif operator == '=':
+            value = operand
+
+    return dict(as_=as_, bound=bound, value=value)
+
+
+@build_ast.register
+def _returns_block(_: AxisParser.ReturnsBlockContext, expr: syn.Expr):
+    return dict(expr=expr)
+
+@build_ast.register
+def _suite_block(_: AxisParser.SuiteBlockContext, *statements: syn.Node):
+    return dict(statements=statements)
+
 
 
 @build_ast.register

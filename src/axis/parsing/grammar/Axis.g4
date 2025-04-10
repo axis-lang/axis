@@ -36,18 +36,23 @@ val v = if (a > b) {a} else {b}
 */
 
 
-suite: statement* EOF;
+//suite: statement* EOF;
 
-defItem: 'def' expression;
-valItem: 'val' (expression) (':' expression)? ('=' expression)? ';'?;
+defItem: 'def' expression EOF;
+valItem: 'val' expression (':' expression)? ('=' expression)? ';'? EOF;
+returnsBlock: 'returns' expression EOF;
+suiteBlock: 'suite' statement* EOF;
+
+suite: statement*;
 
 // Statements
 statement
     : valStatement
+    | expression
     ;
 
 valStatement
-    : 'val' (pattern) (':' expression)? ('=' expression)? ';'?
+    : 'val' (pattern) (COLON expression)? (ASSIGN expression)? ';'?
     ;
 
 pattern
@@ -201,6 +206,8 @@ GT: '>';
 GE: '>=';
 AND: '&&';
 OR: '||';
+COLON: ':';
+ASSIGN: '=';
 ARROW: '->';
 
 WS: [ \t\r\n]+ -> skip;

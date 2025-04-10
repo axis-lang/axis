@@ -5,17 +5,30 @@ class Node(Record, frozen=True, abstract=True):
         from rich.tree import Tree
         from textwrap import shorten
 
-        tree = Tree(f"[bold][green]{type(self).__name__}[/green][/bold]: {shorten(str(self), 50)}")
+        tree = Tree(f"{type(self).__name__}", style="bold green")
 
         for attr, info in attrs_of(type(self)).items():
-            if isinstance(info.type, Node):
-                tree.add(getattr(self, attr))
-            if isinstance(info.type, tuple):
-                for item in getattr(self, attr):
+            value = getattr(self, attr)
+            # leaf
+            if isinstance(value, (str, int, float, bool)): # LEAF TYPES
+                tree.add(f"[bold][blue]{attr}[/blue][/bold]: [red]{shorten(value, 50)}[/red]")
+
+            # container
+            elif isinstance(value, (tuple, frozenset)):
+                child = Tree(f"[bold][blue]{attr}[/blue][/bold]: {type(value).__name__}")
+                for item in value:
                     if isinstance(item, Node):
-                        tree.add(item)
+                        child.add(item)
+                tree.add(child)
+
+            # node
+            elif isinstance(value, Node):
+                child = value.__rich__()
+                child.label = f"[bold][blue]{attr}[/blue][/bold]: {child.label}"
+                tree.add(child)
 
         return tree
+
 
 class Block(Node, abstract=True):
     '''
@@ -29,13 +42,14 @@ class Block(Node, abstract=True):
     # heading: Heading
     children: tuple[Node]
 
-class Item(Block):
+
+class Item(Block, abstract=True):
     '''
     a item is a def, a unit a val or a function
     '''
 
 
-class Err(Node, abstract=True):
+class Err(Node):
     '''
     A abstract syntactic error node
     '''

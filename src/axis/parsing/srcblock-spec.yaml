@@ -13,8 +13,9 @@ unit | def:
 
 def:
 def | doc:
-def | as:
+def | takes:
 def | where:
+def | as:
 
 as:
 as | doc:
