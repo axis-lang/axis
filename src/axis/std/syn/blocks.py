@@ -1,7 +1,6 @@
 from __future__ import annotations
-from .abstract import Node, Block, Item
+from .abstract import Statement, Block
 from .expr import Expr
-from .items import Val
 
 class Doc(Block):
     content: str
@@ -12,3 +11,6 @@ class Where(Block): ...
 
 class Returns(Block):
     expr: Expr
+
+class Suite(Block):
+    statements: tuple[Statement]

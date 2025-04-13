@@ -1,11 +1,17 @@
 # Testing unit
 
+
+
 def Vector(x,y,z)
 
 takes:
-    val x: T;
+    val x: T
     val y: T
     val z: T
 
 where:
     val T: Number = Real
+
+
+def sin(x: Real, ..)
+

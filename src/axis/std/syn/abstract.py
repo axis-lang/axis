@@ -1,3 +1,4 @@
+from decimal import Decimal
 from protobase import Record, attrs_of
 
 class Node(Record, frozen=True, abstract=True):
@@ -9,9 +10,17 @@ class Node(Record, frozen=True, abstract=True):
 
         for attr, info in attrs_of(type(self)).items():
             value = getattr(self, attr)
+
             # leaf
-            if isinstance(value, (str, int, float, bool)): # LEAF TYPES
+            if isinstance(value, str): # LEAF TYPES
                 tree.add(f"[bold][blue]{attr}[/blue][/bold]: [red]{shorten(value, 50)}[/red]")
+
+            elif isinstance(value, (int, Decimal, float, bool)):
+                tree.add(f"[bold][blue]{attr}[/blue][/bold]: [red]{value}[/red]")
+
+            elif value is Ellipsis:
+                tree.add(f"[bold][blue]{attr}[/blue][/bold]: [red]..[/red]")
+
 
             # container
             elif isinstance(value, (tuple, frozenset)):
@@ -29,28 +38,20 @@ class Node(Record, frozen=True, abstract=True):
 
         return tree
 
+class Statement(Node, abstract=True): 
+    ...
+
+class Expr(Statement, abstract=True): 
+    ...
 
 class Block(Node, abstract=True):
-    '''
-    a block can be takes, o where
-    '''
-    # class Heading(Node, abstract=True):
-    #     '''
-    #     A block heading node
-    #     '''
-
-    # heading: Heading
     children: tuple[Node]
 
-
 class Item(Block, abstract=True):
-    '''
-    a item is a def, a unit a val or a function
-    '''
+    ...
 
+class Err(Node, abstract=True):
+    ...
 
-class Err(Node):
-    '''
-    A abstract syntactic error node
-    '''
-    
+class UnexpectedErr(Node):
+    unexpected: str

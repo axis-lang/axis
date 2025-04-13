@@ -1,18 +1,14 @@
 from decimal import Decimal
 from functools import singledispatch
-from pathlib import Path
 from sys import intern
-from typing import Literal, Optional, Union
+from typing import Literal, Union
 
 from antlr4 import (CommonTokenStream, InputStream, ParserRuleContext,
                     TerminalNode, Token)
-from antlr4.tree.Tree import TerminalNodeImpl
-from protobase import Object, litdispatch
+from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl
 from rich import print
 
 from axis.parsing.grammar import AxisLexer, AxisParser
-from axis.parsing.srcblock import Parser as OutlineParser
-from axis.parsing.srcblock import SrcBlock
 from axis.std import syn
 
 from .AxisLexer import AxisLexer
@@ -26,6 +22,9 @@ def itertree(ctx: ParserRuleContext, fn):
         ctx, (ParserRuleContext | TerminalNode)
     ), f"Expected ParserRuleContext or TerminalNode, got {type(ctx)}"
 
+    if isinstance(ctx, ErrorNodeImpl):
+        raise ValueError(f"Unexpected error node '{ctx.getSymbol()}'") # TODO: generar ast con Errs
+
     if isinstance(ctx, TerminalNodeImpl):
         return fn(ctx, ctx.getSymbol())
 
@@ -37,6 +36,7 @@ def itertree(ctx: ParserRuleContext, fn):
             if (param := itertree(child, fn)) is not IGNORE
         ],
     )
+
 
 @singledispatch
 def build_ast(ctx, *values):
@@ -50,11 +50,9 @@ IGNORED_TOKENS = {
     "]",
     "{",
     "}",
-    ":",
     ";",
     ".",
     ",",
-    "=",
     "def",
     "returns",
     "val",
@@ -64,6 +62,9 @@ IGNORED_TOKENS = {
 
 @build_ast.register
 def _terminal(ctx: TerminalNodeImpl, token: Token):
+    if isinstance(ctx, ErrorNodeImpl):
+        return syn.UnexpectedErr(unexpected=token.text)
+
     match token.type:
         case AxisLexer.DECIMAL:
             return Decimal(token.text)
@@ -71,6 +72,10 @@ def _terminal(ctx: TerminalNodeImpl, token: Token):
             return intern(token.text)
         case AxisLexer.TEXT:
             return token.text
+        case AxisLexer.ELLIPSIS:
+            return ...
+        case AxisLexer.WILDCARD:
+            return None
         case (
             AxisLexer.ADD
             | AxisLexer.SUB
@@ -91,6 +96,7 @@ def _terminal(ctx: TerminalNodeImpl, token: Token):
             return intern(token.text)
         case Token.EOF:
             return IGNORE
+
         case _:
             if token.text in IGNORED_TOKENS:
                 return IGNORE
@@ -99,18 +105,22 @@ def _terminal(ctx: TerminalNodeImpl, token: Token):
 
 
 @build_ast.register
-def _def_item(_: AxisParser.DefItemContext, expr: syn.Expr):
+def _def_item(_: AxisParser.DefItemContext, expr: syn.Expr, *more):
+    print(more)
     return dict(expr=expr)
+
 
 @build_ast.register
 def _val_item(_: AxisParser.ValItemContext, as_: syn.Expr, *more):
     bound = None
     value = None
     for operator, operand in zip(more[::2], more[1::2]):
-        if operator == ':':
+        if operator == ":":
             bound = operand
-        elif operator == '=':
+        elif operator == "=":
             value = operand
+        else:
+            raise ValueError(f"Unknown operator {operator}")
 
     return dict(as_=as_, bound=bound, value=value)
 
@@ -119,10 +129,10 @@ def _val_item(_: AxisParser.ValItemContext, as_: syn.Expr, *more):
 def _returns_block(_: AxisParser.ReturnsBlockContext, expr: syn.Expr):
     return dict(expr=expr)
 
+
 @build_ast.register
 def _suite_block(_: AxisParser.SuiteBlockContext, *statements: syn.Node):
     return dict(statements=statements)
-
 
 
 @build_ast.register
@@ -134,6 +144,8 @@ def _ast_pass(
         AxisParser.LiteralContext,
         AxisParser.PrimaryExprContext,
         AxisParser.ExpressionContext,
+        AxisParser.EllipsisContext,
+        AxisParser.WildcardContext,
     ],
     val,
 ):
@@ -171,25 +183,31 @@ def _call(
 
 @build_ast.register
 def _trailing_call(
-    _: AxisParser.TrailingCallContext,
+    _: AxisParser.TrailingLambdaContext,
     base: syn.Expr,
     trailing: syn.Expr = None,
 ):
     if isinstance(base, syn.Call):
         return syn.Call(base.function, base.argument, trailing)
+    return syn.Call(base, None, trailing) # try trail sugar node?
 
-    return syn.Call(base, None, trailing)
+@build_ast.register
+def _spread(
+    _: AxisParser.SpreadContext,
+    _ellipsis,
+    expr: syn.Expr,
+):
+    return syn.Spread(expr)
 
 
 @build_ast.register
 def _compound(
     ctx: AxisParser.JuxtapositionExprContext,
-    *params,
+    *components,
 ):
-
-    if len(params) == 1:
-        return params[0]
-    return syn.Compound(params)
+    if len(components) == 1:
+        return components[0]
+    return syn.Compound(components=tuple(components))
 
 
 @build_ast.register
@@ -214,26 +232,29 @@ def _tuple_element_single(_: AxisParser.TupleElementSingleContext, value: syn.Ex
 
 @build_ast.register
 def _tuple_element_assignation(
-    _: AxisParser.TupleElementAssignationContext, key: syn.Expr, value: syn.Expr
+    _: AxisParser.TupleElementAssignationContext, key: syn.Expr, _assign, value: syn.Expr
 ):
-    return syn.Tuple.Element(key=key, value=value)
+    return syn.Tuple.Element(key=key, bound=None, value=value)
 
 
 @build_ast.register
 def _tuple_element_bounded(
-    _: AxisParser.TupleElementBoundedContext, key: syn.Expr, bound: syn.Expr
+    _: AxisParser.TupleElementBoundedContext, key: syn.Expr, _colon, bound: syn.Expr
 ):
-    return syn.Tuple.Element(key=key, bound=bound)
+    return syn.Tuple.Element(key=key, bound=bound, value=None)
 
 
 @build_ast.register
 def _tuple_element_bounded_assignation(
     _: AxisParser.TupleElementBoundedAssignationContext,
     key: syn.Expr,
+    _colon,
     bound: syn.Expr,
+    _assign,
     value: syn.Expr,
 ):
     return syn.Tuple.Element(key=key, bound=bound, value=value)
+
 
 def ast_parser_for(item: Literal["def", "val", "fn"]):
 
@@ -252,4 +273,3 @@ def ast_parser_for(item: Literal["def", "val", "fn"]):
         return itertree(tree, build_ast)
 
     return parser
-

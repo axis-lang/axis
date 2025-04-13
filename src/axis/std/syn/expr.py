@@ -1,9 +1,8 @@
+from decimal import Decimal
 from enum import Enum
-from token import ELLIPSIS
 from typing import Optional
-from protobase import Metadata, Object, Record
-
-from .abstract import Node
+from protobase import Metadata
+from .abstract import Node, Expr
 
 class Location(Metadata):
     line: int
@@ -12,25 +11,15 @@ class Location(Metadata):
     def __str__(self):
         return f"{self.line}:{self.column}"
 
-
-class Statement(Node): ...
-
-
-class Expr(Statement): ...
-
-
-class Suite(Node):
-    statements: list[Node]
-
-
 class Id(Expr):
     symbol: str
 
+class Lit(Expr):
+    value: bool | int | Decimal | str
 
 class MemberAccess(Expr):
     of: Node
     member: list[str]
-
 
 class BinaryOperation(Expr):
     class Operator(str, Enum):
@@ -71,18 +60,13 @@ class Call(Expr):
     argument: Optional[Expr]
     trailing: Optional[Expr]
 
+class Spread(Expr):
+    expr: Expr
+
+
 
 class Compound(Expr):
-    elements: tuple[Expr, ...]
-
-class Special(Expr):
-    class Type(str, Enum):
-        PLACEHOLDER = "_"
-        ELLIPSIS = ".."
-
-class Suite(Expr):
-    statements: tuple[Statement, ...]
-
+    components: tuple[Expr, ...]
 
 class Tuple(Expr):
 
@@ -91,4 +75,4 @@ class Tuple(Expr):
         bound: Optional[Expr]
         value: Optional[Expr]
 
-    elements: tuple[Element]
+    elements: tuple[Element, ...]

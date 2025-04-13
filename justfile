@@ -7,7 +7,10 @@ tests:
 
 watch:
     @just tests
-    @poetry run watchmedo shell-command --patterns="*.py" --recursive --command='just tests' .
+    @poetry run watchmedo shell-command \
+        --patterns="*.py" \
+        --recursive \
+        --command='just tests' .
 
 docs:
     @clear && printf '\e[3J'
