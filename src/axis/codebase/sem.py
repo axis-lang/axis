@@ -1,24 +1,20 @@
-from .syn import SyntacticLayer
+"""
+cada forma (morph) ast de una entidad contribuye a los aspectos semanticos
+de la entidad. estos aspectos se tratan de la siguiente manera:
 
-from axis.std import Id, sem
+1. sobrecarga de la llamada a la entidad
+2. sobrecarga de rasgo de la entidad
+3. namespace plain flatten de la entidad
+
+"""
+from protobase import frozendict
+from .ast import SyntacticLayer
+
+from axis.dom import sem, ref
 
 
 class SemanticLayer(SyntacticLayer, abstract=True):
-    """ 
-    Semantic layer for the codebase. This layer is responsible for
-    creating the semantic graph from the syntactic layer. 
-    """
+    def sem_scoping_of_mod(self, mod_ref: ref.Unit):
+        # tansolo modifica la disposicion de los datos a group_recursive
+        return sem.Scoping.for_item(self.ast_of_unit(mod_ref))
 
-    @property
-    def sem_graph(self):
-        for unit in self.fs_units:
-            unit_ast = self.ast_of_unit(unit)
-
-            # construye de forma recursiva el arbol de nodos semanticos de la unidad
-            # comenzando con el nodo raiz, la unidad misma.
-
-            # todas las unidades y sus nodos son agregaddos al arbol de unidades
-           
-            # esta funcion debe ser refactorizada pensando en la computacion incremental
-
-        return sem.Graph()

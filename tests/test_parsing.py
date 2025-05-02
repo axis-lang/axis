@@ -12,12 +12,6 @@ class GrammarTest(unittest.TestCase):
     parser = Parser()
 
     def test_parser(self):
-
-        unit = self.parser.parse_unit(Path('test.ax'), "def Vector(a+b)")
-        print(unit)
-
-    def test_parser(self):
-
         unit = self.parser.parse_unit(SOURCE_UNIT_PATH)
         print(unit)
 

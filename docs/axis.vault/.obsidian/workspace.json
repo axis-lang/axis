@@ -11,28 +11,34 @@
             "id": "260e59c5a4278e1f",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "exo/DSign.md",
-                "mode": "source",
-                "source": false
+                "file": "Untitled.canvas",
+                "viewState": {
+                  "x": 110,
+                  "y": -191.5,
+                  "zoom": 0
+                }
               },
-              "icon": "lucide-file",
-              "title": "DSign"
+              "icon": "lucide-layout-dashboard",
+              "title": "Untitled"
             }
           },
           {
             "id": "de0753372e33e191",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "PadihGPA.md",
-                "mode": "source",
-                "source": false
+                "file": "Untitled.canvas",
+                "viewState": {
+                  "x": 303.1817286276824,
+                  "y": -53.87381240367889,
+                  "zoom": 0
+                }
               },
-              "icon": "lucide-file",
-              "title": "PadihGPA"
+              "icon": "lucide-layout-dashboard",
+              "title": "Untitled"
             }
           }
         ],
@@ -180,10 +186,11 @@
   },
   "active": "de0753372e33e191",
   "lastOpenFiles": [
+    "Semantic scoping.md",
     "Untitled.canvas",
+    "exo/DSign.md",
     "PadihGPA.md",
     "default.md",
-    "exo/DSign.md",
     "exo"
   ]
 }
