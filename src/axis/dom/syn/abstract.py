@@ -1,11 +1,11 @@
 from __future__ import annotations
 from decimal import Decimal
 from typing import Iterable, Self
-from protobase import Record, attrs_of
+from protobase import Record, attrs_of, mutate
 from rich.tree import Tree
 from rich.text import Text
 from textwrap import shorten
-from axis.dom import Ref
+from axis.dom import Ref, src, log
 
 class Node(Record, frozen=True, abstract=True):
     __slots__ = ('__weakref__',)
@@ -67,6 +67,23 @@ class Node(Record, frozen=True, abstract=True):
 
         return tree
 
+    @classmethod
+    def with_metadata_of(cls, node: Node, **attrs) -> Self:
+        result = cls(**attrs)
+        src.tag_span_from(node, result)
+        return result
+
+    def with_attrs(self, **kwargs) -> Self:
+        result = mutate(self, **kwargs)
+        src.Span.of(self).tag(result)
+        return result
+
+    @property
+    def span(self) -> src.Span | None:
+        return src.Span.of(self)
+
+    def label(self, *args, **kwargs) -> Self:
+        return log.Label(self.span, *args, **kwargs)
 ## Declarative syntax
 
 class Block(Node, abstract=True):

@@ -1,18 +1,23 @@
 #%%
 from __future__ import annotations
+
 from enum import Enum, auto
-from protobase import Record
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
+
+from protobase import Record, mutate
+from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.style import Style
 from rich.text import Text
+
 from axis.dom import src
+
 
 class Severity(Enum):
     ERROR = auto()
     WARNING = auto()
-    NOTE = auto()
+    INFO = auto()
 
 class LabelStyle(Enum):
     PRIMARY = auto()
@@ -21,7 +26,7 @@ class LabelStyle(Enum):
 _SEVERITY_STYLE = {
     Severity.ERROR: Style(color="red", bold=True),
     Severity.WARNING: Style(color="yellow", bold=True),
-    Severity.NOTE: Style(color="blue", bold=True),
+    Severity.INFO: Style(color="blue", bold=True),
 }
 
 _LABEL_STYLE = {
@@ -32,7 +37,7 @@ _LABEL_STYLE = {
 
 class Label(Record, frozen=True):
     span: src.Span
-    message: str = ""
+    message: str
     style: LabelStyle = LabelStyle.PRIMARY
 
     @property
@@ -41,11 +46,36 @@ class Label(Record, frozen=True):
 
 class Diagnostic(Record, frozen=True):
     severity: Severity
-    code: str
     message: str
-    labels: tuple[Label] = []
-    notes: tuple[str] = []
+    code: Optional[str] = None
+    labels: tuple[Label] = ()
+    notes: tuple[str] = ()
     suggestion: Optional[str] = None
+
+    def label(
+        self,
+        span: src.Span,
+        message: str = "",
+        style: LabelStyle = LabelStyle.PRIMARY,
+    ) -> Label:
+
+        if not isinstance(span, src.Span):
+            span = src.Span.of(span)
+
+        if span is None:
+            return self
+
+        return mutate(self, labels=self.labels + (Label(span=span, message=message, style=style),))
+
+
+    def note(self, message: str) -> Diagnostic:
+        return mutate(self, notes=self.notes + (message,))
+
+    def suggest(self, message: str) -> Diagnostic:
+        return mutate(self, suggestion=message)
+    
+    def show(self) -> None:
+        print(self)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
@@ -121,9 +151,21 @@ class Diagnostic(Record, frozen=True):
                 end_pos = file.position_at_offset(lbl.span.end)
                 start_line = start_pos.line.line_no
                 end_line = end_pos.line.line_no
-                if start_line != end_line:
-                    msg = Text(f" {lbl.message}\n", style=_LABEL_STYLE[lbl.style])
-                    yield msg
+                
+                # Display message for the label
+                if lbl.message:
+                    if start_line == end_line:
+                        # For single-line spans, show the message below the line
+                        s_col = start_pos.col_no - 1
+                        e_col = end_pos.col_no - 1
+                        gutter = " " * len(f"   {start_line} | ")
+                        pointer = " " * s_col + "^" * (e_col - s_col)
+                        msg = Text(f"{gutter}{pointer} {lbl.message}\n", style=_LABEL_STYLE[lbl.style])
+                        yield msg
+                    else:
+                        # For multiline spans, show the message after the span
+                        msg = Text(f"   → {lbl.message}\n", style=_LABEL_STYLE[lbl.style])
+                        yield msg
 
         for note in self.notes:
             nt = Text(f"note: {note}\n", style="italic")
@@ -131,6 +173,18 @@ class Diagnostic(Record, frozen=True):
         if self.suggestion:
             sg = Text(f"suggestion: {self.suggestion}\n", style="underline")
             yield sg
+
+
+
+
+def error(message: str):
+    return Diagnostic(severity=Severity.ERROR, message=message)
+
+def warning(message: str):
+    return Diagnostic(severity=Severity.WARNING, message=message)
+
+def info(message: str):
+    return Diagnostic(severity=Severity.INFO, message=message)
 
 # ===== Example / Test =====
 if __name__ == "__main__":

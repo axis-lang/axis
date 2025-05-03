@@ -4,8 +4,11 @@ unit alpha.beta
 
 
 use std.io(
-    print: print,
-    self: io,
+    p = print,
+    more.items(
+        here
+    ),
+    other
 )
 
 def Number

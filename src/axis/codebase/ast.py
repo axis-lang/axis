@@ -11,7 +11,7 @@ class SyntacticLayer(SourceLayer, abstract=True):
     def outline_spec(self):
         return syn.OUTLINE_SPEC
 
-    def ast_of_unit(self, src_file: src.File):
+    def ast_of_unit(self, src_file: src.File) -> syn.Unit:
 
         outline = self.outline_spec.parse_tree(syn.Unit, src_file)
 

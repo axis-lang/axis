@@ -1,81 +1,65 @@
-#%%
-'''
-ref es parte del RSVDG?
-'''
+"""
+
+Una referencia es un objeto que identifica univocamente un elemento
+en el sistema de entidades. El sistema de entidades es un sistema arboreo
+donde cada nodo es una entidad y cada entidad puede tener un padre
+o un conjunto de hijos. Las entidades pueden ser modulos, funciones,
+clases, variables, etc.
+
+Existen dos tipos de referencias:
+ - Referencia fisica: tiene como raiz un codebase y se refiere a
+    partes de ese codebase. la referencia fisica se maneja en axis.dom.src.
+    Las referencias fisicas son objetos que representan elementos
+    fisicos (textuales y estructurales) en el codebase.
+
+
+ - Referencia logica: implementadas en este modulo, hacen referencia al
+    istema de entidades
+
+
+"""
 
 from __future__ import annotations
 from pathlib import Path
-from typing import ClassVar, Optional
-from protobase import Record
+from typing import ClassVar, Optional, Self
+from protobase import Record, cached_property
 
 
-class Ref(Record, consed=True, abstract=True):
-    ROOT: ClassVar[Root]
-    parent: Optional[Ref]
-
-    # value protocol
-
-    def member(self, name: str) -> Child:
-        return Child(self, name)
-    
-
-class Root(Ref):
-    parent: None = None
-
-ROOT = Ref.ROOT = Root(None)
+KNOW_GLOBAL_ANCHORS = {"std", "lib", "com", "org", "man"}
 
 
-
-class Child(Ref):
-    'parent.memeber'
-    name: str
+class Ref(Record, abstract=True):
+    ROOT: ClassVar[Global]
 
 
-class Index(Ref):
-    "parent[..indice]"
-    #indice: Tuple
+class Global(Ref, consed=True):
+    """
+    Referencia a un elemento global en el sistema de entidades,
+    se representa prefijada como "@root.std" o "@std"
 
+    el primer elemento de la referencia siempre debe ser un
+    namespace y su nombre esta delimitado a elementos conocidos (std, lib).
 
-class Call(Ref):
-    "parent(..argument)"
-    #argument: Tuple
+    """
 
+    class Element(Record, frozen=True, abstract=True): ...
 
-class Param(Ref):
-    name: str
+    class Child(Element):
+        name: str
 
-
-class Hiperparam(Ref):
-    name: str
-
-
-class Codebase(Ref):
-    path: Path
+    elements: tuple[Element, ...]
 
     @property
-    def parts(self) -> str:
-        return tuple(self.path.name.split(".")[:-1])
+    def parent(self) -> Optional[Self]:
+        if not self.elements:
+            return None
+        return self.__class__(self.elements[:-1])
 
-    def mod(self, path: Path) -> Unit:
-        return Unit(parent=self, path=path)
+    def __str__(self) -> str:
+        return "@" + ".".join(str(e) for e in self.elements)
 
-    def __str__(self):
-        return "::".join(self.parts)
-
-    def __repr__(self):
-        return f"ref.Codebase({str(self)})"
-
-    def __rich__(self):
-        return f"[blue]{str(self)}[/]"
+    def child(self, name: str) -> Self:
+        return self.__class__(self.elements + (self.Child(name),))
 
 
-class Unit(Ref):
-    parent: Codebase
-    path: Path
-
-    @property
-    def rel_path(self):
-        return self.path.relative_to(self.parent.path)
-
-    def __repr__(self):
-        return f"ref.Mod({self.rel_path})"
+ROOT = Ref.ROOT = Global(elements=())

@@ -81,7 +81,7 @@ class AstBuilder(Record):
             )
 
         if isinstance(result, syn.Node):
-            src.Location(self.source[start: stop]).tag(result)
+            self.source[start: stop].tag(result)
 
         return result
 
@@ -297,7 +297,7 @@ class AstBuilder(Record):
         for member in members:
             result = syn.Member(
                 of=result,
-                sym=member,
+                name=member,
             )
         return result
 

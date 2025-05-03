@@ -14,7 +14,8 @@ from axis.dom import sem, ref
 
 
 class SemanticLayer(SyntacticLayer, abstract=True):
-    def sem_scoping_of_mod(self, mod_ref: ref.Unit):
-        # tansolo modifica la disposicion de los datos a group_recursive
-        return sem.Scoping.for_item(self.ast_of_unit(mod_ref))
+    ''
+    # def sem_scoping_of_mod(self, mod_ref: ref.Unit):
+    #     # tansolo modifica la disposicion de los datos a group_recursive
+    #     return sem.Scoping.for_item(self.ast_of_unit(mod_ref))
 

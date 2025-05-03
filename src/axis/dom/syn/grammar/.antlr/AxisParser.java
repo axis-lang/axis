@@ -1,4 +1,4 @@
-// Generated from /home/jdluque/Workspace/prodisign/axis/src/axis/parsing/grammar/Axis.g4 by ANTLR 4.13.1
+// Generated from /home/jdluque/Workspace/prodisign/axis/src/axis/dom/syn/grammar/Axis.g4 by ANTLR 4.13.1
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;

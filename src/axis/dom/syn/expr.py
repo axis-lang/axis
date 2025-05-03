@@ -1,24 +1,22 @@
+from __future__ import annotations
+
 from decimal import Decimal
 from enum import Enum
-from functools import singledispatch
-from typing import Optional
-from protobase import Metadata
-from .abstract import Node, Expr
-from axis.dom import ref
+from typing import ClassVar, Optional
 
-class Location(Metadata):
-    line: int
-    column: int
+from .abstract import Expr, Node
 
-    def __str__(self):
-        return f"{self.line}:{self.column}"
 
 class Sym(Expr):
     '''
     Representa un simbolo en el AST que debe ser resuelto semanticamente
     '''
+    ROOT: ClassVar[Sym]
+
     name: str
     at: Optional[str] = None
+
+Sym.ROOT = Sym('@root', at='root')
 
 class Lit(Expr):
     value: bool | int | Decimal | str
@@ -36,7 +34,7 @@ class Tuple(Expr):
 
 class Member(Expr):
     of: Node
-    sym: Sym
+    name: str
 
 class BinaryOperation(Expr):
     class Operator(str, Enum):
@@ -74,7 +72,7 @@ class MonaryOperation(Expr):
 class Apply(Expr):
 
     function: Expr
-    argument: Optional[Expr]
+    argument: Tuple
     trailing: Optional[Expr]
 
 class Index(Expr):

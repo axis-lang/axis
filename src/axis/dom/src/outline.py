@@ -6,7 +6,8 @@ from typing import Callable, Optional, Self
 
 from protobase import MISSING, MissingType, Record, frozendict
 
-from .file import File, Line, Span
+from .file import File, Line
+from .span import Span
 
 DEFAULT_KEYWORD_SEPARATOR = " :\t"
 EMPTY_LINE = re.compile(r"^\s*$", re.MULTILINE)
