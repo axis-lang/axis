@@ -10,7 +10,7 @@ de la entidad. estos aspectos se tratan de la siguiente manera:
 from protobase import frozendict
 from .ast import SyntacticLayer
 
-from axis.dom import sem, ref
+from axis.core import sem, ref
 
 
 class SemanticLayer(SyntacticLayer, abstract=True):

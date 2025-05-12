@@ -2,7 +2,7 @@
 
 from axis.codebase.src import SourceLayer
 
-from axis.dom import syn, src
+from axis.core import syn, src
 
 from rich import print
 

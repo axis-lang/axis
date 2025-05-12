@@ -1,6 +1,6 @@
 from pathlib import Path
 from protobase import Object, cached_property
-from axis.dom import Id, ref, src
+from axis.core import Id, ref, src
 
 class SourceLayer(Object, abstract=True):
     src_path: Path

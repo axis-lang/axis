@@ -1,0 +1,14 @@
+from axis.core import syn
+
+class Suite(syn.Expr):
+    statements: tuple[syn.Statement, ...]
+
+@syn.AstBuilder.build.register
+def build_suite_ast(
+    self,
+    ctx: syn.AxisParser.SuiteContext,
+    *statements,
+):
+    # if len(statements) == 1 and isinstance(statements[0], syn.Expr):
+    #     return statements[0]
+    return Suite(statements=statements)

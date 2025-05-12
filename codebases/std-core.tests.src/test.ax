@@ -1,0 +1,93 @@
+unit alpha.beta
+     ----------
+     Unit 
+
+
+use std.io(
+    socket: net,
+    more.items(
+        here
+    ),
+    other
+)
+
+def Number
+    ------
+    base de implementacion de todo tipo numerico
+
+mod Number
+    ------
+    The number module
+
+    def Boolean 
+        -------
+        A boolean number
+
+    def Integer
+        -------
+        builtin para numeros enteros, platform independent
+
+    def Natural
+        -------
+        builtin para numeros naturales, pltform agnostic
+
+    def Decimal
+        -------
+        builtin para numeros decimales, platform independent
+
+    def Real
+        ----
+        builtin para numeros decimales, platform independent
+
+    def Complex
+        -------
+        
+use Number(
+    Real, 
+    Decimal, 
+    Complex
+)
+    ----------------------------
+    We use numbers in root scope
+
+
+def Vector[T](..)
+    -------------
+    Vector function
+takes: 
+    val x: T
+        ----
+        Parameter y
+
+    val y: T
+        ----
+        Parameter y
+
+where: 
+    val T: Type[.. Real]
+
+returns ()
+        -----
+        The function return type
+
+takes:
+    val x: T
+    val y: T
+    val z: T
+
+where:
+    val T: Number = Decimal
+
+
+def sin(x: Decimal, ..)
+
+
+
+def Type
+
+
+def default
+returns T
+where:
+    val T: Type
+
