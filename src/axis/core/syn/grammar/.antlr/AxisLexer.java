@@ -1,4 +1,4 @@
-// Generated from /home/jdluque/Workspace/prodisign/axis/src/axis/dom/syn/grammar/Axis.g4 by ANTLR 4.13.1
+// Generated from /home/jdluque/Workspace/prodisign/axis/src/axis/core/syn/grammar/Axis.g4 by ANTLR 4.13.1
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.Token;

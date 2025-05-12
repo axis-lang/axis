@@ -23,7 +23,11 @@ class Node(Record, frozen=True, abstract=True):
 
         tree = Tree(label, guide_style=TYPE_STYLE)
 
-        for attr, value in attrs_of(self).items():
+        # primero los valores simples
+        # luego los nodos
+        # finalmente contenedores
+
+        for attr, value in reversed(attrs_of(self).items()):
             if value is None or value == ():
                 continue
 

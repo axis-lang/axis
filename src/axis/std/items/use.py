@@ -1,3 +1,4 @@
+
 from typing import ClassVar, Optional
 from axis.core import syn
 
@@ -16,12 +17,13 @@ class Use(syn.Item):
     value: Optional[syn.Expr]
 
 
-@syn.AstBuilder.build.register
+@syn.AstBuilder.build.register(syn.AxisParser.UseItemContext)
 def build_use_ast(
     self,
-    ctx: syn.AxisParser.UseItemContext,
+    _,
     expr: syn.Expr,
     *more,
+    children: tuple[syn.Block],
 ):
     bound = None
     value = None
@@ -33,4 +35,4 @@ def build_use_ast(
         else:
             raise ValueError(f"Unknown operator {operator}")
 
-    return dict(expr=expr, bound=bound, value=value)
+    return Use(expr=expr, bound=bound, value=value, children=children)

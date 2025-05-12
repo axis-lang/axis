@@ -11,4 +11,4 @@ def build_apply(
     function: syn.Expr,
     argument: syn.Expr,
 ):
-    return Apply(function, argument, None)
+    return Apply(function, argument)

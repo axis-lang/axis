@@ -1,7 +1,7 @@
 from typing import Optional, Self
 from protobase import Object, Record, attrs_of
 from functools import singledispatchmethod
-from axis.core import Ref, syn, src, log, ref
+from axis.core import syn, src, log, ref
 
 class ScopingPass(Object):
     '''

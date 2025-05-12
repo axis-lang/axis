@@ -15,9 +15,10 @@ class Sym(syn.Expr):
 
 Sym.ROOT = Sym('@root', at='root')    
 
-@syn.AstBuilder.build.register
+print('reg expression')
+@syn.AstBuilder.build.register(syn.AxisParser.IdentifierContext)
 def build_sym_ast(
-    self: syn.AstBuilder, 
+    self, 
     ctx: syn.AxisParser.IdentifierContext, 
     val: str
 ):

@@ -3,16 +3,15 @@
 from axis.codebase.src import SourceLayer
 
 from axis.core import syn, src
+from axis import std
 
 from rich import print
 
 class SyntacticLayer(SourceLayer, abstract=True):
     @property
-    def outline_spec(self):
-        return syn.OUTLINE_SPEC
+    def unit_outline_spec(self):
+        return std.Unit.build_ouline_spec()
 
     def ast_of_unit(self, src_file: src.File) -> syn.Unit:
-
-        outline = self.outline_spec.parse_tree(syn.Unit, src_file)
-
-        return outline.transform(syn.outline_transform_fn)
+        return self.unit_outline_spec.parse_outline(src_file)
+        #return outline.transform(syn.outline_transform_fn)

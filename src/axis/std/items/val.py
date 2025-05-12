@@ -15,12 +15,13 @@ class Val(syn.Item):
     bound: Optional[syn.Expr]
     value: Optional[syn.Expr]
 
-@syn.AstBuilder.build.register
+@syn.AstBuilder.build.register(syn.AxisParser.ValItemContext)
 def build_val_ast(
     self, 
-    ctx: syn.AxisParser.ValItemContext, 
+    _, 
     expr: syn.Expr, 
-    *more
+    *more,
+    children=tuple[syn.Block],
 ):
     bound = None
     value = None
@@ -32,4 +33,4 @@ def build_val_ast(
         else:
             raise ValueError(f"Unknown operator {operator}")
 
-    return dict(expr=expr, bound=bound, value=value)
+    return Val(expr=expr, bound=bound, value=value, children=children)

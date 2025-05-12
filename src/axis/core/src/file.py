@@ -14,6 +14,17 @@ class File(Record, frozen=True):
     path: Path
     buffer: str | None = None
 
+    @classmethod
+    def from_path(cls, path: Path|str) -> File:
+        """
+        Creates a File object from a file path.
+        """
+        if isinstance(path, str):
+            path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"File {path} does not exist")
+        return cls(path=path)
+
     @cached_property
     def content(self) -> str:
         if self.buffer is not None:

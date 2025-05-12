@@ -93,8 +93,8 @@ class Outline[T: Block](Record, frozen=True):
         @classmethod
         def from_bool(cls, must_be_indented: Optional[bool]) -> Outline.Identation:
             if must_be_indented is None:
-                return cls.SAME
-            return cls.NEST if must_be_indented else cls.OPT
+                return cls.OPT
+            return cls.NEST if must_be_indented else cls.SAME
 
     # class Child(Record, frozen=True):
     #     block_type: type[Block]

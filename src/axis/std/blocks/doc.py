@@ -1,19 +1,21 @@
 from textwrap import dedent
-from typing import Self
+from typing import ClassVar, Self
 from axis.core import syn, src
 
 class Doc(syn.Block):
-    keyword: str = ("---", '')
+    keyword: ClassVar[str] = "---"
+    keyword_sep: ClassVar[str] = ""
+
     content: str    
     
     @classmethod
-    def parse_block(cls, tree: src.Outline.Tree, children: tuple[syn.Block]) -> Self:
+    def parse_block(cls, span: src.Span, children: tuple[syn.Block]) -> Self:
         """
         Parse the tree and return a Doc instance.
         """
         return cls(
             children=children,
-            content=dedent(tree.content)
+            content=dedent(span.content)
         )
 
-syn.Item.register_child_block_type(Doc, must_be_indented=None)
+syn.Item.child_block_type(Doc, must_be_indented=None)

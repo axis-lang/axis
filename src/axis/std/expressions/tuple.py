@@ -14,9 +14,9 @@ class Tuple(syn.Expr):
 
 @syn.AstBuilder.build.register
 def build_tuple_ast(
-    self: syn.AstBuilder,
-    ctx: syn.AxisParser.TupleContext,
-    elements: tuple[Tuple.Element, ...],
+    self,
+    ctx: syn.AxisParser.TupleContext | syn.AxisParser.ShapeContext,
+    *elements: tuple[Tuple.Element, ...],
 ) -> Tuple:
     return Tuple(elements=elements)
 

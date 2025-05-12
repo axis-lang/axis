@@ -23,7 +23,7 @@ valStatement
     ;
 
 pattern
-    : identifier
+    : ID
     | tuplePattern
     ;
 
@@ -33,8 +33,8 @@ tuplePattern
     ;
 
 tuplePatternElement
-    : identifier
-    | identifier ':' identifier
+    : ID
+    | ID ':' ID
     ;
 
 
@@ -84,13 +84,20 @@ postfix
 
 // Primary expressions
 primaryExpr
-    : identifier            // Variables
+    : identifier
     | literal               // Numbers
     | tuple                 // Tuples
     | lambda                // Bracket expressions
     | spread
     | wildcard              // Wildcard
     | ellipsis              // Ellipsis
+    ;
+
+identifier: ID; // sym
+
+literal // lit
+    : DECIMAL
+    | TEXT
     ;
 
 wildcard: '_';
@@ -132,13 +139,13 @@ lambdaParams
     ;
 
 lambdaParam
-    : identifier (':' expression)?
+    : ID (':' expression)?
     ;
 
 // Function arguments
 argument
     : expression                    // Positional argument
-    | identifier ':' expression     // Named argument
+    | ID ':' expression     // Named argument
     ;
 
 
@@ -149,17 +156,6 @@ argument
 //     : 'if' '(' expression ')' expression ('else' expression)?
 //     ;
 
-
-
-identifier: ID;
-
-literal
-    : decimal
-    | text
-    ;
-
-text: TEXT;
-decimal: DECIMAL;
 
 // Lexer Rules
 ID: [a-zA-Z_][a-zA-Z0-9_]*;

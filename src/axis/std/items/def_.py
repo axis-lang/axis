@@ -1,5 +1,6 @@
 from typing import ClassVar, Optional
 from axis.core import syn, sem
+from .val import Val
 
 
 class Def(syn.Item):
@@ -51,21 +52,56 @@ class Def(syn.Item):
         expr: syn.Expr
 
 
-@syn.AstBuilder.build.register
-def build_def_ast(self, _: syn.AxisParser.DefItemContext, expr: syn.Expr):
-    return dict(expr=expr)
+Def.child_block_type(Def.Where, must_be_indented=False)
+Def.child_block_type(Def.Takes, must_be_indented=False)
+Def.child_block_type(Def.Returns, must_be_indented=False)
 
-@syn.AstBuilder.build.register
-def build_def_where_ast(self, _: syn.AxisParser.WhereBlockContext):
-    return dict()
+Def.Where.child_block_type(Val, must_be_indented=True)
+Def.Takes.child_block_type(Val, must_be_indented=True)
 
-@syn.AstBuilder.build.register
-def build_def_takes_ast(self, _: syn.AxisParser.TakesBlockContext, id: Optional[str]=None):
-    return dict(id=id)
 
-@syn.AstBuilder.build.register
-def build_def_returns_ast(self, _: syn.AxisParser.ReturnsBlockContext, expr: syn.Expr):
-    return dict(expr=expr)
+@syn.AstBuilder.build.register(syn.AxisParser.DefItemContext)
+def build_def_ast(
+    self,
+    _,
+    expr: syn.Expr,
+    /,
+    children: tuple[syn.Block],
+):
+    # todo, procesar los childrens para obtener parametros, hiperparametros y return
+    return Def(expr=expr, children=children)
+
+
+@syn.AstBuilder.build.register(syn.AxisParser.WhereBlockContext)
+def build_def_where_ast(
+    self, _, _colon, *, children: tuple[syn.Block]
+):
+    return Def.Where(children=children)
+
+
+@syn.AstBuilder.build.register(syn.AxisParser.TakesBlockContext)
+def build_def_takes_ast(
+    self,
+    _,
+    *args,
+    children: tuple[syn.Block],
+):
+    id = args[0] if len(args) > 0 else None
+    return Def.Takes(id=id, children=children)
+
+
+@syn.AstBuilder.build.register(syn.AxisParser.ReturnsBlockContext)
+def build_def_returns_ast(
+    self,
+    _,
+    expr: syn.Expr,
+    *,
+    children: tuple[syn.Block],
+):
+    return Def.Returns(
+        expr=expr,
+        children=children,
+    )
 
 
 @sem.ScopingPass.process_item.register

@@ -1,4 +1,4 @@
-# Generated from src/axis/parsing/grammar/Axis.g4 by ANTLR 4.13.2
+# Generated from src/axis/core/syn/grammar/Axis.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .AxisParser import AxisParser
@@ -269,6 +269,24 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#identifier.
+    def enterIdentifier(self, ctx:AxisParser.IdentifierContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#identifier.
+    def exitIdentifier(self, ctx:AxisParser.IdentifierContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#literal.
+    def enterLiteral(self, ctx:AxisParser.LiteralContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#literal.
+    def exitLiteral(self, ctx:AxisParser.LiteralContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#wildcard.
     def enterWildcard(self, ctx:AxisParser.WildcardContext):
         pass
@@ -401,42 +419,6 @@ class AxisListener(ParseTreeListener):
 
     # Exit a parse tree produced by AxisParser#argument.
     def exitArgument(self, ctx:AxisParser.ArgumentContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#identifier.
-    def enterIdentifier(self, ctx:AxisParser.IdentifierContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#identifier.
-    def exitIdentifier(self, ctx:AxisParser.IdentifierContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#literal.
-    def enterLiteral(self, ctx:AxisParser.LiteralContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#literal.
-    def exitLiteral(self, ctx:AxisParser.LiteralContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#text.
-    def enterText(self, ctx:AxisParser.TextContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#text.
-    def exitText(self, ctx:AxisParser.TextContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#decimal.
-    def enterDecimal(self, ctx:AxisParser.DecimalContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#decimal.
-    def exitDecimal(self, ctx:AxisParser.DecimalContext):
         pass
 
 
