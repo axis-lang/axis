@@ -1,7 +1,8 @@
 
 from typing import ClassVar, Optional
-from axis.core import syn
-
+from axis.core import syn, sem
+from axis.std.transcriptions.destructuring import reify_destructure
+from axis.std.expressions.sym import Sym
 
 class Use(syn.Item):
     """
@@ -36,3 +37,13 @@ def build_use_ast(
             raise ValueError(f"Unknown operator {operator}")
 
     return Use(expr=expr, bound=bound, value=value, children=children)
+
+
+@sem.ScopingPass.process_item.register
+def process_use(self, use_ast: Use):
+    # evaluate use expression
+    elements = reify_destructure(use_ast.expr, from_=Sym.ROOT)
+
+    # register symbols
+    for elem in elements:
+        self.add_symbol(elem.key.name, elem)

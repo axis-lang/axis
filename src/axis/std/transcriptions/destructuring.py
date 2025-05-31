@@ -36,7 +36,7 @@ class Destructuring(Object):
 
     @transform.register
     def eval_sym(self, sym: Sym, bound: syn.Expr):
-        return syn.Member(of=bound, name=sym.name).with_span_of(sym)
+        return Member(of=bound, name=sym.name).with_span_of(sym)
 
     @transform.register
     def eval_member(self, member: Member, bound: syn.Expr):

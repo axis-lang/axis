@@ -33,11 +33,11 @@ def build_ast(
     return Mod(path=path, children=children)
 
 
-@sem.ScopingPass.process_item.register
+@sem.ScopingPass.process_item.register(Mod)
 def process_mod_scoping(self: sem.ScopingPass, mod_ast: Mod):
     # evaluar el path
     base_path_expr = transcript_sym_to_member_expressions(
-        mod_ast.path, member_of=self.base_path_expr
+        mod_ast.path, of=self.base_path_expr
     )
 
     mod_scoping = self.child_scoping(mod_ast, base_path_expr)

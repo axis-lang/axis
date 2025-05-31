@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from pathlib import Path
-from typing import Dict, List, Optional, Self
+from typing import Any, Dict, List, Optional, Self
 
 from protobase import Record, mutate
 from rich import print
@@ -52,9 +52,17 @@ class Diagnostic(Record, frozen=True):
     notes: tuple[str] = ()
     suggestion: Optional[str] = None
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self.emit()
+
+
     def with_label(
         self,
-        span: src.Span,
+        span: src.Span | Any,
         message: str = "",
         style: LabelStyle = LabelStyle.PRIMARY,
     ) -> Self:

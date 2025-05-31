@@ -7,7 +7,7 @@ class Compound(syn.Expr):
 @syn.AstBuilder.build.register
 def build_compound(
     self,
-    ctx: syn.AxisParser.JuxtapositionExprContext,
+    ctx: syn.AxisParser.JuxtapositionContext,
     *components,
 ):
     if len(components) == 1:

@@ -41,40 +41,54 @@ tuplePatternElement
 
 // Expression hierarchy (precedence low to high)
 expression
-    : juxtapositionExpr
+    : juxtaposition
     ;
 
 
 // Juxtaposition (right-to-left evaluation)
-juxtapositionExpr
-    : logicalExpr (logicalExpr)*
+juxtaposition
+    : range (range)*
     ;
 
+
+range: logical ('..' logical)?;
+
+
 // Logical operators
-logicalExpr
-    : comparisonExpr ((AND | OR) comparisonExpr)*
+logical
+    : comparison (logicalOp comparison)*
     ;
 
 logicalOp: '&&' | '||';
 
 // Comparison operators
-comparisonExpr
-    : addition ((EQ | NE | LT | LE | GT | GE) addition)*
+comparison
+    : addition (comparisonOp addition)*
     ;
+
+comparisonOp: '==' | '!=' | '<' | '<=' | '>' | '>=';
 
 // Additive operators
 addition
-    : product ((ADD | SUB) product)*
+    : product (additiveOp product)*
     ;
+
+additiveOp: '+' | '-';
 
 // Multiplicative operators
 product
-    : postfix ((MUL | DIV | MOD) postfix)*
+    : prefix (productiveOp prefix)*
+    ;
+
+productiveOp: '*' | '/' | '%';
+
+prefix
+    : postfix                                                   # PrefixPass          
     ;
 
 // Postfix operations
 postfix
-    : primaryExpr                                               # Pass
+    : primary                                                   # PostfixPass
     | postfix lambda                                            # TrailingLambda
     | postfix tuple                                             # Call
     | postfix shape                                             # Index
@@ -83,45 +97,43 @@ postfix
     ;
 
 // Primary expressions
-primaryExpr
-    : identifier
-    | literal               // Numbers
+primary
+    : sym
+    | lit
     | tuple                 // Tuples
     | lambda                // Bracket expressions
-    | spread
-    | wildcard              // Wildcard
-    | ellipsis              // Ellipsis
+    // | wildcard              // Wildcard
+    // | spread
+    // | ellipsis              // Ellipsis
+    //| etc
     ;
 
-identifier: ID; // sym
+sym: ID ('@' ID)?;
 
-literal // lit
-    : DECIMAL
+lit : DECIMAL
     | TEXT
     ;
 
-wildcard: '_';
-ellipsis: '..';
-spread: '..' expression;
+// wildcard: '_';
+// ellipsis: '..';
+// spread: '..' expression;
+// etc: '...' expression?;
 
 // Tuple expressions
-
-
 tuple
-    : '(' (tupleElement (',' tupleElement)*)? ','? ')'
+    : '(' (element (',' element)*)? ','? ')'
     ;
+
 shape
-    : '[' (tupleElement (',' tupleElement)*)? ','? ']'
+    : '[' (element (',' element)*)? ','? ']'
     ;
 
-
-tupleElement
-    : expression                                    # TupleElementSingle
-    | expression '=' expression                     # TupleElementAssignation
-    | expression ':' expression                     # TupleElementBounded
-    | expression ':' expression '=' expression      # TupleElementBoundedAssignation
+element
+    : expression                                        # ValueElement
+    | ID (':' expression)? ('=' expression)?            # NamedElement
+    | '..' expression?                                  # SpreadElement
     ;
-
+//| suite (':' expression)? ('=' expression)?         # DynElement
 // ..: ..T = ..alpha
 // _: _ = _
 
@@ -142,15 +154,6 @@ lambdaParam
     : ID (':' expression)?
     ;
 
-// Function arguments
-argument
-    : expression                    // Positional argument
-    | ID ':' expression     // Named argument
-    ;
-
-
-
-
 // If expressions
 // ifExpr
 //     : 'if' '(' expression ')' expression ('else' expression)?
@@ -158,28 +161,28 @@ argument
 
 
 // Lexer Rules
-ID: [a-zA-Z_][a-zA-Z0-9_]*;
+ID: [$]?[a-zA-Z_][a-zA-Z0-9_]*;
 DECIMAL: [0-9]+ ('.' [0-9]+)?;
 TEXT: '\'' ( ~'\'' | '\\' . )* '\'';
-ADD: '+';
-SUB: '-';
-MUL: '*';
-DIV: '/';
-MOD: '%';
-EQ: '==';
-NE: '!=';
-LT: '<';
-LE: '<=';
-GT: '>';
-GE: '>=';
-AND: '&&';
-OR: '||';
-COLON: ':';
-ASSIGN: '=';
-ARROW: '->';
+// ADD: '+';
+// SUB: '-';
+// MUL: '*';
+// DIV: '/';
+// MOD: '%';
+// EQ: '==';
+// NE: '!=';
+// LT: '<';
+// LE: '<=';
+// GT: '>';
+// GE: '>=';
+// AND: '&&';
+// OR: '||';
+// COLON: ':';
+// ASSIGN: '=';
+// ARROW: '->';
 
-ELLIPSIS: '..';
-WILDCARD: '_';
+// ELLIPSIS: '..';
+// WILDCARD: '_';
 
 WS: [ \t\r\n]+ -> skip;
 COMMENT: '#' ~[\r\n]* -> skip;

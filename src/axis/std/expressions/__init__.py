@@ -7,5 +7,5 @@ from .member import Member
 from .tuple import Tuple
 from .lit import Lit
 from .compound import Compound
-from .spread import Spread
+#from .etc import Etc
 from .trail import Trail

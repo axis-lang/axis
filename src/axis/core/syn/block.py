@@ -11,7 +11,7 @@ from .ast_builder import AstBuilder
 from .node import Node
 
 
-def derive_parse_block_content(block_type: type[Block]):
+def impl_parse_block_content(block_type: type[Block]):
     from antlr4 import CommonTokenStream, InputStream
     from .grammar import AxisLexer, AxisParser
     from .item import Item
@@ -41,12 +41,13 @@ def derive_parse_block_content(block_type: type[Block]):
     return parser
 
 
+
 class Block(Node, src.Block, abstract=True):
     # todos los derivados de block se autoregistran en el parser
     children: tuple[Block]
 
 
-    @derived(derive_parse_block_content)
+    @derived(impl_parse_block_content)
     @classmethod
     def parse_block(cls, content: src.Span, children: tuple[Block]) -> Self:
         ...

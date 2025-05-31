@@ -5,6 +5,8 @@ from .block import *
 from .item import *
 from .ast_builder import * 
 from .ast_transformer import *
+from .ast_visitor import *
+from .matching import *
 
 # OUTLINE_SPEC: src.Outline[type[Block]] = src.Outline.build(
 #     src.Outline.Spec(

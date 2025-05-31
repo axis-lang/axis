@@ -6,7 +6,7 @@ tests:
     @poetry run python -m unittest discover -s tests
 
 watch:
-    @just tests
+    #@just tests
     @poetry run watchmedo shell-command \
         --patterns="*.py" \
         --recursive \

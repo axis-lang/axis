@@ -1,6 +1,7 @@
 from typing import ClassVar, Optional
 from axis.core import syn, sem
 from .val import Val
+from axis.std.expressions import Apply
 
 
 class Def(syn.Item):
@@ -104,8 +105,14 @@ def build_def_returns_ast(
     )
 
 
-@sem.ScopingPass.process_item.register
+
+
+@sem.ScopingPass.process_item.register(Def)
 def def_scoping(self: sem.ScopingPass, def_ast: Def):
+
+
+    def_ast.expr
+
     # evaluar el path
 
     # extrae el nombre desde def_ast.expr
@@ -124,3 +131,5 @@ def def_scoping(self: sem.ScopingPass, def_ast: Def):
 
     # return child_scoping
     pass
+
+

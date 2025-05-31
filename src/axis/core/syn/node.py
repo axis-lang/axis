@@ -9,6 +9,8 @@ from axis.core import src, log
 
 class Node(Record, frozen=True, abstract=True):
     __slots__ = ('__weakref__',)
+
+
     def __rich__(self):
 
         OP_STYLE = 'yellow'
@@ -71,9 +73,7 @@ class Node(Record, frozen=True, abstract=True):
 
         return tree
 
-    #@@classmethod
     def with_span_of(self, node: Node) -> Self:
-        #result = cls(**attrs)
         src.tag_span_from(node, self)
         return self
 

@@ -3,24 +3,8 @@ from typing import Union
 from axis.core import syn
 
 class BinOp(syn.Expr):
-    # TODO: operator como syn node tendrá span
-    class Operator(str, Enum):
-        ADD = "+"
-        SUB = "-"
-        MUL = "*"
-        DIV = "/"
-        MOD = "%"
-        EQ = "=="
-        NE = "!="
-        LT = "<"
-        LE = "<="
-        GT = ">"
-        GE = ">="
-        AND = "&&"
-        OR = "||"
-
-        def __repr__(self):
-            return f"{type(self).__name__}.{self.name}"
+    class Operator(syn.Node):
+        symbol: str
 
     op: Operator
     lhs: syn.Expr
@@ -33,16 +17,30 @@ def build_binop_ast(
     ctx: Union[
         syn.AxisParser.ProductContext,
         syn.AxisParser.AdditionContext,
-        syn.AxisParser.ComparisonExprContext,
-        syn.AxisParser.LogicalExprContext,
+        syn.AxisParser.ComparisonContext,
+        syn.AxisParser.LogicalContext,
+        syn.AxisParser.RangeContext,
     ],
     lhs,
     *vals,
 ):
     for operator, operand in zip(vals[::2], vals[1::2]):
         lhs = BinOp(
-            op=BinOp.Operator(operator),
+            op=operator,
             lhs=lhs,
             rhs=operand,
         )
     return lhs
+
+@syn.AstBuilder.build.register
+def build_binary_operator_ast(
+    self,
+    ctx: Union[
+        syn.AxisParser.LogicalOpContext,
+        syn.AxisParser.AdditiveOpContext,
+        syn.AxisParser.ProductiveOpContext,
+        syn.AxisParser.ComparisonOpContext,
+    ],
+    symbol: str,
+):
+    return BinOp.Operator(symbol=symbol)

@@ -85,7 +85,7 @@ class Block(Object, abstract=True):
         
 
 class Outline[T: Block](Record, frozen=True):
-    class Identation(str, Enum):
+    class Identation(str, Enum): # En block
         SAME = ""
         NEST = "(?:[ \t]+)"
         OPT = "(?:[ \t]*)"
@@ -95,17 +95,6 @@ class Outline[T: Block](Record, frozen=True):
             if must_be_indented is None:
                 return cls.OPT
             return cls.NEST if must_be_indented else cls.SAME
-
-    # class Child(Record, frozen=True):
-    #     block_type: type[Block]
-    #     identation: Outline.Identation
-
-    # class Spec(Record, frozen=True):
-    #     block_type: type[Block]
-    #     keyword: str
-    #     #children: tuple[Outline.Child[type[Block]], ...]
-    #     children: frozendict[type[Block], Outline.Identation]
-    #     separators: str = DEFAULT_KEYWORD_SEPARATOR
 
     class Rule(Record, frozen=True):
         block_type: type[Block]
@@ -122,111 +111,11 @@ class Outline[T: Block](Record, frozen=True):
     start: type[T]
     rules: frozendict[type[Block], Rule]
 
-    # @classmethod
-    # def build(cls, *args: Spec[Block]) -> Outline[Block]:
-    #     specs = {spec.block_type: spec for spec in args}
-
-    #     identation_regexes = {
-    #         Outline.Identation.SAME: "",
-    #         Outline.Identation.NEST: "(?:[ \t]+)",
-    #         Outline.Identation.OPT: "(?:[ \t]*)",
-    #     }
-
-    #     def build_rule(spec: Outline.Spec[Block]) -> Outline.Rule[Block]:
-    #         child_patterns = []
-    #         child_items = []
-
-    #         for child_type, child_ident in spec.children.items():
-    #             child_spec = specs[child_type]
-    #             child_items.append(child_spec.block_type)
-
-    #             iden_part = identation_regexes[child_ident]
-    #             kw_part = re.escape(child_spec.keyword)
-    #             sep_part = (
-    #                 f"(?:[{re.escape(child_spec.separators)}])"
-    #                 #f"[{escape(child_spec.separators)}]"
-    #                 if child_spec.separators
-    #                 else ""
-    #             )
-
-    #             child_patterns.append(f"({iden_part}{kw_part}{sep_part})")
-
-    #         return Outline.Rule(
-    #             block_type=spec.block_type,
-    #             child_items=tuple(child_items),
-    #             #child_pattern=re.compile("^" + "|".join(child_patterns), re.MULTILINE),
-    #             child_pattern=re.compile("|".join(child_patterns), re.MULTILINE),
-    #         )
-
-    #     return cls(frozendict({spec.block_type: build_rule(spec) for spec in specs.values()}))
-
-    # class Tree(Record, frozen=True):
-    #     rule: Outline.Rule
-    #     span: Span
-    #     children: tuple[Self, ...]
-
-
-    #     @property
-    #     def block_type(self) -> str:
-    #         return self.rule.block_type
-
-    #     @property
-    #     def content(self) -> str:
-    #         return self.span.content
-
-    #     def __rich__(self):
-    #         from textwrap import shorten
-
-    #         from rich.tree import Tree
-
-    #         tree = Tree(
-    #             f"[bold][green]{self.rule.block_type}[/green][/bold]: {shorten(self.content, 50)}"
-    #         )
-    #         for child in self.children:
-    #             tree.add(child)
-
-    #         return tree
-
-    #     def transform(
-    #         self,
-    #         fn: Callable[[Self, tuple[type[Block], ...]], Block | MissingType],
-    #     ) -> Block | MissingType:
-
-    #         children = tuple(
-    #             child_value
-    #             for child_block in self.children
-    #             if (child_value := child_block.transform(fn)) is not MISSING
-    #         )
-
-            
-    #         # fn desde self.rule.type.parse_outline()
-    #         self.rule.block_type.parse_outline
-
-    #         try:
-    #             return fn(self, children)
-    #         except Exception as e:
-    #             e.add_note(
-    #                 f"Error processing block of type {self.rule.block_type} with content:\n{self.span.content}"
-    #             )
-    #             raise
-
     class StackEntry(Record):
         rule: Outline.Rule
         identation: str
         content: list[Line]
         children: list[Block]
-
-        # def as_tree(self):
-        #     first_line, last_line = self.content[0], self.content[-1]
-        #     return Outline.Tree(
-        #         rule=self.rule,
-        #         span=Span(
-        #             file=first_line.file,
-        #             start=first_line.start,
-        #             end=last_line.end,
-        #         ),
-        #         children=tuple(self.children),
-        #     )
 
         def as_block(self):
             return self.rule.block_type.parse_block(
