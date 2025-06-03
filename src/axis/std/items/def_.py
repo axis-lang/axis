@@ -42,7 +42,7 @@ class Def(syn.Item):
         keyword_sep: ClassVar[str] = ": \t"
         grammar: ClassVar[str] = "takes: 'takes' ID? ':' EOF;"
 
-        id: Optional[str]
+        name: Optional[str]
 
     class Returns(syn.Block):
         """ """
@@ -62,7 +62,7 @@ Def.Takes.child_block_type(Val, must_be_indented=True)
 
 
 @syn.AstBuilder.build.register(syn.AxisParser.DefItemContext)
-def build_def_ast(
+def build_def(
     self,
     _,
     expr: syn.Expr,
@@ -74,25 +74,25 @@ def build_def_ast(
 
 
 @syn.AstBuilder.build.register(syn.AxisParser.WhereBlockContext)
-def build_def_where_ast(
+def build_def_where(
     self, _, _colon, *, children: tuple[syn.Block]
 ):
     return Def.Where(children=children)
 
 
 @syn.AstBuilder.build.register(syn.AxisParser.TakesBlockContext)
-def build_def_takes_ast(
+def build_def_takes(
     self,
     _,
-    *args,
+    name: Optional[str] = None,
+    *,
     children: tuple[syn.Block],
 ):
-    id = args[0] if len(args) > 0 else None
-    return Def.Takes(id=id, children=children)
+    return Def.Takes(name=name, children=children)
 
 
 @syn.AstBuilder.build.register(syn.AxisParser.ReturnsBlockContext)
-def build_def_returns_ast(
+def build_def_returns(
     self,
     _,
     expr: syn.Expr,

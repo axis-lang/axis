@@ -1,0 +1,106 @@
+# %%
+import unittest
+from decimal import Decimal
+
+from rich import print
+
+from axis import std
+from axis.core import sem, src, syn
+
+# SRCBLOCK_SPEC_PATH = Path("src/axis/codebase/grammar/srcblock-spec.yaml")
+# SOURCE_UNIT_PATH = Path("src/std.base.tests.src/test.ax")
+
+
+class GrammarTest(unittest.TestCase):
+    # parser = Parser()
+
+    def test_parse_expr(self):
+        self.assertEqual(
+            syn.Expr.parse("1 + 2"),
+            std.BinOp(
+                lhs=std.Lit(Decimal(1)),
+                rhs=std.Lit(Decimal(2)),
+                op=std.BinOp.Operator("+"),
+            ),
+        )
+
+    def test_parse_tuple(self):
+        e = syn.Expr.parse(
+            """(
+            a, 
+            a:b, 
+            a=b, 
+            a:b=c,
+            ..alpha,
+            )"""
+        )
+        # print(e)
+
+
+class ExprMatchingTest(unittest.TestCase):
+    # parser = Parser()
+
+    def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
+        if isinstance(expected, str):
+            expected = syn.Expr.parse(expected)
+        self.assertEqual(expr, expected)
+
+    def test_unify(self):
+
+        match_test = syn.Match.expr("$ctx.$name($a, ..$b, $c)")
+
+        match = match_test("Natural.alpha(1,2,3,4,5)")
+
+        self.assertEqualExpr(match["$ctx"], "Natural")
+        #self.assertEqualExpr(match["$name"], "Natural.alpha")
+        self.assertEqual(match["$name"], "alpha")
+        self.assertEqualExpr(match["$a"], "1")
+        self.assertEqualExpr(match["$b"], "(2, 3, 4)")
+        self.assertEqualExpr(match["$c"], "5")
+
+
+
+class ExprReificationTest(unittest.TestCase):
+    # parser = Parser()
+
+    def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
+        if isinstance(expected, str):
+            expected = syn.Expr.parse(expected)
+        self.assertEqual(expr, expected)
+
+    def test_reify(self):
+        match = syn.Match.expr("foo(..$a)")
+        reify = syn.Reify.expr("bar(..$a)")
+
+        vals = match("foo(1, 2, 3)")
+        print(vals)
+
+        print(reify(vals))
+
+
+
+
+
+
+
+
+# def test_parser(self):
+#     unit = self.parser.parse_unit(SOURCE_UNIT_PATH)
+#     print(unit)
+# ol = std.Unit.build_ouline_spec()
+# file = src.File.from_path(SOURCE_UNIT_PATH)
+# unit = ol.parse_outline(file)
+
+# scoping = sem.ScopingPass(None, std.Sym.ROOT)
+# scoping.process_item(unit)
+
+
+# def test_parser(self):
+#     unit = self.parser.parse_unit(SOURCE_UNIT_PATH)
+#     print(unit)
+# ol = std.Unit.build_ouline_spec()
+# file = src.File.from_path(SOURCE_UNIT_PATH)
+# unit = ol.parse_outline(file)
+
+# scoping = sem.ScopingPass(None, std.Sym.ROOT)
+# scoping.process_item(unit)

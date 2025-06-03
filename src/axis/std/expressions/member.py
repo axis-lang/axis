@@ -1,3 +1,4 @@
+from multiprocessing import Value
 from os import name
 from axis.core import syn
 
@@ -11,10 +12,10 @@ class Member(syn.Expr):
 
 
 @syn.AstBuilder.build.register
-def build_member_ast(
+def build_member(
     self,
     ctx: syn.AxisParser.MemberAccessContext,
-    of,
+    of: syn.Node,
     *members: str,
 ):
     result = of
@@ -29,10 +30,23 @@ def match_member(self: syn.Matcher, mem: Member, other: syn.Expr):
         return self.match_node(mem, other)
 
     if not isinstance(other, Member):
-        raise syn.StopUnification        
+        raise self.StopMatching
 
     self.match(mem.of, other.of)
 
-    self.capture(mem.name, other)
+    self.capture_value(mem.name, other.name)
+    #self.capture_value(mem.name, mem)
+
+@syn.Reifier.reify.register(Member)
+def reify_member(self: syn.Reifier, mem: Member):    
+    if not mem.is_wildcard:
+        return self.reify_node(mem)
+    
+    return mem.with_attrs(
+        of=self.reify(mem.of),
+        name=self.value(mem.name)
+    )
+
+    return self.reify(self.value(mem.name))
 
         

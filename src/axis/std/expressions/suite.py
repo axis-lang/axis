@@ -6,7 +6,7 @@ class Suite(syn.Expr):
 @syn.AstBuilder.build.register
 def build_suite_ast(
     self,
-    ctx: syn.AxisParser.SuiteContext,
+    _: syn.AxisParser.SuiteContext,
     *statements,
 ):
     # if len(statements) == 1 and isinstance(statements[0], syn.Expr):

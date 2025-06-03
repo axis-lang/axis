@@ -7,7 +7,7 @@ from protobase import derived
 
 from axis.core import src
 
-from .ast_builder import AstBuilder
+from .building import AstBuilder
 from .node import Node
 
 
@@ -20,7 +20,7 @@ def impl_parse_block_content(block_type: type[Block]):
     postfix = 'Item' if issubclass(block_type, Item) else 'Block'
     item = f"{prefix}{postfix}" # e.g. "unitItem" or "suiteBlock"
 
-    def parser(cls, span: src.Span, children: tuple[Block]) -> dict:
+    def parser(cls, span: src.Span, children: tuple[Block], **opts) -> dict:
         lexer = AxisLexer(InputStream(span.content))
         parser = AxisParser(CommonTokenStream(lexer))
 
@@ -33,7 +33,8 @@ def impl_parse_block_content(block_type: type[Block]):
         if parser.getNumberOfSyntaxErrors() > 0:
             print(span.content)
 
-        ast_builder = AstBuilder(span)
+        ast_builder = AstBuilder(span, **opts)
+        
         result = ast_builder(tree, children=children)
 
         return result
