@@ -20,8 +20,7 @@ class Block(Object, abstract=True):
     def __class_post_build__(cls):
         cls.child_block_types = {}
         if not cls.__isabstract__:
-            keyword = getattr(cls, "keyword", None)
-            assert keyword is not None, f"Block {cls.__qualname__} must have a keyword"
+            assert getattr(cls, "keyword", None) is not None, f"Block {cls.__qualname__} must have a keyword"
 
     @classmethod
     def parse_block(cls, span: Span, children: tuple[Block, ...]) -> Self:
@@ -30,7 +29,7 @@ class Block(Object, abstract=True):
         )
         
     @classmethod
-    def child_block_type(cls, child_block_class: type[Block], /, must_be_indented: Optional[bool]=False):
+    def add_child_block(cls, child_block_class: type[Block], /, must_be_indented: Optional[bool]=False):
         cls.child_block_types[child_block_class] = Outline.Identation.from_bool(must_be_indented)
         return child_block_class
 

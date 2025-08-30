@@ -32,7 +32,7 @@ class AstTransformer(Object, abstract=True):
 
     @transform.register    
     def transform_none(self, none: None) -> None:
-        pass
+        return None
 
     @transform.register
     def transform_str(self, string: str) -> str:

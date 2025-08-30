@@ -26,23 +26,43 @@ class Tuple(syn.Expr):
 
         value: Optional[syn.Expr]
 
+        def __str__(self) -> str:
+            return str(self.value)
+
     class SpreadElement(Element):
         "..spread"
 
         etc: Optional[syn.Expr]
 
-    class NamedElement(syn.Node):
+        def __str__(self) -> str:
+            if self.etc:
+                return f'..{self.etc}..'
+            return '..'
+
+    class NominalElement(Element):
         "name: bound = value"
 
-        name: str
-        bound: Optional[syn.Expr]
-        value: Optional[syn.Expr]
+        key: syn.Expr = None
+        bound: Optional[syn.Expr] = None
+        value: Optional[syn.Expr] = None
 
-        @property
-        def is_wildcard(self) -> bool:
-            return self.name[0] == "$"
+        # @property
+        # def is_wildcard(self) -> bool:
+        #     return self.key[0] == "$"
+
+        def __str__(self) -> str:
+            if self.bound and self.value:
+                return f'{self.key}: {self.bound} = {self.value}'
+            if self.bound:
+                return f'{self.key}: {self.bound}'
+            if self.value:
+                return f'{self.key} = {self.value}'
+            return str(self.key)
 
     elements: tuple[Element, ...]
+
+    def __str__(self) -> str:
+        return '(' + ', '.join(str(e) for e in self.elements) + ')'
 
     def __len__(self) -> int:
         return len(self.elements)
@@ -111,19 +131,30 @@ class Tuple(syn.Expr):
         return head_elements, rest_elements, tail_elements
 
 
-@syn.AstBuilder.build.register
+@syn.AstBuilder.build.register(syn.AxisParser.TupleContext | syn.AxisParser.ShapeContext)
 def build_tuple_ast(
     self,
-    ctx: syn.AxisParser.TupleContext | syn.AxisParser.ShapeContext,
+    _,
     *elements: tuple[Tuple.Element, ...],
 ) -> Tuple:
     return Tuple(elements=elements)
+
+syn.AstBuilder.decl_pass_context(syn.AxisParser.ElementContext)
+
+@syn.AstBuilder.build.register(syn.AxisParser.ValueElementContext)
+def build_value_element_ast(
+    self,
+    _,
+    value: syn.Expr,
+):
+    return Tuple.ValueElement(value=value)
+
 
 
 @syn.AstBuilder.build.register(syn.AxisParser.ValueElementContext)
 def build_value_element_ast(
     self,
-    _: syn.AxisParser.ValueElementContext,
+    _,
     value: syn.Expr,
 ):
     return Tuple.ValueElement(value=value)
@@ -132,18 +163,18 @@ def build_value_element_ast(
 @syn.AstBuilder.build.register(syn.AxisParser.SpreadElementContext)
 def build_spread_element_ast(
     self,
-    _: syn.AxisParser.SpreadElementContext,
+    _,
     ellipsis: str,
-    etc: syn.Expr,
+    etc: Optional[syn.Expr] = None,
 ):
     assert ellipsis == "..", "Expected '..' for spread element"
     return Tuple.SpreadElement(etc=etc)
 
 
-@syn.AstBuilder.build.register(syn.AxisParser.NamedElementContext)
-def build_named_element_ast(
+@syn.AstBuilder.build.register(syn.AxisParser.NominalElementContext)
+def build_nominal_element_ast(
     self,
-    _: syn.AxisParser.NamedElementContext,
+    _,
     name: str,
     op1: Optional[str] = None,
     e1: Optional[syn.Expr] = None,
@@ -152,20 +183,20 @@ def build_named_element_ast(
 ):
     if op1 == ":":
         if op2 is None:
-            return Tuple.NamedElement(name=name, bound=e1, value=None)
+            return Tuple.NominalElement(key=name, bound=e1, value=None)
         assert op2 == "=", "Expected '=' after ':' in named element"
-        return Tuple.NamedElement(name=name, bound=e1, value=e2)
+        return Tuple.NominalElement(key=name, bound=e1, value=e2)
 
     assert op1 == "=", "Expected '=' before named element"
     assert op2 is None, "Expected no operator after '=' in named element"
-    return Tuple.NamedElement(name=name, bound=None, value=e1)
+    return Tuple.NominalElement(key=name, bound=None, value=e1)
 
 
 @syn.Matcher.match.register(Tuple)
 def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
 
     if not isinstance(value, Tuple):
-        raise self.StopMatching
+        raise self.NoMatch
 
     try:
         head_and_tail_count = tuple.head_and_tail_count
@@ -178,7 +209,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
         )
 
     except:
-        raise self.StopMatching
+        raise self.NoMatch
 
     for a, b in zip(target_head, value_head):
         self.match_node(a, b)
@@ -208,15 +239,17 @@ def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
             and isinstance(elem.etc, Sym)
             and elem.etc.is_wildcard
         ):
-            if elem.etc.name not in self.values:
-                raise ValueError(f"Unresolved wildcard: {elem.etc.name}")
+            target = self.value(elem.etc.name, Tuple)
 
-            target = self.values[elem.etc.name]
+            # if elem.etc.name[1:] not in self.values:
+            #     raise ValueError(f"Unresolved wildcard: {elem.etc.name}")
 
-            if not isinstance(target, Tuple):
-                raise ValueError(
-                    f"Expected a Tuple for wildcard {elem.etc.name}, got {type(target)}"
-                )
+            # target = self.values[elem.etc.name]
+
+            # if not isinstance(target, Tuple):
+            #     raise ValueError(
+            #         f"Expected a Tuple for wildcard {elem.etc.name}, got {type(target)}"
+            #     )
 
             elements.extend(target.elements)
             continue

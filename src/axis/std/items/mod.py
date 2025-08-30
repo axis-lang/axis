@@ -1,8 +1,9 @@
 from __future__ import annotations
+from functools import singledispatch
 from typing import Annotated, ClassVar, Optional
 
 from axis.core import src, syn, ref, log, sem
-from axis.std.transcriptions.sym_to_member import transcript_sym_to_member_expressions
+from axis.std.transcriptions.sym_to_member import sym_to_member_of
 
 
 class Mod(syn.Item):
@@ -20,29 +21,38 @@ class Mod(syn.Item):
     keyword: ClassVar[str] = "mod"
     grammar: ClassVar[str] = "mod: 'mod' expression ':' EOF;"
 
-    path: Optional[syn.Expr]
+    path: syn.Expr # mount path
+    # las unidades tienen un montaje absoluto, los modulos son relativos, las funciones pueden ser relativas a la unidad o definidas en un 
+
+    def generate_content_manifest_entries(self, base_ref: ref.Ref = ref.Ref.root):
+        base = ref.eval(self.path, base=base_ref)
+        for child in self.children:
+            if isinstance(child, syn.Item):
+                yield from child.generate_content_manifest_entries(base)
+
+    @classmethod
+    def build(cls, kw, path: syn.Expr, *, children=tuple[syn.Block]):
+        return cls(path=path, children=children)
+
+# @syn.AstBuilder.build.register(syn.AxisParser.ModItemContext)
+# def build_ast(
+#     self,
+#     _,
+#     path: syn.Expr,
+#     children: tuple[syn.Block],
+# ):
+#     return Mod(path=path, children=children)
 
 
-@syn.AstBuilder.build.register(syn.AxisParser.ModItemContext)
-def build_ast(
-    self,
-    _,
-    path: syn.Expr,
-    children: tuple[syn.Block],
-):
-    return Mod(path=path, children=children)
+@sem.Binder.discover.register(Mod)
+def discover_mod(parent: sem.Binder, mod: Mod):
+    # eval_ref -> ref
+    path = sym_to_member_of(mod.path, of=parent.path)
 
+    mod_binder = parent.child(mod, path)
 
-@sem.ScopingPass.process_item.register(Mod)
-def process_mod_scoping(self: sem.ScopingPass, mod_ast: Mod):
-    # evaluar el path
-    base_path_expr = transcript_sym_to_member_expressions(
-        mod_ast.path, of=self.base_path_expr
-    )
+    for block in iter(mod):
+        #if isinstance(block, syn.Item):
+        mod_binder.discover(block)
 
-    mod_scoping = self.child_scoping(mod_ast, base_path_expr)
-    for item in mod_ast.iter(syn.Item):
-        grandchild_scoping = mod_scoping.process_item(item)
-        # we have 3 levels of scoping access here, this is useful?
-
-    return mod_scoping
+    print(mod_binder.imports)

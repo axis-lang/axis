@@ -1,19 +1,21 @@
 unit alpha.beta
      ----------
-     Unit 
+     this is a comment
 
 
 use std.io(
-    socket: net,
+    socket = net,
     more.items(
         here
     ),
-    other
+    other(..)
 )
 
 def Number
     ------
     base de implementacion de todo tipo numerico
+
+val num: Number
 
 mod Number
     ------
@@ -41,6 +43,9 @@ mod Number
 
     def Complex
         -------
+
+    mod Complex
+        
         
 use Number(
     Real, 
@@ -51,23 +56,27 @@ use Number(
     We use numbers in root scope
 
 
-def Vector[T](..)
+def Vector[T]
     -------------
     Vector function
 takes: 
     val x: T
         ----
         Parameter y
-
     val y: T
         ----
         Parameter y
 
+        const limits(gt=10)
+        
+
+
 where: 
     val T: Type[.. Real]
-
-returns ()
-        -----
+        ----------------
+        Type of x and y params
+returns None
+        ----
         The function return type
 
 takes:

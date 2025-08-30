@@ -1,16 +1,17 @@
 help: 
     @just --list
 
-tests:
+launch: 
+    @poetry run python -m axis
+
+test:
     @clear && printf '\e[3J'
     @poetry run python -m unittest discover -s tests
 
 watch:
     #@just tests
-    @poetry run watchmedo shell-command \
-        --patterns="*.py" \
-        --recursive \
-        --command='just tests' .
+    watchexec -r -e py,ax -- 'just test && just launch'
+
 
 docs:
     @clear && printf '\e[3J'

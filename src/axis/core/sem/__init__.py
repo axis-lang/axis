@@ -43,6 +43,6 @@ takes:
 """
 
 
-from .scoping import *
+from .binding import *
 #from .abstract import *
 #from .entities import *

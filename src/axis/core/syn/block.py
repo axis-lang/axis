@@ -1,7 +1,6 @@
-
 from __future__ import annotations
 
-from typing import Iterable, Self
+from typing import ClassVar, Iterable, Self
 
 from protobase import derived
 
@@ -13,6 +12,7 @@ from .node import Node
 
 def impl_parse_block_content(block_type: type[Block]):
     from antlr4 import CommonTokenStream, InputStream
+
     from .grammar import AxisLexer, AxisParser
     from .item import Item
 
@@ -45,23 +45,19 @@ def impl_parse_block_content(block_type: type[Block]):
 
 class Block(Node, src.Block, abstract=True):
     # todos los derivados de block se autoregistran en el parser
-    children: tuple[Block]
+    type Children = tuple[Block, ...]
+    grammar_context_infix: ClassVar[str] = 'Block'
+    children: Children
 
 
     @derived(impl_parse_block_content)
     @classmethod
-    def parse_block(cls, content: src.Span, children: tuple[Block]) -> Self:
+    def parse_block(cls, content: src.Span, children: Children) -> Self:
         ...
 
+    def __len__(self):
+        return len(self.children)
 
-    def iter[T: Block](self, *instanceof: type[T]) -> Iterable[T]:
-        ''' 
-        Iterates over the children of this block, filtering by type if specified.
-        '''
-        if instanceof == ():
-            return iter(self.children)
-
-        for child in self.children:
-            if isinstance(child, instanceof):
-                yield child
+    def __iter__(self):
+        return iter(self.children)
 

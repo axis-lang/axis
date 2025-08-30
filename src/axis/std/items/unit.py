@@ -9,13 +9,6 @@ class Unit(Mod):
     keyword: ClassVar = "unit"
     grammar: ClassVar = "unit: 'unit' expression ':' EOF;"
 
-
-@syn.AstBuilder.build.register(syn.AxisParser.UnitItemContext)
-def build_ast(
-    self,
-    _,
-    path: syn.Expr,
-    *,
-    children: tuple[syn.Block],
-):
-    return Unit(path=path, children=children)
+    @classmethod
+    def build(cls, kw, path: syn.Expr, *, children=tuple[syn.Block]):
+        return cls(path=path, children=children)

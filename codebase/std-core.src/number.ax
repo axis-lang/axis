@@ -1,0 +1,20 @@
+unit std
+
+def Number
+
+
+
+def Bool: Number
+
+def Nat: Number
+
+def Int: Number
+
+def Real: Number
+
+def Complex: Number
+
+def Quat: Number
+
+
+def add(..nums: Number) -> Number

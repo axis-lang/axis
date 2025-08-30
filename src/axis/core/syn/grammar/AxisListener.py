@@ -44,12 +44,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#useItem.
-    def enterUseItem(self, ctx:AxisParser.UseItemContext):
+    # Enter a parse tree produced by AxisParser#useBlock.
+    def enterUseBlock(self, ctx:AxisParser.UseBlockContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#useItem.
-    def exitUseItem(self, ctx:AxisParser.UseItemContext):
+    # Exit a parse tree produced by AxisParser#useBlock.
+    def exitUseBlock(self, ctx:AxisParser.UseBlockContext):
         pass
 
 
@@ -314,12 +314,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#sym.
-    def enterSym(self, ctx:AxisParser.SymContext):
+    # Enter a parse tree produced by AxisParser#symExpr.
+    def enterSymExpr(self, ctx:AxisParser.SymExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#sym.
-    def exitSym(self, ctx:AxisParser.SymContext):
+    # Exit a parse tree produced by AxisParser#symExpr.
+    def exitSymExpr(self, ctx:AxisParser.SymExprContext):
         pass
 
 
@@ -350,29 +350,38 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#ValueElement.
+    # Enter a parse tree produced by AxisParser#element.
+    def enterElement(self, ctx:AxisParser.ElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#element.
+    def exitElement(self, ctx:AxisParser.ElementContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#valueElement.
     def enterValueElement(self, ctx:AxisParser.ValueElementContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#ValueElement.
+    # Exit a parse tree produced by AxisParser#valueElement.
     def exitValueElement(self, ctx:AxisParser.ValueElementContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#NamedElement.
-    def enterNamedElement(self, ctx:AxisParser.NamedElementContext):
+    # Enter a parse tree produced by AxisParser#nominalElement.
+    def enterNominalElement(self, ctx:AxisParser.NominalElementContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#NamedElement.
-    def exitNamedElement(self, ctx:AxisParser.NamedElementContext):
+    # Exit a parse tree produced by AxisParser#nominalElement.
+    def exitNominalElement(self, ctx:AxisParser.NominalElementContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#SpreadElement.
+    # Enter a parse tree produced by AxisParser#spreadElement.
     def enterSpreadElement(self, ctx:AxisParser.SpreadElementContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#SpreadElement.
+    # Exit a parse tree produced by AxisParser#spreadElement.
     def exitSpreadElement(self, ctx:AxisParser.SpreadElementContext):
         pass
 

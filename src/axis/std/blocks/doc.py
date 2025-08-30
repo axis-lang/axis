@@ -18,4 +18,4 @@ class Doc(syn.Block):
             content=dedent(span.content)
         )
 
-syn.Item.child_block_type(Doc, must_be_indented=None)
+syn.Item.add_child_block(Doc, must_be_indented=None)

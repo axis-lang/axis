@@ -1,6 +1,7 @@
 from decimal import Decimal
 from functools import singledispatchmethod
 from sys import intern
+from typing import ClassVar
 
 from antlr4 import ParserRuleContext, TerminalNode, Token
 from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl
@@ -22,31 +23,26 @@ IGNORED_TOKENS = {
     ";",
     ".",
     ",",
-    "unit",
-    "mod",
-    "use",
-    "val",
-    "def",
-    "returns",
-    "takes",
-    "where",
-    "suite",
-    "fn",
-}
-
-PASS_CONTEXTS = {
-    AxisParser.PrimaryContext,
-    AxisParser.PostfixPassContext,
-    AxisParser.PostfixContext,
-    AxisParser.PrefixPassContext,
-    AxisParser.PrefixContext,
-    AxisParser.ExpressionContext,
-    AxisParser.StatementContext,
 }
 
 
 class AstBuilder(Object):
+
+    pass_contexts: ClassVar[set[type[ParserRuleContext]]] = {
+        AxisParser.PrimaryContext,
+        AxisParser.PostfixPassContext,
+        AxisParser.PostfixContext,
+        AxisParser.PrefixPassContext,
+        AxisParser.PrefixContext,
+        AxisParser.ExpressionContext,
+        AxisParser.StatementContext,
+    }
+
     source: src.Span
+
+    @classmethod
+    def decl_pass_context(cls, ctx_type: type[ParserRuleContext]):
+        cls.pass_contexts.add(ctx_type)
 
     def __call__(self, ctx: ParserRuleContext | TerminalNode, **kwargs):
         if not isinstance(ctx, (ParserRuleContext | TerminalNode)):
@@ -87,7 +83,7 @@ class AstBuilder(Object):
 
     @singledispatchmethod
     def build(self, ctx: ParserRuleContext, *args):
-        if type(ctx) in PASS_CONTEXTS:
+        if type(ctx) in self.pass_contexts:
             if len(args) != 1:
                 raise ValueError(
                     f"Expected 1 argument for {type(ctx)}, got {len(args)}"
@@ -136,11 +132,10 @@ class AstBuilder(Object):
             case Token.EOF:
                 return IGNORE
 
-            #case _:
+            # case _:
         if token.text in IGNORED_TOKENS:
             return IGNORE
-        
+
         return intern(token.text)
 
-
-        #raise NotImplementedError(f"Unknown terminal {token.text}")
+        # raise NotImplementedError(f"Unknown terminal {token.text}")

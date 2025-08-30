@@ -1,10 +1,12 @@
 grammar Axis;
 
+
 unitItem: 'unit' expression EOF;
 modItem: 'mod' expression EOF;
 defItem: 'def' expression EOF;
 valItem: 'val' expression (':' expression)? ('=' expression)? ';'? EOF;
-useItem: 'use' expression EOF;
+
+useBlock: 'use' expression EOF;
 takesBlock: 'takes' ID? ':' EOF;
 whereBlock: 'where' ':' EOF;
 returnsBlock: 'returns' expression EOF;
@@ -98,7 +100,7 @@ postfix
 
 // Primary expressions
 primary
-    : sym
+    : symExpr
     | lit
     | tuple                 // Tuples
     | lambda                // Bracket expressions
@@ -108,7 +110,7 @@ primary
     //| etc
     ;
 
-sym: ID ('@' ID)?;
+symExpr: ID ('@' ID)?;
 
 lit : DECIMAL
     | TEXT
@@ -129,10 +131,24 @@ shape
     ;
 
 element
-    : expression                                        # ValueElement
-    | ID (':' expression)? ('=' expression)?            # NamedElement
-    | '..' expression?                                  # SpreadElement
+    : valueElement
+    | nominalElement
+    | spreadElement
     ;
+
+valueElement
+    : expression;
+
+nominalElement
+    : expression ':' expression
+    | expression '=' expression
+    | expression ':' expression '=' expression
+    ;
+
+spreadElement
+    : '..' expression?
+    ;
+
 //| suite (':' expression)? ('=' expression)?         # DynElement
 // ..: ..T = ..alpha
 // _: _ = _

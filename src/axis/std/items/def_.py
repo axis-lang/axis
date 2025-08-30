@@ -1,7 +1,8 @@
-from typing import ClassVar, Optional
-from axis.core import syn, sem
+from protobase import Object, Record, cached_property
+from typing import ClassVar, Literal, Optional
+from axis.core import syn, sem, log
 from .val import Val
-from axis.std.expressions import Apply
+from axis.std.expr import Apply, Sym, Tuple
 
 
 class Def(syn.Item):
@@ -16,10 +17,25 @@ class Def(syn.Item):
         val N: Number
     """
 
-    keyword: ClassVar[str] = "def"
-    grammar: ClassVar[str] = "def: 'def' expression EOF;"
+    class Kind(syn.MatchClass, abstract=True, frozen=True):
+        name: Sym
 
-    expr: syn.Expr
+    class ClassKind(Kind):
+        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+            syn.Expr.parse("$name@Sym"),
+            syn.Expr.parse("$name[..$generics]"),
+        )
+
+        generics: Optional[Tuple] = None
+
+    class FunctionKind(Kind):
+        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+            syn.Expr.parse("$name@Sym(..$arguments)"),
+            syn.Expr.parse("$context.$name(..$arguments)"),
+        )
+
+        arguments: Optional[Tuple] = None
+        context: Optional[syn.Expr] = None
 
     class Where(syn.Block):
         """
@@ -30,6 +46,10 @@ class Def(syn.Item):
         keyword: ClassVar[str] = "where"
         keyword_sep: ClassVar[str] = ": \t"
         grammar: ClassVar[str] = "where: 'where' ':' EOF;"
+
+        @classmethod
+        def build(cls, kw: Literal["where"], colon: Literal[':'], *, children: syn.Block.Children):
+            return cls(children=children)
 
     class Takes(syn.Block):
         """
@@ -44,6 +64,16 @@ class Def(syn.Item):
 
         name: Optional[str]
 
+        @classmethod
+        def build(
+            cls,
+            kw: Literal["takes"],
+            name: Optional[str] = None,
+            *,
+            children: syn.Block.Children,
+        ):
+            return cls(name=name, children=children)
+
     class Returns(syn.Block):
         """ """
 
@@ -52,84 +82,103 @@ class Def(syn.Item):
 
         expr: syn.Expr
 
+        @classmethod
+        def build(cls, kw:Literal['returns'], expr: syn.Expr, *, children: syn.Block.Children):
+            return cls(expr=expr, children=children)
 
-Def.child_block_type(Def.Where, must_be_indented=False)
-Def.child_block_type(Def.Takes, must_be_indented=False)
-Def.child_block_type(Def.Returns, must_be_indented=False)
+    keyword: ClassVar[str] = "def"
+    grammar: ClassVar[str] = "def: 'def' expression EOF;"
 
-Def.Where.child_block_type(Val, must_be_indented=True)
-Def.Takes.child_block_type(Val, must_be_indented=True)
+    expr: syn.Expr
 
+    @classmethod
+    def build(
+        cls, kw: Literal["def"], expr: syn.Expr, *, children: tuple[syn.Block, ...]
+    ):
+        return cls(expr=expr, children=children)
 
-@syn.AstBuilder.build.register(syn.AxisParser.DefItemContext)
-def build_def(
-    self,
-    _,
-    expr: syn.Expr,
-    /,
-    children: tuple[syn.Block],
-):
-    # todo, procesar los childrens para obtener parametros, hiperparametros y return
-    return Def(expr=expr, children=children)
+    @cached_property
+    def kind(self):
+        kind = self.Kind.match(self.expr)
+        if kind is None:
+            log.error(
+                f"Definition expression does not match any known kind: {self.expr}"
+            ).with_label(self.as_label).emit()
+        return kind
 
-
-@syn.AstBuilder.build.register(syn.AxisParser.WhereBlockContext)
-def build_def_where(
-    self, _, _colon, *, children: tuple[syn.Block]
-):
-    return Def.Where(children=children)
-
-
-@syn.AstBuilder.build.register(syn.AxisParser.TakesBlockContext)
-def build_def_takes(
-    self,
-    _,
-    name: Optional[str] = None,
-    *,
-    children: tuple[syn.Block],
-):
-    return Def.Takes(name=name, children=children)
+    def generate_content_manifest_entries(self, base_ref):
+        kind = self.kind
+        if kind is None:
+            return
+        yield base_ref.member(kind.name.name), self
+        # generate sub globals
 
 
-@syn.AstBuilder.build.register(syn.AxisParser.ReturnsBlockContext)
-def build_def_returns(
-    self,
-    _,
-    expr: syn.Expr,
-    *,
-    children: tuple[syn.Block],
-):
-    return Def.Returns(
-        expr=expr,
-        children=children,
-    )
+Def.add_child_block(Def.Where, must_be_indented=False)
+Def.add_child_block(Def.Takes, must_be_indented=False)
+Def.add_child_block(Def.Returns, must_be_indented=False)
+Def.Where.add_child_block(Val, must_be_indented=True)
+Def.Takes.add_child_block(Val, must_be_indented=True)
 
 
+# @syn.AstBuilder.build.register(syn.AxisParser.DefItemContext)
+# def build_def(
+#     self,
+#     _,
+#     expr: syn.Expr,
+#     *,
+#     children: tuple[syn.Block],
+# ):
+#     # todo, procesar los childrens para obtener parametros, hiperparametros y return
+#     return Def(expr=expr, children=children)
 
 
-@sem.ScopingPass.process_item.register(Def)
-def def_scoping(self: sem.ScopingPass, def_ast: Def):
+# @syn.AstBuilder.build.register(syn.AxisParser.WhereBlockContext)
+# def build_def_where(
+#     self, _, _colon, *, children: tuple[syn.Block]
+# ):
+#     return Def.Where(children=children)
 
 
-    def_ast.expr
-
-    # evaluar el path
-
-    # extrae el nombre desde def_ast.expr
-
-    # extrae hiperparametros desde def_ast.children Where
-    # extrae parametros desde def_ast.chidlren Takes
-
-    # como exportar los Parametros
-
-    # mod_path_expr = sem.transform_sym_to_member(mod_ast.path, member_of=self.path_prefix)
-
-    # child_scoping = self.child_scoping(path_prefix=mod_path_expr, ast=mod_ast)
-    # for item in mod_ast.iter(syn.Item):
-    #     grandchild_scoping = child_scoping.process_item(item)
-    #     # we have 3 levels of scoping access here, this is useful?
-
-    # return child_scoping
-    pass
+# @syn.AstBuilder.build.register(syn.AxisParser.TakesBlockContext)
+# def build_def_takes(
+#     self,
+#     _,
+#     name: Optional[str] = None,
+#     *,
+#     children: tuple[syn.Block],
+# ):
+#     return Def.Takes(name=name, children=children)
 
 
+# @syn.AstBuilder.build.register(syn.AxisParser.ReturnsBlockContext)
+# def build_def_returns(
+#     self,
+#     _,
+#     expr: syn.Expr,
+#     *,
+#     children: tuple[syn.Block],
+# ):
+#     return Def.Returns(
+#         expr=expr,
+#         children=children,
+#     )
+
+DEF_MATCH_SYMBOL = syn.Match.from_expr("$nm")
+DEF_MATCH_EXT_SYMBOL = syn.Match.from_expr("$nm: $ext")
+DEF_MATCH_FUNCTION = syn.Match.from_expr("$nm(..$args)")
+DEF_MATCH_METHOD = syn.Match.from_expr("$ctx.$nm(..$args)")
+
+
+@sem.Binder.discover.register(Def)
+def bind_def(parent: sem.Binder, def_: Def):
+
+    if vars := DEF_MATCH_SYMBOL(def_.expr):
+        name = vars.get("$nm")
+        parent.export_item(name, def_)
+    elif vars := DEF_MATCH_FUNCTION(def_.expr):
+        name = vars.get("$nm")
+        parent.export_item(name, def_)
+    elif vars := DEF_MATCH_METHOD(def_.expr):
+        name = vars.get("$nm")
+        parent.export_item(name, def_)

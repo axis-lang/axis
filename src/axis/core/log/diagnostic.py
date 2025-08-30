@@ -37,7 +37,7 @@ _LABEL_STYLE = {
 
 class Label(Record, frozen=True):
     span: src.Span
-    message: str
+    message: Optional[str] = None
     style: LabelStyle = LabelStyle.PRIMARY
 
     @property
@@ -60,20 +60,23 @@ class Diagnostic(Record, frozen=True):
             self.emit()
 
 
-    def with_label(
-        self,
-        span: src.Span | Any,
-        message: str = "",
-        style: LabelStyle = LabelStyle.PRIMARY,
-    ) -> Self:
+    def with_label(self, label: Label) -> Diagnostic:
+        return mutate(self, labels=self.labels + (label,))
 
-        if not isinstance(span, src.Span):
-            span = src.Span.of(span)
+    # def with_label(
+    #     self,
+    #     span: src.Span | Any,
+    #     message: str = "",
+    #     style: LabelStyle = LabelStyle.PRIMARY,
+    # ) -> Self:
 
-        if span is None:
-            return self
+    #     if not isinstance(span, src.Span):
+    #         span = src.Span.of(span)
 
-        return mutate(self, labels=self.labels + (Label(span=span, message=message, style=style),))
+    #     if span is None:
+    #         return self
+
+    #     return mutate(self, labels=self.labels + (Label(span=span, message=message, style=style),))
 
 
     def with_note(self, message: str) -> Diagnostic:

@@ -6,12 +6,14 @@ from .statement import Statement
 
 
 class Reifier(Object):
-    values: dict[str, Any] = {}
+    values: dict[str, Any]
 
     def __call__(self, item: Node) -> Node:
+        print('EEE', self.values)
         return self.reify(item)
 
-    def value(self, name: str, expected_type: type = Node) -> Node:
+    def value[T:Node](self, name: str, expected_type: type[T] = Node) -> T:
+        name = name[1:]
         if name not in self.values:
             raise ValueError(f"Unresolved value: {name}")
 
@@ -30,7 +32,7 @@ class Reifier(Object):
         return value
 
     @reify.register
-    def reify_node[N:Node](self, node: N) -> N:
+    def reify_node(self, node: Node) -> Node:
         attrs = {k: self.reify(v) for k, v in attrs_of(node).items()}
         return node.__class__(**attrs).with_span_of(node)
 

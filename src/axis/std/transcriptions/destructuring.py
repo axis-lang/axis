@@ -1,69 +1,102 @@
+"""
+Dependency tree transformations:
+
+Transforma una expresion del tipo deptree en una expresion de composicion de tuples:
+
+C = deptree_to_tuple(A, B)
+
+A: std.io(
+    console.print: log,
+    file(..),
+)
+
+B: @root
+
+C: (
+    log = @root.std.io.console.print
+    ..@root.std.io.file
+)
+"""
 from functools import singledispatchmethod
 from protobase import Object
 from axis.core import syn, log
-from axis.std.expressions import Tuple, Member, Sym, Apply
+from axis.std.expr import Tuple, Member, Sym, Apply
+
 
 class Destructuring(Object):
     """
+    Destructuring para globales
+
     transforma una expresion desestructurada en un conjunto de expresiones
     Tuple.Element
-    'std.io(log=console.print)' -> 'log = std.io.console.print' 
+    'std.io(console.print: log)' -> 'log = std.io.console.print' 
     """
 
-    def __call__(self, expr: syn.Expr, bound: syn.Expr):
-        result = self.transform(expr, bound)
+    def __call__(self, expr: syn.Expr, prefix: syn.Expr):
+        result = self.transform(expr, prefix)
 
-        def process_element(elem): 
-            if isinstance(elem, Tuple.Element):
-                return elem
+        def process_expr(elem): 
+            # if isinstance(elem, Tuple.Element):
+            #     return elem
             if isinstance(elem, Member):
                 ' convierte "a.b.c" en "c: a.b.c" '
-                return Tuple.Element(
-                    key=Sym(name=elem.name).with_span_of(elem), 
-                    bound=elem, 
-                    value=None,
+                return Tuple.NominalElement(
+                    key=elem.as_sym(), 
+                    value=elem,
                 ).with_span_of(elem)
+            
+            # syn.Error(expr0elem)
         
-            return None
+            return elem
         
-        return tuple(map(process_element, deep_flatten(result)))
+        elements=tuple(map(process_expr, deep_flatten(result)))
+        
+        return Tuple(elements=elements).with_span_of(expr)
 
     @singledispatchmethod
-    def transform(self, expr: syn.Item, bound: syn.Expr):
+    def transform(self, expr: syn.Item, prefix: syn.Expr):
         raise NotImplementedError(
             f"{type(self).__qualname__} not implemented for {type(expr).__qualname__}"
         )
 
     @transform.register
-    def eval_sym(self, sym: Sym, bound: syn.Expr):
-        return Member(of=bound, name=sym.name).with_span_of(sym)
+    def eval_none(self, none: None, prefix: syn.Expr):
+        return None
 
     @transform.register
-    def eval_member(self, member: Member, bound: syn.Expr):
-        return member.with_attrs(of=self.transform(member.of, bound))
+    def eval_sym(self, sym: Sym, prefix: syn.Expr):
+        return Member(of=prefix, name=sym.name).with_span_of(sym)
 
     @transform.register
-    def eval_apply(self, apply: Apply, bound: syn.Expr):
-        bound = self.transform(apply.function, bound)
-        return tuple(self.transform(arg, bound) for arg in apply.argument.elements)
+    def eval_member(self, member: Member, prefix: syn.Expr):
+        return member.with_attrs(of=self.transform(member.of, prefix))
 
     @transform.register
-    def eval_tuple_elem(self, element: Tuple.Element, bound: syn.Expr):
-        if element.value is not None:
-            #log.error(f"Invalid destructuring expression").with_label(element.value, "Invalid use of element value").emit()
-            return self.transform(element.value, bound)
+    def eval_apply(self, apply: Apply, prefix: syn.Expr):
+        prefix = self.transform(apply.function, prefix)
+        return self.transform(apply.argument, prefix)
+    
+    @transform.register
+    def eval_tuple(self, tup: Tuple, prefix: syn.Expr):
+        return tuple(self.transform(element, prefix) for element in tup.elements)
+    
+    @transform.register
+    def eval_tuple_value_elem(self, elem: Tuple.ValueElement, prefix: syn.Expr):
+        #return elem.with_attrs(value=self.transform(elem.value, prefix))
+        return self.transform(elem.value, prefix)
 
-        if element.key is not None:
-            bound = self.transform(element.bound, bound)
-            
-            if isinstance(element.key, Sym):
-                return element.with_attrs(bound=bound)
-                
-            log.error(f"Invalid destructuring expression").with_label(element.bound, "Invalid use of element key").emit()
+    @transform.register
+    def eval_tuple_nominal_elem(self, elem: Tuple.NominalElement, prefix: syn.Expr):
+        return elem.with_attrs(
+            key=elem.value,
+            bound=elem.bound,
+            value=self.transform(elem.key, prefix),
+        )
+    
+    @transform.register
+    def eval_tuple_spread_elem(self, elem: Tuple.SpreadElement, prefix: syn.Expr):
+        return elem.with_attrs(etc=self.transform(elem.etc, prefix))
 
-            return element.with_attrs(bound=bound)
-        
-        return self.transform(element.bound, bound)
 
 def reify_destructure(expr: syn.Expr, from_: syn.Expr):
     """
@@ -71,7 +104,6 @@ def reify_destructure(expr: syn.Expr, from_: syn.Expr):
     """
     return Destructuring()(expr, from_)
 
-# deep_flat_map
 
 def deep_flatten(lst):
     lst = list(lst)

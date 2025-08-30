@@ -47,16 +47,16 @@ class ExprMatchingTest(unittest.TestCase):
 
     def test_unify(self):
 
-        match_test = syn.Match.expr("$ctx.$name($a, ..$b, $c)")
+        match_test = syn.Match.from_expr("$ctx.$name($a, ..$b, $c)")
 
         match = match_test("Natural.alpha(1,2,3,4,5)")
 
-        self.assertEqualExpr(match["$ctx"], "Natural")
+        self.assertEqualExpr(match["ctx"], "Natural")
         #self.assertEqualExpr(match["$name"], "Natural.alpha")
-        self.assertEqual(match["$name"], "alpha")
-        self.assertEqualExpr(match["$a"], "1")
-        self.assertEqualExpr(match["$b"], "(2, 3, 4)")
-        self.assertEqualExpr(match["$c"], "5")
+        self.assertEqualExpr(match["name"], "alpha")
+        self.assertEqualExpr(match["a"], "1")
+        self.assertEqualExpr(match["b"], "(2, 3, 4)")
+        self.assertEqualExpr(match["c"], "5")
 
 
 
@@ -69,11 +69,12 @@ class ExprReificationTest(unittest.TestCase):
         self.assertEqual(expr, expected)
 
     def test_reify(self):
-        match = syn.Match.expr("foo(..$a)")
-        reify = syn.Reify.expr("bar(..$a)")
+        match = syn.Match.from_expr("$m.$n($a, ..$etc, $b)")
+        reify = syn.Reify.expr("$n.$m($b, ..$etc, $a)")
 
-        vals = match("foo(1, 2, 3)")
+        vals = match("foo.bar(1, 2, 3, 4, 5)")
         print(vals)
+
 
         print(reify(vals))
 
