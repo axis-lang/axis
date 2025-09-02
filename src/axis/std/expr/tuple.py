@@ -221,7 +221,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
         ), "Expected a spread element in the rest of the tuple"
 
         if isinstance(target_spread.etc, Sym) and target_spread.etc.is_wildcard:
-            self.capture_value(target_spread.etc.name, value.with_attrs(elements=value_rest))
+            self.capture_value(target_spread.etc.name, value.with_attr(elements=value_rest))
 
     for a, b in zip(target_tail, value_tail):
         self.match_node(a, b)
@@ -256,4 +256,4 @@ def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
 
         elements.append(self.reify(elem))
 
-    return tup.with_attrs(elements=tuple(elements))
+    return tup.with_attr(elements=tuple(elements))

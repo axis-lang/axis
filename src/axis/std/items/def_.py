@@ -106,13 +106,13 @@ class Def(syn.Item):
             ).with_label(self.as_label).emit()
         return kind
 
-    def generate_content_manifest_entries(self, base_ref):
-        kind = self.kind
-        if kind is None:
-            return
-        yield base_ref.member(kind.name.name), self
-        # generate sub globals
-
+    def bind(cls, parent: sem.Binding) -> sem.Binding:
+         return sem.Binding(
+            parent=parent,
+            ref=parent.ref.member(cls.kind.name.name),
+            item=cls,
+         )
+    
 
 Def.add_child_block(Def.Where, must_be_indented=False)
 Def.add_child_block(Def.Takes, must_be_indented=False)
@@ -164,21 +164,21 @@ Def.Takes.add_child_block(Val, must_be_indented=True)
 #         children=children,
 #     )
 
-DEF_MATCH_SYMBOL = syn.Match.from_expr("$nm")
-DEF_MATCH_EXT_SYMBOL = syn.Match.from_expr("$nm: $ext")
-DEF_MATCH_FUNCTION = syn.Match.from_expr("$nm(..$args)")
-DEF_MATCH_METHOD = syn.Match.from_expr("$ctx.$nm(..$args)")
+# DEF_MATCH_SYMBOL = syn.Match.from_expr("$nm")
+# DEF_MATCH_EXT_SYMBOL = syn.Match.from_expr("$nm: $ext")
+# DEF_MATCH_FUNCTION = syn.Match.from_expr("$nm(..$args)")
+# DEF_MATCH_METHOD = syn.Match.from_expr("$ctx.$nm(..$args)")
 
 
-@sem.Binder.discover.register(Def)
-def bind_def(parent: sem.Binder, def_: Def):
+# @sem.Binder.discover.register(Def)
+# def bind_def(parent: sem.Binder, def_: Def):
 
-    if vars := DEF_MATCH_SYMBOL(def_.expr):
-        name = vars.get("$nm")
-        parent.export_item(name, def_)
-    elif vars := DEF_MATCH_FUNCTION(def_.expr):
-        name = vars.get("$nm")
-        parent.export_item(name, def_)
-    elif vars := DEF_MATCH_METHOD(def_.expr):
-        name = vars.get("$nm")
-        parent.export_item(name, def_)
+#     if vars := DEF_MATCH_SYMBOL(def_.expr):
+#         name = vars.get("$nm")
+#         parent.export_item(name, def_)
+#     elif vars := DEF_MATCH_FUNCTION(def_.expr):
+#         name = vars.get("$nm")
+#         parent.export_item(name, def_)
+#     elif vars := DEF_MATCH_METHOD(def_.expr):
+#         name = vars.get("$nm")
+#         parent.export_item(name, def_)

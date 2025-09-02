@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, Dict, List, NoReturn, Optional, Self
 
 from protobase import Record, mutate
 from rich import print
@@ -85,6 +85,9 @@ class Diagnostic(Record, frozen=True):
     def with_suggest(self, message: str) -> Diagnostic:
         return mutate(self, suggestion=message)
     
+    def throw(self) -> NoReturn:
+        raise self
+
     def emit(self) -> None:
         print(self)
 

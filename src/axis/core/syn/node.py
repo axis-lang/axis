@@ -102,7 +102,7 @@ class Node(Record, frozen=True, abstract=True):
         src.tag_span_from(node, self)
         return self
 
-    def with_attrs(self, **kwargs) -> Self:
+    def with_attr(self, **kwargs) -> Self:
         result = mutate(self, **kwargs)
         src.tag_span_from(self, result)
         return result

@@ -69,7 +69,7 @@ class Destructuring(Object):
 
     @transform.register
     def eval_member(self, member: Member, prefix: syn.Expr):
-        return member.with_attrs(of=self.transform(member.of, prefix))
+        return member.with_attr(of=self.transform(member.of, prefix))
 
     @transform.register
     def eval_apply(self, apply: Apply, prefix: syn.Expr):
@@ -87,7 +87,7 @@ class Destructuring(Object):
 
     @transform.register
     def eval_tuple_nominal_elem(self, elem: Tuple.NominalElement, prefix: syn.Expr):
-        return elem.with_attrs(
+        return elem.with_attr(
             key=elem.value,
             bound=elem.bound,
             value=self.transform(elem.key, prefix),
@@ -95,7 +95,7 @@ class Destructuring(Object):
     
     @transform.register
     def eval_tuple_spread_elem(self, elem: Tuple.SpreadElement, prefix: syn.Expr):
-        return elem.with_attrs(etc=self.transform(elem.etc, prefix))
+        return elem.with_attr(etc=self.transform(elem.etc, prefix))
 
 
 def reify_destructure(expr: syn.Expr, from_: syn.Expr):

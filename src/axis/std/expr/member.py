@@ -53,7 +53,7 @@ def reify_member(self: syn.Reifier, mem: Member):
     # si tail es member, path_prefix tail con self.reify(mem.of)
     # sino:
 
-    return mem.with_attrs(
+    return mem.with_attr(
         of=self.reify(mem.of),
         name=self.value(mem.name, expected_type=Sym).name
     )
@@ -62,6 +62,6 @@ def reify_member(self: syn.Reifier, mem: Member):
 
         
 
-@val.Evaluator.eval.register(Member)
-def eval_member(self: val.Evaluator, mem: Member):
+@val.Ref.Evaluator.eval.register(Member)
+def eval_member(self: val.Ref.Evaluator, mem: Member):
     return self.eval(mem.of).member(mem.name)

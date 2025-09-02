@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
-from axis.core import syn, ref
+from axis.core import syn, val
 
 
 class Sym(syn.Expr):
@@ -63,6 +63,6 @@ def reify_sym(self: syn.Reifier, sym: Sym):
     return self.reify(self.value(sym.name))
 
 
-@ref.Evaluator.eval.register(Sym)
-def ref_eval_sym(self: ref.Evaluator, node: Sym) -> ref.Ref:
+@val.Ref.Evaluator.eval.register(Sym)
+def ref_eval_sym(self: val.Ref.Evaluator, node: Sym) -> val.Ref:
     return self.base.member(node.name)

@@ -24,17 +24,36 @@ class Val(syn.Item):
         *more,
         children: tuple[syn.Block, ...] = (),
     ):
-        bound = None
-        value = None
-        for operator, operand in zip(more[0::2], more[1::2]):
-            if operator == ":":
-                bound = operand
-            elif operator == "=":
-                value = operand
-            else:
-                raise ValueError(f"Unknown operator {operator}")
+        match more:
+            case (":", bound, "=", value):
+                pass
+            case (":", bound):
+                value = None
+            case ("=", value):
+                bound = None
+            case ():
+                bound = None
+                value = None
+            case _:
+                raise ValueError(f"Invalid syntax for val: {more}")
 
         return Val(key=key, bound=bound, value=value, children=children)
+
+    def bind(self, parent: sem.Binding) -> sem.Binding:
+        match self.key:
+            case Sym(name=name):
+                 ref = parent.ref.member(name)
+            case _:
+                log.error(f"Value key must be a symbol, got {self.key}").with_label(
+                    self.as_label
+                ).throw()
+
+
+        return sem.Binding(
+            parent=parent,
+            ref=parent.ref.member(self.key.name) if isinstance(self.key, Sym) else parent.ref,
+            item=self,
+        )
 
     def generate_content_manifest_entries(self, base_ref):
         match self.key:
@@ -52,12 +71,12 @@ class Val(syn.Item):
 # undefined para cuando una variable no ha sido inicializada
 
 
-@sem.Binder.discover.register(Val)
-def discover_val(parent: sem.Binder, val: Val):
-    match val:
-        case Val(key=Sym(name=name)):
-            parent.export_item(val.key.name, val)
-        case _:
-            log.error(f"Value key must be a symbol, got {val.key}").with_label(
-                val.as_label
-            ).emit()
+# @sem.Binder.discover.register(Val)
+# def discover_val(parent: sem.Binder, val: Val):
+#     match val:
+#         case Val(key=Sym(name=name)):
+#             parent.export_item(val.key.name, val)
+#         case _:
+#             log.error(f"Value key must be a symbol, got {val.key}").with_label(
+#                 val.as_label
+#             ).emit()

@@ -21,34 +21,34 @@ class Use(syn.Block):
 
     @classmethod
     def build(cls, kw: str, expr: syn.Expr, *, children: tuple[syn.Block]) -> Self:
-        return cls(expr=expr)
+        return cls(expr=expr, children=children)
 
     @cached_property
     def flat_expr(self) -> Tuple:
         return reify_destructure(self.expr, from_=Sym.ROOT)
 
 
-@syn.AstBuilder.build.register(syn.AxisParser.UseBlockContext)
-def build_use_ast(
-    self,
-    _,
-    kw: str,
-    expr: syn.Expr,
-    *,
-    children: tuple[syn.Block],
-):
-    return Use(expr=expr, children=children)
+# @syn.AstBuilder.build.register(syn.AxisParser.UseBlockContext)
+# def build_use_ast(
+#     self,
+#     _,
+#     kw: str,
+#     expr: syn.Expr,
+#     *,
+#     children: tuple[syn.Block],
+# ):
+#     return Use(expr=expr, children=children)
 
 
-@sem.Binder.discover.register(Use)
-def discover_use(self: sem.Binder, use: Use):
-    #print(use.flat_expr)
+# @sem.Binder.discover.register(Use)
+# def discover_use(self: sem.Binder, use: Use):
+#     #print(use.flat_expr)
 
-    for elem in use.flat_expr:
-        if isinstance(elem, Tuple.NominalElement):
-            self.import_ref(elem.key, elem.value)
-        elif isinstance(elem, Tuple.SpreadElement):
-            self.import_ref(..., elem.etc)
+#     for elem in use.flat_expr:
+#         if isinstance(elem, Tuple.NominalElement):
+#             self.import_ref(elem.key, elem.value)
+#         elif isinstance(elem, Tuple.SpreadElement):
+#             self.import_ref(..., elem.etc)
 
-    # TODO: declare binding imports
+#     # TODO: declare binding imports
 

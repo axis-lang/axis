@@ -1,6 +1,6 @@
-from typing import ClassVar, Generator
+from typing import ClassVar, Generator, Iterable, Self
 from .block import Block
-from axis.core import ref
+from axis.core import val
 
 class Item(Block, abstract=True):
     '''
@@ -14,7 +14,17 @@ class Item(Block, abstract=True):
         )
 
 
-    def generate_content_manifest_entries(self, base_ref: ref.Ref)-> Generator[tuple[ref.Ref, 'Item'], None, None]:
+    def generate_content_manifest_entries(self, base_ref: val.Ref)-> Generator[tuple[val.Ref, 'Item'], None, None]:
         raise NotImplementedError(
             f"{type(self).__qualname__} does not implement 'generate_globals' method"
+        )    
+
+    def split_subitems(self) -> tuple[Self, tuple['Item', ...]]:
+        items = tuple(child for child in self.children if isinstance(child, Item))
+        others = tuple(child for child in self.children if not isinstance(child, Item))
+        return self.with_attr(children=others), items
+
+    def bind(self, binder: 'sem.Binder') -> 'sem.Binding':
+        raise NotImplementedError(
+            f"{type(self).__qualname__} does not implement 'bind' method"
         )
