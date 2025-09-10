@@ -1,3 +1,4 @@
+from __future__ import annotations
 from protobase import Object, Record, cached_property
 from typing import ClassVar, Literal, Optional
 from axis.core import syn, sem, log
@@ -106,13 +107,13 @@ class Def(syn.Item):
             ).with_label(self.as_label).emit()
         return kind
 
-    def bind(cls, parent: sem.Binding) -> sem.Binding:
-         return sem.Binding(
-            parent=parent,
-            ref=parent.ref.member(cls.kind.name.name),
-            item=cls,
-         )
-    
+    class Binding(syn.Item.Binding):
+        item: Def
+
+        @property
+        def ref(self):
+            return self.parent.ref.member(self.item.kind.name.name)
+
 
 Def.add_child_block(Def.Where, must_be_indented=False)
 Def.add_child_block(Def.Takes, must_be_indented=False)

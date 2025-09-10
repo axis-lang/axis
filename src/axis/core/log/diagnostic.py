@@ -60,8 +60,8 @@ class Diagnostic(Record, frozen=True):
             self.emit()
 
 
-    def with_label(self, label: Label) -> Diagnostic:
-        return mutate(self, labels=self.labels + (label,))
+    def with_label(self, *labels: Label) -> Diagnostic:
+        return mutate(self, labels=self.labels + labels)
 
     # def with_label(
     #     self,

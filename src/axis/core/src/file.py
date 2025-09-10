@@ -11,6 +11,7 @@ from protobase import  Record, cached_property
 
 
 class File(Record, frozen=True):
+    #dir: Dir
     path: Path
     buffer: str | None = None
 
@@ -21,8 +22,9 @@ class File(Record, frozen=True):
         """
         if isinstance(path, str):
             path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"File {path} does not exist")
+        path = path.resolve()
+        if not path.is_file():
+            raise IsADirectoryError(f"Path {path} is not a file")
         return cls(path=path)
 
     @cached_property

@@ -4,7 +4,7 @@ from typing import ClassVar, Iterable, Self
 
 from protobase import derived
 
-from axis.core import src
+from axis.core import src, sem
 
 from .building import AstBuilder
 from .node import Node
@@ -61,3 +61,6 @@ class Block(Node, src.Block, abstract=True):
     def __iter__(self):
         return iter(self.children)
 
+    def contribute_to_scope(self, scope: sem.Scope.Builder) -> None:
+        for child in self.children:
+            child.contribute_to_scope(scope)

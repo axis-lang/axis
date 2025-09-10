@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 from axis.core import syn, sem, log
 from axis.std.expr import Sym
@@ -39,21 +40,21 @@ class Val(syn.Item):
 
         return Val(key=key, bound=bound, value=value, children=children)
 
-    def bind(self, parent: sem.Binding) -> sem.Binding:
-        match self.key:
-            case Sym(name=name):
-                 ref = parent.ref.member(name)
-            case _:
-                log.error(f"Value key must be a symbol, got {self.key}").with_label(
-                    self.as_label
-                ).throw()
+    class Binding(syn.Item.Binding):
+        item: Val
 
+        @property
+        def ref(self):
+            match self.item.key:
+                case Sym(name=name):
+                    ref = self.parent.ref.member(name)
+                case _:
+                    log.error(f"Value key must be a symbol, got {self.item.key}").with_label(
+                        self.item.as_label
+                    ).throw()
 
-        return sem.Binding(
-            parent=parent,
-            ref=parent.ref.member(self.key.name) if isinstance(self.key, Sym) else parent.ref,
-            item=self,
-        )
+            return self.parent.ref.member(self.item.key.name) if isinstance(self.item.key, Sym) else self.parent.ref
+
 
     def generate_content_manifest_entries(self, base_ref):
         match self.key:

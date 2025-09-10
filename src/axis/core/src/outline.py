@@ -83,7 +83,7 @@ class Block(Object, abstract=True):
         return Outline(cls, frozendict(rules))
         
 
-class Outline[T: Block](Record, frozen=True):
+class Outline[T: Block](Record, frozen=True): #outline.spec
     class Identation(str, Enum): # En block
         SAME = ""
         NEST = "(?:[ \t]+)"

@@ -1,9 +1,7 @@
 from __future__ import annotations
-from decimal import Decimal
-from operator import is_
 from typing import ClassVar, Iterable, Optional, Self
 from warnings import warn
-from protobase import Record, attrs_of, mutate, Type
+from protobase import Record, attrs_of, mutate, Type, is_abstract
 from rich.tree import Tree
 from rich.text import Text
 from textwrap import shorten, fill
@@ -30,10 +28,24 @@ class Node(Record, frozen=True, abstract=True):
                 return warn(f'Grammar rule not found for {proto.name} ({ctx_name})')
 
             print(f'Binding {cls.__qualname__}.build() to {ctx_name}')
-            @AstBuilder.build.register(ctx_class)
+            @AstBuilder.build.register(ctx_class)   
             def build(ast_builder, ctx, *args, **kwargs):
                 return cls.build(*args, **kwargs)
-       
+    
+    # def __class_post_build__(cls):
+    #     if is_abstract(cls):
+    #         return
+    
+    #     from axis.core.syn.grammar import AxisParser
+    #     ctx_name = f'{cls.__name__}{cls.grammar_context_infix}Context'
+    #     ctx_class = getattr(AxisParser, ctx_name, None)
+    #     if ctx_class is None:
+    #         return warn(f'Grammar rule not found for {cls.__name__} ({ctx_name})')
+
+    #     print(f'Bindin {cls.__qualname__}.build() to {ctx_name}')
+    #     @AstBuilder.build.register(ctx_class)
+    #     def build_ast(ast_builder, ctx, *args, **kwargs):
+    #         return cls.build(*args, **kwargs)
 
     def __rich__(self):
 
@@ -94,7 +106,6 @@ class Node(Record, frozen=True, abstract=True):
             attr_label.append(' = ', style=OP_STYLE)
             attr_label.append(Text(shorten(str(value), 50), style=VALUE_STYLE))
             tree.add(attr_label)
-
 
         return tree
 

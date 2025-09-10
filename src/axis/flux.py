@@ -2,16 +2,32 @@
 from __future__ import annotations
 from functools import cached_property, wraps, update_wrapper
 from typing import Any, Callable, ClassVar
-from protobase import Object, Context, Consed, Inmutable
+from protobase import Object, Record, Context
 from contextvars import ContextVar
 
 
+"""
+el sistema tiene dos contadores globales de revision, commit y stash..
+las inferencias anteriores a la revision commit son descartadas (liberando memoria)
+las inferencias entre commit y stash son guardadas en un log de cambios (para undo)
+
+el sistema tiene inputs e input sources.. los input sources son funciones puras que retornan
+conjuntos de inputs (tuplas o frozensets) y son rastreadas por el sistema.
+todo el sistema responde a esos input sources, recomputando las inferencias que dependen de ellos.
+
+un input puede ser: agregado, actualizado o eliminado.
+
+los inputs pueden actuar en cascada, por ejemplo, inputs pueden ser referencias a archivos (sus paths)
+y otro input source una funcion que lee esos archivos y retorna su contenido como input.
+el contenido puede ser actualizado.
+
+"""
 
 class FluxCycle(Exception):
     pass
 
 
-class FluxQuery(Context, context_base=True): # TODO: Consed o Inmutable
+class FluxQuery(Record, Context, frozen=True, hub=True):
     "Query Object"
 
     func: Callable
@@ -50,7 +66,7 @@ class FluxQuery(Context, context_base=True): # TODO: Consed o Inmutable
 
 
 
-class FluxGraph(Context, context_base=True):
+class FluxGraph(Context, hub=True):
     "Tracks the flux of a environment (DB)"
 
     class Entry(Object):
@@ -72,7 +88,7 @@ class FluxGraph(Context, context_base=True):
         return invalidations
 
 
-class FluxTracked[*P, R](Inmutable):
+class FluxTracked[*P, R](Record, frozen=True):
     __slots__ = ("__doc__",)
 
     fn: Callable[[*P], R]

@@ -1,1 +1,2 @@
-from .doc import Doc
+from .doc import *
+from .use import *
