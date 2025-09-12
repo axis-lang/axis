@@ -4,8 +4,8 @@ from decimal import Decimal
 
 from rich import print
 
-from axis import std
-from axis.core import sem, src, syn
+from axis import expr
+from axis import sem, src, syn
 
 # SRCBLOCK_SPEC_PATH = Path("src/axis/codebase/grammar/srcblock-spec.yaml")
 # SOURCE_UNIT_PATH = Path("src/std.base.tests.src/test.ax")
@@ -17,10 +17,10 @@ class GrammarTest(unittest.TestCase):
     def test_parse_expr(self):
         self.assertEqual(
             syn.Expr.parse("1 + 2"),
-            std.BinOp(
-                lhs=std.Lit(Decimal(1)),
-                rhs=std.Lit(Decimal(2)),
-                op=std.BinOp.Operator("+"),
+            expr.BinOp(
+                lhs=expr.Lit(Decimal(1)),
+                rhs=expr.Lit(Decimal(2)),
+                op=expr.BinOp.Operator("+"),
             ),
         )
 
