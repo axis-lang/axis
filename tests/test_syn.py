@@ -48,6 +48,7 @@ class ExprMatchingTest(unittest.TestCase):
     def test_unify(self):
 
         match_test = syn.Match.from_expr("$ctx.$name($a, ..$b, $c)")
+        print(match_test.patterns[0])
 
         match = match_test("Natural.alpha(1,2,3,4,5)")
 

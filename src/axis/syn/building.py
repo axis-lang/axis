@@ -208,7 +208,7 @@ class FromSrcMixin(Record, frozen=True, abstract=True):
     def span(self) -> src.Span | None:
         return src.Span.of(self)
 
-    @property
+    #@property
     def as_label(self, *args, **kwargs):
         assert self.span is not None, f'Node {self!r} has no span'
         return log.Label(self.span, *args, **kwargs)

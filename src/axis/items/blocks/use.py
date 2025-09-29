@@ -135,9 +135,9 @@ class Destructuring(Object):
             value=self.transform(elem.key, prefix),
         )
     
-    @transform.register
-    def eval_tuple_spread_elem(self, elem: expr.Tuple.Spread, prefix: syn.Expr):
-        return elem.with_attr(etc=self.transform(elem.etc, prefix))
+    # @transform.register
+    # def eval_tuple_spread_elem(self, elem: expr.Tuple.Spread, prefix: syn.Expr):
+    #     return elem.with_attr(etc=self.transform(elem.etc, prefix))
 
 
 def reify_destructure(expr: syn.Expr, from_: syn.Expr):

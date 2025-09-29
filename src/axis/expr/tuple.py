@@ -7,9 +7,10 @@ from axis import syn, log
 
 # from .etc import Etc
 from .sym import Sym
+from .etc import Etc
 
 
-class Tuple(syn.Expr):
+class Tuple(syn.Expr, frozen=True):
     """
     Represents a tuple expression in the AST.
     It can contain elements that are:
@@ -19,37 +20,44 @@ class Tuple(syn.Expr):
 
     """
 
-    class Element(syn.Node, abstract=True):
-        grammar_context_infix: ClassVar[Literal['Element']] = 'Element'
+    class Element(syn.Node, frozen=True, abstract=True):
+        grammar_context_infix: ClassVar[Literal["Element"]] = "Element"
 
+        @property
+        def is_spread(self) -> bool:
+            raise NotImplementedError
 
-    class Value(Element):
+    class Value(Element, frozen=True):  # PositionalElement
         "value"
 
         value: Optional[syn.Expr]
 
         def __str__(self) -> str:
             return str(self.value)
-        
+
         @classmethod
         def build(cls, value: syn.Expr):
             return cls(value=value)
 
-    class Spread(Element):
-        "..spread"
+        @property
+        def is_spread(self) -> bool:
+            return isinstance(self.value, Etc)
 
-        etc: Optional[syn.Expr]
+    # class Spread(Element):
+    #     "..spread"
 
-        @classmethod
-        def build(cls, ellipsis: Literal['..'], etc: Optional[syn.Expr]=None):
-            return cls(etc=etc)
+    #     etc: Optional[syn.Expr]
 
-        def __str__(self) -> str:
-            if self.etc:
-                return f'..{self.etc}'
-            return '..'
+    #     @classmethod
+    #     def build(cls, ellipsis: Literal['..'], etc: Optional[syn.Expr]=None):
+    #         return cls(etc=etc)
 
-    class Nominal(Element):
+    #     def __str__(self) -> str:
+    #         if self.etc:
+    #             return f'..{self.etc}'
+    #         return '..'
+
+    class Nominal(Element, frozen=True):
         "name: bound = value"
 
         key: syn.Expr
@@ -57,7 +65,14 @@ class Tuple(syn.Expr):
         value: Optional[syn.Expr] = None
 
         @classmethod
-        def build(cls, key: syn.Expr, op1: Optional[str] = None, e1: Optional[syn.Expr] = None, op2: Optional[str] = None, e2: Optional[syn.Expr] = None):
+        def build(
+            cls,
+            key: syn.Expr,
+            op1: Optional[str] = None,
+            e1: Optional[syn.Expr] = None,
+            op2: Optional[str] = None,
+            e2: Optional[syn.Expr] = None,
+        ):
             match (op1, e1, op2, e2):
                 case (":", bound, "=", value):
                     return cls(key=key, bound=bound, value=value)
@@ -68,8 +83,13 @@ class Tuple(syn.Expr):
                 case (None, None, None, None):
                     return cls(key=key, bound=None, value=None)
                 case _:
-                    raise ValueError(f"Invalid syntax for named element: {key} {op1} {e1} {op2} {e2}")
+                    raise ValueError(
+                        f"Invalid syntax for named element: {key} {op1} {e1} {op2} {e2}"
+                    )
 
+        @property
+        def is_spread(self) -> bool:
+            return isinstance(self.key, Etc)
 
         # @property
         # def is_wildcard(self) -> bool:
@@ -77,11 +97,11 @@ class Tuple(syn.Expr):
 
         def __str__(self) -> str:
             if self.bound and self.value:
-                return f'{self.key}: {self.bound} = {self.value}'
+                return f"{self.key}: {self.bound} = {self.value}"
             if self.bound:
-                return f'{self.key}: {self.bound}'
+                return f"{self.key}: {self.bound}"
             if self.value:
-                return f'{self.key} = {self.value}'
+                return f"{self.key} = {self.value}"
             return str(self.key)
 
     elements: tuple[Element, ...]
@@ -91,12 +111,12 @@ class Tuple(syn.Expr):
         return cls(elements=elements)
 
     def __str__(self) -> str:
-        return '(' + ', '.join(str(e) for e in self.elements) + ')'
+        return "(" + ", ".join(str(e) for e in self.elements) + ")"
 
     def __len__(self) -> int:
         return len(self.elements)
 
-    def __getitem__(self, index: int | slice) -> Element:
+    def __getitem__(self, index: int | slice) -> Element | tuple[Element, ...]:
         return self.elements[index]
 
     def __iter__(self):
@@ -104,9 +124,7 @@ class Tuple(syn.Expr):
 
     @cached_property
     def spread_positions(self) -> tuple[int, ...]:
-        return tuple(
-            i for i, e in enumerate(self.elements) if isinstance(e, self.Spread)
-        )
+        return tuple(i for i, e in enumerate(self.elements) if e.is_spread)
 
     @cached_property  # TODO: cached property can retain the raised error and rethrow it on subsequent calls
     def head_and_tail_count(self) -> tuple[int, int]:
@@ -126,7 +144,7 @@ class Tuple(syn.Expr):
             ) as err:
                 for pos in spread_positions:
                     err.with_label(
-                        self.elements[pos], f"Spread element at position {pos}"
+                        self.elements[pos].as_label(f"Spread element at position {pos}")
                     )
             raise ValueError("Tuple has multiple spread positions")
 
@@ -160,8 +178,8 @@ class Tuple(syn.Expr):
         return head_elements, rest_elements, tail_elements
 
 
-class Shape(Tuple):
-    ...
+class Shape(Tuple): ...
+
 
 # @syn.AstBuilder.build.register(syn.AxisParser.TupleContext | syn.AxisParser.ShapeContext)
 # def build_tuple_ast(
@@ -180,7 +198,6 @@ class Shape(Tuple):
 #     value: syn.Expr,
 # ):
 #     return Tuple.Value(value=value)
-
 
 
 # @syn.AstBuilder.build.register(syn.AxisParser.ValueElementContext)
@@ -224,7 +241,7 @@ class Shape(Tuple):
 #     return Tuple.Nominal(key=name, bound=None, value=e1)
 
 
-@syn.Matcher.match.register(Tuple)
+@syn.Matcher.impl(Tuple)
 def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
 
     if not isinstance(value, Tuple):
@@ -246,20 +263,28 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
     for a, b in zip(target_head, value_head):
         self.match_node(a, b)
 
-    if len(target_rest) == 1:
-        target_spread = target_rest[0]
-        assert isinstance(
-            target_spread, Tuple.Spread
-        ), "Expected a spread element in the rest of the tuple"
+    match target_rest:
+        case (
+            Tuple.Value(value=Etc(expr=Sym(name=wildcard_name) as target_sym)),
+        ) if target_sym.is_wildcard:
 
-        if isinstance(target_spread.etc, Sym) and target_spread.etc.is_wildcard:
-            self.capture_value(target_spread.etc.name, value.with_attr(elements=value_rest))
+            # target_etc = target_rest[0]
+            # assert target_etc.is_spread, "Expected a spread element in the rest of the tuple"
+            # TODO: logica de captura de valores, ampliar con bounds etc
+            self.capture_value(wildcard_name, value.with_attr(elements=value_rest))
+
+    # if len(target_rest) == 1:
+    #     target_etc = target_rest[0]
+    #     assert target_etc.is_spread, "Expected a spread element in the rest of the tuple"
+    #     # TODO: logica de captura de valores, ampliar con bounds etc
+    #     if isinstance(target_etc.expr, Sym) and target_etc.expr.is_wildcard:
+    #         self.capture_value(target_etc.expr.name, value.with_attr(elements=value_rest))
 
     for a, b in zip(target_tail, value_tail):
         self.match_node(a, b)
 
 
-@syn.Reifier.reify.register(Tuple)
+@syn.Reifier.impl(Tuple)
 def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
     """
     Reifies a Tuple expression, resolving any wildcards or named elements.
@@ -267,11 +292,11 @@ def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
     elements = []
     for elem in tup.elements:
         if (
-            isinstance(elem, Tuple.Spread)
-            and isinstance(elem.etc, Sym)
-            and elem.etc.is_wildcard
+            isinstance(elem, Etc)
+            and isinstance(elem.expr, Sym)
+            and elem.expr.is_wildcard
         ):
-            target = self.value(elem.etc.name, Tuple)
+            target = self.value(elem.expr.name, Tuple)
 
             # if elem.etc.name[1:] not in self.values:
             #     raise ValueError(f"Unresolved wildcard: {elem.etc.name}")

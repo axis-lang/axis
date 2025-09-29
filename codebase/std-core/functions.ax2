@@ -1,14 +1,15 @@
 unit std
 
-def is_empty[T]: { x: T -> Boolean }
-    --------
-    Un array cuya extension tiene algun valor a 0 es is_empty
-    un optional none es empty
-    un conjunto vacio es empty
-    un mapa sin elemento es empty
+use std.io.console(print)
+use std.process(cli)
 
+fn main(..) -> cli.Result
+---------------------------------
+  The main function
+takes:
+    var arguments: cli.Arguments
+:: 
+    print("Hello world")
 
-def count[T]: { x: T -> Natural }
-    -----
-
+    cli.Result.Ok()
 

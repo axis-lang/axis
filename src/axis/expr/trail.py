@@ -1,15 +1,12 @@
+from typing import Self
 from axis import syn
 
-class Trail(syn.Expr):
-    'Represents a trailing lambda expression'
-    base: syn.Expr
-    suite: syn.Expr
+class Trail(syn.Expr, frozen=True):
+    'base {suite}'
 
-@syn.Builder.build.register
-def build_trail_ast(
-    self,
-    ctx: syn.AxisParser.TrailingLambdaContext,
-    base: syn.Expr,
-    trailing: syn.Expr = None,
-):
-    return Trail(base, trailing)
+    base: syn.Expr
+    suite: syn.Expr # lambda
+
+    @classmethod
+    def build(cls, base: syn.Expr, suite: syn.Expr) -> Self:
+        return cls(base=base, suite=suite)

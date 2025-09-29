@@ -91,24 +91,26 @@ prefixExpr
 // Postfix operations
 postfixExpr
     : primaryExpr                                                   # PostfixPass
-    | postfixExpr lambda                                            # TrailingLambda
+    | postfixExpr lambda                                            # TrailExpr
     | postfixExpr tupleExpr                                         # ApplyExpr
-    | postfixExpr shapeExpr                                         # Index
+    | postfixExpr shapeExpr                                         # IndexExpr
     | postfixExpr ('.' ID)+                                         # MemberExpr
     | postfixExpr ('::' ID)+                                        # ScopeExpr
     ;
 
 // Primary exprs
 primaryExpr
-    : symExpr
+    : wildcardExpr
+    | etcExpr
+    | symExpr
     | litExpr
     | tupleExpr
     | lambda
-    // | wildcard              // Wildcard
-    // | spread
-    // | ellipsis              // Ellipsis
-    //| etc
     ;
+
+wildcardExpr: '_';
+
+etcExpr: '..' expr?;
 
 symExpr: ID ('@' ID)?;
 
@@ -133,7 +135,7 @@ shapeExpr
 tupleElement
     : tupleValueElement
     | tupleNominalElement
-    | tupleSpreadElement
+    //| tupleSpreadElement
     ;
 
 tupleValueElement

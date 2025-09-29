@@ -96,3 +96,6 @@ class Tuple[V: Data = Data, K: Data = Data](Value, frozen=True):
         return self.__meta__.bounds[offset].value_of(self.__data__[offset])
 
  
+    # @transform.register
+    # def eval_tuple_spread_elem(self, elem: expr.Tuple.Spread, prefix: syn.Expr):
+    #     return elem.with_attr(etc=self.transform(elem.etc, prefix))

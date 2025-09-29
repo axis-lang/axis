@@ -260,15 +260,6 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#TrailingLambda.
-    def enterTrailingLambda(self, ctx:AxisParser.TrailingLambdaContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#TrailingLambda.
-    def exitTrailingLambda(self, ctx:AxisParser.TrailingLambdaContext):
-        pass
-
-
     # Enter a parse tree produced by AxisParser#MemberExpr.
     def enterMemberExpr(self, ctx:AxisParser.MemberExprContext):
         pass
@@ -287,12 +278,21 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#Index.
-    def enterIndex(self, ctx:AxisParser.IndexContext):
+    # Enter a parse tree produced by AxisParser#TrailExpr.
+    def enterTrailExpr(self, ctx:AxisParser.TrailExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#Index.
-    def exitIndex(self, ctx:AxisParser.IndexContext):
+    # Exit a parse tree produced by AxisParser#TrailExpr.
+    def exitTrailExpr(self, ctx:AxisParser.TrailExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#IndexExpr.
+    def enterIndexExpr(self, ctx:AxisParser.IndexExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#IndexExpr.
+    def exitIndexExpr(self, ctx:AxisParser.IndexExprContext):
         pass
 
 
@@ -311,6 +311,24 @@ class AxisListener(ParseTreeListener):
 
     # Exit a parse tree produced by AxisParser#primaryExpr.
     def exitPrimaryExpr(self, ctx:AxisParser.PrimaryExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#wildcardExpr.
+    def enterWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#wildcardExpr.
+    def exitWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#etcExpr.
+    def enterEtcExpr(self, ctx:AxisParser.EtcExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#etcExpr.
+    def exitEtcExpr(self, ctx:AxisParser.EtcExprContext):
         pass
 
 
