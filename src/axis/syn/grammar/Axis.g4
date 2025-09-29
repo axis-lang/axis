@@ -108,9 +108,10 @@ primaryExpr
     | lambda
     ;
 
-wildcardExpr: '_';
 
-etcExpr: '..' expr?;
+wildcardExpr: '_'; // placePattern
+
+etcExpr: '..' expr?; // etcPattern
 
 symExpr: ID ('@' ID)?;
 
