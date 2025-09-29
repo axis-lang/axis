@@ -9,6 +9,10 @@ class Span(Metadata, Record, frozen=True):
     start: int
     end: int
 
+    @classmethod
+    def from_str(cls, content: str):
+        return cls(File.from_buffer("<unnamed>", content), 0, len(content))
+
     def __len__(self) -> int:
         return self.end - self.start
 
@@ -61,14 +65,17 @@ class Span(Metadata, Record, frozen=True):
     def content(self) -> str:
         return self.file.content[self.start : self.end]
 
+    def __str__(self):
+        return self.content
+
+
 def span_of(obj: object) -> Span | None:
     return Span.of(obj)
 
+
 def tag_span_from(from_: object, *to) -> Span | None:
-    'aplica el source span de from_ a to'
+    "aplica el source span de from_ a to"
     span = Span.of(from_)
     if span is None:
         return None
     span.tag(*to)
-
-

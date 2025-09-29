@@ -1,15 +1,13 @@
 from functools import singledispatchmethod
 from typing import Any, Self
 from protobase import Object, attrs_of, frozendict
-from .node import Node
-from .statement import Statement
+from .node import Node, Statement
 
 
 class Reifier(Object):
     values: dict[str, Any]
 
     def __call__(self, item: Node) -> Node:
-        print('EEE', self.values)
         return self.reify(item)
 
     def value[T:Node](self, name: str, expected_type: type[T] = Node) -> T:
@@ -31,6 +29,13 @@ class Reifier(Object):
     def reify(self, value: Any) -> Any:
         return value
 
+    @classmethod
+    def impl(cls, target_type: type[Node]):
+        def decorator(func):
+            cls.reify.register(target_type, func)  # type: ignore
+            return func
+        return decorator
+
     @reify.register
     def reify_node(self, node: Node) -> Node:
         attrs = {k: self.reify(v) for k, v in attrs_of(node).items()}
@@ -51,5 +56,5 @@ class Reify(Object):
     @classmethod
     def expr(cls, pattern: Statement | str) -> Self:
         if isinstance(pattern, str):
-            pattern = Statement.parse(pattern)
+            pattern = Statement.from_str(pattern)
         return cls(pattern=pattern)

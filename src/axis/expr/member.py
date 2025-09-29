@@ -1,9 +1,8 @@
-from multiprocessing import Value
-from os import name
+from typing import Self
 from axis import syn, val
 from .sym import Sym
 
-class Member(syn.Expr):
+class Member(syn.Expr, frozen=True):
     of: syn.Expr
     name: str
 
@@ -17,21 +16,28 @@ class Member(syn.Expr):
     def as_sym(self):
         return Sym(name=self.name).with_span_of(self)
 
-
-@syn.AstBuilder.build.register
-def build_member(
-    self,
-    ctx: syn.AxisParser.MemberAccessContext,
-    of: syn.Node,
-    *members: str,
-):
-    result = of
-    for member in members:
-        result = Member(of=result, name=member)
-    return result
+    @classmethod
+    def build(cls, of: syn.Expr, *members):
+        result = of
+        for member in members:
+            result = cls(of=result, name=member)
+        return result
 
 
-@syn.Matcher.match.register(Member)
+# @syn.Builder.build.register
+# def build_member(
+#     self,
+#     ctx: syn.AxisParser.MemberAccessContext,
+#     of: syn.Node,
+#     *members: str,
+# ):
+#     result = of
+#     for member in members:
+#         result = Member(of=result, name=member)
+#     return result
+
+
+@syn.Matcher.impl(Member)
 def match_member(self: syn.Matcher, pattern: Member, value: syn.Expr):    
     if not pattern.is_wildcard:
         return self.match_node(pattern, value)
@@ -44,7 +50,7 @@ def match_member(self: syn.Matcher, pattern: Member, value: syn.Expr):
     self.capture_value(pattern.name, value.as_sym())
     #self.capture_value(mem.name, mem)
 
-@syn.Reifier.reify.register(Member)
+@syn.Reifier.impl(Member)
 def reify_member(self: syn.Reifier, mem: Member):    
     if not mem.is_wildcard:
         return self.reify_node(mem)
@@ -62,6 +68,6 @@ def reify_member(self: syn.Reifier, mem: Member):
 
         
 
-@val.Ref.Evaluator.eval.register(Member)
-def eval_member(self: val.Ref.Evaluator, mem: Member):
-    return self.eval(mem.of).member(mem.name)
+# @val.Ref.Evaluator.eval.register(Member)
+# def eval_member(self: val.Ref.Evaluator, mem: Member):
+#     return self.eval(mem.of).member(mem.name)

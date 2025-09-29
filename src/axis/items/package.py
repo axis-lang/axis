@@ -2,8 +2,7 @@ from typing import Self
 from protobase import Record, cached_property
 
 from axis import src, syn, val
-from .index import GlobalIndex
-from .binding import Binding
+#from .index import GlobalIndex
 
 class Package(Record, frozen=True):
     dir: src.Dir
@@ -26,17 +25,6 @@ class Package(Record, frozen=True):
     def source_paths(self):  # path -> file
         return self.dir.glob("**/*.ax")
 
-    # @property
-    # def source_block_spec(self):
-    #     from axis import items
-    #     return items.Unit.build_outline_spec()
-
-    # def unit_ast(self, path: src.Path):
-    #     from axis import items
-
-    #     file = src.File.from_path(self.dir.path / path)
-    #     return self.source_block_spec.parse_outline(file)
-
     def file_items(self, path: src.Path):
         from axis import items
         file = src.File.from_path(self.dir.path / path)
@@ -50,6 +38,26 @@ class Package(Record, frozen=True):
             for item in self.file_items(path)
         )
 
+
+    # @property
+    # def source_block_spec(self):
+    #     from axis import items
+    #     return items.Unit.build_outline_spec()
+
+    # def unit_ast(self, path: src.Path):
+    #     from axis import items
+
+    #     file = src.File.from_path(self.dir.path / path)
+    #     return self.source_block_spec.parse_outline(file)
+
+    # def file_bindings(self, path: src.Path) -> frozenset[Binding]:
+    #     from axis import items
+    #     #return items.Unit.build_outline_spec()
+
+    #     file = src.File.from_path(self.dir.path / path)
+    #     ast_item = items.Unit.outline_spec.parse_outline(file)
+    #     # ast_item = self.source_block_spec.parse_outline(file)
+    #     return frozenset(Binding.generate_from(ast_item, pkg=self, parent=self.root_binding))
 
     # class RootBinding(Binding):
     #     @property
@@ -66,11 +74,9 @@ class Package(Record, frozen=True):
 
     # @property
     # def global_index(self):
-    #     all_items = 
+    #     all_bindings = set()
 
-        # all_bindings = set()
+    #     for path in self.source_paths:
+    #         all_bindings.update(self.file_bindings(path))
 
-        # for path in self.source_paths:
-        #     all_bindings.update(self.file_bindings(path))
-
-        # return GlobalIndex.from_bindings(all_bindings)
+    #     return GlobalIndex.from_bindings(all_bindings)

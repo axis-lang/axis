@@ -1,17 +1,17 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
-from axis import syn, sem, log, expr
+from axis import items, syn, sem, log, expr
 
 
 
-class Val(syn.Item):
+class Val(syn.Item, frozen=True):
     """
     Represents a 'val' item:
     val expr: bound = value
     """
 
-    keyword: ClassVar = "val"
-    grammar: ClassVar = "val: 'val' expression ':' expression '=' expression EOF;"
+    outline_keyword: ClassVar[str] = "val"
+    #grammar: ClassVar = "val: 'val' expression ':' expression '=' expression EOF;"
 
     key: syn.Expr
     bound: Optional[syn.Expr]
@@ -23,6 +23,8 @@ class Val(syn.Item):
         kw: Literal["val"],
         key: syn.Expr,
         *more,
+        parent: syn.Item,
+        pkg: items.Package,
         children: tuple[syn.Block, ...] = (),
     ):
         match more:
@@ -38,32 +40,32 @@ class Val(syn.Item):
             case _:
                 raise ValueError(f"Invalid syntax for val: {more}")
 
-        return Val(key=key, bound=bound, value=value, children=children)
+        return Val(key=key, bound=bound, value=value)
 
-    class Binding(sem.Binding):
-        item: Val
+    # class Binding(sem.Binding):
+    #     item: Val
 
-        @property
-        def ref(self):
-            match self.item.key:
-                case expr.Sym(name=name):
-                    ref = self.parent.ref.member(name)
-                case _:
-                    log.error(f"Value key must be a symbol, got {self.item.key}").with_label(
-                        self.item.as_label
-                    ).throw()
+    #     @property
+    #     def ref(self):
+    #         match self.item.key:
+    #             case expr.Sym(name=name):
+    #                 ref = self.parent.ref.member(name)
+    #             case _:
+    #                 log.error(f"Value key must be a symbol, got {self.item.key}").with_label(
+    #                     self.item.as_label
+    #                 ).throw()
 
-            return self.parent.ref.member(self.item.key.name) if isinstance(self.item.key, expr.Sym) else self.parent.ref
+    #         return self.parent.ref.member(self.item.key.name) if isinstance(self.item.key, expr.Sym) else self.parent.ref
 
 
-    def generate_content_manifest_entries(self, base_ref):
-        match self.key:
-            case expr.Sym(name=name):
-                yield base_ref.member(name), self
-            case _:
-                log.error(f"Value key must be a symbol, got {self.key}").with_label(
-                    self.as_label
-                ).emit()
+    # def generate_content_manifest_entries(self, base_ref):
+    #     match self.key:
+    #         case expr.Sym(name=name):
+    #             yield base_ref.member(name), self
+    #         case _:
+    #             log.error(f"Value key must be a symbol, got {self.key}").with_label(
+    #                 self.as_label
+    #             ).emit()
 
 
 # valor NaV (not a value) sera retornado cuando una evaluacion sea erronea

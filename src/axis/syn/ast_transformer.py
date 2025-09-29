@@ -46,7 +46,6 @@ class AstTransformer(Object, abstract=True):
     def transform_int(self, integer: int) -> int:
         return integer
 
-
     @transform.register
     def transform_decimal(self, decimal: Decimal) -> Decimal:
         return decimal

@@ -10,7 +10,7 @@ else:
 
 def serializedATN():
     return [
-        4,1,42,393,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,43,393,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,
         2,14,7,14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,
         7,20,2,21,7,21,2,22,7,22,2,23,7,23,2,24,7,24,2,25,7,25,2,26,7,26,
@@ -46,7 +46,7 @@ def serializedATN():
         40,1,40,3,40,391,8,40,1,40,0,1,54,41,0,2,4,6,8,10,12,14,16,18,20,
         22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,
         66,68,70,72,74,76,78,80,0,5,1,0,17,18,1,0,19,24,1,0,25,26,1,0,27,
-        29,1,0,39,40,403,0,82,1,0,0,0,2,86,1,0,0,0,4,90,1,0,0,0,6,94,1,0,
+        30,1,0,40,41,403,0,82,1,0,0,0,2,86,1,0,0,0,4,90,1,0,0,0,6,94,1,0,
         0,0,8,109,1,0,0,0,10,113,1,0,0,0,12,120,1,0,0,0,14,124,1,0,0,0,16,
         128,1,0,0,0,18,140,1,0,0,0,20,145,1,0,0,0,22,147,1,0,0,0,24,162,
         1,0,0,0,26,164,1,0,0,0,28,181,1,0,0,0,30,183,1,0,0,0,32,185,1,0,
@@ -63,10 +63,10 @@ def serializedATN():
         0,101,103,3,30,15,0,102,100,1,0,0,0,102,103,1,0,0,0,103,105,1,0,
         0,0,104,106,5,7,0,0,105,104,1,0,0,0,105,106,1,0,0,0,106,107,1,0,
         0,0,107,108,5,0,0,1,108,7,1,0,0,0,109,110,5,8,0,0,110,111,3,30,15,
-        0,111,112,5,0,0,1,112,9,1,0,0,0,113,115,5,9,0,0,114,116,5,38,0,0,
-        115,114,1,0,0,0,115,116,1,0,0,0,116,117,1,0,0,0,117,118,5,5,0,0,
-        118,119,5,0,0,1,119,11,1,0,0,0,120,121,5,10,0,0,121,122,5,5,0,0,
-        122,123,5,0,0,1,123,13,1,0,0,0,124,125,5,11,0,0,125,126,3,30,15,
+        0,111,112,5,0,0,1,112,9,1,0,0,0,113,115,5,9,0,0,114,116,3,30,15,
+        0,115,114,1,0,0,0,115,116,1,0,0,0,116,117,1,0,0,0,117,118,5,5,0,
+        0,118,119,5,0,0,1,119,11,1,0,0,0,120,121,5,10,0,0,121,122,5,5,0,
+        0,122,123,5,0,0,1,123,13,1,0,0,0,124,125,5,11,0,0,125,126,3,30,15,
         0,126,127,5,0,0,1,127,15,1,0,0,0,128,132,5,12,0,0,129,131,3,20,10,
         0,130,129,1,0,0,0,131,134,1,0,0,0,132,130,1,0,0,0,132,133,1,0,0,
         0,133,135,1,0,0,0,134,132,1,0,0,0,135,136,5,0,0,1,136,17,1,0,0,0,
@@ -77,13 +77,13 @@ def serializedATN():
         15,0,151,149,1,0,0,0,151,152,1,0,0,0,152,155,1,0,0,0,153,154,5,6,
         0,0,154,156,3,30,15,0,155,153,1,0,0,0,155,156,1,0,0,0,156,158,1,
         0,0,0,157,159,5,7,0,0,158,157,1,0,0,0,158,159,1,0,0,0,159,23,1,0,
-        0,0,160,163,5,38,0,0,161,163,3,26,13,0,162,160,1,0,0,0,162,161,1,
+        0,0,160,163,5,39,0,0,161,163,3,26,13,0,162,160,1,0,0,0,162,161,1,
         0,0,0,163,25,1,0,0,0,164,173,5,13,0,0,165,170,3,28,14,0,166,167,
         5,14,0,0,167,169,3,28,14,0,168,166,1,0,0,0,169,172,1,0,0,0,170,168,
         1,0,0,0,170,171,1,0,0,0,171,174,1,0,0,0,172,170,1,0,0,0,173,165,
         1,0,0,0,173,174,1,0,0,0,174,175,1,0,0,0,175,176,5,15,0,0,176,27,
-        1,0,0,0,177,182,5,38,0,0,178,179,5,38,0,0,179,180,5,5,0,0,180,182,
-        5,38,0,0,181,177,1,0,0,0,181,178,1,0,0,0,182,29,1,0,0,0,183,184,
+        1,0,0,0,177,182,5,39,0,0,178,179,5,39,0,0,179,180,5,5,0,0,180,182,
+        5,39,0,0,181,177,1,0,0,0,181,178,1,0,0,0,182,29,1,0,0,0,183,184,
         3,32,16,0,184,31,1,0,0,0,185,189,3,34,17,0,186,188,3,34,17,0,187,
         186,1,0,0,0,188,191,1,0,0,0,189,187,1,0,0,0,189,190,1,0,0,0,190,
         33,1,0,0,0,191,189,1,0,0,0,192,195,3,36,18,0,193,194,5,16,0,0,194,
@@ -103,27 +103,27 @@ def serializedATN():
         1,0,0,0,241,242,3,54,27,0,242,53,1,0,0,0,243,244,6,27,-1,0,244,245,
         3,56,28,0,245,268,1,0,0,0,246,247,10,5,0,0,247,267,3,74,37,0,248,
         249,10,4,0,0,249,267,3,62,31,0,250,251,10,3,0,0,251,267,3,64,32,
-        0,252,255,10,2,0,0,253,254,5,30,0,0,254,256,5,38,0,0,255,253,1,0,
+        0,252,255,10,2,0,0,253,254,5,31,0,0,254,256,5,39,0,0,255,253,1,0,
         0,0,256,257,1,0,0,0,257,255,1,0,0,0,257,258,1,0,0,0,258,267,1,0,
-        0,0,259,262,10,1,0,0,260,261,5,31,0,0,261,263,5,38,0,0,262,260,1,
+        0,0,259,262,10,1,0,0,260,261,5,32,0,0,261,263,5,39,0,0,262,260,1,
         0,0,0,263,264,1,0,0,0,264,262,1,0,0,0,264,265,1,0,0,0,265,267,1,
         0,0,0,266,246,1,0,0,0,266,248,1,0,0,0,266,250,1,0,0,0,266,252,1,
         0,0,0,266,259,1,0,0,0,267,270,1,0,0,0,268,266,1,0,0,0,268,269,1,
         0,0,0,269,55,1,0,0,0,270,268,1,0,0,0,271,276,3,58,29,0,272,276,3,
         60,30,0,273,276,3,62,31,0,274,276,3,74,37,0,275,271,1,0,0,0,275,
         272,1,0,0,0,275,273,1,0,0,0,275,274,1,0,0,0,276,57,1,0,0,0,277,280,
-        5,38,0,0,278,279,5,32,0,0,279,281,5,38,0,0,280,278,1,0,0,0,280,281,
+        5,39,0,0,278,279,5,33,0,0,279,281,5,39,0,0,280,278,1,0,0,0,280,281,
         1,0,0,0,281,59,1,0,0,0,282,283,7,4,0,0,283,61,1,0,0,0,284,293,5,
         13,0,0,285,290,3,66,33,0,286,287,5,14,0,0,287,289,3,66,33,0,288,
         286,1,0,0,0,289,292,1,0,0,0,290,288,1,0,0,0,290,291,1,0,0,0,291,
         294,1,0,0,0,292,290,1,0,0,0,293,285,1,0,0,0,293,294,1,0,0,0,294,
         296,1,0,0,0,295,297,5,14,0,0,296,295,1,0,0,0,296,297,1,0,0,0,297,
-        298,1,0,0,0,298,299,5,15,0,0,299,63,1,0,0,0,300,309,5,33,0,0,301,
+        298,1,0,0,0,298,299,5,15,0,0,299,63,1,0,0,0,300,309,5,34,0,0,301,
         306,3,66,33,0,302,303,5,14,0,0,303,305,3,66,33,0,304,302,1,0,0,0,
         305,308,1,0,0,0,306,304,1,0,0,0,306,307,1,0,0,0,307,310,1,0,0,0,
         308,306,1,0,0,0,309,301,1,0,0,0,309,310,1,0,0,0,310,312,1,0,0,0,
         311,313,5,14,0,0,312,311,1,0,0,0,312,313,1,0,0,0,313,314,1,0,0,0,
-        314,315,5,34,0,0,315,65,1,0,0,0,316,320,3,68,34,0,317,320,3,70,35,
+        314,315,5,35,0,0,315,65,1,0,0,0,316,320,3,68,34,0,317,320,3,70,35,
         0,318,320,3,72,36,0,319,316,1,0,0,0,319,317,1,0,0,0,319,318,1,0,
         0,0,320,67,1,0,0,0,321,322,3,30,15,0,322,69,1,0,0,0,323,324,3,30,
         15,0,324,325,5,5,0,0,325,326,3,30,15,0,326,338,1,0,0,0,327,328,3,
@@ -131,21 +131,21 @@ def serializedATN():
         3,30,15,0,332,333,5,5,0,0,333,334,3,30,15,0,334,335,5,6,0,0,335,
         336,3,30,15,0,336,338,1,0,0,0,337,323,1,0,0,0,337,327,1,0,0,0,337,
         331,1,0,0,0,338,71,1,0,0,0,339,341,5,16,0,0,340,342,3,30,15,0,341,
-        340,1,0,0,0,341,342,1,0,0,0,342,73,1,0,0,0,343,345,5,35,0,0,344,
+        340,1,0,0,0,341,342,1,0,0,0,342,73,1,0,0,0,343,345,5,36,0,0,344,
         346,3,78,39,0,345,344,1,0,0,0,345,346,1,0,0,0,346,347,1,0,0,0,347,
-        351,5,36,0,0,348,350,3,20,10,0,349,348,1,0,0,0,350,353,1,0,0,0,351,
+        351,5,37,0,0,348,350,3,20,10,0,349,348,1,0,0,0,350,353,1,0,0,0,351,
         349,1,0,0,0,351,352,1,0,0,0,352,355,1,0,0,0,353,351,1,0,0,0,354,
         356,3,30,15,0,355,354,1,0,0,0,355,356,1,0,0,0,356,357,1,0,0,0,357,
-        373,5,37,0,0,358,362,5,35,0,0,359,361,3,20,10,0,360,359,1,0,0,0,
+        373,5,38,0,0,358,362,5,36,0,0,359,361,3,20,10,0,360,359,1,0,0,0,
         361,364,1,0,0,0,362,360,1,0,0,0,362,363,1,0,0,0,363,366,1,0,0,0,
         364,362,1,0,0,0,365,367,3,30,15,0,366,365,1,0,0,0,366,367,1,0,0,
         0,367,369,1,0,0,0,368,370,3,76,38,0,369,368,1,0,0,0,369,370,1,0,
-        0,0,370,371,1,0,0,0,371,373,5,37,0,0,372,343,1,0,0,0,372,358,1,0,
+        0,0,370,371,1,0,0,0,371,373,5,38,0,0,372,343,1,0,0,0,372,358,1,0,
         0,0,373,75,1,0,0,0,374,375,5,7,0,0,375,77,1,0,0,0,376,381,3,80,40,
         0,377,378,5,14,0,0,378,380,3,80,40,0,379,377,1,0,0,0,380,383,1,0,
         0,0,381,379,1,0,0,0,381,382,1,0,0,0,382,385,1,0,0,0,383,381,1,0,
         0,0,384,386,5,14,0,0,385,384,1,0,0,0,385,386,1,0,0,0,386,79,1,0,
-        0,0,387,390,5,38,0,0,388,389,5,5,0,0,389,391,3,30,15,0,390,388,1,
+        0,0,387,390,5,39,0,0,388,389,5,5,0,0,389,391,3,30,15,0,390,388,1,
         0,0,0,390,391,1,0,0,0,391,81,1,0,0,0,45,98,102,105,115,132,140,145,
         151,155,158,162,170,173,181,189,195,203,214,225,236,257,264,266,
         268,275,280,290,293,296,306,309,312,319,337,341,345,351,355,362,
@@ -166,8 +166,8 @@ class AxisParser ( Parser ):
                      "'='", "';'", "'use'", "'takes'", "'where'", "'returns'", 
                      "'suite'", "'('", "','", "')'", "'..'", "'&&'", "'||'", 
                      "'=='", "'!='", "'<'", "'<='", "'>'", "'>='", "'+'", 
-                     "'-'", "'*'", "'/'", "'%'", "'.'", "'::'", "'@'", "'['", 
-                     "']'", "'{'", "'->'", "'}'" ]
+                     "'-'", "'*'", "'/'", "'%'", "'\\u00B7'", "'.'", "'::'", 
+                     "'@'", "'['", "']'", "'{'", "'->'", "'}'" ]
 
     symbolicNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
@@ -178,8 +178,8 @@ class AxisParser ( Parser ):
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
                       "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                      "<INVALID>", "<INVALID>", "ID", "DECIMAL", "TEXT", 
-                      "WS", "COMMENT" ]
+                      "<INVALID>", "<INVALID>", "<INVALID>", "ID", "DECIMAL", 
+                      "TEXT", "WS", "COMMENT" ]
 
     RULE_unitItem = 0
     RULE_modItem = 1
@@ -196,22 +196,22 @@ class AxisParser ( Parser ):
     RULE_pattern = 12
     RULE_tuplePattern = 13
     RULE_tuplePatternElement = 14
-    RULE_expression = 15
-    RULE_juxtaposition = 16
-    RULE_range = 17
-    RULE_logical = 18
-    RULE_logicalOp = 19
-    RULE_comparison = 20
+    RULE_expr = 15
+    RULE_compoundExpr = 16
+    RULE_rangeExpr = 17
+    RULE_logicExpr = 18
+    RULE_logicOp = 19
+    RULE_comparisonExpr = 20
     RULE_comparisonOp = 21
-    RULE_addition = 22
+    RULE_additiveExpr = 22
     RULE_additiveOp = 23
-    RULE_product = 24
+    RULE_productiveExpr = 24
     RULE_productiveOp = 25
-    RULE_prefix = 26
-    RULE_postfix = 27
-    RULE_primary = 28
+    RULE_prefixExpr = 26
+    RULE_postfixExpr = 27
+    RULE_primaryExpr = 28
     RULE_symExpr = 29
-    RULE_lit = 30
+    RULE_litExpr = 30
     RULE_tupleExpr = 31
     RULE_shapeExpr = 32
     RULE_tupleElement = 33
@@ -226,13 +226,13 @@ class AxisParser ( Parser ):
     ruleNames =  [ "unitItem", "modItem", "defItem", "valItem", "useBlock", 
                    "takesBlock", "whereBlock", "returnsBlock", "suiteBlock", 
                    "suite", "statement", "valStatement", "pattern", "tuplePattern", 
-                   "tuplePatternElement", "expression", "juxtaposition", 
-                   "range", "logical", "logicalOp", "comparison", "comparisonOp", 
-                   "addition", "additiveOp", "product", "productiveOp", 
-                   "prefix", "postfix", "primary", "symExpr", "lit", "tupleExpr", 
-                   "shapeExpr", "tupleElement", "tupleValueElement", "tupleNominalElement", 
-                   "tupleSpreadElement", "lambda", "semicolon", "lambdaParams", 
-                   "lambdaParam" ]
+                   "tuplePatternElement", "expr", "compoundExpr", "rangeExpr", 
+                   "logicExpr", "logicOp", "comparisonExpr", "comparisonOp", 
+                   "additiveExpr", "additiveOp", "productiveExpr", "productiveOp", 
+                   "prefixExpr", "postfixExpr", "primaryExpr", "symExpr", 
+                   "litExpr", "tupleExpr", "shapeExpr", "tupleElement", 
+                   "tupleValueElement", "tupleNominalElement", "tupleSpreadElement", 
+                   "lambda", "semicolon", "lambdaParams", "lambdaParam" ]
 
     EOF = Token.EOF
     T__0=1
@@ -272,11 +272,12 @@ class AxisParser ( Parser ):
     T__34=35
     T__35=36
     T__36=37
-    ID=38
-    DECIMAL=39
-    TEXT=40
-    WS=41
-    COMMENT=42
+    T__37=38
+    ID=39
+    DECIMAL=40
+    TEXT=41
+    WS=42
+    COMMENT=43
 
     def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
         super().__init__(input, output)
@@ -294,8 +295,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def EOF(self):
@@ -324,7 +325,7 @@ class AxisParser ( Parser ):
             self.state = 82
             self.match(AxisParser.T__0)
             self.state = 83
-            self.expression()
+            self.expr()
             self.state = 84
             self.match(AxisParser.EOF)
         except RecognitionException as re:
@@ -343,8 +344,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def EOF(self):
@@ -373,7 +374,7 @@ class AxisParser ( Parser ):
             self.state = 86
             self.match(AxisParser.T__1)
             self.state = 87
-            self.expression()
+            self.expr()
             self.state = 88
             self.match(AxisParser.EOF)
         except RecognitionException as re:
@@ -392,8 +393,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def EOF(self):
@@ -422,7 +423,7 @@ class AxisParser ( Parser ):
             self.state = 90
             self.match(AxisParser.T__2)
             self.state = 91
-            self.expression()
+            self.expr()
             self.state = 92
             self.match(AxisParser.EOF)
         except RecognitionException as re:
@@ -441,11 +442,11 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.ExpressionContext)
+                return self.getTypedRuleContexts(AxisParser.ExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.ExpressionContext,i)
+                return self.getTypedRuleContext(AxisParser.ExprContext,i)
 
 
         def EOF(self):
@@ -475,7 +476,7 @@ class AxisParser ( Parser ):
             self.state = 94
             self.match(AxisParser.T__3)
             self.state = 95
-            self.expression()
+            self.expr()
             self.state = 98
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -483,7 +484,7 @@ class AxisParser ( Parser ):
                 self.state = 96
                 self.match(AxisParser.T__4)
                 self.state = 97
-                self.expression()
+                self.expr()
 
 
             self.state = 102
@@ -493,7 +494,7 @@ class AxisParser ( Parser ):
                 self.state = 100
                 self.match(AxisParser.T__5)
                 self.state = 101
-                self.expression()
+                self.expr()
 
 
             self.state = 105
@@ -522,8 +523,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def EOF(self):
@@ -552,7 +553,7 @@ class AxisParser ( Parser ):
             self.state = 109
             self.match(AxisParser.T__7)
             self.state = 110
-            self.expression()
+            self.expr()
             self.state = 111
             self.match(AxisParser.EOF)
         except RecognitionException as re:
@@ -574,8 +575,9 @@ class AxisParser ( Parser ):
         def EOF(self):
             return self.getToken(AxisParser.EOF, 0)
 
-        def ID(self):
-            return self.getToken(AxisParser.ID, 0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
+
 
         def getRuleIndex(self):
             return AxisParser.RULE_takesBlock
@@ -603,9 +605,9 @@ class AxisParser ( Parser ):
             self.state = 115
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==38:
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182144) != 0):
                 self.state = 114
-                self.match(AxisParser.ID)
+                self.expr()
 
 
             self.state = 117
@@ -673,8 +675,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def EOF(self):
@@ -703,7 +705,7 @@ class AxisParser ( Parser ):
             self.state = 124
             self.match(AxisParser.T__10)
             self.state = 125
-            self.expression()
+            self.expr()
             self.state = 126
             self.match(AxisParser.EOF)
         except RecognitionException as re:
@@ -758,7 +760,7 @@ class AxisParser ( Parser ):
             self.state = 132
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505095184) != 0):
+            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182160) != 0):
                 self.state = 129
                 self.statement()
                 self.state = 134
@@ -814,7 +816,7 @@ class AxisParser ( Parser ):
             self.state = 140
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505095184) != 0):
+            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182160) != 0):
                 self.state = 137
                 self.statement()
                 self.state = 142
@@ -841,8 +843,8 @@ class AxisParser ( Parser ):
             return self.getTypedRuleContext(AxisParser.ValStatementContext,0)
 
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def getRuleIndex(self):
@@ -872,10 +874,10 @@ class AxisParser ( Parser ):
                 self.state = 143
                 self.valStatement()
                 pass
-            elif token in [13, 35, 38, 39, 40]:
+            elif token in [13, 36, 39, 40, 41]:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 144
-                self.expression()
+                self.expr()
                 pass
             else:
                 raise NoViableAltException(self)
@@ -900,11 +902,11 @@ class AxisParser ( Parser ):
             return self.getTypedRuleContext(AxisParser.PatternContext,0)
 
 
-        def expression(self, i:int=None):
+        def expr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.ExpressionContext)
+                return self.getTypedRuleContexts(AxisParser.ExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.ExpressionContext,i)
+                return self.getTypedRuleContext(AxisParser.ExprContext,i)
 
 
         def getRuleIndex(self):
@@ -940,7 +942,7 @@ class AxisParser ( Parser ):
                 self.state = 149
                 self.match(AxisParser.T__4)
                 self.state = 150
-                self.expression()
+                self.expr()
 
 
             self.state = 155
@@ -950,7 +952,7 @@ class AxisParser ( Parser ):
                 self.state = 153
                 self.match(AxisParser.T__5)
                 self.state = 154
-                self.expression()
+                self.expr()
 
 
             self.state = 158
@@ -1006,7 +1008,7 @@ class AxisParser ( Parser ):
             self.state = 162
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [38]:
+            if token in [39]:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 160
                 self.match(AxisParser.ID)
@@ -1068,7 +1070,7 @@ class AxisParser ( Parser ):
             self.state = 173
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==38:
+            if _la==39:
                 self.state = 165
                 self.tuplePatternElement()
                 self.state = 170
@@ -1157,39 +1159,39 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class ExpressionContext(ParserRuleContext):
+    class ExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def juxtaposition(self):
-            return self.getTypedRuleContext(AxisParser.JuxtapositionContext,0)
+        def compoundExpr(self):
+            return self.getTypedRuleContext(AxisParser.CompoundExprContext,0)
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_expression
+            return AxisParser.RULE_expr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExpression" ):
-                listener.enterExpression(self)
+            if hasattr( listener, "enterExpr" ):
+                listener.enterExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExpression" ):
-                listener.exitExpression(self)
+            if hasattr( listener, "exitExpr" ):
+                listener.exitExpr(self)
 
 
 
 
-    def expression(self):
+    def expr(self):
 
-        localctx = AxisParser.ExpressionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 30, self.RULE_expression)
+        localctx = AxisParser.ExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 30, self.RULE_expr)
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 183
-            self.juxtaposition()
+            self.compoundExpr()
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1199,49 +1201,49 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class JuxtapositionContext(ParserRuleContext):
+    class CompoundExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def range_(self, i:int=None):
+        def rangeExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.RangeContext)
+                return self.getTypedRuleContexts(AxisParser.RangeExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.RangeContext,i)
+                return self.getTypedRuleContext(AxisParser.RangeExprContext,i)
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_juxtaposition
+            return AxisParser.RULE_compoundExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterJuxtaposition" ):
-                listener.enterJuxtaposition(self)
+            if hasattr( listener, "enterCompoundExpr" ):
+                listener.enterCompoundExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitJuxtaposition" ):
-                listener.exitJuxtaposition(self)
+            if hasattr( listener, "exitCompoundExpr" ):
+                listener.exitCompoundExpr(self)
 
 
 
 
-    def juxtaposition(self):
+    def compoundExpr(self):
 
-        localctx = AxisParser.JuxtapositionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 32, self.RULE_juxtaposition)
+        localctx = AxisParser.CompoundExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 32, self.RULE_compoundExpr)
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 185
-            self.range_()
+            self.rangeExpr()
             self.state = 189
             self._errHandler.sync(self)
             _alt = self._interp.adaptivePredict(self._input,14,self._ctx)
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                 if _alt==1:
                     self.state = 186
-                    self.range_() 
+                    self.rangeExpr() 
                 self.state = 191
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,14,self._ctx)
@@ -1255,43 +1257,43 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class RangeContext(ParserRuleContext):
+    class RangeExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def logical(self, i:int=None):
+        def logicExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.LogicalContext)
+                return self.getTypedRuleContexts(AxisParser.LogicExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.LogicalContext,i)
+                return self.getTypedRuleContext(AxisParser.LogicExprContext,i)
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_range
+            return AxisParser.RULE_rangeExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterRange" ):
-                listener.enterRange(self)
+            if hasattr( listener, "enterRangeExpr" ):
+                listener.enterRangeExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitRange" ):
-                listener.exitRange(self)
+            if hasattr( listener, "exitRangeExpr" ):
+                listener.exitRangeExpr(self)
 
 
 
 
-    def range_(self):
+    def rangeExpr(self):
 
-        localctx = AxisParser.RangeContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 34, self.RULE_range)
+        localctx = AxisParser.RangeExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 34, self.RULE_rangeExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 192
-            self.logical()
+            self.logicExpr()
             self.state = 195
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -1299,7 +1301,7 @@ class AxisParser ( Parser ):
                 self.state = 193
                 self.match(AxisParser.T__15)
                 self.state = 194
-                self.logical()
+                self.logicExpr()
 
 
         except RecognitionException as re:
@@ -1311,58 +1313,58 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class LogicalContext(ParserRuleContext):
+    class LogicExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def comparison(self, i:int=None):
+        def comparisonExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.ComparisonContext)
+                return self.getTypedRuleContexts(AxisParser.ComparisonExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.ComparisonContext,i)
+                return self.getTypedRuleContext(AxisParser.ComparisonExprContext,i)
 
 
-        def logicalOp(self, i:int=None):
+        def logicOp(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.LogicalOpContext)
+                return self.getTypedRuleContexts(AxisParser.LogicOpContext)
             else:
-                return self.getTypedRuleContext(AxisParser.LogicalOpContext,i)
+                return self.getTypedRuleContext(AxisParser.LogicOpContext,i)
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_logical
+            return AxisParser.RULE_logicExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLogical" ):
-                listener.enterLogical(self)
+            if hasattr( listener, "enterLogicExpr" ):
+                listener.enterLogicExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLogical" ):
-                listener.exitLogical(self)
+            if hasattr( listener, "exitLogicExpr" ):
+                listener.exitLogicExpr(self)
 
 
 
 
-    def logical(self):
+    def logicExpr(self):
 
-        localctx = AxisParser.LogicalContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 36, self.RULE_logical)
+        localctx = AxisParser.LogicExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 36, self.RULE_logicExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 197
-            self.comparison()
+            self.comparisonExpr()
             self.state = 203
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la==17 or _la==18:
                 self.state = 198
-                self.logicalOp()
+                self.logicOp()
                 self.state = 199
-                self.comparison()
+                self.comparisonExpr()
                 self.state = 205
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -1376,7 +1378,7 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class LogicalOpContext(ParserRuleContext):
+    class LogicOpContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -1385,23 +1387,23 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_logicalOp
+            return AxisParser.RULE_logicOp
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLogicalOp" ):
-                listener.enterLogicalOp(self)
+            if hasattr( listener, "enterLogicOp" ):
+                listener.enterLogicOp(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLogicalOp" ):
-                listener.exitLogicalOp(self)
+            if hasattr( listener, "exitLogicOp" ):
+                listener.exitLogicOp(self)
 
 
 
 
-    def logicalOp(self):
+    def logicOp(self):
 
-        localctx = AxisParser.LogicalOpContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 38, self.RULE_logicalOp)
+        localctx = AxisParser.LogicOpContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 38, self.RULE_logicOp)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
@@ -1421,18 +1423,18 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class ComparisonContext(ParserRuleContext):
+    class ComparisonExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def addition(self, i:int=None):
+        def additiveExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.AdditionContext)
+                return self.getTypedRuleContexts(AxisParser.AdditiveExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.AdditionContext,i)
+                return self.getTypedRuleContext(AxisParser.AdditiveExprContext,i)
 
 
         def comparisonOp(self, i:int=None):
@@ -1443,28 +1445,28 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_comparison
+            return AxisParser.RULE_comparisonExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterComparison" ):
-                listener.enterComparison(self)
+            if hasattr( listener, "enterComparisonExpr" ):
+                listener.enterComparisonExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitComparison" ):
-                listener.exitComparison(self)
+            if hasattr( listener, "exitComparisonExpr" ):
+                listener.exitComparisonExpr(self)
 
 
 
 
-    def comparison(self):
+    def comparisonExpr(self):
 
-        localctx = AxisParser.ComparisonContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 40, self.RULE_comparison)
+        localctx = AxisParser.ComparisonExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 40, self.RULE_comparisonExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 208
-            self.addition()
+            self.additiveExpr()
             self.state = 214
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -1472,7 +1474,7 @@ class AxisParser ( Parser ):
                 self.state = 209
                 self.comparisonOp()
                 self.state = 210
-                self.addition()
+                self.additiveExpr()
                 self.state = 216
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -1531,18 +1533,18 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class AdditionContext(ParserRuleContext):
+    class AdditiveExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def product(self, i:int=None):
+        def productiveExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.ProductContext)
+                return self.getTypedRuleContexts(AxisParser.ProductiveExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.ProductContext,i)
+                return self.getTypedRuleContext(AxisParser.ProductiveExprContext,i)
 
 
         def additiveOp(self, i:int=None):
@@ -1553,28 +1555,28 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_addition
+            return AxisParser.RULE_additiveExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAddition" ):
-                listener.enterAddition(self)
+            if hasattr( listener, "enterAdditiveExpr" ):
+                listener.enterAdditiveExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAddition" ):
-                listener.exitAddition(self)
+            if hasattr( listener, "exitAdditiveExpr" ):
+                listener.exitAdditiveExpr(self)
 
 
 
 
-    def addition(self):
+    def additiveExpr(self):
 
-        localctx = AxisParser.AdditionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 44, self.RULE_addition)
+        localctx = AxisParser.AdditiveExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 44, self.RULE_additiveExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 219
-            self.product()
+            self.productiveExpr()
             self.state = 225
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -1582,7 +1584,7 @@ class AxisParser ( Parser ):
                 self.state = 220
                 self.additiveOp()
                 self.state = 221
-                self.product()
+                self.productiveExpr()
                 self.state = 227
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -1641,18 +1643,18 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class ProductContext(ParserRuleContext):
+    class ProductiveExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def prefix(self, i:int=None):
+        def prefixExpr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.PrefixContext)
+                return self.getTypedRuleContexts(AxisParser.PrefixExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.PrefixContext,i)
+                return self.getTypedRuleContext(AxisParser.PrefixExprContext,i)
 
 
         def productiveOp(self, i:int=None):
@@ -1663,36 +1665,36 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_product
+            return AxisParser.RULE_productiveExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterProduct" ):
-                listener.enterProduct(self)
+            if hasattr( listener, "enterProductiveExpr" ):
+                listener.enterProductiveExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitProduct" ):
-                listener.exitProduct(self)
+            if hasattr( listener, "exitProductiveExpr" ):
+                listener.exitProductiveExpr(self)
 
 
 
 
-    def product(self):
+    def productiveExpr(self):
 
-        localctx = AxisParser.ProductContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 48, self.RULE_product)
+        localctx = AxisParser.ProductiveExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 48, self.RULE_productiveExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 230
-            self.prefix()
+            self.prefixExpr()
             self.state = 236
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 939524096) != 0):
+            while (((_la) & ~0x3f) == 0 and ((1 << _la) & 2013265920) != 0):
                 self.state = 231
                 self.productiveOp()
                 self.state = 232
-                self.prefix()
+                self.prefixExpr()
                 self.state = 238
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -1737,7 +1739,7 @@ class AxisParser ( Parser ):
             self.enterOuterAlt(localctx, 1)
             self.state = 239
             _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & 939524096) != 0)):
+            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & 2013265920) != 0)):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
@@ -1751,7 +1753,7 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class PrefixContext(ParserRuleContext):
+    class PrefixExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -1760,7 +1762,7 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_prefix
+            return AxisParser.RULE_prefixExpr
 
      
         def copyFrom(self, ctx:ParserRuleContext):
@@ -1768,14 +1770,14 @@ class AxisParser ( Parser ):
 
 
 
-    class PrefixPassContext(PrefixContext):
+    class PrefixPassContext(PrefixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PrefixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PrefixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
 
 
         def enterRule(self, listener:ParseTreeListener):
@@ -1788,15 +1790,15 @@ class AxisParser ( Parser ):
 
 
 
-    def prefix(self):
+    def prefixExpr(self):
 
-        localctx = AxisParser.PrefixContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 52, self.RULE_prefix)
+        localctx = AxisParser.PrefixExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 52, self.RULE_prefixExpr)
         try:
             localctx = AxisParser.PrefixPassContext(self, localctx)
             self.enterOuterAlt(localctx, 1)
             self.state = 241
-            self.postfix(0)
+            self.postfixExpr(0)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1806,7 +1808,7 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class PostfixContext(ParserRuleContext):
+    class PostfixExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -1815,21 +1817,21 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_postfix
+            return AxisParser.RULE_postfixExpr
 
      
         def copyFrom(self, ctx:ParserRuleContext):
             super().copyFrom(ctx)
 
 
-    class ApplyExprContext(PostfixContext):
+    class ApplyExprContext(PostfixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
 
         def tupleExpr(self):
             return self.getTypedRuleContext(AxisParser.TupleExprContext,0)
@@ -1844,38 +1846,14 @@ class AxisParser ( Parser ):
                 listener.exitApplyExpr(self)
 
 
-    class MemberAccessContext(PostfixContext):
+    class TrailingLambdaContext(PostfixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
-
-        def ID(self, i:int=None):
-            if i is None:
-                return self.getTokens(AxisParser.ID)
-            else:
-                return self.getToken(AxisParser.ID, i)
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMemberAccess" ):
-                listener.enterMemberAccess(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMemberAccess" ):
-                listener.exitMemberAccess(self)
-
-
-    class TrailingLambdaContext(PostfixContext):
-
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
-            super().__init__(parser)
-            self.copyFrom(ctx)
-
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
 
         def lambda_(self):
             return self.getTypedRuleContext(AxisParser.LambdaContext,0)
@@ -1890,14 +1868,14 @@ class AxisParser ( Parser ):
                 listener.exitTrailingLambda(self)
 
 
-    class ScopeAccessContext(PostfixContext):
+    class MemberExprContext(PostfixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
 
         def ID(self, i:int=None):
             if i is None:
@@ -1906,22 +1884,22 @@ class AxisParser ( Parser ):
                 return self.getToken(AxisParser.ID, i)
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterScopeAccess" ):
-                listener.enterScopeAccess(self)
+            if hasattr( listener, "enterMemberExpr" ):
+                listener.enterMemberExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitScopeAccess" ):
-                listener.exitScopeAccess(self)
+            if hasattr( listener, "exitMemberExpr" ):
+                listener.exitMemberExpr(self)
 
 
-    class PostfixPassContext(PostfixContext):
+    class PostfixPassContext(PostfixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def primary(self):
-            return self.getTypedRuleContext(AxisParser.PrimaryContext,0)
+        def primaryExpr(self):
+            return self.getTypedRuleContext(AxisParser.PrimaryExprContext,0)
 
 
         def enterRule(self, listener:ParseTreeListener):
@@ -1933,14 +1911,14 @@ class AxisParser ( Parser ):
                 listener.exitPostfixPass(self)
 
 
-    class IndexContext(PostfixContext):
+    class IndexContext(PostfixExprContext):
 
-        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixContext
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def postfix(self):
-            return self.getTypedRuleContext(AxisParser.PostfixContext,0)
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
 
         def shapeExpr(self):
             return self.getTypedRuleContext(AxisParser.ShapeExprContext,0)
@@ -1955,14 +1933,38 @@ class AxisParser ( Parser ):
                 listener.exitIndex(self)
 
 
+    class ScopeExprContext(PostfixExprContext):
 
-    def postfix(self, _p:int=0):
+        def __init__(self, parser, ctx:ParserRuleContext): # actually a AxisParser.PostfixExprContext
+            super().__init__(parser)
+            self.copyFrom(ctx)
+
+        def postfixExpr(self):
+            return self.getTypedRuleContext(AxisParser.PostfixExprContext,0)
+
+        def ID(self, i:int=None):
+            if i is None:
+                return self.getTokens(AxisParser.ID)
+            else:
+                return self.getToken(AxisParser.ID, i)
+
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterScopeExpr" ):
+                listener.enterScopeExpr(self)
+
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitScopeExpr" ):
+                listener.exitScopeExpr(self)
+
+
+
+    def postfixExpr(self, _p:int=0):
         _parentctx = self._ctx
         _parentState = self.state
-        localctx = AxisParser.PostfixContext(self, self._ctx, _parentState)
+        localctx = AxisParser.PostfixExprContext(self, self._ctx, _parentState)
         _prevctx = localctx
         _startState = 54
-        self.enterRecursionRule(localctx, 54, self.RULE_postfix, _p)
+        self.enterRecursionRule(localctx, 54, self.RULE_postfixExpr, _p)
         try:
             self.enterOuterAlt(localctx, 1)
             localctx = AxisParser.PostfixPassContext(self, localctx)
@@ -1970,7 +1972,7 @@ class AxisParser ( Parser ):
             _prevctx = localctx
 
             self.state = 244
-            self.primary()
+            self.primaryExpr()
             self._ctx.stop = self._input.LT(-1)
             self.state = 268
             self._errHandler.sync(self)
@@ -1984,8 +1986,8 @@ class AxisParser ( Parser ):
                     self._errHandler.sync(self)
                     la_ = self._interp.adaptivePredict(self._input,22,self._ctx)
                     if la_ == 1:
-                        localctx = AxisParser.TrailingLambdaContext(self, AxisParser.PostfixContext(self, _parentctx, _parentState))
-                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfix)
+                        localctx = AxisParser.TrailingLambdaContext(self, AxisParser.PostfixExprContext(self, _parentctx, _parentState))
+                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfixExpr)
                         self.state = 246
                         if not self.precpred(self._ctx, 5):
                             from antlr4.error.Errors import FailedPredicateException
@@ -1995,8 +1997,8 @@ class AxisParser ( Parser ):
                         pass
 
                     elif la_ == 2:
-                        localctx = AxisParser.ApplyExprContext(self, AxisParser.PostfixContext(self, _parentctx, _parentState))
-                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfix)
+                        localctx = AxisParser.ApplyExprContext(self, AxisParser.PostfixExprContext(self, _parentctx, _parentState))
+                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfixExpr)
                         self.state = 248
                         if not self.precpred(self._ctx, 4):
                             from antlr4.error.Errors import FailedPredicateException
@@ -2006,8 +2008,8 @@ class AxisParser ( Parser ):
                         pass
 
                     elif la_ == 3:
-                        localctx = AxisParser.IndexContext(self, AxisParser.PostfixContext(self, _parentctx, _parentState))
-                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfix)
+                        localctx = AxisParser.IndexContext(self, AxisParser.PostfixExprContext(self, _parentctx, _parentState))
+                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfixExpr)
                         self.state = 250
                         if not self.precpred(self._ctx, 3):
                             from antlr4.error.Errors import FailedPredicateException
@@ -2017,8 +2019,8 @@ class AxisParser ( Parser ):
                         pass
 
                     elif la_ == 4:
-                        localctx = AxisParser.MemberAccessContext(self, AxisParser.PostfixContext(self, _parentctx, _parentState))
-                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfix)
+                        localctx = AxisParser.MemberExprContext(self, AxisParser.PostfixExprContext(self, _parentctx, _parentState))
+                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfixExpr)
                         self.state = 252
                         if not self.precpred(self._ctx, 2):
                             from antlr4.error.Errors import FailedPredicateException
@@ -2029,7 +2031,7 @@ class AxisParser ( Parser ):
                         while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                             if _alt == 1:
                                 self.state = 253
-                                self.match(AxisParser.T__29)
+                                self.match(AxisParser.T__30)
                                 self.state = 254
                                 self.match(AxisParser.ID)
 
@@ -2042,8 +2044,8 @@ class AxisParser ( Parser ):
                         pass
 
                     elif la_ == 5:
-                        localctx = AxisParser.ScopeAccessContext(self, AxisParser.PostfixContext(self, _parentctx, _parentState))
-                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfix)
+                        localctx = AxisParser.ScopeExprContext(self, AxisParser.PostfixExprContext(self, _parentctx, _parentState))
+                        self.pushNewRecursionContext(localctx, _startState, self.RULE_postfixExpr)
                         self.state = 259
                         if not self.precpred(self._ctx, 1):
                             from antlr4.error.Errors import FailedPredicateException
@@ -2054,7 +2056,7 @@ class AxisParser ( Parser ):
                         while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                             if _alt == 1:
                                 self.state = 260
-                                self.match(AxisParser.T__30)
+                                self.match(AxisParser.T__31)
                                 self.state = 261
                                 self.match(AxisParser.ID)
 
@@ -2080,7 +2082,7 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class PrimaryContext(ParserRuleContext):
+    class PrimaryExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -2091,8 +2093,8 @@ class AxisParser ( Parser ):
             return self.getTypedRuleContext(AxisParser.SymExprContext,0)
 
 
-        def lit(self):
-            return self.getTypedRuleContext(AxisParser.LitContext,0)
+        def litExpr(self):
+            return self.getTypedRuleContext(AxisParser.LitExprContext,0)
 
 
         def tupleExpr(self):
@@ -2104,43 +2106,43 @@ class AxisParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return AxisParser.RULE_primary
+            return AxisParser.RULE_primaryExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPrimary" ):
-                listener.enterPrimary(self)
+            if hasattr( listener, "enterPrimaryExpr" ):
+                listener.enterPrimaryExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPrimary" ):
-                listener.exitPrimary(self)
+            if hasattr( listener, "exitPrimaryExpr" ):
+                listener.exitPrimaryExpr(self)
 
 
 
 
-    def primary(self):
+    def primaryExpr(self):
 
-        localctx = AxisParser.PrimaryContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 56, self.RULE_primary)
+        localctx = AxisParser.PrimaryExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 56, self.RULE_primaryExpr)
         try:
             self.state = 275
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [38]:
+            if token in [39]:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 271
                 self.symExpr()
                 pass
-            elif token in [39, 40]:
+            elif token in [40, 41]:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 272
-                self.lit()
+                self.litExpr()
                 pass
             elif token in [13]:
                 self.enterOuterAlt(localctx, 3)
                 self.state = 273
                 self.tupleExpr()
                 pass
-            elif token in [35]:
+            elif token in [36]:
                 self.enterOuterAlt(localctx, 4)
                 self.state = 274
                 self.lambda_()
@@ -2197,7 +2199,7 @@ class AxisParser ( Parser ):
             la_ = self._interp.adaptivePredict(self._input,25,self._ctx)
             if la_ == 1:
                 self.state = 278
-                self.match(AxisParser.T__31)
+                self.match(AxisParser.T__32)
                 self.state = 279
                 self.match(AxisParser.ID)
 
@@ -2211,7 +2213,7 @@ class AxisParser ( Parser ):
         return localctx
 
 
-    class LitContext(ParserRuleContext):
+    class LitExprContext(ParserRuleContext):
         __slots__ = 'parser'
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -2225,29 +2227,29 @@ class AxisParser ( Parser ):
             return self.getToken(AxisParser.TEXT, 0)
 
         def getRuleIndex(self):
-            return AxisParser.RULE_lit
+            return AxisParser.RULE_litExpr
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLit" ):
-                listener.enterLit(self)
+            if hasattr( listener, "enterLitExpr" ):
+                listener.enterLitExpr(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLit" ):
-                listener.exitLit(self)
+            if hasattr( listener, "exitLitExpr" ):
+                listener.exitLitExpr(self)
 
 
 
 
-    def lit(self):
+    def litExpr(self):
 
-        localctx = AxisParser.LitContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 60, self.RULE_lit)
+        localctx = AxisParser.LitExprContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 60, self.RULE_litExpr)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 282
             _la = self._input.LA(1)
-            if not(_la==39 or _la==40):
+            if not(_la==40 or _la==41):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
@@ -2301,7 +2303,7 @@ class AxisParser ( Parser ):
             self.state = 293
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505160704) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010247680) != 0):
                 self.state = 285
                 self.tupleElement()
                 self.state = 290
@@ -2374,11 +2376,11 @@ class AxisParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 300
-            self.match(AxisParser.T__32)
+            self.match(AxisParser.T__33)
             self.state = 309
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505160704) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010247680) != 0):
                 self.state = 301
                 self.tupleElement()
                 self.state = 306
@@ -2405,7 +2407,7 @@ class AxisParser ( Parser ):
 
 
             self.state = 314
-            self.match(AxisParser.T__33)
+            self.match(AxisParser.T__34)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -2491,8 +2493,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def getRuleIndex(self):
@@ -2516,7 +2518,7 @@ class AxisParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 321
-            self.expression()
+            self.expr()
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -2533,11 +2535,11 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expr(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(AxisParser.ExpressionContext)
+                return self.getTypedRuleContexts(AxisParser.ExprContext)
             else:
-                return self.getTypedRuleContext(AxisParser.ExpressionContext,i)
+                return self.getTypedRuleContext(AxisParser.ExprContext,i)
 
 
         def getRuleIndex(self):
@@ -2565,35 +2567,35 @@ class AxisParser ( Parser ):
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 323
-                self.expression()
+                self.expr()
                 self.state = 324
                 self.match(AxisParser.T__4)
                 self.state = 325
-                self.expression()
+                self.expr()
                 pass
 
             elif la_ == 2:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 327
-                self.expression()
+                self.expr()
                 self.state = 328
                 self.match(AxisParser.T__5)
                 self.state = 329
-                self.expression()
+                self.expr()
                 pass
 
             elif la_ == 3:
                 self.enterOuterAlt(localctx, 3)
                 self.state = 331
-                self.expression()
+                self.expr()
                 self.state = 332
                 self.match(AxisParser.T__4)
                 self.state = 333
-                self.expression()
+                self.expr()
                 self.state = 334
                 self.match(AxisParser.T__5)
                 self.state = 335
-                self.expression()
+                self.expr()
                 pass
 
 
@@ -2613,8 +2615,8 @@ class AxisParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def getRuleIndex(self):
@@ -2643,9 +2645,9 @@ class AxisParser ( Parser ):
             self.state = 341
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505095168) != 0):
+            if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182144) != 0):
                 self.state = 340
-                self.expression()
+                self.expr()
 
 
         except RecognitionException as re:
@@ -2686,8 +2688,8 @@ class AxisParser ( Parser ):
             else:
                 return self.getTypedRuleContext(AxisParser.StatementContext,i)
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
         def semicolon(self):
             return self.getTypedRuleContext(AxisParser.SemicolonContext,0)
@@ -2717,8 +2719,8 @@ class AxisParser ( Parser ):
             else:
                 return self.getTypedRuleContext(AxisParser.StatementContext,i)
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def enterRule(self, listener:ParseTreeListener):
@@ -2744,17 +2746,17 @@ class AxisParser ( Parser ):
                 localctx = AxisParser.LambdaSuiteContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
                 self.state = 343
-                self.match(AxisParser.T__34)
+                self.match(AxisParser.T__35)
                 self.state = 345
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if _la==38:
+                if _la==39:
                     self.state = 344
                     self.lambdaParams()
 
 
                 self.state = 347
-                self.match(AxisParser.T__35)
+                self.match(AxisParser.T__36)
                 self.state = 351
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,36,self._ctx)
@@ -2769,20 +2771,20 @@ class AxisParser ( Parser ):
                 self.state = 355
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505095168) != 0):
+                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182144) != 0):
                     self.state = 354
-                    self.expression()
+                    self.expr()
 
 
                 self.state = 357
-                self.match(AxisParser.T__36)
+                self.match(AxisParser.T__37)
                 pass
 
             elif la_ == 2:
                 localctx = AxisParser.BasicSuiteContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
                 self.state = 358
-                self.match(AxisParser.T__34)
+                self.match(AxisParser.T__35)
                 self.state = 362
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,38,self._ctx)
@@ -2797,9 +2799,9 @@ class AxisParser ( Parser ):
                 self.state = 366
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 1958505095168) != 0):
+                if (((_la) & ~0x3f) == 0 and ((1 << _la) & 3917010182144) != 0):
                     self.state = 365
-                    self.expression()
+                    self.expr()
 
 
                 self.state = 369
@@ -2811,7 +2813,7 @@ class AxisParser ( Parser ):
 
 
                 self.state = 371
-                self.match(AxisParser.T__36)
+                self.match(AxisParser.T__37)
                 pass
 
 
@@ -2940,8 +2942,8 @@ class AxisParser ( Parser ):
         def ID(self):
             return self.getToken(AxisParser.ID, 0)
 
-        def expression(self):
-            return self.getTypedRuleContext(AxisParser.ExpressionContext,0)
+        def expr(self):
+            return self.getTypedRuleContext(AxisParser.ExprContext,0)
 
 
         def getRuleIndex(self):
@@ -2974,7 +2976,7 @@ class AxisParser ( Parser ):
                 self.state = 388
                 self.match(AxisParser.T__4)
                 self.state = 389
-                self.expression()
+                self.expr()
 
 
         except RecognitionException as re:
@@ -2990,14 +2992,14 @@ class AxisParser ( Parser ):
     def sempred(self, localctx:RuleContext, ruleIndex:int, predIndex:int):
         if self._predicates == None:
             self._predicates = dict()
-        self._predicates[27] = self.postfix_sempred
+        self._predicates[27] = self.postfixExpr_sempred
         pred = self._predicates.get(ruleIndex, None)
         if pred is None:
             raise Exception("No predicate with index:" + str(ruleIndex))
         else:
             return pred(localctx, predIndex)
 
-    def postfix_sempred(self, localctx:PostfixContext, predIndex:int):
+    def postfixExpr_sempred(self, localctx:PostfixExprContext, predIndex:int):
             if predIndex == 0:
                 return self.precpred(self._ctx, 5)
          

@@ -1,13 +1,9 @@
 from functools import singledispatchmethod
 from typing import Any, ClassVar, Self, Sequence
 from protobase import Object, Record, attrs_of, frozendict
-from .node import Node
-from .expr import Expr
+from .node import Node, Expr
 
 class Matcher(Object):
-    """
-    A base class of a reification pass for the AST
-    """
 
     class NoMatch(Exception): ...
 
@@ -42,15 +38,22 @@ class Matcher(Object):
         raise self.NoMatch
 
     @singledispatchmethod
-    def match(self, target: Any, value: Any):
+    def match(self, target: Any, value: Any) -> None: # TODO: returns bool?
         # if type(value) is not type(ctrl):
         #     raise StopUnification(f"Cannot unify {ctrl} with {value}")
 
         if target != value:
             raise self.NoMatch
 
+    @classmethod
+    def impl(cls, target_type: type[Node]):
+        def decorator(func):
+            cls.match.register(target_type, func)  # type: ignore
+            return func
+        return decorator
+
     @match.register
-    def match_node(self, target: Node, value: Any) -> Node:
+    def match_node(self, target: Node, value: Any):
         if not isinstance(value, type(target)):
             raise self.NoMatch
 
@@ -58,7 +61,7 @@ class Matcher(Object):
             self.match(v, getattr(value, k))
 
     @match.register
-    def match_tuple(self, target: tuple, value: Any) -> Node:
+    def match_tuple(self, target: tuple, value: Any):
         if not isinstance(value, tuple):
             raise self.NoMatch
 
@@ -78,7 +81,7 @@ class Match(Object):
 
     def __call__(self, expr: Expr | str) -> frozendict[str, Any] | None:
         if isinstance(expr, str):
-            expr = Expr.parse(expr)
+            expr = Expr.from_str(expr)
         matcher = Matcher()
         for target in self.patterns:
             result = matcher(target, expr)
@@ -88,10 +91,10 @@ class Match(Object):
 
     @classmethod
     def from_expr(cls, *patterns: Expr | str) -> Self:
-        patterns = tuple(Expr.parse(target) if isinstance(target, str) else target for target in patterns)
+        patterns = tuple(Expr.from_str(target) if isinstance(target, str) else target for target in patterns)
         return cls(patterns=patterns)
 
-class MatchClass(Record, abstract=True):
+class MatchClass(Record, abstract=True, frozen=True):
     """
     Match an expression against multiple target patterns
     and return the first successful match's captured values.
@@ -101,9 +104,9 @@ class MatchClass(Record, abstract=True):
     @classmethod
     def match(cls, expr: Expr | str) -> Self | None:
         if isinstance(expr, str):
-            expr = Expr.parse(expr)
+            expr = Expr.from_str(expr)
 
-        def _match(cls: MatchClass, expr: Expr):
+        def _match(cls: type[Self], expr: Expr):
             if not hasattr(cls, 'match_patterns'):
                 return None
             for target in cls.match_patterns:
@@ -142,13 +145,13 @@ class MultiMatcher(Object):
         def decorator(cls: type[MatchResult]):
             for e in expr:
                 if isinstance(e, str):
-                    e = Expr.parse(e)
+                    e = Expr.from_str(e)
                 self.patterns[e] = cls
             return cls
         
     def __call__(self, expr: Expr | str) -> MatchResult | None:
         if isinstance(expr, str):
-            expr = Expr.parse(expr)
+            expr = Expr.from_str(expr)
         for pattern, cls in self.patterns.items():
             matcher = Matcher()
             result = matcher(pattern, expr)

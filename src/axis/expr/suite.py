@@ -3,7 +3,7 @@ from axis import syn
 class Suite(syn.Expr):
     statements: tuple[syn.Statement, ...]
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_suite_ast(
     self,
     _: syn.AxisParser.SuiteContext,

@@ -3,7 +3,7 @@ from axis import syn
 from .sym import Sym
 from .tuple import Tuple
 
-class Apply(syn.Expr):
+class Apply(syn.Expr, frozen=True):
     function: syn.Expr
     argument: syn.Expr
 

@@ -1,0 +1,14 @@
+unit std
+
+def is_empty[T]: { x: T -> Boolean }
+    --------
+    Un array cuya extension tiene algun valor a 0 es is_empty
+    un optional none es empty
+    un conjunto vacio es empty
+    un mapa sin elemento es empty
+
+
+def count[T]: { x: T -> Natural }
+    -----
+
+

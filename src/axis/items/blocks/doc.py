@@ -2,9 +2,9 @@ from textwrap import dedent
 from typing import ClassVar, Self
 from axis import syn, src
 
-class Doc(syn.Block):
-    keyword: ClassVar[str] = "---"
-    keyword_sep: ClassVar[str] = ""
+class Doc(syn.Block, frozen=True):
+    outline_keyword: ClassVar[str] = "---"
+    outline_keyword_sep: ClassVar[str] = ""
 
     content: str    
     
@@ -13,9 +13,7 @@ class Doc(syn.Block):
         """
         Parse the tree and return a Doc instance.
         """
-        return cls(
-            children=children,
-            content=dedent(span.content)
-        )
+        # discard children for now
+        return cls(content=dedent(span.content))
 
-syn.Item.add_child_block(Doc, must_be_indented=None)
+syn.Item.register_outline_children(Doc)

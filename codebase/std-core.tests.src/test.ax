@@ -11,6 +11,8 @@ use std.io(
     other(..)
 )
 
+
+
 def Number
     ------
     base de implementacion de todo tipo numerico

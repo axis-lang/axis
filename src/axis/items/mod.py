@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import ClassVar, Optional
+from typing import ClassVar
 
-from axis import src, syn, log, sem, val, expr, blocks
-from .def_ import Def
-from .val import Val
-from protobase import cached_property, frozendict
+from axis import syn, sem, val, items
+from protobase import cached_property
 
-class Mod(syn.Item):
+
+class Mod(syn.Item, frozen=True):
     """
     Cometido: agrupar semanticamente un conjunto de sub-items.
 
@@ -18,27 +17,39 @@ class Mod(syn.Item):
             ...
     """
 
-    keyword: ClassVar[str] = "mod"
-    grammar: ClassVar[str] = "mod: 'mod' expression ':' EOF;"
+    outline_keyword: ClassVar[str] = "mod"
+    # grammar: ClassVar[str] = "mod: 'mod' expression ':' EOF;"
 
-    path: expr.Member | expr.Sym
+    pkg: items.Package
 
-    @property
-    def name(self) -> str:
-        if isinstance(self.path, expr.Member):
-            return self.path.as_sym()
-        elif isinstance(self.path, expr.Sym):
-            return self.path
+    path: syn.Expr
+    # uses: tuple[blocks.Use, ...]
 
-        raise TypeError(f"Unexpected path type: {type(self.path)}")
+    # @property
+    # def name(self) -> str:
+    #     if isinstance(self.path, expr.Member):
+    #         return self.path.as_sym()
+    #     elif isinstance(self.path, expr.Sym):
+    #         return self.path
+
+    #     raise TypeError(f"Unexpected path type: {type(self.path)}")
 
     @classmethod
-    def build(cls, kw, path: syn.Expr, *, children=tuple[syn.Block, ...]):
-        return cls(path=path, children=children)
+    def build(
+        cls,
+        kw,
+        path: syn.Expr,
+        *,
+        pkg: items.Package,
+        children: tuple[syn.Block, ...],
+        parent: syn.SegregatedOutlineNode,
+    ):
+        # children=children,
+        return cls(path=path, parent=parent, pkg=pkg)
 
-    class Binding(sem.Binding):
-        item: Mod
+    # class Binding(sem.Binding):
+    #     item: Mod
 
-        @cached_property
-        def ref(self):
-            return val.Ref.from_expr(self.item.path, base_ref=self.parent.ref)
+    #     @cached_property
+    #     def ref(self):
+    #         return val.Ref.from_expr(self.item.path, base_ref=self.parent.ref)

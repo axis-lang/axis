@@ -1,14 +1,14 @@
 from axis import syn
 
 class Index(syn.Expr):
-    base: syn.Expr
+    origin: syn.Expr
     indice: syn.Expr
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_index_ast(
     self,
     ctx: syn.AxisParser.IndexContext,
-    base: syn.Expr,
+    origin: syn.Expr,
     indice: syn.Expr,
 ):
-    return Index(base, indice)
+    return Index(origin=origin, indice=indice)

@@ -143,57 +143,57 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#expression.
-    def enterExpression(self, ctx:AxisParser.ExpressionContext):
+    # Enter a parse tree produced by AxisParser#expr.
+    def enterExpr(self, ctx:AxisParser.ExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#expression.
-    def exitExpression(self, ctx:AxisParser.ExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#juxtaposition.
-    def enterJuxtaposition(self, ctx:AxisParser.JuxtapositionContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#juxtaposition.
-    def exitJuxtaposition(self, ctx:AxisParser.JuxtapositionContext):
+    # Exit a parse tree produced by AxisParser#expr.
+    def exitExpr(self, ctx:AxisParser.ExprContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#range.
-    def enterRange(self, ctx:AxisParser.RangeContext):
+    # Enter a parse tree produced by AxisParser#compoundExpr.
+    def enterCompoundExpr(self, ctx:AxisParser.CompoundExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#range.
-    def exitRange(self, ctx:AxisParser.RangeContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#logical.
-    def enterLogical(self, ctx:AxisParser.LogicalContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#logical.
-    def exitLogical(self, ctx:AxisParser.LogicalContext):
+    # Exit a parse tree produced by AxisParser#compoundExpr.
+    def exitCompoundExpr(self, ctx:AxisParser.CompoundExprContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#logicalOp.
-    def enterLogicalOp(self, ctx:AxisParser.LogicalOpContext):
+    # Enter a parse tree produced by AxisParser#rangeExpr.
+    def enterRangeExpr(self, ctx:AxisParser.RangeExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#logicalOp.
-    def exitLogicalOp(self, ctx:AxisParser.LogicalOpContext):
+    # Exit a parse tree produced by AxisParser#rangeExpr.
+    def exitRangeExpr(self, ctx:AxisParser.RangeExprContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#comparison.
-    def enterComparison(self, ctx:AxisParser.ComparisonContext):
+    # Enter a parse tree produced by AxisParser#logicExpr.
+    def enterLogicExpr(self, ctx:AxisParser.LogicExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#comparison.
-    def exitComparison(self, ctx:AxisParser.ComparisonContext):
+    # Exit a parse tree produced by AxisParser#logicExpr.
+    def exitLogicExpr(self, ctx:AxisParser.LogicExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#logicOp.
+    def enterLogicOp(self, ctx:AxisParser.LogicOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#logicOp.
+    def exitLogicOp(self, ctx:AxisParser.LogicOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#comparisonExpr.
+    def enterComparisonExpr(self, ctx:AxisParser.ComparisonExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#comparisonExpr.
+    def exitComparisonExpr(self, ctx:AxisParser.ComparisonExprContext):
         pass
 
 
@@ -206,12 +206,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#addition.
-    def enterAddition(self, ctx:AxisParser.AdditionContext):
+    # Enter a parse tree produced by AxisParser#additiveExpr.
+    def enterAdditiveExpr(self, ctx:AxisParser.AdditiveExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#addition.
-    def exitAddition(self, ctx:AxisParser.AdditionContext):
+    # Exit a parse tree produced by AxisParser#additiveExpr.
+    def exitAdditiveExpr(self, ctx:AxisParser.AdditiveExprContext):
         pass
 
 
@@ -224,12 +224,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#product.
-    def enterProduct(self, ctx:AxisParser.ProductContext):
+    # Enter a parse tree produced by AxisParser#productiveExpr.
+    def enterProductiveExpr(self, ctx:AxisParser.ProductiveExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#product.
-    def exitProduct(self, ctx:AxisParser.ProductContext):
+    # Exit a parse tree produced by AxisParser#productiveExpr.
+    def exitProductiveExpr(self, ctx:AxisParser.ProductiveExprContext):
         pass
 
 
@@ -260,15 +260,6 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#MemberAccess.
-    def enterMemberAccess(self, ctx:AxisParser.MemberAccessContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#MemberAccess.
-    def exitMemberAccess(self, ctx:AxisParser.MemberAccessContext):
-        pass
-
-
     # Enter a parse tree produced by AxisParser#TrailingLambda.
     def enterTrailingLambda(self, ctx:AxisParser.TrailingLambdaContext):
         pass
@@ -278,12 +269,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#ScopeAccess.
-    def enterScopeAccess(self, ctx:AxisParser.ScopeAccessContext):
+    # Enter a parse tree produced by AxisParser#MemberExpr.
+    def enterMemberExpr(self, ctx:AxisParser.MemberExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#ScopeAccess.
-    def exitScopeAccess(self, ctx:AxisParser.ScopeAccessContext):
+    # Exit a parse tree produced by AxisParser#MemberExpr.
+    def exitMemberExpr(self, ctx:AxisParser.MemberExprContext):
         pass
 
 
@@ -305,12 +296,21 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#primary.
-    def enterPrimary(self, ctx:AxisParser.PrimaryContext):
+    # Enter a parse tree produced by AxisParser#ScopeExpr.
+    def enterScopeExpr(self, ctx:AxisParser.ScopeExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#primary.
-    def exitPrimary(self, ctx:AxisParser.PrimaryContext):
+    # Exit a parse tree produced by AxisParser#ScopeExpr.
+    def exitScopeExpr(self, ctx:AxisParser.ScopeExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#primaryExpr.
+    def enterPrimaryExpr(self, ctx:AxisParser.PrimaryExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#primaryExpr.
+    def exitPrimaryExpr(self, ctx:AxisParser.PrimaryExprContext):
         pass
 
 
@@ -323,12 +323,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#lit.
-    def enterLit(self, ctx:AxisParser.LitContext):
+    # Enter a parse tree produced by AxisParser#litExpr.
+    def enterLitExpr(self, ctx:AxisParser.LitExprContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#lit.
-    def exitLit(self, ctx:AxisParser.LitContext):
+    # Exit a parse tree produced by AxisParser#litExpr.
+    def exitLitExpr(self, ctx:AxisParser.LitExprContext):
         pass
 
 

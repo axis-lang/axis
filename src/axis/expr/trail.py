@@ -5,7 +5,7 @@ class Trail(syn.Expr):
     base: syn.Expr
     suite: syn.Expr
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_trail_ast(
     self,
     ctx: syn.AxisParser.TrailingLambdaContext,

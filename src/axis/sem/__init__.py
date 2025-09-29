@@ -41,7 +41,7 @@ takes:
 
 """
 
-from .package import *
-from .binding import *
-from .scope import *
-from .index import *
+# from .package import *
+# from .binding import *
+# from .scope import *
+# from .index import *

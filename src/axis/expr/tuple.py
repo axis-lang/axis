@@ -52,7 +52,7 @@ class Tuple(syn.Expr):
     class Nominal(Element):
         "name: bound = value"
 
-        key: syn.Expr = None
+        key: syn.Expr
         bound: Optional[syn.Expr] = None
         value: Optional[syn.Expr] = None
 

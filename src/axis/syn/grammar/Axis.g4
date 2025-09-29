@@ -1,15 +1,15 @@
 grammar Axis;
 
 
-unitItem: 'unit' expression EOF;
-modItem: 'mod' expression EOF;
-defItem: 'def' expression EOF;
-valItem: 'val' expression (':' expression)? ('=' expression)? ';'? EOF;
+unitItem: 'unit' expr EOF;
+modItem: 'mod' expr EOF;
+defItem: 'def' expr EOF;
+valItem: 'val' expr (':' expr)? ('=' expr)? ';'? EOF;
 
-useBlock: 'use' expression EOF;
-takesBlock: 'takes' ID? ':' EOF;
+useBlock: 'use' expr EOF;
+takesBlock: 'takes' expr? ':' EOF;
 whereBlock: 'where' ':' EOF;
-returnsBlock: 'returns' expression EOF;
+returnsBlock: 'returns' expr EOF;
 suiteBlock: 'suite' statement* EOF;
 
 suite: statement*;
@@ -17,11 +17,11 @@ suite: statement*;
 // Statements
 statement
     : valStatement
-    | expression
+    | expr
     ;
 
 valStatement
-    : 'val' (pattern) (':' expression)? ('=' expression)? ';'?
+    : 'val' (pattern) (':' expr)? ('=' expr)? ';'?
     ;
 
 pattern
@@ -41,67 +41,67 @@ tuplePatternElement
 
 
 
-// Expression hierarchy (precedence low to high)
-expression
-    : juxtaposition
+// expr hierarchy (precedence low to high)
+expr
+    : compoundExpr
     ;
 
 
 // Juxtaposition (right-to-left evaluation)
-juxtaposition
-    : range (range)*
+compoundExpr
+    : rangeExpr (rangeExpr)*
     ;
 
 
-range: logical ('..' logical)?;
+rangeExpr: logicExpr ('..' logicExpr)?;
 
 
 // Logical operators
-logical
-    : comparison (logicalOp comparison)*
+logicExpr
+    : comparisonExpr (logicOp comparisonExpr)*
     ;
 
-logicalOp: '&&' | '||';
+logicOp: '&&' | '||';
 
 // Comparison operators
-comparison
-    : addition (comparisonOp addition)*
+comparisonExpr
+    : additiveExpr (comparisonOp additiveExpr)*
     ;
 
 comparisonOp: '==' | '!=' | '<' | '<=' | '>' | '>=';
 
 // Additive operators
-addition
-    : product (additiveOp product)*
+additiveExpr
+    : productiveExpr (additiveOp productiveExpr)*
     ;
 
 additiveOp: '+' | '-';
 
 // Multiplicative operators
-product
-    : prefix (productiveOp prefix)*
+productiveExpr
+    : prefixExpr (productiveOp prefixExpr)*
     ;
 
-productiveOp: '*' | '/' | '%';
+productiveOp: '*' | '/' | '%' | '·';
 
-prefix
-    : postfix                                                   # PrefixPass          
+prefixExpr
+    : postfixExpr                                                   # PrefixPass          
     ;
 
 // Postfix operations
-postfix
-    : primary                                                   # PostfixPass
-    | postfix lambda                                            # TrailingLambda
-    | postfix tupleExpr                                         # ApplyExpr
-    | postfix shapeExpr                                         # Index
-    | postfix ('.' ID)+                                         # MemberAccess
-    | postfix ('::' ID)+                                        # ScopeAccess
+postfixExpr
+    : primaryExpr                                                   # PostfixPass
+    | postfixExpr lambda                                            # TrailingLambda
+    | postfixExpr tupleExpr                                         # ApplyExpr
+    | postfixExpr shapeExpr                                         # Index
+    | postfixExpr ('.' ID)+                                         # MemberExpr
+    | postfixExpr ('::' ID)+                                        # ScopeExpr
     ;
 
-// Primary expressions
-primary
+// Primary exprs
+primaryExpr
     : symExpr
-    | lit
+    | litExpr
     | tupleExpr
     | lambda
     // | wildcard              // Wildcard
@@ -112,16 +112,16 @@ primary
 
 symExpr: ID ('@' ID)?;
 
-lit : DECIMAL
+litExpr : DECIMAL
     | TEXT
     ;
 
 // wildcard: '_';
 // ellipsis: '..';
-// spread: '..' expression;
-// etc: '...' expression?;
+// spread: '..' expr;
+// etc: '...' expr?;
 
-// Tuple expressions
+// Tuple exprs
 tupleExpr
     : '(' (tupleElement (',' tupleElement)*)? ','? ')'
     ;
@@ -137,27 +137,27 @@ tupleElement
     ;
 
 tupleValueElement
-    : expression;
+    : expr;
 
 tupleNominalElement
-    : expression ':' expression
-    | expression '=' expression
-    | expression ':' expression '=' expression
+    : expr ':' expr
+    | expr '=' expr
+    | expr ':' expr '=' expr
     ;
 
 tupleSpreadElement
-    : '..' expression?
+    : '..' expr?
     ;
 
-//| suite (':' expression)? ('=' expression)?         # DynElement
+//| suite (':' expr)? ('=' expr)?         # DynElement
 // ..: ..T = ..alpha
 // _: _ = _
 
 
-// Bracket expressions (used as parentheses in other languages or trailing lambdas)
+// Bracket exprs (used as parentheses in other languages or trailing lambdas)
 lambda
-    : '{' lambdaParams? '->' statement* expression? '}'    # LambdaSuite
-    | '{' statement* expression? semicolon? '}'            # BasicSuite
+    : '{' lambdaParams? '->' statement* expr? '}'    # LambdaSuite
+    | '{' statement* expr? semicolon? '}'            # BasicSuite
     ;
 
 semicolon: ';';
@@ -167,12 +167,12 @@ lambdaParams
     ;
 
 lambdaParam
-    : ID (':' expression)?
+    : ID (':' expr)?
     ;
 
-// If expressions
+// If exprs
 // ifExpr
-//     : 'if' '(' expression ')' expression ('else' expression)?
+//     : 'if' '(' expr ')' expr ('else' expr)?
 //     ;
 
 

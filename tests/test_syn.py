@@ -16,7 +16,7 @@ class GrammarTest(unittest.TestCase):
 
     def test_parse_expr(self):
         self.assertEqual(
-            syn.Expr.parse("1 + 2"),
+            syn.Expr.from_str("1 + 2"),
             expr.BinOp(
                 lhs=expr.Lit(Decimal(1)),
                 rhs=expr.Lit(Decimal(2)),
@@ -25,7 +25,7 @@ class GrammarTest(unittest.TestCase):
         )
 
     def test_parse_tuple(self):
-        e = syn.Expr.parse(
+        e = syn.Expr.from_str(
             """(
             a, 
             a:b, 
@@ -42,7 +42,7 @@ class ExprMatchingTest(unittest.TestCase):
 
     def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
         if isinstance(expected, str):
-            expected = syn.Expr.parse(expected)
+            expected = syn.Expr.from_str(expected)
         self.assertEqual(expr, expected)
 
     def test_unify(self):

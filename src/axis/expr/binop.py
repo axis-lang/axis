@@ -10,15 +10,15 @@ class BinOp(syn.Expr):
     lhs: syn.Expr
     rhs: syn.Expr
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_binop_ast(
     self,
     ctx: Union[
-        syn.AxisParser.ProductContext,
-        syn.AxisParser.AdditionContext,
-        syn.AxisParser.ComparisonContext,
-        syn.AxisParser.LogicalContext,
-        syn.AxisParser.RangeContext,
+        syn.AxisParser.ProductiveExprContext,
+        syn.AxisParser.AdditiveExprContext,
+        syn.AxisParser.ComparisonExprContext,
+        syn.AxisParser.LogicExprContext,
+        syn.AxisParser.RangeExprContext,
     ],
     lhs,
     *vals,
@@ -31,11 +31,11 @@ def build_binop_ast(
         )
     return lhs
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_binary_operator_ast(
     self,
     ctx: Union[
-        syn.AxisParser.LogicalOpContext,
+        syn.AxisParser.LogicOpContext,
         syn.AxisParser.AdditiveOpContext,
         syn.AxisParser.ProductiveOpContext,
         syn.AxisParser.ComparisonOpContext,

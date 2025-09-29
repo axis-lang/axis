@@ -14,39 +14,57 @@ class Def(syn.Item):
         val y: N
     where:
         val N: Number
+
     """
 
     class Kind(syn.MatchClass, abstract=True, frozen=True):
-        name: expr.Sym
+        sym: expr.Sym
 
-    class ClassKind(Kind):
+    class QualKind(Kind, frozen=True):
         match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.parse("$name@Sym"),
-            syn.Expr.parse("$name[..$generics]"),
+            syn.Expr.from_str("$sym@Sym $qualified@Sym"),
+            syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
+        )
+
+        qualified: expr.Sym
+        generics: Optional[expr.Tuple] = None
+
+    class ClassKind(Kind, frozen=True):
+        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+            syn.Expr.from_str("$sym@Sym"),
+            syn.Expr.from_str("$sym@Sym[..$generics]"),
         )
 
         generics: Optional[expr.Tuple] = None
 
-    class FunctionKind(Kind):
+    class FunctionKind(Kind, frozen=True):
         match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.parse("$name@Sym(..$arguments)"),
-            syn.Expr.parse("$context.$name(..$arguments)"),
+            syn.Expr.from_str("$sym@Sym(..$params)"),
+            syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
+            syn.Expr.from_str("$context.$sym@Sym(..$params)"),
+            syn.Expr.from_str("$context.$sym@Sym[..$generics](..$params)"),
         )
 
-        arguments: Optional[expr.Tuple] = None
+        params: Optional[expr.Tuple] = None
         context: Optional[syn.Expr] = None
 
+    outline_keyword: ClassVar[str] = "def"
+    # grammar: ClassVar[str] = "def: 'def' expression EOF;"
+    pkg: items.Package
 
-    keyword: ClassVar[str] = "def"
-    grammar: ClassVar[str] = "def: 'def' expression EOF;"
-
-    expr: syn.Expr
+    expr: syn.Expr  # repr_expr
 
     @classmethod
     def build(
-        cls, kw: Literal["def"], expr: syn.Expr, *, children: tuple[syn.Block, ...]
+        cls,
+        kw: Literal["def"],
+        expr: syn.Expr,
+        *,
+        parent: syn.Item,
+        pkg: items.Package,
+        children: tuple[syn.Block, ...],
     ):
-        return cls(expr=expr, children=children)
+        return cls(expr=expr, parent=parent, pkg=pkg)
 
     @cached_property
     def kind(self):
@@ -55,15 +73,16 @@ class Def(syn.Item):
             log.error(
                 f"Definition expression does not match any known kind: {self.expr}"
             ).with_label(self.as_label).emit()
+            raise ValueError(f"Invalid definition expression: {self.expr}")
         return kind
 
-    class Binding(sem.Binding):
-        item: Def
+    # class Binding(sem.Binding, frozen=True):
+    #     item: Def
 
-        @property
-        def ref(self):
-            return self.parent.ref.member(self.item.kind.name.name)
-
+    #     @property
+    #     def ref(self):
+    #         assert self.parent is not None
+    #         return self.parent.ref.member(self.item.kind.sym.name)
 
 
 # @syn.AstBuilder.build.register(syn.AxisParser.DefItemContext)

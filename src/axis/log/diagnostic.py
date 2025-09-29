@@ -14,6 +14,13 @@ from rich.text import Text
 from axis import src
 
 
+class DiagnosticException(Exception):
+    def __init__(self, diagnostic: Diagnostic):
+        self.diagnostic = diagnostic
+        super().__init__(diagnostic.message)
+
+    
+
 class Severity(Enum):
     ERROR = auto()
     WARNING = auto()
@@ -86,7 +93,8 @@ class Diagnostic(Record, frozen=True):
         return mutate(self, suggestion=message)
     
     def throw(self) -> NoReturn:
-        raise self
+        self.emit()
+        raise DiagnosticException(self).with_traceback(None)
 
     def emit(self) -> None:
         print(self)

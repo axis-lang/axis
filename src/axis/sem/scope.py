@@ -5,29 +5,30 @@ from xml.sax.handler import EntityResolver
 
 from protobase import Record, frozendict, inmutable
 
-from axis import syn, val, log
-
-@inmutable
-class ScopeKey(Protocol):
-    name: str
-    at: Optional[str]
+from axis import syn, val, log, sem
 
 
-class Scope[K: ScopeKey, V: syn.Node](Record, frozen=True):
+
+class Scope(Record, frozen=True):
     """
     Semantic scope representa un espacio de nombres jerarquico.
 
     """
+    #class Entry(Record, frozen=True):
+    type Key = str
+    type Value = val.Ref
+    type Entry = val.Ref
+        
 
-    class Builder[K: ScopeKey, V](Record):
+    class Builder(Record):
         name: Optional[str] = None
         parent: Optional[Scope] = None
-        entries: dict[K, list[V]] = {}
+        entries: dict[Scope.Key, list[Scope.Entry]] = {}
 
-        def add(self, key: K, value: V) -> Self:
+        def add(self, key: Scope.Key, value: Scope.Value):
             self.entries.setdefault(key, []).append(value)
 
-        def build(self) -> Scope[K, V]:
+        def build(self) -> Scope:
             entries = {}
             for key, valueset in self.entries.items():
                 if len(valueset) > 1:

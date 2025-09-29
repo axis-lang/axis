@@ -44,7 +44,7 @@ Sym.ROOT = Sym("@root")
 #     return Sym(name=name, at=at)
 
 
-@syn.Matcher.match.register(Sym)
+@syn.Matcher.impl(Sym)
 def match_sym(self: syn.Matcher, sym: Sym, value: syn.Expr):
     if not sym.is_wildcard:
         return self.match_node(sym, value)
@@ -55,7 +55,7 @@ def match_sym(self: syn.Matcher, sym: Sym, value: syn.Expr):
     self.capture_value(sym.name, value)
 
 
-@syn.Reifier.reify.register(Sym)
+@syn.Reifier.impl(Sym)
 def reify_sym(self: syn.Reifier, sym: Sym):
     if not sym.is_wildcard:
         return self.reify_node(sym)
@@ -63,6 +63,6 @@ def reify_sym(self: syn.Reifier, sym: Sym):
     return self.reify(self.value(sym.name))
 
 
-@val.Ref.Evaluator.eval.register(Sym)
-def ref_eval_sym(self: val.Ref.Evaluator, node: Sym) -> val.Ref:
-    return self.base.member(node.name)
+# @val.Ref.Evaluator.eval.register(Sym)
+# def ref_eval_sym(self: val.Ref.Evaluator, node: Sym) -> val.Ref:
+#     return self.base.member(node.name)

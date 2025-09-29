@@ -1,25 +1,25 @@
 from functools import singledispatchmethod
-from typing import ClassVar, Optional, Self
+from typing import ClassVar, Literal, Optional, Self
 
 from protobase import Object, cached_property
 
 from axis import expr, log, syn
 
 
-class Use(syn.Block): # es un block!
+class Use(syn.Block, frozen=True):
     """
     Represents a 'use' entity:
     use x
     """
 
-    keyword: ClassVar[str] = "use"
-    grammar: ClassVar[str] = "use: 'use' expression EOF;"
+    outline_keyword: ClassVar[str] = "use"
+    #grammar: ClassVar[str] = "use: 'use' expression EOF;"
 
     import_expr: syn.Expr
 
     @classmethod
-    def build(cls, kw: str, import_expr: syn.Expr, *, children: tuple[syn.Block, ...]) -> Self:
-        return cls(import_expr=import_expr, children=children)
+    def build(cls, kw: Literal['use'], import_expr: syn.Expr, *, children: tuple[syn.Block, ...]) -> Self:
+        return cls(import_expr=import_expr)
 
     @cached_property
     def flat_expr(self) -> expr.Tuple:
@@ -147,10 +147,10 @@ def reify_destructure(expr: syn.Expr, from_: syn.Expr):
     return Destructuring()(expr, from_)
 
 
-def deep_flatten(lst):
+def deep_flatten(lst, leaf_types=(str, bytes)):
     lst = list(lst)
     for i, _ in enumerate(lst):
-        while (hasattr(lst[i], "__iter__") and not isinstance(lst[i], (str, bytes))):
+        while (hasattr(lst[i], "__iter__") and not isinstance(lst[i], leaf_types)):
             lst[i:i + 1] = lst[i]
     return lst
 

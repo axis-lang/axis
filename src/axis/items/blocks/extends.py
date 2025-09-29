@@ -2,18 +2,18 @@ from typing import ClassVar, Literal
 from axis import syn
 
 
-class Returns(syn.Block):
+class Extends(syn.Block):
     """ """
 
-    keyword: ClassVar[str] = "returns"
-    grammar: ClassVar[str] = "returns: 'returns' expression EOF;"
+    keyword: ClassVar[str] = "extends"
+    grammar: ClassVar[str] = "extends: 'extends' expression EOF;"
 
     expr: syn.Expr
 
     @classmethod
     def build(
         cls,
-        kw: Literal["returns"],
+        kw: Literal["extends"],
         expr: syn.Expr,
         *,
         children: syn.Block.Children,

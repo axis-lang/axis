@@ -9,7 +9,7 @@ class Binding(Record, frozen=True, abstract=True):
     """
     multiples bindings compondran las entidades
     """
-    pkg: 'sem.Package'
+    pkg: sem.Package
     parent: Optional[Binding]  # actua como scope
     item: syn.Item
 
@@ -17,7 +17,7 @@ class Binding(Record, frozen=True, abstract=True):
     def generate_from(
         cls,
         item: syn.Item,
-        pkg: 'sem.Package',
+        pkg: sem.Package,
         parent: Optional[Binding] = None,
     ) -> Iterable[Binding]:
         item, subitems = item.split_subitems()

@@ -20,30 +20,30 @@ public class AxisParser extends Parser {
 		T__9=10, T__10=11, T__11=12, T__12=13, T__13=14, T__14=15, T__15=16, T__16=17, 
 		T__17=18, T__18=19, T__19=20, T__20=21, T__21=22, T__22=23, T__23=24, 
 		T__24=25, T__25=26, T__26=27, T__27=28, T__28=29, T__29=30, T__30=31, 
-		T__31=32, T__32=33, T__33=34, T__34=35, T__35=36, T__36=37, ID=38, DECIMAL=39, 
-		TEXT=40, WS=41, COMMENT=42;
+		T__31=32, T__32=33, T__33=34, T__34=35, T__35=36, T__36=37, T__37=38, 
+		ID=39, DECIMAL=40, TEXT=41, WS=42, COMMENT=43;
 	public static final int
 		RULE_unitItem = 0, RULE_modItem = 1, RULE_defItem = 2, RULE_valItem = 3, 
 		RULE_useBlock = 4, RULE_takesBlock = 5, RULE_whereBlock = 6, RULE_returnsBlock = 7, 
 		RULE_suiteBlock = 8, RULE_suite = 9, RULE_statement = 10, RULE_valStatement = 11, 
 		RULE_pattern = 12, RULE_tuplePattern = 13, RULE_tuplePatternElement = 14, 
-		RULE_expression = 15, RULE_juxtaposition = 16, RULE_range = 17, RULE_logical = 18, 
-		RULE_logicalOp = 19, RULE_comparison = 20, RULE_comparisonOp = 21, RULE_addition = 22, 
-		RULE_additiveOp = 23, RULE_product = 24, RULE_productiveOp = 25, RULE_prefix = 26, 
-		RULE_postfix = 27, RULE_primary = 28, RULE_symExpr = 29, RULE_lit = 30, 
-		RULE_tupleExpr = 31, RULE_shapeExpr = 32, RULE_tupleElement = 33, RULE_tupleValueElement = 34, 
-		RULE_tupleNominalElement = 35, RULE_tupleSpreadElement = 36, RULE_lambda = 37, 
-		RULE_semicolon = 38, RULE_lambdaParams = 39, RULE_lambdaParam = 40;
+		RULE_expr = 15, RULE_compoundExpr = 16, RULE_rangeExpr = 17, RULE_logicExpr = 18, 
+		RULE_logicOp = 19, RULE_comparisonExpr = 20, RULE_comparisonOp = 21, RULE_additiveExpr = 22, 
+		RULE_additiveOp = 23, RULE_productiveExpr = 24, RULE_productiveOp = 25, 
+		RULE_prefixExpr = 26, RULE_postfixExpr = 27, RULE_primaryExpr = 28, RULE_symExpr = 29, 
+		RULE_litExpr = 30, RULE_tupleExpr = 31, RULE_shapeExpr = 32, RULE_tupleElement = 33, 
+		RULE_tupleValueElement = 34, RULE_tupleNominalElement = 35, RULE_tupleSpreadElement = 36, 
+		RULE_lambda = 37, RULE_semicolon = 38, RULE_lambdaParams = 39, RULE_lambdaParam = 40;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"unitItem", "modItem", "defItem", "valItem", "useBlock", "takesBlock", 
 			"whereBlock", "returnsBlock", "suiteBlock", "suite", "statement", "valStatement", 
-			"pattern", "tuplePattern", "tuplePatternElement", "expression", "juxtaposition", 
-			"range", "logical", "logicalOp", "comparison", "comparisonOp", "addition", 
-			"additiveOp", "product", "productiveOp", "prefix", "postfix", "primary", 
-			"symExpr", "lit", "tupleExpr", "shapeExpr", "tupleElement", "tupleValueElement", 
-			"tupleNominalElement", "tupleSpreadElement", "lambda", "semicolon", "lambdaParams", 
-			"lambdaParam"
+			"pattern", "tuplePattern", "tuplePatternElement", "expr", "compoundExpr", 
+			"rangeExpr", "logicExpr", "logicOp", "comparisonExpr", "comparisonOp", 
+			"additiveExpr", "additiveOp", "productiveExpr", "productiveOp", "prefixExpr", 
+			"postfixExpr", "primaryExpr", "symExpr", "litExpr", "tupleExpr", "shapeExpr", 
+			"tupleElement", "tupleValueElement", "tupleNominalElement", "tupleSpreadElement", 
+			"lambda", "semicolon", "lambdaParams", "lambdaParam"
 		};
 	}
 	public static final String[] ruleNames = makeRuleNames();
@@ -53,8 +53,8 @@ public class AxisParser extends Parser {
 			null, "'unit'", "'mod'", "'def'", "'val'", "':'", "'='", "';'", "'use'", 
 			"'takes'", "'where'", "'returns'", "'suite'", "'('", "','", "')'", "'..'", 
 			"'&&'", "'||'", "'=='", "'!='", "'<'", "'<='", "'>'", "'>='", "'+'", 
-			"'-'", "'*'", "'/'", "'%'", "'.'", "'::'", "'@'", "'['", "']'", "'{'", 
-			"'->'", "'}'"
+			"'-'", "'*'", "'/'", "'%'", "'\\u00B7'", "'.'", "'::'", "'@'", "'['", 
+			"']'", "'{'", "'->'", "'}'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -63,7 +63,7 @@ public class AxisParser extends Parser {
 			null, null, null, null, null, null, null, null, null, null, null, null, 
 			null, null, null, null, null, null, null, null, null, null, null, null, 
 			null, null, null, null, null, null, null, null, null, null, null, null, 
-			null, null, "ID", "DECIMAL", "TEXT", "WS", "COMMENT"
+			null, null, null, "ID", "DECIMAL", "TEXT", "WS", "COMMENT"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -119,8 +119,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class UnitItemContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public UnitItemContext(ParserRuleContext parent, int invokingState) {
@@ -138,7 +138,7 @@ public class AxisParser extends Parser {
 			setState(82);
 			match(T__0);
 			setState(83);
-			expression();
+			expr();
 			setState(84);
 			match(EOF);
 			}
@@ -156,8 +156,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ModItemContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public ModItemContext(ParserRuleContext parent, int invokingState) {
@@ -175,7 +175,7 @@ public class AxisParser extends Parser {
 			setState(86);
 			match(T__1);
 			setState(87);
-			expression();
+			expr();
 			setState(88);
 			match(EOF);
 			}
@@ -193,8 +193,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class DefItemContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public DefItemContext(ParserRuleContext parent, int invokingState) {
@@ -212,7 +212,7 @@ public class AxisParser extends Parser {
 			setState(90);
 			match(T__2);
 			setState(91);
-			expression();
+			expr();
 			setState(92);
 			match(EOF);
 			}
@@ -230,11 +230,11 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ValItemContext extends ParserRuleContext {
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<ExprContext> expr() {
+			return getRuleContexts(ExprContext.class);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
+		public ExprContext expr(int i) {
+			return getRuleContext(ExprContext.class,i);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public ValItemContext(ParserRuleContext parent, int invokingState) {
@@ -253,7 +253,7 @@ public class AxisParser extends Parser {
 			setState(94);
 			match(T__3);
 			setState(95);
-			expression();
+			expr();
 			setState(98);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
@@ -262,7 +262,7 @@ public class AxisParser extends Parser {
 				setState(96);
 				match(T__4);
 				setState(97);
-				expression();
+				expr();
 				}
 			}
 
@@ -274,7 +274,7 @@ public class AxisParser extends Parser {
 				setState(100);
 				match(T__5);
 				setState(101);
-				expression();
+				expr();
 				}
 			}
 
@@ -305,8 +305,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class UseBlockContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public UseBlockContext(ParserRuleContext parent, int invokingState) {
@@ -324,7 +324,7 @@ public class AxisParser extends Parser {
 			setState(109);
 			match(T__7);
 			setState(110);
-			expression();
+			expr();
 			setState(111);
 			match(EOF);
 			}
@@ -343,7 +343,9 @@ public class AxisParser extends Parser {
 	@SuppressWarnings("CheckReturnValue")
 	public static class TakesBlockContext extends ParserRuleContext {
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
-		public TerminalNode ID() { return getToken(AxisParser.ID, 0); }
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
+		}
 		public TakesBlockContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -362,10 +364,10 @@ public class AxisParser extends Parser {
 			setState(115);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (_la==ID) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182144L) != 0)) {
 				{
 				setState(114);
-				match(ID);
+				expr();
 				}
 			}
 
@@ -422,8 +424,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ReturnsBlockContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TerminalNode EOF() { return getToken(AxisParser.EOF, 0); }
 		public ReturnsBlockContext(ParserRuleContext parent, int invokingState) {
@@ -441,7 +443,7 @@ public class AxisParser extends Parser {
 			setState(124);
 			match(T__10);
 			setState(125);
-			expression();
+			expr();
 			setState(126);
 			match(EOF);
 			}
@@ -484,7 +486,7 @@ public class AxisParser extends Parser {
 			setState(132);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505095184L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182160L) != 0)) {
 				{
 				{
 				setState(129);
@@ -534,7 +536,7 @@ public class AxisParser extends Parser {
 			setState(140);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505095184L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182160L) != 0)) {
 				{
 				{
 				setState(137);
@@ -563,8 +565,8 @@ public class AxisParser extends Parser {
 		public ValStatementContext valStatement() {
 			return getRuleContext(ValStatementContext.class,0);
 		}
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public StatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -587,14 +589,14 @@ public class AxisParser extends Parser {
 				}
 				break;
 			case T__12:
-			case T__34:
+			case T__35:
 			case ID:
 			case DECIMAL:
 			case TEXT:
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(144);
-				expression();
+				expr();
 				}
 				break;
 			default:
@@ -617,11 +619,11 @@ public class AxisParser extends Parser {
 		public PatternContext pattern() {
 			return getRuleContext(PatternContext.class,0);
 		}
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<ExprContext> expr() {
+			return getRuleContexts(ExprContext.class);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
+		public ExprContext expr(int i) {
+			return getRuleContext(ExprContext.class,i);
 		}
 		public ValStatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -650,7 +652,7 @@ public class AxisParser extends Parser {
 				setState(149);
 				match(T__4);
 				setState(150);
-				expression();
+				expr();
 				}
 			}
 
@@ -662,7 +664,7 @@ public class AxisParser extends Parser {
 				setState(153);
 				match(T__5);
 				setState(154);
-				expression();
+				expr();
 				}
 			}
 
@@ -852,24 +854,24 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ExpressionContext extends ParserRuleContext {
-		public JuxtapositionContext juxtaposition() {
-			return getRuleContext(JuxtapositionContext.class,0);
+	public static class ExprContext extends ParserRuleContext {
+		public CompoundExprContext compoundExpr() {
+			return getRuleContext(CompoundExprContext.class,0);
 		}
-		public ExpressionContext(ParserRuleContext parent, int invokingState) {
+		public ExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_expression; }
+		@Override public int getRuleIndex() { return RULE_expr; }
 	}
 
-	public final ExpressionContext expression() throws RecognitionException {
-		ExpressionContext _localctx = new ExpressionContext(_ctx, getState());
-		enterRule(_localctx, 30, RULE_expression);
+	public final ExprContext expr() throws RecognitionException {
+		ExprContext _localctx = new ExprContext(_ctx, getState());
+		enterRule(_localctx, 30, RULE_expr);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(183);
-			juxtaposition();
+			compoundExpr();
 			}
 		}
 		catch (RecognitionException re) {
@@ -884,28 +886,28 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class JuxtapositionContext extends ParserRuleContext {
-		public List<RangeContext> range() {
-			return getRuleContexts(RangeContext.class);
+	public static class CompoundExprContext extends ParserRuleContext {
+		public List<RangeExprContext> rangeExpr() {
+			return getRuleContexts(RangeExprContext.class);
 		}
-		public RangeContext range(int i) {
-			return getRuleContext(RangeContext.class,i);
+		public RangeExprContext rangeExpr(int i) {
+			return getRuleContext(RangeExprContext.class,i);
 		}
-		public JuxtapositionContext(ParserRuleContext parent, int invokingState) {
+		public CompoundExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_juxtaposition; }
+		@Override public int getRuleIndex() { return RULE_compoundExpr; }
 	}
 
-	public final JuxtapositionContext juxtaposition() throws RecognitionException {
-		JuxtapositionContext _localctx = new JuxtapositionContext(_ctx, getState());
-		enterRule(_localctx, 32, RULE_juxtaposition);
+	public final CompoundExprContext compoundExpr() throws RecognitionException {
+		CompoundExprContext _localctx = new CompoundExprContext(_ctx, getState());
+		enterRule(_localctx, 32, RULE_compoundExpr);
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(185);
-			range();
+			rangeExpr();
 			setState(189);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,14,_ctx);
@@ -914,7 +916,7 @@ public class AxisParser extends Parser {
 					{
 					{
 					setState(186);
-					range();
+					rangeExpr();
 					}
 					} 
 				}
@@ -936,28 +938,28 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class RangeContext extends ParserRuleContext {
-		public List<LogicalContext> logical() {
-			return getRuleContexts(LogicalContext.class);
+	public static class RangeExprContext extends ParserRuleContext {
+		public List<LogicExprContext> logicExpr() {
+			return getRuleContexts(LogicExprContext.class);
 		}
-		public LogicalContext logical(int i) {
-			return getRuleContext(LogicalContext.class,i);
+		public LogicExprContext logicExpr(int i) {
+			return getRuleContext(LogicExprContext.class,i);
 		}
-		public RangeContext(ParserRuleContext parent, int invokingState) {
+		public RangeExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_range; }
+		@Override public int getRuleIndex() { return RULE_rangeExpr; }
 	}
 
-	public final RangeContext range() throws RecognitionException {
-		RangeContext _localctx = new RangeContext(_ctx, getState());
-		enterRule(_localctx, 34, RULE_range);
+	public final RangeExprContext rangeExpr() throws RecognitionException {
+		RangeExprContext _localctx = new RangeExprContext(_ctx, getState());
+		enterRule(_localctx, 34, RULE_rangeExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(192);
-			logical();
+			logicExpr();
 			setState(195);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
@@ -966,7 +968,7 @@ public class AxisParser extends Parser {
 				setState(193);
 				match(T__15);
 				setState(194);
-				logical();
+				logicExpr();
 				}
 			}
 
@@ -984,34 +986,34 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class LogicalContext extends ParserRuleContext {
-		public List<ComparisonContext> comparison() {
-			return getRuleContexts(ComparisonContext.class);
+	public static class LogicExprContext extends ParserRuleContext {
+		public List<ComparisonExprContext> comparisonExpr() {
+			return getRuleContexts(ComparisonExprContext.class);
 		}
-		public ComparisonContext comparison(int i) {
-			return getRuleContext(ComparisonContext.class,i);
+		public ComparisonExprContext comparisonExpr(int i) {
+			return getRuleContext(ComparisonExprContext.class,i);
 		}
-		public List<LogicalOpContext> logicalOp() {
-			return getRuleContexts(LogicalOpContext.class);
+		public List<LogicOpContext> logicOp() {
+			return getRuleContexts(LogicOpContext.class);
 		}
-		public LogicalOpContext logicalOp(int i) {
-			return getRuleContext(LogicalOpContext.class,i);
+		public LogicOpContext logicOp(int i) {
+			return getRuleContext(LogicOpContext.class,i);
 		}
-		public LogicalContext(ParserRuleContext parent, int invokingState) {
+		public LogicExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_logical; }
+		@Override public int getRuleIndex() { return RULE_logicExpr; }
 	}
 
-	public final LogicalContext logical() throws RecognitionException {
-		LogicalContext _localctx = new LogicalContext(_ctx, getState());
-		enterRule(_localctx, 36, RULE_logical);
+	public final LogicExprContext logicExpr() throws RecognitionException {
+		LogicExprContext _localctx = new LogicExprContext(_ctx, getState());
+		enterRule(_localctx, 36, RULE_logicExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(197);
-			comparison();
+			comparisonExpr();
 			setState(203);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
@@ -1019,9 +1021,9 @@ public class AxisParser extends Parser {
 				{
 				{
 				setState(198);
-				logicalOp();
+				logicOp();
 				setState(199);
-				comparison();
+				comparisonExpr();
 				}
 				}
 				setState(205);
@@ -1042,16 +1044,16 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class LogicalOpContext extends ParserRuleContext {
-		public LogicalOpContext(ParserRuleContext parent, int invokingState) {
+	public static class LogicOpContext extends ParserRuleContext {
+		public LogicOpContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_logicalOp; }
+		@Override public int getRuleIndex() { return RULE_logicOp; }
 	}
 
-	public final LogicalOpContext logicalOp() throws RecognitionException {
-		LogicalOpContext _localctx = new LogicalOpContext(_ctx, getState());
-		enterRule(_localctx, 38, RULE_logicalOp);
+	public final LogicOpContext logicOp() throws RecognitionException {
+		LogicOpContext _localctx = new LogicOpContext(_ctx, getState());
+		enterRule(_localctx, 38, RULE_logicOp);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
@@ -1080,12 +1082,12 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ComparisonContext extends ParserRuleContext {
-		public List<AdditionContext> addition() {
-			return getRuleContexts(AdditionContext.class);
+	public static class ComparisonExprContext extends ParserRuleContext {
+		public List<AdditiveExprContext> additiveExpr() {
+			return getRuleContexts(AdditiveExprContext.class);
 		}
-		public AdditionContext addition(int i) {
-			return getRuleContext(AdditionContext.class,i);
+		public AdditiveExprContext additiveExpr(int i) {
+			return getRuleContext(AdditiveExprContext.class,i);
 		}
 		public List<ComparisonOpContext> comparisonOp() {
 			return getRuleContexts(ComparisonOpContext.class);
@@ -1093,21 +1095,21 @@ public class AxisParser extends Parser {
 		public ComparisonOpContext comparisonOp(int i) {
 			return getRuleContext(ComparisonOpContext.class,i);
 		}
-		public ComparisonContext(ParserRuleContext parent, int invokingState) {
+		public ComparisonExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_comparison; }
+		@Override public int getRuleIndex() { return RULE_comparisonExpr; }
 	}
 
-	public final ComparisonContext comparison() throws RecognitionException {
-		ComparisonContext _localctx = new ComparisonContext(_ctx, getState());
-		enterRule(_localctx, 40, RULE_comparison);
+	public final ComparisonExprContext comparisonExpr() throws RecognitionException {
+		ComparisonExprContext _localctx = new ComparisonExprContext(_ctx, getState());
+		enterRule(_localctx, 40, RULE_comparisonExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(208);
-			addition();
+			additiveExpr();
 			setState(214);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
@@ -1117,7 +1119,7 @@ public class AxisParser extends Parser {
 				setState(209);
 				comparisonOp();
 				setState(210);
-				addition();
+				additiveExpr();
 				}
 				}
 				setState(216);
@@ -1176,12 +1178,12 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AdditionContext extends ParserRuleContext {
-		public List<ProductContext> product() {
-			return getRuleContexts(ProductContext.class);
+	public static class AdditiveExprContext extends ParserRuleContext {
+		public List<ProductiveExprContext> productiveExpr() {
+			return getRuleContexts(ProductiveExprContext.class);
 		}
-		public ProductContext product(int i) {
-			return getRuleContext(ProductContext.class,i);
+		public ProductiveExprContext productiveExpr(int i) {
+			return getRuleContext(ProductiveExprContext.class,i);
 		}
 		public List<AdditiveOpContext> additiveOp() {
 			return getRuleContexts(AdditiveOpContext.class);
@@ -1189,21 +1191,21 @@ public class AxisParser extends Parser {
 		public AdditiveOpContext additiveOp(int i) {
 			return getRuleContext(AdditiveOpContext.class,i);
 		}
-		public AdditionContext(ParserRuleContext parent, int invokingState) {
+		public AdditiveExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_addition; }
+		@Override public int getRuleIndex() { return RULE_additiveExpr; }
 	}
 
-	public final AdditionContext addition() throws RecognitionException {
-		AdditionContext _localctx = new AdditionContext(_ctx, getState());
-		enterRule(_localctx, 44, RULE_addition);
+	public final AdditiveExprContext additiveExpr() throws RecognitionException {
+		AdditiveExprContext _localctx = new AdditiveExprContext(_ctx, getState());
+		enterRule(_localctx, 44, RULE_additiveExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(219);
-			product();
+			productiveExpr();
 			setState(225);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
@@ -1213,7 +1215,7 @@ public class AxisParser extends Parser {
 				setState(220);
 				additiveOp();
 				setState(221);
-				product();
+				productiveExpr();
 				}
 				}
 				setState(227);
@@ -1272,12 +1274,12 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ProductContext extends ParserRuleContext {
-		public List<PrefixContext> prefix() {
-			return getRuleContexts(PrefixContext.class);
+	public static class ProductiveExprContext extends ParserRuleContext {
+		public List<PrefixExprContext> prefixExpr() {
+			return getRuleContexts(PrefixExprContext.class);
 		}
-		public PrefixContext prefix(int i) {
-			return getRuleContext(PrefixContext.class,i);
+		public PrefixExprContext prefixExpr(int i) {
+			return getRuleContext(PrefixExprContext.class,i);
 		}
 		public List<ProductiveOpContext> productiveOp() {
 			return getRuleContexts(ProductiveOpContext.class);
@@ -1285,31 +1287,31 @@ public class AxisParser extends Parser {
 		public ProductiveOpContext productiveOp(int i) {
 			return getRuleContext(ProductiveOpContext.class,i);
 		}
-		public ProductContext(ParserRuleContext parent, int invokingState) {
+		public ProductiveExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_product; }
+		@Override public int getRuleIndex() { return RULE_productiveExpr; }
 	}
 
-	public final ProductContext product() throws RecognitionException {
-		ProductContext _localctx = new ProductContext(_ctx, getState());
-		enterRule(_localctx, 48, RULE_product);
+	public final ProductiveExprContext productiveExpr() throws RecognitionException {
+		ProductiveExprContext _localctx = new ProductiveExprContext(_ctx, getState());
+		enterRule(_localctx, 48, RULE_productiveExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(230);
-			prefix();
+			prefixExpr();
 			setState(236);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 939524096L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2013265920L) != 0)) {
 				{
 				{
 				setState(231);
 				productiveOp();
 				setState(232);
-				prefix();
+				prefixExpr();
 				}
 				}
 				setState(238);
@@ -1346,7 +1348,7 @@ public class AxisParser extends Parser {
 			{
 			setState(239);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 939524096L) != 0)) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 2013265920L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1368,34 +1370,34 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PrefixContext extends ParserRuleContext {
-		public PrefixContext(ParserRuleContext parent, int invokingState) {
+	public static class PrefixExprContext extends ParserRuleContext {
+		public PrefixExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_prefix; }
+		@Override public int getRuleIndex() { return RULE_prefixExpr; }
 	 
-		public PrefixContext() { }
-		public void copyFrom(PrefixContext ctx) {
+		public PrefixExprContext() { }
+		public void copyFrom(PrefixExprContext ctx) {
 			super.copyFrom(ctx);
 		}
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class PrefixPassContext extends PrefixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
+	public static class PrefixPassContext extends PrefixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
 		}
-		public PrefixPassContext(PrefixContext ctx) { copyFrom(ctx); }
+		public PrefixPassContext(PrefixExprContext ctx) { copyFrom(ctx); }
 	}
 
-	public final PrefixContext prefix() throws RecognitionException {
-		PrefixContext _localctx = new PrefixContext(_ctx, getState());
-		enterRule(_localctx, 52, RULE_prefix);
+	public final PrefixExprContext prefixExpr() throws RecognitionException {
+		PrefixExprContext _localctx = new PrefixExprContext(_ctx, getState());
+		enterRule(_localctx, 52, RULE_prefixExpr);
 		try {
 			_localctx = new PrefixPassContext(_localctx);
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(241);
-			postfix(0);
+			postfixExpr(0);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1410,88 +1412,88 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PostfixContext extends ParserRuleContext {
-		public PostfixContext(ParserRuleContext parent, int invokingState) {
+	public static class PostfixExprContext extends ParserRuleContext {
+		public PostfixExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_postfix; }
+		@Override public int getRuleIndex() { return RULE_postfixExpr; }
 	 
-		public PostfixContext() { }
-		public void copyFrom(PostfixContext ctx) {
+		public PostfixExprContext() { }
+		public void copyFrom(PostfixExprContext ctx) {
 			super.copyFrom(ctx);
 		}
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class ApplyExprContext extends PostfixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
+	public static class ApplyExprContext extends PostfixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
 		}
 		public TupleExprContext tupleExpr() {
 			return getRuleContext(TupleExprContext.class,0);
 		}
-		public ApplyExprContext(PostfixContext ctx) { copyFrom(ctx); }
+		public ApplyExprContext(PostfixExprContext ctx) { copyFrom(ctx); }
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class MemberAccessContext extends PostfixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
-		}
-		public List<TerminalNode> ID() { return getTokens(AxisParser.ID); }
-		public TerminalNode ID(int i) {
-			return getToken(AxisParser.ID, i);
-		}
-		public MemberAccessContext(PostfixContext ctx) { copyFrom(ctx); }
-	}
-	@SuppressWarnings("CheckReturnValue")
-	public static class TrailingLambdaContext extends PostfixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
+	public static class TrailingLambdaContext extends PostfixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
 		}
 		public LambdaContext lambda() {
 			return getRuleContext(LambdaContext.class,0);
 		}
-		public TrailingLambdaContext(PostfixContext ctx) { copyFrom(ctx); }
+		public TrailingLambdaContext(PostfixExprContext ctx) { copyFrom(ctx); }
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class ScopeAccessContext extends PostfixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
+	public static class MemberExprContext extends PostfixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
 		}
 		public List<TerminalNode> ID() { return getTokens(AxisParser.ID); }
 		public TerminalNode ID(int i) {
 			return getToken(AxisParser.ID, i);
 		}
-		public ScopeAccessContext(PostfixContext ctx) { copyFrom(ctx); }
+		public MemberExprContext(PostfixExprContext ctx) { copyFrom(ctx); }
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class PostfixPassContext extends PostfixContext {
-		public PrimaryContext primary() {
-			return getRuleContext(PrimaryContext.class,0);
+	public static class PostfixPassContext extends PostfixExprContext {
+		public PrimaryExprContext primaryExpr() {
+			return getRuleContext(PrimaryExprContext.class,0);
 		}
-		public PostfixPassContext(PostfixContext ctx) { copyFrom(ctx); }
+		public PostfixPassContext(PostfixExprContext ctx) { copyFrom(ctx); }
 	}
 	@SuppressWarnings("CheckReturnValue")
-	public static class IndexContext extends PostfixContext {
-		public PostfixContext postfix() {
-			return getRuleContext(PostfixContext.class,0);
+	public static class IndexContext extends PostfixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
 		}
 		public ShapeExprContext shapeExpr() {
 			return getRuleContext(ShapeExprContext.class,0);
 		}
-		public IndexContext(PostfixContext ctx) { copyFrom(ctx); }
+		public IndexContext(PostfixExprContext ctx) { copyFrom(ctx); }
+	}
+	@SuppressWarnings("CheckReturnValue")
+	public static class ScopeExprContext extends PostfixExprContext {
+		public PostfixExprContext postfixExpr() {
+			return getRuleContext(PostfixExprContext.class,0);
+		}
+		public List<TerminalNode> ID() { return getTokens(AxisParser.ID); }
+		public TerminalNode ID(int i) {
+			return getToken(AxisParser.ID, i);
+		}
+		public ScopeExprContext(PostfixExprContext ctx) { copyFrom(ctx); }
 	}
 
-	public final PostfixContext postfix() throws RecognitionException {
-		return postfix(0);
+	public final PostfixExprContext postfixExpr() throws RecognitionException {
+		return postfixExpr(0);
 	}
 
-	private PostfixContext postfix(int _p) throws RecognitionException {
+	private PostfixExprContext postfixExpr(int _p) throws RecognitionException {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
-		PostfixContext _localctx = new PostfixContext(_ctx, _parentState);
-		PostfixContext _prevctx = _localctx;
+		PostfixExprContext _localctx = new PostfixExprContext(_ctx, _parentState);
+		PostfixExprContext _prevctx = _localctx;
 		int _startState = 54;
-		enterRecursionRule(_localctx, 54, RULE_postfix, _p);
+		enterRecursionRule(_localctx, 54, RULE_postfixExpr, _p);
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
@@ -1502,7 +1504,7 @@ public class AxisParser extends Parser {
 			_prevctx = _localctx;
 
 			setState(244);
-			primary();
+			primaryExpr();
 			}
 			_ctx.stop = _input.LT(-1);
 			setState(268);
@@ -1518,8 +1520,8 @@ public class AxisParser extends Parser {
 					switch ( getInterpreter().adaptivePredict(_input,22,_ctx) ) {
 					case 1:
 						{
-						_localctx = new TrailingLambdaContext(new PostfixContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_postfix);
+						_localctx = new TrailingLambdaContext(new PostfixExprContext(_parentctx, _parentState));
+						pushNewRecursionContext(_localctx, _startState, RULE_postfixExpr);
 						setState(246);
 						if (!(precpred(_ctx, 5))) throw new FailedPredicateException(this, "precpred(_ctx, 5)");
 						setState(247);
@@ -1528,8 +1530,8 @@ public class AxisParser extends Parser {
 						break;
 					case 2:
 						{
-						_localctx = new ApplyExprContext(new PostfixContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_postfix);
+						_localctx = new ApplyExprContext(new PostfixExprContext(_parentctx, _parentState));
+						pushNewRecursionContext(_localctx, _startState, RULE_postfixExpr);
 						setState(248);
 						if (!(precpred(_ctx, 4))) throw new FailedPredicateException(this, "precpred(_ctx, 4)");
 						setState(249);
@@ -1538,8 +1540,8 @@ public class AxisParser extends Parser {
 						break;
 					case 3:
 						{
-						_localctx = new IndexContext(new PostfixContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_postfix);
+						_localctx = new IndexContext(new PostfixExprContext(_parentctx, _parentState));
+						pushNewRecursionContext(_localctx, _startState, RULE_postfixExpr);
 						setState(250);
 						if (!(precpred(_ctx, 3))) throw new FailedPredicateException(this, "precpred(_ctx, 3)");
 						setState(251);
@@ -1548,8 +1550,8 @@ public class AxisParser extends Parser {
 						break;
 					case 4:
 						{
-						_localctx = new MemberAccessContext(new PostfixContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_postfix);
+						_localctx = new MemberExprContext(new PostfixExprContext(_parentctx, _parentState));
+						pushNewRecursionContext(_localctx, _startState, RULE_postfixExpr);
 						setState(252);
 						if (!(precpred(_ctx, 2))) throw new FailedPredicateException(this, "precpred(_ctx, 2)");
 						setState(255); 
@@ -1561,7 +1563,7 @@ public class AxisParser extends Parser {
 								{
 								{
 								setState(253);
-								match(T__29);
+								match(T__30);
 								setState(254);
 								match(ID);
 								}
@@ -1578,8 +1580,8 @@ public class AxisParser extends Parser {
 						break;
 					case 5:
 						{
-						_localctx = new ScopeAccessContext(new PostfixContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_postfix);
+						_localctx = new ScopeExprContext(new PostfixExprContext(_parentctx, _parentState));
+						pushNewRecursionContext(_localctx, _startState, RULE_postfixExpr);
 						setState(259);
 						if (!(precpred(_ctx, 1))) throw new FailedPredicateException(this, "precpred(_ctx, 1)");
 						setState(262); 
@@ -1591,7 +1593,7 @@ public class AxisParser extends Parser {
 								{
 								{
 								setState(260);
-								match(T__30);
+								match(T__31);
 								setState(261);
 								match(ID);
 								}
@@ -1627,12 +1629,12 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PrimaryContext extends ParserRuleContext {
+	public static class PrimaryExprContext extends ParserRuleContext {
 		public SymExprContext symExpr() {
 			return getRuleContext(SymExprContext.class,0);
 		}
-		public LitContext lit() {
-			return getRuleContext(LitContext.class,0);
+		public LitExprContext litExpr() {
+			return getRuleContext(LitExprContext.class,0);
 		}
 		public TupleExprContext tupleExpr() {
 			return getRuleContext(TupleExprContext.class,0);
@@ -1640,15 +1642,15 @@ public class AxisParser extends Parser {
 		public LambdaContext lambda() {
 			return getRuleContext(LambdaContext.class,0);
 		}
-		public PrimaryContext(ParserRuleContext parent, int invokingState) {
+		public PrimaryExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_primary; }
+		@Override public int getRuleIndex() { return RULE_primaryExpr; }
 	}
 
-	public final PrimaryContext primary() throws RecognitionException {
-		PrimaryContext _localctx = new PrimaryContext(_ctx, getState());
-		enterRule(_localctx, 56, RULE_primary);
+	public final PrimaryExprContext primaryExpr() throws RecognitionException {
+		PrimaryExprContext _localctx = new PrimaryExprContext(_ctx, getState());
+		enterRule(_localctx, 56, RULE_primaryExpr);
 		try {
 			setState(275);
 			_errHandler.sync(this);
@@ -1665,7 +1667,7 @@ public class AxisParser extends Parser {
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(272);
-				lit();
+				litExpr();
 				}
 				break;
 			case T__12:
@@ -1675,7 +1677,7 @@ public class AxisParser extends Parser {
 				tupleExpr();
 				}
 				break;
-			case T__34:
+			case T__35:
 				enterOuterAlt(_localctx, 4);
 				{
 				setState(274);
@@ -1723,7 +1725,7 @@ public class AxisParser extends Parser {
 			case 1:
 				{
 				setState(278);
-				match(T__31);
+				match(T__32);
 				setState(279);
 				match(ID);
 				}
@@ -1743,18 +1745,18 @@ public class AxisParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class LitContext extends ParserRuleContext {
+	public static class LitExprContext extends ParserRuleContext {
 		public TerminalNode DECIMAL() { return getToken(AxisParser.DECIMAL, 0); }
 		public TerminalNode TEXT() { return getToken(AxisParser.TEXT, 0); }
-		public LitContext(ParserRuleContext parent, int invokingState) {
+		public LitExprContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_lit; }
+		@Override public int getRuleIndex() { return RULE_litExpr; }
 	}
 
-	public final LitContext lit() throws RecognitionException {
-		LitContext _localctx = new LitContext(_ctx, getState());
-		enterRule(_localctx, 60, RULE_lit);
+	public final LitExprContext litExpr() throws RecognitionException {
+		LitExprContext _localctx = new LitExprContext(_ctx, getState());
+		enterRule(_localctx, 60, RULE_litExpr);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
@@ -1809,7 +1811,7 @@ public class AxisParser extends Parser {
 			setState(293);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505160704L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010247680L) != 0)) {
 				{
 				setState(285);
 				tupleElement();
@@ -1882,11 +1884,11 @@ public class AxisParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(300);
-			match(T__32);
+			match(T__33);
 			setState(309);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505160704L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010247680L) != 0)) {
 				{
 				setState(301);
 				tupleElement();
@@ -1922,7 +1924,7 @@ public class AxisParser extends Parser {
 			}
 
 			setState(314);
-			match(T__33);
+			match(T__34);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1996,8 +1998,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class TupleValueElementContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TupleValueElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2012,7 +2014,7 @@ public class AxisParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(321);
-			expression();
+			expr();
 			}
 		}
 		catch (RecognitionException re) {
@@ -2028,11 +2030,11 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class TupleNominalElementContext extends ParserRuleContext {
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<ExprContext> expr() {
+			return getRuleContexts(ExprContext.class);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
+		public ExprContext expr(int i) {
+			return getRuleContext(ExprContext.class,i);
 		}
 		public TupleNominalElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2051,37 +2053,37 @@ public class AxisParser extends Parser {
 				enterOuterAlt(_localctx, 1);
 				{
 				setState(323);
-				expression();
+				expr();
 				setState(324);
 				match(T__4);
 				setState(325);
-				expression();
+				expr();
 				}
 				break;
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(327);
-				expression();
+				expr();
 				setState(328);
 				match(T__5);
 				setState(329);
-				expression();
+				expr();
 				}
 				break;
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
 				setState(331);
-				expression();
+				expr();
 				setState(332);
 				match(T__4);
 				setState(333);
-				expression();
+				expr();
 				setState(334);
 				match(T__5);
 				setState(335);
-				expression();
+				expr();
 				}
 				break;
 			}
@@ -2099,8 +2101,8 @@ public class AxisParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class TupleSpreadElementContext extends ParserRuleContext {
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public TupleSpreadElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2120,10 +2122,10 @@ public class AxisParser extends Parser {
 			setState(341);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505095168L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182144L) != 0)) {
 				{
 				setState(340);
-				expression();
+				expr();
 				}
 			}
 
@@ -2160,8 +2162,8 @@ public class AxisParser extends Parser {
 		public StatementContext statement(int i) {
 			return getRuleContext(StatementContext.class,i);
 		}
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public SemicolonContext semicolon() {
 			return getRuleContext(SemicolonContext.class,0);
@@ -2179,8 +2181,8 @@ public class AxisParser extends Parser {
 		public StatementContext statement(int i) {
 			return getRuleContext(StatementContext.class,i);
 		}
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public LambdaSuiteContext(LambdaContext ctx) { copyFrom(ctx); }
 	}
@@ -2199,7 +2201,7 @@ public class AxisParser extends Parser {
 				enterOuterAlt(_localctx, 1);
 				{
 				setState(343);
-				match(T__34);
+				match(T__35);
 				setState(345);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
@@ -2211,7 +2213,7 @@ public class AxisParser extends Parser {
 				}
 
 				setState(347);
-				match(T__35);
+				match(T__36);
 				setState(351);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,36,_ctx);
@@ -2231,15 +2233,15 @@ public class AxisParser extends Parser {
 				setState(355);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505095168L) != 0)) {
+				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182144L) != 0)) {
 					{
 					setState(354);
-					expression();
+					expr();
 					}
 				}
 
 				setState(357);
-				match(T__36);
+				match(T__37);
 				}
 				break;
 			case 2:
@@ -2247,7 +2249,7 @@ public class AxisParser extends Parser {
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(358);
-				match(T__34);
+				match(T__35);
 				setState(362);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,38,_ctx);
@@ -2267,10 +2269,10 @@ public class AxisParser extends Parser {
 				setState(366);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 1958505095168L) != 0)) {
+				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3917010182144L) != 0)) {
 					{
 					setState(365);
-					expression();
+					expr();
 					}
 				}
 
@@ -2285,7 +2287,7 @@ public class AxisParser extends Parser {
 				}
 
 				setState(371);
-				match(T__36);
+				match(T__37);
 				}
 				break;
 			}
@@ -2398,8 +2400,8 @@ public class AxisParser extends Parser {
 	@SuppressWarnings("CheckReturnValue")
 	public static class LambdaParamContext extends ParserRuleContext {
 		public TerminalNode ID() { return getToken(AxisParser.ID, 0); }
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ExprContext expr() {
+			return getRuleContext(ExprContext.class,0);
 		}
 		public LambdaParamContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2424,7 +2426,7 @@ public class AxisParser extends Parser {
 				setState(388);
 				match(T__4);
 				setState(389);
-				expression();
+				expr();
 				}
 			}
 
@@ -2444,11 +2446,11 @@ public class AxisParser extends Parser {
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 27:
-			return postfix_sempred((PostfixContext)_localctx, predIndex);
+			return postfixExpr_sempred((PostfixExprContext)_localctx, predIndex);
 		}
 		return true;
 	}
-	private boolean postfix_sempred(PostfixContext _localctx, int predIndex) {
+	private boolean postfixExpr_sempred(PostfixExprContext _localctx, int predIndex) {
 		switch (predIndex) {
 		case 0:
 			return precpred(_ctx, 5);
@@ -2465,7 +2467,7 @@ public class AxisParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\u0004\u0001*\u0189\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0004\u0001+\u0189\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
 		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
 		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
 		"\b\u0007\b\u0002\t\u0007\t\u0002\n\u0007\n\u0002\u000b\u0007\u000b\u0002"+
@@ -2523,9 +2525,9 @@ public class AxisParser extends Parser {
 		"(\u0001(\u0003(\u0187\b(\u0001(\u0000\u00016)\u0000\u0002\u0004\u0006"+
 		"\b\n\f\u000e\u0010\u0012\u0014\u0016\u0018\u001a\u001c\u001e \"$&(*,."+
 		"02468:<>@BDFHJLNP\u0000\u0005\u0001\u0000\u0011\u0012\u0001\u0000\u0013"+
-		"\u0018\u0001\u0000\u0019\u001a\u0001\u0000\u001b\u001d\u0001\u0000\'("+
-		"\u0193\u0000R\u0001\u0000\u0000\u0000\u0002V\u0001\u0000\u0000\u0000\u0004"+
-		"Z\u0001\u0000\u0000\u0000\u0006^\u0001\u0000\u0000\u0000\bm\u0001\u0000"+
+		"\u0018\u0001\u0000\u0019\u001a\u0001\u0000\u001b\u001e\u0001\u0000()\u0193"+
+		"\u0000R\u0001\u0000\u0000\u0000\u0002V\u0001\u0000\u0000\u0000\u0004Z"+
+		"\u0001\u0000\u0000\u0000\u0006^\u0001\u0000\u0000\u0000\bm\u0001\u0000"+
 		"\u0000\u0000\nq\u0001\u0000\u0000\u0000\fx\u0001\u0000\u0000\u0000\u000e"+
 		"|\u0001\u0000\u0000\u0000\u0010\u0080\u0001\u0000\u0000\u0000\u0012\u008c"+
 		"\u0001\u0000\u0000\u0000\u0014\u0091\u0001\u0000\u0000\u0000\u0016\u0093"+
@@ -2555,84 +2557,84 @@ public class AxisParser extends Parser {
 		"\u0000\u0000jk\u0001\u0000\u0000\u0000kl\u0005\u0000\u0000\u0001l\u0007"+
 		"\u0001\u0000\u0000\u0000mn\u0005\b\u0000\u0000no\u0003\u001e\u000f\u0000"+
 		"op\u0005\u0000\u0000\u0001p\t\u0001\u0000\u0000\u0000qs\u0005\t\u0000"+
-		"\u0000rt\u0005&\u0000\u0000sr\u0001\u0000\u0000\u0000st\u0001\u0000\u0000"+
-		"\u0000tu\u0001\u0000\u0000\u0000uv\u0005\u0005\u0000\u0000vw\u0005\u0000"+
-		"\u0000\u0001w\u000b\u0001\u0000\u0000\u0000xy\u0005\n\u0000\u0000yz\u0005"+
-		"\u0005\u0000\u0000z{\u0005\u0000\u0000\u0001{\r\u0001\u0000\u0000\u0000"+
-		"|}\u0005\u000b\u0000\u0000}~\u0003\u001e\u000f\u0000~\u007f\u0005\u0000"+
-		"\u0000\u0001\u007f\u000f\u0001\u0000\u0000\u0000\u0080\u0084\u0005\f\u0000"+
-		"\u0000\u0081\u0083\u0003\u0014\n\u0000\u0082\u0081\u0001\u0000\u0000\u0000"+
-		"\u0083\u0086\u0001\u0000\u0000\u0000\u0084\u0082\u0001\u0000\u0000\u0000"+
-		"\u0084\u0085\u0001\u0000\u0000\u0000\u0085\u0087\u0001\u0000\u0000\u0000"+
-		"\u0086\u0084\u0001\u0000\u0000\u0000\u0087\u0088\u0005\u0000\u0000\u0001"+
-		"\u0088\u0011\u0001\u0000\u0000\u0000\u0089\u008b\u0003\u0014\n\u0000\u008a"+
-		"\u0089\u0001\u0000\u0000\u0000\u008b\u008e\u0001\u0000\u0000\u0000\u008c"+
-		"\u008a\u0001\u0000\u0000\u0000\u008c\u008d\u0001\u0000\u0000\u0000\u008d"+
-		"\u0013\u0001\u0000\u0000\u0000\u008e\u008c\u0001\u0000\u0000\u0000\u008f"+
-		"\u0092\u0003\u0016\u000b\u0000\u0090\u0092\u0003\u001e\u000f\u0000\u0091"+
-		"\u008f\u0001\u0000\u0000\u0000\u0091\u0090\u0001\u0000\u0000\u0000\u0092"+
-		"\u0015\u0001\u0000\u0000\u0000\u0093\u0094\u0005\u0004\u0000\u0000\u0094"+
-		"\u0097\u0003\u0018\f\u0000\u0095\u0096\u0005\u0005\u0000\u0000\u0096\u0098"+
-		"\u0003\u001e\u000f\u0000\u0097\u0095\u0001\u0000\u0000\u0000\u0097\u0098"+
-		"\u0001\u0000\u0000\u0000\u0098\u009b\u0001\u0000\u0000\u0000\u0099\u009a"+
-		"\u0005\u0006\u0000\u0000\u009a\u009c\u0003\u001e\u000f\u0000\u009b\u0099"+
-		"\u0001\u0000\u0000\u0000\u009b\u009c\u0001\u0000\u0000\u0000\u009c\u009e"+
-		"\u0001\u0000\u0000\u0000\u009d\u009f\u0005\u0007\u0000\u0000\u009e\u009d"+
-		"\u0001\u0000\u0000\u0000\u009e\u009f\u0001\u0000\u0000\u0000\u009f\u0017"+
-		"\u0001\u0000\u0000\u0000\u00a0\u00a3\u0005&\u0000\u0000\u00a1\u00a3\u0003"+
-		"\u001a\r\u0000\u00a2\u00a0\u0001\u0000\u0000\u0000\u00a2\u00a1\u0001\u0000"+
-		"\u0000\u0000\u00a3\u0019\u0001\u0000\u0000\u0000\u00a4\u00ad\u0005\r\u0000"+
-		"\u0000\u00a5\u00aa\u0003\u001c\u000e\u0000\u00a6\u00a7\u0005\u000e\u0000"+
-		"\u0000\u00a7\u00a9\u0003\u001c\u000e\u0000\u00a8\u00a6\u0001\u0000\u0000"+
-		"\u0000\u00a9\u00ac\u0001\u0000\u0000\u0000\u00aa\u00a8\u0001\u0000\u0000"+
-		"\u0000\u00aa\u00ab\u0001\u0000\u0000\u0000\u00ab\u00ae\u0001\u0000\u0000"+
-		"\u0000\u00ac\u00aa\u0001\u0000\u0000\u0000\u00ad\u00a5\u0001\u0000\u0000"+
-		"\u0000\u00ad\u00ae\u0001\u0000\u0000\u0000\u00ae\u00af\u0001\u0000\u0000"+
-		"\u0000\u00af\u00b0\u0005\u000f\u0000\u0000\u00b0\u001b\u0001\u0000\u0000"+
-		"\u0000\u00b1\u00b6\u0005&\u0000\u0000\u00b2\u00b3\u0005&\u0000\u0000\u00b3"+
-		"\u00b4\u0005\u0005\u0000\u0000\u00b4\u00b6\u0005&\u0000\u0000\u00b5\u00b1"+
-		"\u0001\u0000\u0000\u0000\u00b5\u00b2\u0001\u0000\u0000\u0000\u00b6\u001d"+
-		"\u0001\u0000\u0000\u0000\u00b7\u00b8\u0003 \u0010\u0000\u00b8\u001f\u0001"+
-		"\u0000\u0000\u0000\u00b9\u00bd\u0003\"\u0011\u0000\u00ba\u00bc\u0003\""+
-		"\u0011\u0000\u00bb\u00ba\u0001\u0000\u0000\u0000\u00bc\u00bf\u0001\u0000"+
-		"\u0000\u0000\u00bd\u00bb\u0001\u0000\u0000\u0000\u00bd\u00be\u0001\u0000"+
-		"\u0000\u0000\u00be!\u0001\u0000\u0000\u0000\u00bf\u00bd\u0001\u0000\u0000"+
-		"\u0000\u00c0\u00c3\u0003$\u0012\u0000\u00c1\u00c2\u0005\u0010\u0000\u0000"+
-		"\u00c2\u00c4\u0003$\u0012\u0000\u00c3\u00c1\u0001\u0000\u0000\u0000\u00c3"+
-		"\u00c4\u0001\u0000\u0000\u0000\u00c4#\u0001\u0000\u0000\u0000\u00c5\u00cb"+
-		"\u0003(\u0014\u0000\u00c6\u00c7\u0003&\u0013\u0000\u00c7\u00c8\u0003("+
-		"\u0014\u0000\u00c8\u00ca\u0001\u0000\u0000\u0000\u00c9\u00c6\u0001\u0000"+
-		"\u0000\u0000\u00ca\u00cd\u0001\u0000\u0000\u0000\u00cb\u00c9\u0001\u0000"+
-		"\u0000\u0000\u00cb\u00cc\u0001\u0000\u0000\u0000\u00cc%\u0001\u0000\u0000"+
-		"\u0000\u00cd\u00cb\u0001\u0000\u0000\u0000\u00ce\u00cf\u0007\u0000\u0000"+
-		"\u0000\u00cf\'\u0001\u0000\u0000\u0000\u00d0\u00d6\u0003,\u0016\u0000"+
-		"\u00d1\u00d2\u0003*\u0015\u0000\u00d2\u00d3\u0003,\u0016\u0000\u00d3\u00d5"+
-		"\u0001\u0000\u0000\u0000\u00d4\u00d1\u0001\u0000\u0000\u0000\u00d5\u00d8"+
-		"\u0001\u0000\u0000\u0000\u00d6\u00d4\u0001\u0000\u0000\u0000\u00d6\u00d7"+
-		"\u0001\u0000\u0000\u0000\u00d7)\u0001\u0000\u0000\u0000\u00d8\u00d6\u0001"+
-		"\u0000\u0000\u0000\u00d9\u00da\u0007\u0001\u0000\u0000\u00da+\u0001\u0000"+
-		"\u0000\u0000\u00db\u00e1\u00030\u0018\u0000\u00dc\u00dd\u0003.\u0017\u0000"+
-		"\u00dd\u00de\u00030\u0018\u0000\u00de\u00e0\u0001\u0000\u0000\u0000\u00df"+
-		"\u00dc\u0001\u0000\u0000\u0000\u00e0\u00e3\u0001\u0000\u0000\u0000\u00e1"+
-		"\u00df\u0001\u0000\u0000\u0000\u00e1\u00e2\u0001\u0000\u0000\u0000\u00e2"+
-		"-\u0001\u0000\u0000\u0000\u00e3\u00e1\u0001\u0000\u0000\u0000\u00e4\u00e5"+
-		"\u0007\u0002\u0000\u0000\u00e5/\u0001\u0000\u0000\u0000\u00e6\u00ec\u0003"+
-		"4\u001a\u0000\u00e7\u00e8\u00032\u0019\u0000\u00e8\u00e9\u00034\u001a"+
-		"\u0000\u00e9\u00eb\u0001\u0000\u0000\u0000\u00ea\u00e7\u0001\u0000\u0000"+
-		"\u0000\u00eb\u00ee\u0001\u0000\u0000\u0000\u00ec\u00ea\u0001\u0000\u0000"+
-		"\u0000\u00ec\u00ed\u0001\u0000\u0000\u0000\u00ed1\u0001\u0000\u0000\u0000"+
-		"\u00ee\u00ec\u0001\u0000\u0000\u0000\u00ef\u00f0\u0007\u0003\u0000\u0000"+
-		"\u00f03\u0001\u0000\u0000\u0000\u00f1\u00f2\u00036\u001b\u0000\u00f25"+
-		"\u0001\u0000\u0000\u0000\u00f3\u00f4\u0006\u001b\uffff\uffff\u0000\u00f4"+
+		"\u0000rt\u0003\u001e\u000f\u0000sr\u0001\u0000\u0000\u0000st\u0001\u0000"+
+		"\u0000\u0000tu\u0001\u0000\u0000\u0000uv\u0005\u0005\u0000\u0000vw\u0005"+
+		"\u0000\u0000\u0001w\u000b\u0001\u0000\u0000\u0000xy\u0005\n\u0000\u0000"+
+		"yz\u0005\u0005\u0000\u0000z{\u0005\u0000\u0000\u0001{\r\u0001\u0000\u0000"+
+		"\u0000|}\u0005\u000b\u0000\u0000}~\u0003\u001e\u000f\u0000~\u007f\u0005"+
+		"\u0000\u0000\u0001\u007f\u000f\u0001\u0000\u0000\u0000\u0080\u0084\u0005"+
+		"\f\u0000\u0000\u0081\u0083\u0003\u0014\n\u0000\u0082\u0081\u0001\u0000"+
+		"\u0000\u0000\u0083\u0086\u0001\u0000\u0000\u0000\u0084\u0082\u0001\u0000"+
+		"\u0000\u0000\u0084\u0085\u0001\u0000\u0000\u0000\u0085\u0087\u0001\u0000"+
+		"\u0000\u0000\u0086\u0084\u0001\u0000\u0000\u0000\u0087\u0088\u0005\u0000"+
+		"\u0000\u0001\u0088\u0011\u0001\u0000\u0000\u0000\u0089\u008b\u0003\u0014"+
+		"\n\u0000\u008a\u0089\u0001\u0000\u0000\u0000\u008b\u008e\u0001\u0000\u0000"+
+		"\u0000\u008c\u008a\u0001\u0000\u0000\u0000\u008c\u008d\u0001\u0000\u0000"+
+		"\u0000\u008d\u0013\u0001\u0000\u0000\u0000\u008e\u008c\u0001\u0000\u0000"+
+		"\u0000\u008f\u0092\u0003\u0016\u000b\u0000\u0090\u0092\u0003\u001e\u000f"+
+		"\u0000\u0091\u008f\u0001\u0000\u0000\u0000\u0091\u0090\u0001\u0000\u0000"+
+		"\u0000\u0092\u0015\u0001\u0000\u0000\u0000\u0093\u0094\u0005\u0004\u0000"+
+		"\u0000\u0094\u0097\u0003\u0018\f\u0000\u0095\u0096\u0005\u0005\u0000\u0000"+
+		"\u0096\u0098\u0003\u001e\u000f\u0000\u0097\u0095\u0001\u0000\u0000\u0000"+
+		"\u0097\u0098\u0001\u0000\u0000\u0000\u0098\u009b\u0001\u0000\u0000\u0000"+
+		"\u0099\u009a\u0005\u0006\u0000\u0000\u009a\u009c\u0003\u001e\u000f\u0000"+
+		"\u009b\u0099\u0001\u0000\u0000\u0000\u009b\u009c\u0001\u0000\u0000\u0000"+
+		"\u009c\u009e\u0001\u0000\u0000\u0000\u009d\u009f\u0005\u0007\u0000\u0000"+
+		"\u009e\u009d\u0001\u0000\u0000\u0000\u009e\u009f\u0001\u0000\u0000\u0000"+
+		"\u009f\u0017\u0001\u0000\u0000\u0000\u00a0\u00a3\u0005\'\u0000\u0000\u00a1"+
+		"\u00a3\u0003\u001a\r\u0000\u00a2\u00a0\u0001\u0000\u0000\u0000\u00a2\u00a1"+
+		"\u0001\u0000\u0000\u0000\u00a3\u0019\u0001\u0000\u0000\u0000\u00a4\u00ad"+
+		"\u0005\r\u0000\u0000\u00a5\u00aa\u0003\u001c\u000e\u0000\u00a6\u00a7\u0005"+
+		"\u000e\u0000\u0000\u00a7\u00a9\u0003\u001c\u000e\u0000\u00a8\u00a6\u0001"+
+		"\u0000\u0000\u0000\u00a9\u00ac\u0001\u0000\u0000\u0000\u00aa\u00a8\u0001"+
+		"\u0000\u0000\u0000\u00aa\u00ab\u0001\u0000\u0000\u0000\u00ab\u00ae\u0001"+
+		"\u0000\u0000\u0000\u00ac\u00aa\u0001\u0000\u0000\u0000\u00ad\u00a5\u0001"+
+		"\u0000\u0000\u0000\u00ad\u00ae\u0001\u0000\u0000\u0000\u00ae\u00af\u0001"+
+		"\u0000\u0000\u0000\u00af\u00b0\u0005\u000f\u0000\u0000\u00b0\u001b\u0001"+
+		"\u0000\u0000\u0000\u00b1\u00b6\u0005\'\u0000\u0000\u00b2\u00b3\u0005\'"+
+		"\u0000\u0000\u00b3\u00b4\u0005\u0005\u0000\u0000\u00b4\u00b6\u0005\'\u0000"+
+		"\u0000\u00b5\u00b1\u0001\u0000\u0000\u0000\u00b5\u00b2\u0001\u0000\u0000"+
+		"\u0000\u00b6\u001d\u0001\u0000\u0000\u0000\u00b7\u00b8\u0003 \u0010\u0000"+
+		"\u00b8\u001f\u0001\u0000\u0000\u0000\u00b9\u00bd\u0003\"\u0011\u0000\u00ba"+
+		"\u00bc\u0003\"\u0011\u0000\u00bb\u00ba\u0001\u0000\u0000\u0000\u00bc\u00bf"+
+		"\u0001\u0000\u0000\u0000\u00bd\u00bb\u0001\u0000\u0000\u0000\u00bd\u00be"+
+		"\u0001\u0000\u0000\u0000\u00be!\u0001\u0000\u0000\u0000\u00bf\u00bd\u0001"+
+		"\u0000\u0000\u0000\u00c0\u00c3\u0003$\u0012\u0000\u00c1\u00c2\u0005\u0010"+
+		"\u0000\u0000\u00c2\u00c4\u0003$\u0012\u0000\u00c3\u00c1\u0001\u0000\u0000"+
+		"\u0000\u00c3\u00c4\u0001\u0000\u0000\u0000\u00c4#\u0001\u0000\u0000\u0000"+
+		"\u00c5\u00cb\u0003(\u0014\u0000\u00c6\u00c7\u0003&\u0013\u0000\u00c7\u00c8"+
+		"\u0003(\u0014\u0000\u00c8\u00ca\u0001\u0000\u0000\u0000\u00c9\u00c6\u0001"+
+		"\u0000\u0000\u0000\u00ca\u00cd\u0001\u0000\u0000\u0000\u00cb\u00c9\u0001"+
+		"\u0000\u0000\u0000\u00cb\u00cc\u0001\u0000\u0000\u0000\u00cc%\u0001\u0000"+
+		"\u0000\u0000\u00cd\u00cb\u0001\u0000\u0000\u0000\u00ce\u00cf\u0007\u0000"+
+		"\u0000\u0000\u00cf\'\u0001\u0000\u0000\u0000\u00d0\u00d6\u0003,\u0016"+
+		"\u0000\u00d1\u00d2\u0003*\u0015\u0000\u00d2\u00d3\u0003,\u0016\u0000\u00d3"+
+		"\u00d5\u0001\u0000\u0000\u0000\u00d4\u00d1\u0001\u0000\u0000\u0000\u00d5"+
+		"\u00d8\u0001\u0000\u0000\u0000\u00d6\u00d4\u0001\u0000\u0000\u0000\u00d6"+
+		"\u00d7\u0001\u0000\u0000\u0000\u00d7)\u0001\u0000\u0000\u0000\u00d8\u00d6"+
+		"\u0001\u0000\u0000\u0000\u00d9\u00da\u0007\u0001\u0000\u0000\u00da+\u0001"+
+		"\u0000\u0000\u0000\u00db\u00e1\u00030\u0018\u0000\u00dc\u00dd\u0003.\u0017"+
+		"\u0000\u00dd\u00de\u00030\u0018\u0000\u00de\u00e0\u0001\u0000\u0000\u0000"+
+		"\u00df\u00dc\u0001\u0000\u0000\u0000\u00e0\u00e3\u0001\u0000\u0000\u0000"+
+		"\u00e1\u00df\u0001\u0000\u0000\u0000\u00e1\u00e2\u0001\u0000\u0000\u0000"+
+		"\u00e2-\u0001\u0000\u0000\u0000\u00e3\u00e1\u0001\u0000\u0000\u0000\u00e4"+
+		"\u00e5\u0007\u0002\u0000\u0000\u00e5/\u0001\u0000\u0000\u0000\u00e6\u00ec"+
+		"\u00034\u001a\u0000\u00e7\u00e8\u00032\u0019\u0000\u00e8\u00e9\u00034"+
+		"\u001a\u0000\u00e9\u00eb\u0001\u0000\u0000\u0000\u00ea\u00e7\u0001\u0000"+
+		"\u0000\u0000\u00eb\u00ee\u0001\u0000\u0000\u0000\u00ec\u00ea\u0001\u0000"+
+		"\u0000\u0000\u00ec\u00ed\u0001\u0000\u0000\u0000\u00ed1\u0001\u0000\u0000"+
+		"\u0000\u00ee\u00ec\u0001\u0000\u0000\u0000\u00ef\u00f0\u0007\u0003\u0000"+
+		"\u0000\u00f03\u0001\u0000\u0000\u0000\u00f1\u00f2\u00036\u001b\u0000\u00f2"+
+		"5\u0001\u0000\u0000\u0000\u00f3\u00f4\u0006\u001b\uffff\uffff\u0000\u00f4"+
 		"\u00f5\u00038\u001c\u0000\u00f5\u010c\u0001\u0000\u0000\u0000\u00f6\u00f7"+
 		"\n\u0005\u0000\u0000\u00f7\u010b\u0003J%\u0000\u00f8\u00f9\n\u0004\u0000"+
 		"\u0000\u00f9\u010b\u0003>\u001f\u0000\u00fa\u00fb\n\u0003\u0000\u0000"+
 		"\u00fb\u010b\u0003@ \u0000\u00fc\u00ff\n\u0002\u0000\u0000\u00fd\u00fe"+
-		"\u0005\u001e\u0000\u0000\u00fe\u0100\u0005&\u0000\u0000\u00ff\u00fd\u0001"+
+		"\u0005\u001f\u0000\u0000\u00fe\u0100\u0005\'\u0000\u0000\u00ff\u00fd\u0001"+
 		"\u0000\u0000\u0000\u0100\u0101\u0001\u0000\u0000\u0000\u0101\u00ff\u0001"+
 		"\u0000\u0000\u0000\u0101\u0102\u0001\u0000\u0000\u0000\u0102\u010b\u0001"+
-		"\u0000\u0000\u0000\u0103\u0106\n\u0001\u0000\u0000\u0104\u0105\u0005\u001f"+
-		"\u0000\u0000\u0105\u0107\u0005&\u0000\u0000\u0106\u0104\u0001\u0000\u0000"+
+		"\u0000\u0000\u0000\u0103\u0106\n\u0001\u0000\u0000\u0104\u0105\u0005 "+
+		"\u0000\u0000\u0105\u0107\u0005\'\u0000\u0000\u0106\u0104\u0001\u0000\u0000"+
 		"\u0000\u0107\u0108\u0001\u0000\u0000\u0000\u0108\u0106\u0001\u0000\u0000"+
 		"\u0000\u0108\u0109\u0001\u0000\u0000\u0000\u0109\u010b\u0001\u0000\u0000"+
 		"\u0000\u010a\u00f6\u0001\u0000\u0000\u0000\u010a\u00f8\u0001\u0000\u0000"+
@@ -2644,28 +2646,28 @@ public class AxisParser extends Parser {
 		"\u0003>\u001f\u0000\u0112\u0114\u0003J%\u0000\u0113\u010f\u0001\u0000"+
 		"\u0000\u0000\u0113\u0110\u0001\u0000\u0000\u0000\u0113\u0111\u0001\u0000"+
 		"\u0000\u0000\u0113\u0112\u0001\u0000\u0000\u0000\u01149\u0001\u0000\u0000"+
-		"\u0000\u0115\u0118\u0005&\u0000\u0000\u0116\u0117\u0005 \u0000\u0000\u0117"+
-		"\u0119\u0005&\u0000\u0000\u0118\u0116\u0001\u0000\u0000\u0000\u0118\u0119"+
-		"\u0001\u0000\u0000\u0000\u0119;\u0001\u0000\u0000\u0000\u011a\u011b\u0007"+
-		"\u0004\u0000\u0000\u011b=\u0001\u0000\u0000\u0000\u011c\u0125\u0005\r"+
-		"\u0000\u0000\u011d\u0122\u0003B!\u0000\u011e\u011f\u0005\u000e\u0000\u0000"+
-		"\u011f\u0121\u0003B!\u0000\u0120\u011e\u0001\u0000\u0000\u0000\u0121\u0124"+
-		"\u0001\u0000\u0000\u0000\u0122\u0120\u0001\u0000\u0000\u0000\u0122\u0123"+
-		"\u0001\u0000\u0000\u0000\u0123\u0126\u0001\u0000\u0000\u0000\u0124\u0122"+
-		"\u0001\u0000\u0000\u0000\u0125\u011d\u0001\u0000\u0000\u0000\u0125\u0126"+
-		"\u0001\u0000\u0000\u0000\u0126\u0128\u0001\u0000\u0000\u0000\u0127\u0129"+
-		"\u0005\u000e\u0000\u0000\u0128\u0127\u0001\u0000\u0000\u0000\u0128\u0129"+
-		"\u0001\u0000\u0000\u0000\u0129\u012a\u0001\u0000\u0000\u0000\u012a\u012b"+
-		"\u0005\u000f\u0000\u0000\u012b?\u0001\u0000\u0000\u0000\u012c\u0135\u0005"+
-		"!\u0000\u0000\u012d\u0132\u0003B!\u0000\u012e\u012f\u0005\u000e\u0000"+
-		"\u0000\u012f\u0131\u0003B!\u0000\u0130\u012e\u0001\u0000\u0000\u0000\u0131"+
-		"\u0134\u0001\u0000\u0000\u0000\u0132\u0130\u0001\u0000\u0000\u0000\u0132"+
-		"\u0133\u0001\u0000\u0000\u0000\u0133\u0136\u0001\u0000\u0000\u0000\u0134"+
-		"\u0132\u0001\u0000\u0000\u0000\u0135\u012d\u0001\u0000\u0000\u0000\u0135"+
-		"\u0136\u0001\u0000\u0000\u0000\u0136\u0138\u0001\u0000\u0000\u0000\u0137"+
-		"\u0139\u0005\u000e\u0000\u0000\u0138\u0137\u0001\u0000\u0000\u0000\u0138"+
-		"\u0139\u0001\u0000\u0000\u0000\u0139\u013a\u0001\u0000\u0000\u0000\u013a"+
-		"\u013b\u0005\"\u0000\u0000\u013bA\u0001\u0000\u0000\u0000\u013c\u0140"+
+		"\u0000\u0115\u0118\u0005\'\u0000\u0000\u0116\u0117\u0005!\u0000\u0000"+
+		"\u0117\u0119\u0005\'\u0000\u0000\u0118\u0116\u0001\u0000\u0000\u0000\u0118"+
+		"\u0119\u0001\u0000\u0000\u0000\u0119;\u0001\u0000\u0000\u0000\u011a\u011b"+
+		"\u0007\u0004\u0000\u0000\u011b=\u0001\u0000\u0000\u0000\u011c\u0125\u0005"+
+		"\r\u0000\u0000\u011d\u0122\u0003B!\u0000\u011e\u011f\u0005\u000e\u0000"+
+		"\u0000\u011f\u0121\u0003B!\u0000\u0120\u011e\u0001\u0000\u0000\u0000\u0121"+
+		"\u0124\u0001\u0000\u0000\u0000\u0122\u0120\u0001\u0000\u0000\u0000\u0122"+
+		"\u0123\u0001\u0000\u0000\u0000\u0123\u0126\u0001\u0000\u0000\u0000\u0124"+
+		"\u0122\u0001\u0000\u0000\u0000\u0125\u011d\u0001\u0000\u0000\u0000\u0125"+
+		"\u0126\u0001\u0000\u0000\u0000\u0126\u0128\u0001\u0000\u0000\u0000\u0127"+
+		"\u0129\u0005\u000e\u0000\u0000\u0128\u0127\u0001\u0000\u0000\u0000\u0128"+
+		"\u0129\u0001\u0000\u0000\u0000\u0129\u012a\u0001\u0000\u0000\u0000\u012a"+
+		"\u012b\u0005\u000f\u0000\u0000\u012b?\u0001\u0000\u0000\u0000\u012c\u0135"+
+		"\u0005\"\u0000\u0000\u012d\u0132\u0003B!\u0000\u012e\u012f\u0005\u000e"+
+		"\u0000\u0000\u012f\u0131\u0003B!\u0000\u0130\u012e\u0001\u0000\u0000\u0000"+
+		"\u0131\u0134\u0001\u0000\u0000\u0000\u0132\u0130\u0001\u0000\u0000\u0000"+
+		"\u0132\u0133\u0001\u0000\u0000\u0000\u0133\u0136\u0001\u0000\u0000\u0000"+
+		"\u0134\u0132\u0001\u0000\u0000\u0000\u0135\u012d\u0001\u0000\u0000\u0000"+
+		"\u0135\u0136\u0001\u0000\u0000\u0000\u0136\u0138\u0001\u0000\u0000\u0000"+
+		"\u0137\u0139\u0005\u000e\u0000\u0000\u0138\u0137\u0001\u0000\u0000\u0000"+
+		"\u0138\u0139\u0001\u0000\u0000\u0000\u0139\u013a\u0001\u0000\u0000\u0000"+
+		"\u013a\u013b\u0005#\u0000\u0000\u013bA\u0001\u0000\u0000\u0000\u013c\u0140"+
 		"\u0003D\"\u0000\u013d\u0140\u0003F#\u0000\u013e\u0140\u0003H$\u0000\u013f"+
 		"\u013c\u0001\u0000\u0000\u0000\u013f\u013d\u0001\u0000\u0000\u0000\u013f"+
 		"\u013e\u0001\u0000\u0000\u0000\u0140C\u0001\u0000\u0000\u0000\u0141\u0142"+
@@ -2681,15 +2683,15 @@ public class AxisParser extends Parser {
 		"\u0000\u0000\u0000\u0152G\u0001\u0000\u0000\u0000\u0153\u0155\u0005\u0010"+
 		"\u0000\u0000\u0154\u0156\u0003\u001e\u000f\u0000\u0155\u0154\u0001\u0000"+
 		"\u0000\u0000\u0155\u0156\u0001\u0000\u0000\u0000\u0156I\u0001\u0000\u0000"+
-		"\u0000\u0157\u0159\u0005#\u0000\u0000\u0158\u015a\u0003N\'\u0000\u0159"+
+		"\u0000\u0157\u0159\u0005$\u0000\u0000\u0158\u015a\u0003N\'\u0000\u0159"+
 		"\u0158\u0001\u0000\u0000\u0000\u0159\u015a\u0001\u0000\u0000\u0000\u015a"+
-		"\u015b\u0001\u0000\u0000\u0000\u015b\u015f\u0005$\u0000\u0000\u015c\u015e"+
+		"\u015b\u0001\u0000\u0000\u0000\u015b\u015f\u0005%\u0000\u0000\u015c\u015e"+
 		"\u0003\u0014\n\u0000\u015d\u015c\u0001\u0000\u0000\u0000\u015e\u0161\u0001"+
 		"\u0000\u0000\u0000\u015f\u015d\u0001\u0000\u0000\u0000\u015f\u0160\u0001"+
 		"\u0000\u0000\u0000\u0160\u0163\u0001\u0000\u0000\u0000\u0161\u015f\u0001"+
 		"\u0000\u0000\u0000\u0162\u0164\u0003\u001e\u000f\u0000\u0163\u0162\u0001"+
 		"\u0000\u0000\u0000\u0163\u0164\u0001\u0000\u0000\u0000\u0164\u0165\u0001"+
-		"\u0000\u0000\u0000\u0165\u0175\u0005%\u0000\u0000\u0166\u016a\u0005#\u0000"+
+		"\u0000\u0000\u0000\u0165\u0175\u0005&\u0000\u0000\u0166\u016a\u0005$\u0000"+
 		"\u0000\u0167\u0169\u0003\u0014\n\u0000\u0168\u0167\u0001\u0000\u0000\u0000"+
 		"\u0169\u016c\u0001\u0000\u0000\u0000\u016a\u0168\u0001\u0000\u0000\u0000"+
 		"\u016a\u016b\u0001\u0000\u0000\u0000\u016b\u016e\u0001\u0000\u0000\u0000"+
@@ -2697,7 +2699,7 @@ public class AxisParser extends Parser {
 		"\u016e\u016d\u0001\u0000\u0000\u0000\u016e\u016f\u0001\u0000\u0000\u0000"+
 		"\u016f\u0171\u0001\u0000\u0000\u0000\u0170\u0172\u0003L&\u0000\u0171\u0170"+
 		"\u0001\u0000\u0000\u0000\u0171\u0172\u0001\u0000\u0000\u0000\u0172\u0173"+
-		"\u0001\u0000\u0000\u0000\u0173\u0175\u0005%\u0000\u0000\u0174\u0157\u0001"+
+		"\u0001\u0000\u0000\u0000\u0173\u0175\u0005&\u0000\u0000\u0174\u0157\u0001"+
 		"\u0000\u0000\u0000\u0174\u0166\u0001\u0000\u0000\u0000\u0175K\u0001\u0000"+
 		"\u0000\u0000\u0176\u0177\u0005\u0007\u0000\u0000\u0177M\u0001\u0000\u0000"+
 		"\u0000\u0178\u017d\u0003P(\u0000\u0179\u017a\u0005\u000e\u0000\u0000\u017a"+
@@ -2706,7 +2708,7 @@ public class AxisParser extends Parser {
 		"\u0000\u0000\u0000\u017e\u0181\u0001\u0000\u0000\u0000\u017f\u017d\u0001"+
 		"\u0000\u0000\u0000\u0180\u0182\u0005\u000e\u0000\u0000\u0181\u0180\u0001"+
 		"\u0000\u0000\u0000\u0181\u0182\u0001\u0000\u0000\u0000\u0182O\u0001\u0000"+
-		"\u0000\u0000\u0183\u0186\u0005&\u0000\u0000\u0184\u0185\u0005\u0005\u0000"+
+		"\u0000\u0000\u0183\u0186\u0005\'\u0000\u0000\u0184\u0185\u0005\u0005\u0000"+
 		"\u0000\u0185\u0187\u0003\u001e\u000f\u0000\u0186\u0184\u0001\u0000\u0000"+
 		"\u0000\u0186\u0187\u0001\u0000\u0000\u0000\u0187Q\u0001\u0000\u0000\u0000"+
 		"-bfis\u0084\u008c\u0091\u0097\u009b\u009e\u00a2\u00aa\u00ad\u00b5\u00bd"+

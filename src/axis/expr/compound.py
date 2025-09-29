@@ -4,10 +4,10 @@ from axis import syn
 class Compound(syn.Expr):
     components: tuple[syn.Expr, ...]
 
-@syn.AstBuilder.build.register
+@syn.Builder.build.register
 def build_compound(
     self,
-    ctx: syn.AxisParser.JuxtapositionContext,
+    ctx: syn.AxisParser.CompoundExprContext,
     *components,
 ):
     if len(components) == 1:

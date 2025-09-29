@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-
+from textwrap import dedent
 
 from protobase import  Record, cached_property
 
@@ -14,6 +14,10 @@ class File(Record, frozen=True):
     #dir: Dir
     path: Path
     buffer: str | None = None
+
+    @classmethod
+    def from_buffer(cls, path: Path|str, buffer: str) -> File:
+        return cls(path=Path(path), buffer=dedent(buffer))
 
     @classmethod
     def from_path(cls, path: Path|str) -> File:
@@ -119,7 +123,7 @@ class Line(Record, frozen=True):
     def startswith(self, prefix: str) -> bool:
         return self.file.content.startswith(prefix, self.start, self.end)
 
-    def match(self, pattern: re.Pattern | str, offset: int = 0):
+    def match(self, pattern: re.Pattern | str, offset: int = 0, full: bool = False):
         """
         Matches the line content with the given pattern.
         """
@@ -129,19 +133,13 @@ class Line(Record, frozen=True):
         if isinstance(pattern, str):
             pattern = compile(pattern)
 
-        return pattern.match(self.file.content, self.start + offset, self.end)
+        if full:
+            return pattern.fullmatch(self.file.content, self.start + offset, self.end)
+        else:
+            return pattern.match(self.file.content, self.start + offset, self.end)
 
     def fullmatch(self, pattern: re.Pattern | str, offset: int = 0):
-        """
-        Matches the line content with the given pattern.
-        """
-        if offset < 0 or offset > len(self):
-            raise IndexError(f"Offset {offset} out of range (0-{len(self.content)})")
-
-        if isinstance(pattern, str):
-            pattern = re.compile(pattern)
-
-        return pattern.fullmatch(self.file.content, self.start + offset, self.end)
+        self.match(pattern, offset, full=True)
 
 
 class Position(Record, frozen=True):
@@ -155,7 +153,7 @@ class Position(Record, frozen=True):
 
 if __name__ == "__main__":
     from re import compile
-    from textwrap import dedent
+
 
     file = File(
         Path("test.txt"),
