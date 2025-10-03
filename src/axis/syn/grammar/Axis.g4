@@ -53,8 +53,8 @@ compoundExpr
     ;
 
 
-rangeExpr: logicExpr ('..' logicExpr)?;
-
+rangeExpr: logicExpr (rangeOp logicExpr)?;
+rangeOp: '..=' | '..<'; // el operador ellipsis ... indica rango infinito y se utiliza como elemento solitario a = ... tambien es mas generico
 
 // Logical operators
 logicExpr
@@ -86,7 +86,14 @@ productiveOp: '*' | '/' | '%' | '·';
 
 prefixExpr
     : postfixExpr                                                   # PrefixPass          
+    | etcOp prefixExpr                                              # EtcExpr
+    | signOp prefixExpr                                             # SignExpr
     ;
+
+signOp: '+' | '-' | '~' | '!'; //
+etcOp: '..';
+
+prefixOp: '+' | '-' | '!' | '~' | '..'; // etcPattern
 
 // Postfix operations
 postfixExpr
@@ -101,17 +108,19 @@ postfixExpr
 // Primary exprs
 primaryExpr
     : wildcardExpr
-    | etcExpr
+    | ellipsisExpr
+    //| etcExpr // unary operator
     | symExpr
     | litExpr
     | tupleExpr
     | lambda
     ;
 
+ellipsisExpr: '...';
 
 wildcardExpr: '_'; // placePattern
 
-etcExpr: '..' expr?; // etcPattern
+//etcExpr: '..' expr?; // etcPattern
 
 symExpr: ID ('@' ID)?;
 
@@ -134,12 +143,12 @@ shapeExpr
     ;
 
 tupleElement
-    : tupleValueElement
+    : tuplePositionalElement
     | tupleNominalElement
     //| tupleSpreadElement
     ;
 
-tupleValueElement
+tuplePositionalElement
     : expr;
 
 tupleNominalElement

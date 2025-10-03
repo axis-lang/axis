@@ -54,7 +54,7 @@ def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.Result:
 
     for element in node.elements:
         match element:
-            case expr.Tuple.Value(value=value):
+            case expr.Tuple.Positional(value=value):
                 bound, value = evaluator.eval(value)
                 bounds.append(bound)
                 values.append(value)

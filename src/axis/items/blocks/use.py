@@ -123,7 +123,7 @@ class Destructuring(Object):
         return tuple(self.transform(element, prefix) for element in tup.elements)
     
     @transform.register
-    def eval_tuple_value_elem(self, elem: expr.Tuple.Value, prefix: syn.Expr):
+    def eval_tuple_value_elem(self, elem: expr.Tuple.Positional, prefix: syn.Expr):
         #return elem.with_attrs(value=self.transform(elem.value, prefix))
         return self.transform(elem.value, prefix)
 

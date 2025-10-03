@@ -4,7 +4,7 @@ from protobase import Metadata, Record, cached_property
 from .file import File, Line, Position
 
 
-class Span(Metadata, Record, frozen=True):
+class Span(Metadata, Record, frozen=True): # type: ignore
     file: File
     start: int
     end: int

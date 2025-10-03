@@ -194,70 +194,70 @@ class OutlineSpec[T](Record, frozen=True):
         return current_entry.as_tree()
 
 
-if __name__ == "__main__":
-    from rich import print
+# if __name__ == "__main__":
+#     from rich import print
 
-    class Elem(Record, frozen=True):
-        keyword: str
-        keyword_sep: str = " \t"
+#     class Elem(Record, frozen=True):
+#         keyword: str
+#         keyword_sep: str = " \t"
 
-    mod = Elem("mod")
-    doc = Elem("---", "")
-    def_ = Elem("def")
-    val = Elem("val")
-    where = Elem("where", ": \t")
+#     mod = Elem("mod")
+#     doc = Elem("---", "")
+#     def_ = Elem("def")
+#     val = Elem("val")
+#     where = Elem("where", ": \t")
 
-    outline = OutlineSpec.from_rules(
-        OutlineSpec.Rule(
-            mod,
-            frozendict(
-                {
-                    doc: OutlineSpec.Identation.OPT,
-                    def_: OutlineSpec.Identation.SAME,
-                    val: OutlineSpec.Identation.SAME,
-                }
-            ),
-        ),
-        OutlineSpec.Rule(
-            def_,
-            frozendict(
-                {
-                    doc: OutlineSpec.Identation.OPT,
-                    where: OutlineSpec.Identation.SAME,
-                }
-            ),
-        ),
-        OutlineSpec.Rule(
-            where,
-            frozendict(
-                {
-                    val: OutlineSpec.Identation.NEST,
-                }
-            ),
-        ),
-        OutlineSpec.Rule(val, frozendict({})),
-        OutlineSpec.Rule(doc, frozendict({})),
-    )
+#     outline = OutlineSpec.from_rules(
+#         OutlineSpec.Rule(
+#             mod,
+#             frozendict(
+#                 {
+#                     doc: OutlineSpec.Identation.OPT,
+#                     def_: OutlineSpec.Identation.SAME,
+#                     val: OutlineSpec.Identation.SAME,
+#                 }
+#             ),
+#         ),
+#         OutlineSpec.Rule(
+#             def_,
+#             frozendict(
+#                 {
+#                     doc: OutlineSpec.Identation.OPT,
+#                     where: OutlineSpec.Identation.SAME,
+#                 }
+#             ),
+#         ),
+#         OutlineSpec.Rule(
+#             where,
+#             frozendict(
+#                 {
+#                     val: OutlineSpec.Identation.NEST,
+#                 }
+#             ),
+#         ),
+#         OutlineSpec.Rule(val, frozendict({})),
+#         OutlineSpec.Rule(doc, frozendict({})),
+#     )
 
-    file = src.File.from_buffer(
-        Path("test.txt"),
-        """
-        mod alpha
-            -----
-            alpha documentation
+#     file = src.File.from_buffer(
+#         Path("test.txt"),
+#         """
+#         mod alpha
+#             -----
+#             alpha documentation
 
-        def foo
-            --- 
-            foo documentation
-        where:
-            val alpha: Natural = 42
+#         def foo
+#             --- 
+#             foo documentation
+#         where:
+#             val alpha: Natural = 42
 
-        def bar
-            --- 
-            bar documentation
-        where:
-            val beta: Natural = 42
-        """,
-    )
+#         def bar
+#             --- 
+#             bar documentation
+#         where:
+#             val beta: Natural = 42
+#         """,
+#     )
 
-    print(outline.parse_tree(mod, file))
+#     print(outline.parse_tree(mod, file))

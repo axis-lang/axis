@@ -26,7 +26,7 @@ takes:
     val step: T = 1
 
 
-def start..stop
+def start..<stop
 takes: 
     val start: T
     val stop: T
@@ -43,6 +43,4 @@ def Array[..extent] T
 where:
     val extent: Array[rank] Optional Natural = (None)
     val rank: Natural
-
-
 

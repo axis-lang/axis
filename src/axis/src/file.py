@@ -40,7 +40,8 @@ class File(Record, frozen=True):
     @cached_property
     def lines(self) -> tuple[Line, ...]:
         src = self.content
-        starts = [0] + [i + 1 for i, ch in enumerate(src) if ch == "\n"]
+        #starts = [0] + [i + 1 for i, ch in enumerate(src) if ch == "\n"]
+        starts = [0] + [i for i, ch in enumerate(src, 1) if ch == "\n"]
 
         return tuple(
             Line(file=self, start=starts[i], end=starts[i + 1] - 1, line_no=i + 1)
@@ -106,7 +107,7 @@ class Line(Record, frozen=True):
     def __len__(self) -> int:
         return self.end - self.start
 
-    def __getitem__(self, index: int) -> str:
+    def __getitem__(self, index: int):
         if index < 0 or index >= len(self):
             raise IndexError(f"Index {index} out of range (0-{len(self)})")
         return Position(self, index)
@@ -143,7 +144,7 @@ class Line(Record, frozen=True):
 
 
 class Position(Record, frozen=True):
-    line: Line
+    line: Line | Span
     col_no: int
 
     @property

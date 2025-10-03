@@ -17,10 +17,10 @@ class GrammarTest(unittest.TestCase):
     def test_parse_expr(self):
         self.assertEqual(
             syn.Expr.from_str("1 + 2"),
-            expr.BinOp(
+            expr.Additive(
                 lhs=expr.Lit(Decimal(1)),
                 rhs=expr.Lit(Decimal(2)),
-                op=expr.BinOp.Operator("+"),
+                op=expr.Additive.Op.from_str("+"),
             ),
         )
 
@@ -48,9 +48,10 @@ class ExprMatchingTest(unittest.TestCase):
     def test_unify(self):
 
         match_test = syn.Match.from_expr("$ctx.$name($a, ..$b, $c)")
-        print(match_test.patterns[0])
+        #print(match_test.patterns[0])
 
         match = match_test("Natural.alpha(1,2,3,4,5)")
+        assert match is not None
 
         self.assertEqualExpr(match["ctx"], "Natural")
         #self.assertEqualExpr(match["$name"], "Natural.alpha")
@@ -74,10 +75,10 @@ class ExprReificationTest(unittest.TestCase):
         reify = syn.Reify.expr("$n.$m($b, ..$etc, $a)")
 
         vals = match("foo.bar(1, 2, 3, 4, 5)")
-        print(vals)
+        #print(vals)
 
 
-        print(reify(vals))
+        #print(reify(vals))
 
 
 

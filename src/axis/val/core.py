@@ -1,7 +1,7 @@
 # %%
 from __future__ import annotations
 from decimal import Decimal
-from typing import NamedTuple, Union
+from typing import Union
 from protobase import Record, frozendict, cached_property
 
 
@@ -71,7 +71,7 @@ class Tuple[V: Data = Data, K: Data = Data](Value, frozen=True):
     "(..(K|None)=..V)"
     class Meta(Value.Meta, frozen=True):
         key_index: KeyIndex[K]
-        bounds: tuple[Value.Meta, ...]
+        bounds: tuple[Value.Meta, ...] # property_bounds
 
     __meta__: Meta
     __data__: tuple[V, ...]

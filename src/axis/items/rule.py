@@ -1,6 +1,6 @@
 # %%
-'''
-Tipos de reglas: 
+"""
+Tipos de reglas:
 
 ## Infix
 - Productive: *, /, %, ·
@@ -16,60 +16,71 @@ Tipos de reglas:
 
 ## Assign
 - Simple: =
+"""
 
-
-'''
 from __future__ import annotations
 from protobase import Object, Record, cached_property
 from typing import ClassVar, Literal, Optional
 from axis import items, syn, sem, log, expr, val
 
 
-class Def(syn.Item, frozen=True):
-
-    class Kind(syn.MatchClass, abstract=True, frozen=True):
+class Rule(syn.Item, frozen=True):
+    class WhereBlock:
+        values: ...
         ...
 
+    class Kind(syn.MatchClass, abstract=True, frozen=True): ...
+
     class InfixKind(Kind, frozen=True):
-        '''
-        def a + b
+        """
+        def lhs + rhs
         takes:
-            val a: T
-            val b: T
-        where: 
-            val T: Numeric
-        '''
-        op: expr.Infix.Op
+            val lhs: Operand
+            val rhs: Operand
+        where:
+            val Operand: Numeric
+        """
+
+        operator: expr.Infix.Op
         lhs: expr.Sym
         rhs: expr.Sym
 
     class PrefixKind(Kind, frozen=True):
-        '''
-        def -a
+        """
+        def -rhs
         takes:
-            val a: T
+            val rhs: Operand
         where:
-            val T: Numeric
-        '''
-        op: expr.Prefix.Op
+            val Operand: Numeric
+        """
+
+        operator: expr.Prefix.Op
         rhs: expr.Sym
 
+    class ClassKind(Kind, frozen=True):
+        """
+        def Array[..dims] Element
+        takes:
+            val dims: Dims
+        where:
+            val Dims: (..: Optional Natural)
+            val Element: Type
+        returns Type
+        """
+        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+            syn.Expr.from_str("$sym@Sym"),
+            syn.Expr.from_str("$sym@Sym[..$generics]"),
+        )
 
-    class QualKind(Kind, frozen=True):
+        generics: Optional[expr.Tuple] = None
+
+    class QualifierKind(Kind, frozen=True):
         match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
             syn.Expr.from_str("$sym@Sym $qualified@Sym"),
             syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
         )
 
         qualified: expr.Sym
-        generics: Optional[expr.Tuple] = None
-
-    class ClassKind(Kind, frozen=True):
-        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.from_str("$sym@Sym"),
-            syn.Expr.from_str("$sym@Sym[..$generics]"),
-        )
-
         generics: Optional[expr.Tuple] = None
 
     class FunctionKind(Kind, frozen=True):
@@ -83,6 +94,16 @@ class Def(syn.Item, frozen=True):
         params: Optional[expr.Tuple] = None
         context: Optional[syn.Expr] = None
 
+    class MethodKind(Kind, frozen=True):
+        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+            syn.Expr.from_str("$sym@Sym(..$params)"),
+            syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
+            syn.Expr.from_str("$context.$sym(..$params)"),
+            syn.Expr.from_str("$context.$sym[..$generics](..$params)"),
+        )
+
+        params: Optional[expr.Tuple] = None
+        context: Optional[syn.Expr] = None
 
     # grammar: ClassVar[str] = "def: 'def' expression EOF;"
     pkg: items.Package
@@ -130,4 +151,4 @@ class Def(syn.Item, frozen=True):
 
 
 if __name__ == "__main__":
-    def_classes = Def.Kind.__subclasses__()  # filter non abstracts for each pattern
+    def_classes = Rule.Kind.__subclasses__()  # filter non abstracts for each pattern

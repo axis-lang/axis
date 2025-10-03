@@ -1,13 +1,11 @@
-from multiprocessing import Value
-from optparse import Option
-from token import OP
 from typing import ClassVar, Literal, Optional, Self
-from protobase import cached_property
-from axis import syn, log
 
-# from .etc import Etc
+from protobase import cached_property
+
+from axis import log, syn
+
+from .prefix import Etc
 from .sym import Sym
-from .etc import Etc
 
 
 class Tuple(syn.Expr, frozen=True):
@@ -27,7 +25,7 @@ class Tuple(syn.Expr, frozen=True):
         def is_spread(self) -> bool:
             raise NotImplementedError
 
-    class Value(Element, frozen=True):  # PositionalElement
+    class Positional(Element, frozen=True):  # PositionalElement
         "value"
 
         value: Optional[syn.Expr]
@@ -42,20 +40,6 @@ class Tuple(syn.Expr, frozen=True):
         @property
         def is_spread(self) -> bool:
             return isinstance(self.value, Etc)
-
-    # class Spread(Element):
-    #     "..spread"
-
-    #     etc: Optional[syn.Expr]
-
-    #     @classmethod
-    #     def build(cls, ellipsis: Literal['..'], etc: Optional[syn.Expr]=None):
-    #         return cls(etc=etc)
-
-    #     def __str__(self) -> str:
-    #         if self.etc:
-    #             return f'..{self.etc}'
-    #         return '..'
 
     class Nominal(Element, frozen=True):
         "name: bound = value"
@@ -178,67 +162,7 @@ class Tuple(syn.Expr, frozen=True):
         return head_elements, rest_elements, tail_elements
 
 
-class Shape(Tuple): ...
-
-
-# @syn.AstBuilder.build.register(syn.AxisParser.TupleContext | syn.AxisParser.ShapeContext)
-# def build_tuple_ast(
-#     self,
-#     _,
-#     *elements: tuple[Tuple.Element, ...],
-# ) -> Tuple:
-#     return Tuple(elements=elements)
-
-# syn.AstBuilder.decl_pass_context(syn.AxisParser.ElementContext)
-
-# @syn.AstBuilder.build.register(syn.AxisParser.ValueElementContext)
-# def build_value_element_ast(
-#     self,
-#     _,
-#     value: syn.Expr,
-# ):
-#     return Tuple.Value(value=value)
-
-
-# @syn.AstBuilder.build.register(syn.AxisParser.ValueElementContext)
-# def build_value_element_ast(
-#     self,
-#     _,
-#     value: syn.Expr,
-# ):
-#     return Tuple.Value(value=value)
-
-
-# @syn.AstBuilder.build.register(syn.AxisParser.SpreadElementContext)
-# def build_spread_element_ast(
-#     self,
-#     _,
-#     ellipsis: str,
-#     etc: Optional[syn.Expr] = None,
-# ):
-#     assert ellipsis == "..", "Expected '..' for spread element"
-#     return Tuple.Spread(etc=etc)
-
-
-# @syn.AstBuilder.build.register(syn.AxisParser.NominalElementContext)
-# def build_nominal_element_ast(
-#     self,
-#     _,
-#     name: str,
-#     op1: Optional[str] = None,
-#     e1: Optional[syn.Expr] = None,
-#     op2: Optional[str] = None,
-#     e2: Optional[syn.Expr] = None,
-# ):
-#     if op1 == ":":
-#         if op2 is None:
-#             return Tuple.Nominal(key=name, bound=e1, value=None)
-#         assert op2 == "=", "Expected '=' after ':' in named element"
-#         return Tuple.Nominal(key=name, bound=e1, value=e2)
-
-#     assert op1 == "=", "Expected '=' before named element"
-#     assert op2 is None, "Expected no operator after '=' in named element"
-#     return Tuple.Nominal(key=name, bound=None, value=e1)
+class Shape(Tuple, frozen=True): ...
 
 
 @syn.Matcher.impl(Tuple)
@@ -265,7 +189,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
 
     match target_rest:
         case (
-            Tuple.Value(value=Etc(expr=Sym(name=wildcard_name) as target_sym)),
+            Tuple.Positional(value=Etc(rhs=Sym(name=wildcard_name) as target_sym)),
         ) if target_sym.is_wildcard:
 
             # target_etc = target_rest[0]
@@ -291,26 +215,14 @@ def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
     """
     elements = []
     for elem in tup.elements:
-        if (
-            isinstance(elem, Etc)
-            and isinstance(elem.expr, Sym)
-            and elem.expr.is_wildcard
-        ):
-            target = self.value(elem.expr.name, Tuple)
+        match elem:
+            case Tuple.Positional(
+                value=Etc(rhs=Sym(name=wildcard_name) as sym)
+            ) if sym.is_wildcard:
+                target = self.value(wildcard_name, Tuple)
+                elements.extend(target.elements)
 
-            # if elem.etc.name[1:] not in self.values:
-            #     raise ValueError(f"Unresolved wildcard: {elem.etc.name}")
-
-            # target = self.values[elem.etc.name]
-
-            # if not isinstance(target, Tuple):
-            #     raise ValueError(
-            #         f"Expected a Tuple for wildcard {elem.etc.name}, got {type(target)}"
-            #     )
-
-            elements.extend(target.elements)
-            continue
-
-        elements.append(self.reify(elem))
+            case elem:
+                elements.append(self.reify(elem))
 
     return tup.with_attr(elements=tuple(elements))

@@ -10,6 +10,9 @@ from .building import FromSrcMixin
 from .outline import OutlineTree, OutlineRule, OutlineSpec
 
 
+#alpha -> {}
+
+
 class Node(FromSrcMixin, Record, frozen=True, abstract=True):
     grammar_context_infix: ClassVar[str] = "Node"
 
@@ -32,7 +35,7 @@ class Node(FromSrcMixin, Record, frozen=True, abstract=True):
         # luego los nodos
         # finalmente contenedores
 
-        for attr, value in reversed(attrs_of(self).items()):
+        for attr, value in attrs_of(self).items():
             if value is None or value == ():
                 continue
 

@@ -1,15 +1,15 @@
+from typing import Self
 from axis import syn
 
 
-class Compound(syn.Expr):
+class Compound(syn.Expr, frozen=True):
     components: tuple[syn.Expr, ...]
 
-@syn.Builder.build.register
-def build_compound(
-    self,
-    ctx: syn.AxisParser.CompoundExprContext,
-    *components,
-):
-    if len(components) == 1:
-        return components[0]
-    return Compound(components=tuple(components))
+    @classmethod
+    def build(cls, *components: syn.Expr) -> Self:
+        if len(components) == 1:
+            return components[0]  # type: ignore
+        return cls(components=components)
+
+    def __str__(self):
+        return " ".join(str(c) for c in self.components)

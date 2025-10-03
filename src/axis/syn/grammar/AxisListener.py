@@ -170,6 +170,15 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#rangeOp.
+    def enterRangeOp(self, ctx:AxisParser.RangeOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#rangeOp.
+    def exitRangeOp(self, ctx:AxisParser.RangeOpContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#logicExpr.
     def enterLogicExpr(self, ctx:AxisParser.LogicExprContext):
         pass
@@ -251,6 +260,51 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#EtcExpr.
+    def enterEtcExpr(self, ctx:AxisParser.EtcExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#EtcExpr.
+    def exitEtcExpr(self, ctx:AxisParser.EtcExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#SignExpr.
+    def enterSignExpr(self, ctx:AxisParser.SignExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#SignExpr.
+    def exitSignExpr(self, ctx:AxisParser.SignExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#signOp.
+    def enterSignOp(self, ctx:AxisParser.SignOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#signOp.
+    def exitSignOp(self, ctx:AxisParser.SignOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#etcOp.
+    def enterEtcOp(self, ctx:AxisParser.EtcOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#etcOp.
+    def exitEtcOp(self, ctx:AxisParser.EtcOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#prefixOp.
+    def enterPrefixOp(self, ctx:AxisParser.PrefixOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#prefixOp.
+    def exitPrefixOp(self, ctx:AxisParser.PrefixOpContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#ApplyExpr.
     def enterApplyExpr(self, ctx:AxisParser.ApplyExprContext):
         pass
@@ -314,21 +368,21 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#ellipsisExpr.
+    def enterEllipsisExpr(self, ctx:AxisParser.EllipsisExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#ellipsisExpr.
+    def exitEllipsisExpr(self, ctx:AxisParser.EllipsisExprContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#wildcardExpr.
     def enterWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
         pass
 
     # Exit a parse tree produced by AxisParser#wildcardExpr.
     def exitWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#etcExpr.
-    def enterEtcExpr(self, ctx:AxisParser.EtcExprContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#etcExpr.
-    def exitEtcExpr(self, ctx:AxisParser.EtcExprContext):
         pass
 
 
@@ -377,12 +431,12 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#tupleValueElement.
-    def enterTupleValueElement(self, ctx:AxisParser.TupleValueElementContext):
+    # Enter a parse tree produced by AxisParser#tuplePositionalElement.
+    def enterTuplePositionalElement(self, ctx:AxisParser.TuplePositionalElementContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#tupleValueElement.
-    def exitTupleValueElement(self, ctx:AxisParser.TupleValueElementContext):
+    # Exit a parse tree produced by AxisParser#tuplePositionalElement.
+    def exitTuplePositionalElement(self, ctx:AxisParser.TuplePositionalElementContext):
         pass
 
 

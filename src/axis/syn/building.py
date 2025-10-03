@@ -160,13 +160,13 @@ class FromSrcMixin(Record, frozen=True, abstract=True):
             cls.grammar_context_name = f'{name}{cls.grammar_context_infix}Context'
 
         
-        print("Building grammar for", cls.__qualname__, cls.grammar_parser_name, cls.grammar_context_name)
+        #print("Building grammar for", cls.__qualname__, cls.grammar_parser_name, cls.grammar_context_name)
 
         ctx_class = getattr(AxisParser, cls.grammar_context_name, None)
         if ctx_class is None:
             return warn(f'Grammar context not found for {cls.__qualname__} ({cls.grammar_context_name})', stacklevel=4)
 
-        @Builder.build.register(ctx_class)
+        @Builder.build.register(ctx_class) # type: ignore
         def build_ast(builder, ctx, *args, **kwargs):
             return cls.build(*args, **kwargs)
 
