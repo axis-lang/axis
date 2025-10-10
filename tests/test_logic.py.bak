@@ -1,0 +1,84 @@
+import unittest
+
+from axis.logic import Var, Atom, Lit, Rule, Program, Solver, Tup, tpl
+
+
+def parent(a, b):
+    return Lit('parent', (a, b))
+
+def ancestor(a, b):
+    return Lit('ancestor', (a, b))
+
+def eq(a, b):
+    return Lit('=', (a, b))
+
+def neq(a, b):
+    return Lit('!=', (a, b))
+
+
+class LogicSolverAncestorTest(unittest.TestCase):
+    def test_ancestor_query(self):
+        X, Y, Z = Var('X'), Var('Y'), Var('Z')
+        rules = [
+            Rule(parent(Atom('john'), Atom('mary'))),
+            Rule(parent(Atom('mary'), Atom('anne'))),
+            Rule(ancestor(X, Y), (parent(X, Y),)),
+            Rule(ancestor(X, Y), (parent(X, Z), ancestor(Z, Y))),
+        ]
+        prog = Program(tuple(rules))
+        solver = Solver(prog, max_depth=50)
+
+        results = list(solver.query(ancestor(Atom('john'), Y)))
+        ys = {r['Y'] for r in results}
+        self.assertEqual(len(results), 2)
+        self.assertTrue(any(repr(v) == 'Atom(mary)' for v in ys))
+        self.assertTrue(any(repr(v) == 'Atom(anne)' for v in ys))
+
+
+class LogicSolverBasicBuiltinsTest(unittest.TestCase):
+    def test_multiple_solutions_parent_variable(self):
+        Y = Var('Y')
+        rules = [
+            Rule(parent(Atom('john'), Atom('mary'))),
+            Rule(parent(Atom('john'), Atom('peter'))),
+        ]
+        solver = Solver(Program(tuple(rules)))
+        res = list(solver.query(parent(Atom('john'), Y)))
+        self.assertEqual(len(res), 2)
+        values = {repr(r['Y']) for r in res}
+        self.assertEqual(values, {'Atom(mary)', 'Atom(peter)'})
+
+    def test_builtin_equality_and_difference(self):
+        X = Var('X')
+        rules = [Rule(parent(Atom('john'), Atom('mary')))]
+        solver = Solver(Program(tuple(rules)))
+
+        res = list(solver.query((parent(Atom('john'), X), eq(X, Atom('mary')))))
+        self.assertEqual(len(res), 1)
+        self.assertEqual(repr(res[0]['X']), 'Atom(mary)')
+
+        res2 = list(solver.query((parent(Atom('john'), X), neq(X, Atom('mary')))))
+        self.assertEqual(len(res2), 0)
+
+    def test_depth_limit_prevents_infinite_loop(self):
+        X, Y = Var('X'), Var('Y')
+        rules = [Rule(ancestor(X, Y), (ancestor(X, Y),))]
+        solver = Solver(Program(tuple(rules)), max_depth=5)
+        res = list(solver.query(ancestor(Atom('a'), Atom('b'))))
+        self.assertEqual(res, [])
+
+
+class LogicSolverTupleTest(unittest.TestCase):
+    def test_tuple_unification_simple(self):
+        X, Y = Var('X'), Var('Y')
+        pair = lambda t: Lit('pair', (t,))
+        rules = [Rule(pair(tpl(Atom('a'), Atom('b'))))]
+        solver = Solver(Program(tuple(rules)))
+        res = list(solver.query(pair(tpl(X, Y))))
+        self.assertEqual(len(res), 1)
+        self.assertEqual(repr(res[0]['X']), 'Atom(a)')
+        self.assertEqual(repr(res[0]['Y']), 'Atom(b)')
+
+
+if __name__ == '__main__':  # pragma: no cover
+    unittest.main()

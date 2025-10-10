@@ -1,3 +1,4 @@
+from __future__ import annotations
 from protobase import Record
 from axis import syn, expr, builtins
 from functools import singledispatchmethod
@@ -69,7 +70,7 @@ def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.Result:
                 values.append(value)
 
     return (
-        TupleBound(index=builtins.SparseIndex(tuple(keymap)), bound=tuple(bounds)),
+        TupleBound(index=builtins.Index.from_iter(keymap), bound=tuple(bounds)),
         tuple(values),
     )
 
@@ -83,9 +84,9 @@ class Bound(Record, frozen=True, consed=True, abstract=True):
 class TupleBound(Bound, frozen=True, consed=True):
     "Array[index] bound"
 
-    index: builtins.SparseIndex
+    index: builtins.Index
     bound: tuple[Bound, ...]
-
+    
     def __get_property__(self, value: builtins.All, property: str) -> Evaluator.Result:
         offset = self.index.offsets[property]
         match value:

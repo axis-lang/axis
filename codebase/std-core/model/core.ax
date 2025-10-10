@@ -1,0 +1,22 @@
+unit std.model
+
+def Qualifier
+
+
+def Qualifier
+def Capability
+
+mod Qualifier
+    def Cabability
+
+    mod Capability
+
+
+def Array[Indices] 
+
+
+def Type[]
+
+
+def Bound
+

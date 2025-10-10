@@ -44,3 +44,7 @@ where:
     val extent: Array[rank] Optional Natural = (None)
     val rank: Natural
 
+def Text
+--------
+    extends Buffer
+    extends List[Glyph]

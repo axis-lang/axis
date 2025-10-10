@@ -1,101 +1,99 @@
-# %%
 from __future__ import annotations
-from decimal import Decimal
-from typing import Union
-from protobase import Record, frozendict, cached_property
+from protobase import Record
+from axis import builtins
 
 
-class Value(Record, frozen=True, consed=True, abstract=True):
-    class Meta(Record, frozen=True, consed=True, abstract=True):
-        def as_value(self) -> Value:
-            raise NotImplementedError(f"Cannot convert {self} to Value")
-
-        @classmethod
-        def value_of(cls, data: Data) -> Value:
-            raise NotImplementedError(f"Cannot create Value from data {data}")
-
-    __meta__: Meta
-    __data__: Data
-
-    @property
-    def meta(self) -> Value:
-        return self.__meta__.as_value()
+class Node(Record, frozen=True, abstract=True):
+    "Value NODE implementa unificacion y otras operaciones de alto nivel"
 
 
-type Data = Union[
-    None,
-    bool,
-    int,
-    float,
-    Decimal,
-    str, 
-    bytes,
-    tuple[Data, ...],
-    frozenset[Data],
-    frozendict[Data, Data],
-]
+class Value(Node, frozen=True, abstract=True):
+    """
+    Un valor representa un dato que podria ser dinamico o estatico, 
+    cualquier cosa que pueda resultar de evaluar una expresion.
+    """
 
-class KeyIndex[K: Data = Data](Value, frozen=True):
-    'like Map[K] Natural'
-    class Meta(Value.Meta, frozen=True):
-        key_bound: Value.Meta
+    def __get_meta__(self) -> Value:
+        raise NotImplementedError()
 
-    __meta__: Meta
-    __data__: tuple[K | None, ...]
+    def __get_member__(self, name: str) -> Value:
+        raise NotImplementedError()
 
-    @property
-    def keys(self):
-        return self.__data__
+class Const(Value, frozen=True, consed=True, abstract=True):
+    """
+    Un valor constante representa un dato inmutable y conocido en tiempo de compilacion.
+    """
+    # dynamic meta & data?
 
-    @cached_property
-    def indices(self) -> frozendict[K, int]:
-        return frozendict((k, i) for i, k in enumerate(self.__data__) if k is not None)
+    ...
 
-    def __len__(self):
-        return len(self.__data__)
+class Var(Value, frozen=True, consed=True, abstract=True):
+    """
+    Una variable representa un dato que puede cambiar en tiempo de ejecucion. 
+    o ser determinada en tiempo de compilacion.
 
-    def __iter__(self):
-        return iter(self.__data__)
+    en tiempo de compilacion no se conoce su valor exacto, pero si su bound (dominio).
+    informacion: location(stack, heap, pointer), allocation, aliasing 
+    (relacion con otra variable), mutabilidad, etc.
 
-    def __contains__(self, key: K) -> bool:
-        return key in self.indices
+    tambien los generics son variables! existen variables que pueden transformarse en constants?!
+    """
+###
 
-    def __getitem__(self, index: int):
-        return self.__data__[index]
+class DynConst(Const, frozen=True, consed=True, abstract=True):
+    """
+    Una estancia constante tipo creado en tiempo de ejecucion.
+    """
 
-    def get(self, key: K) -> int | None:
-        return self.indices.get(key, None)
+class BuiltinConst(Const, frozen=True, consed=True, abstract=True):
+    """
+    Una estancia constante tipo interno del sistema. 
+    """
+
+    def __get_member__(self, name: str) -> Value:
+        ...
 
 
-class Tuple[V: Data = Data, K: Data = Data](Value, frozen=True):
-    "(..(K|None)=..V)"
-    class Meta(Value.Meta, frozen=True):
-        key_index: KeyIndex[K]
-        bounds: tuple[Value.Meta, ...] # property_bounds
+class Ref(BuiltinConst, frozen=True, consed=True, abstract=True):
+    """
+    Referencia a una entidad conocida en tiempo de compilacion.
+    """
 
-    __meta__: Meta
-    __data__: tuple[V, ...]
+class Bound(Node, frozen=True, consed=True, abstract=True):
+    """
+    constraint de una variable, puede ser un tipo variable.
+    """
 
-    def __len__(self):
-        return len(self.__data__)
+class Type(BuiltinConst, frozen=True, consed=True):
+    """
+    def Type[..Qualifiers, Scheme]
+    takes:
+        val Qualifiers: (..: Qualifier)
+        val Scheme: Scheme
+    """
 
-    def __iter__(self):
-        return iter(
-            bound.value_of(v) for v, bound in zip(self.__data__, self.__meta__.bounds)
-        )
+    qualifiers: builtins.Tuple[Const]  # conjunto de valores constantes construidos
+    scheme: TypeScheme  # tipo de destino estructural o nominal
+    # Meta provider
 
-    def __getitem__(self, offset: int) -> tuple[K | None, Value]:
-        return self.__meta__.key_index[offset], self.__meta__.bounds[offset].value_of(
-            self.__data__[offset]
-        )
 
-    def get(self, key: K) -> Value | None:
-        offset = self.__meta__.key_index.get(key)
-        if offset is None:
-            return None
-        return self.__meta__.bounds[offset].value_of(self.__data__[offset])
+class TypeScheme(Node, frozen=True, consed=True):
+    '''
+    clase abstracta para tipos: struct class union, literal
+    '''
 
- 
-    # @transform.register
-    # def eval_tuple_spread_elem(self, elem: expr.Tuple.Spread, prefix: syn.Expr):
-    #     return elem.with_attr(etc=self.transform(elem.etc, prefix))
+
+class Struct(TypeScheme, frozen=True, consed=True):
+    fields: builtins.Tuple[Bound]
+
+
+#type INDEX[K] = dict[K, INDEX[K]] | set[K]
+
+
+"""
+Closure
+
+struct + Callable 
+
+
+"""
