@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from axis import syn, sem, val, items
-from protobase import cached_property
+from axis import syn, items
 
 
-class Mod(syn.Item, frozen=True):
+class Mod(syn.SegregatedItem, frozen=True):
     """
     Cometido: agrupar semanticamente un conjunto de sub-items.
 
@@ -20,19 +19,9 @@ class Mod(syn.Item, frozen=True):
     outline_keyword: ClassVar[str] = "mod"
     # grammar: ClassVar[str] = "mod: 'mod' expression ':' EOF;"
 
-    pkg: items.Package
+    #pkg: items.Package
 
     path: syn.Expr
-    # uses: tuple[blocks.Use, ...]
-
-    # @property
-    # def name(self) -> str:
-    #     if isinstance(self.path, expr.Member):
-    #         return self.path.as_sym()
-    #     elif isinstance(self.path, expr.Sym):
-    #         return self.path
-
-    #     raise TypeError(f"Unexpected path type: {type(self.path)}")
 
     @classmethod
     def build(
@@ -40,12 +29,13 @@ class Mod(syn.Item, frozen=True):
         kw,
         path: syn.Expr,
         *,
-        pkg: items.Package,
-        children: tuple[syn.Block, ...],
-        parent: syn.SegregatedOutlineNode,
+        #pkg: items.Package,
+        children: syn.OutlineNode.Children,
+        #parent: syn.SegregatedOutlineNode,
+        **kwargs
     ):
-        # children=children,
-        return cls(path=path, parent=parent, pkg=pkg)
+        # procesa imports desde children
+        return cls(path=path, **kwargs)
 
     # class Binding(sem.Binding):
     #     item: Mod

@@ -19,7 +19,7 @@ class Tuple(syn.Expr, frozen=True):
     """
 
     class Element(syn.Node, frozen=True, abstract=True):
-        grammar_context_infix: ClassVar[Literal["Element"]] = "Element"
+        grammar_context_infix: ClassVar[str] = "Element"
 
         @property
         def is_spread(self) -> bool:
@@ -41,12 +41,12 @@ class Tuple(syn.Expr, frozen=True):
         def is_spread(self) -> bool:
             return isinstance(self.value, Etc)
 
-    class Nominal(Element, frozen=True):
+    class Nominal(Element, frozen=True): # es un elemento que implementa value mixin
         "name: bound = value"
 
         key: syn.Expr
-        bound: Optional[syn.Expr] = None
-        value: Optional[syn.Expr] = None
+        bound: Optional[syn.Expr]
+        value: Optional[syn.Expr]
 
         @classmethod
         def build(
@@ -56,16 +56,17 @@ class Tuple(syn.Expr, frozen=True):
             e1: Optional[syn.Expr] = None,
             op2: Optional[str] = None,
             e2: Optional[syn.Expr] = None,
+            **kwargs
         ):
             match (op1, e1, op2, e2):
                 case (":", bound, "=", value):
-                    return cls(key=key, bound=bound, value=value)
+                    return cls(key=key, bound=bound, value=value, **kwargs)
                 case (":", bound, None, None):
-                    return cls(key=key, bound=bound, value=None)
+                    return cls(key=key, bound=bound, value=None, **kwargs)
                 case ("=", value, None, None):
-                    return cls(key=key, bound=None, value=value)
+                    return cls(key=key, bound=None, value=value, **kwargs)
                 case (None, None, None, None):
-                    return cls(key=key, bound=None, value=None)
+                    return cls(key=key, bound=None, value=None, **kwargs)
                 case _:
                     raise ValueError(
                         f"Invalid syntax for named element: {key} {op1} {e1} {op2} {e2}"
@@ -91,8 +92,8 @@ class Tuple(syn.Expr, frozen=True):
     elements: tuple[Element, ...]
 
     @classmethod
-    def build(cls, *elements: Element) -> Self:
-        return cls(elements=elements)
+    def build(cls, *elements: Element, **kwargs) -> Self:
+        return cls(elements=elements, **kwargs)
 
     def __str__(self) -> str:
         return "(" + ", ".join(str(e) for e in self.elements) + ")"

@@ -20,6 +20,12 @@ class Member(Ref):
     parent: Ref
     name: str
 
+
+class GlobalPath(Ref):
+    steps: tuple[str, ...]
+
+    
+
     
 
 # class Ref(Record, consed=True, abstract=True):

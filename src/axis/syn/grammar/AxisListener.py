@@ -44,6 +44,51 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#tupleBlockValElement.
+    def enterTupleBlockValElement(self, ctx:AxisParser.TupleBlockValElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#tupleBlockValElement.
+    def exitTupleBlockValElement(self, ctx:AxisParser.TupleBlockValElementContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#tupleBlockVarElement.
+    def enterTupleBlockVarElement(self, ctx:AxisParser.TupleBlockVarElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#tupleBlockVarElement.
+    def exitTupleBlockVarElement(self, ctx:AxisParser.TupleBlockVarElementContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#tupleBlockLetElement.
+    def enterTupleBlockLetElement(self, ctx:AxisParser.TupleBlockLetElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#tupleBlockLetElement.
+    def exitTupleBlockLetElement(self, ctx:AxisParser.TupleBlockLetElementContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#tupleBlockDynElement.
+    def enterTupleBlockDynElement(self, ctx:AxisParser.TupleBlockDynElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#tupleBlockDynElement.
+    def exitTupleBlockDynElement(self, ctx:AxisParser.TupleBlockDynElementContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#tupleBlockMutElement.
+    def enterTupleBlockMutElement(self, ctx:AxisParser.TupleBlockMutElementContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#tupleBlockMutElement.
+    def exitTupleBlockMutElement(self, ctx:AxisParser.TupleBlockMutElementContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#useBlock.
     def enterUseBlock(self, ctx:AxisParser.UseBlockContext):
         pass
@@ -53,30 +98,30 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#takesBlock.
-    def enterTakesBlock(self, ctx:AxisParser.TakesBlockContext):
+    # Enter a parse tree produced by AxisParser#defWhereBlock.
+    def enterDefWhereBlock(self, ctx:AxisParser.DefWhereBlockContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#takesBlock.
-    def exitTakesBlock(self, ctx:AxisParser.TakesBlockContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#whereBlock.
-    def enterWhereBlock(self, ctx:AxisParser.WhereBlockContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#whereBlock.
-    def exitWhereBlock(self, ctx:AxisParser.WhereBlockContext):
+    # Exit a parse tree produced by AxisParser#defWhereBlock.
+    def exitDefWhereBlock(self, ctx:AxisParser.DefWhereBlockContext):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#returnsBlock.
-    def enterReturnsBlock(self, ctx:AxisParser.ReturnsBlockContext):
+    # Enter a parse tree produced by AxisParser#defTakesBlock.
+    def enterDefTakesBlock(self, ctx:AxisParser.DefTakesBlockContext):
         pass
 
-    # Exit a parse tree produced by AxisParser#returnsBlock.
-    def exitReturnsBlock(self, ctx:AxisParser.ReturnsBlockContext):
+    # Exit a parse tree produced by AxisParser#defTakesBlock.
+    def exitDefTakesBlock(self, ctx:AxisParser.DefTakesBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#defReturnsBlock.
+    def enterDefReturnsBlock(self, ctx:AxisParser.DefReturnsBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#defReturnsBlock.
+    def exitDefReturnsBlock(self, ctx:AxisParser.DefReturnsBlockContext):
         pass
 
 

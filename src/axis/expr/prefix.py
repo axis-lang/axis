@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import ClassVar
-from axis import syn, cfg
+from axis import conf, syn
 
 
 class Prefix(syn.Expr, frozen=True, abstract=True):

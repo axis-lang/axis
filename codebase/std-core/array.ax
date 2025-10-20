@@ -1,0 +1,20 @@
+unit std
+
+def Array[..indices] dtype
+    ----------------------
+    example:
+        val my_array: Array[_,_] _ = (
+            (1,0),    
+            (0,1),    
+        )
+
+takes: 
+    val indices: Indices
+    val dtype: DataType
+
+
+val my_array: Array[_,_] ... = (    
+    (1,0),    
+    (0,1),    
+)
+

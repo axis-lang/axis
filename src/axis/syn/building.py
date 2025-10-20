@@ -148,7 +148,7 @@ class FromSrcMixin(Record, frozen=True, abstract=True):
     def __class_post_build__(cls):
         #super().__class_post_build__()
         if is_abstract(cls):
-            return
+           return
 
         name = cls.__qualname__.replace(".", "") 
                
@@ -159,7 +159,6 @@ class FromSrcMixin(Record, frozen=True, abstract=True):
         if 'grammar_context_name' not in cls.__dict__:
             cls.grammar_context_name = f'{name}{cls.grammar_context_infix}Context'
 
-        
         #print("Building grammar for", cls.__qualname__, cls.grammar_parser_name, cls.grammar_context_name)
 
         ctx_class = getattr(AxisParser, cls.grammar_context_name, None)

@@ -5,10 +5,8 @@ from typing import Iterable, Iterator, Self
 
 from protobase import Record, frozendict
 
-from .map import Map
 
-
-class Index[K](Record, frozen=True, consed=True):
+class FullKeyIndex[K=str](Record, frozen=True, consed=True):
     """
     Un indice relaciona univocamente una clave con una posicion (y viceversa).
     cuando un indice es denso, todas las posiciones tienen una clave asociada.
@@ -17,6 +15,7 @@ class Index[K](Record, frozen=True, consed=True):
     donde una clave podria retornar un slice en vez de un unico offset.
 
     """
+    _keys: tuple[str]
 
     _length: int  # Natural
     _keys: Map[K, int]  # frozendict[int, K] # Map[Natural] K

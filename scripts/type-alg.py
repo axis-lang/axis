@@ -8,7 +8,7 @@ y tambien debe soportar la coercion de tipos:
 let b: Array[_, _] Complex = a  # Matriz identidad 2x2
 
 fn mul_reduce(a: T, b: T) -> N
-where:
+
     val T: Array[..] N
     val N: Number
 

@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import ClassVar, Union
-from axis import syn, cfg
+from axis import conf, syn
 from rich.text import Text
 
 class Infix(syn.Expr, frozen=True, abstract=True):

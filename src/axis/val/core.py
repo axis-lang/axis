@@ -1,6 +1,6 @@
 from __future__ import annotations
 from protobase import Record
-from axis import builtins
+from axis import dom
 
 
 class Node(Record, frozen=True, abstract=True):
@@ -72,8 +72,17 @@ class Type(BuiltinConst, frozen=True, consed=True):
         val Scheme: Scheme
     """
 
-    qualifiers: builtins.Tuple[Const]  # conjunto de valores constantes construidos
-    scheme: TypeScheme  # tipo de destino estructural o nominal
+    class Scheme(Node, frozen=True, abstract=True):
+        ...
+
+    class PolymorphicScheme(Scheme, frozen=True, consed=True):
+        ...
+
+    class NominalScheme(Scheme, frozen=True, consed=True):
+        ...
+
+    qualifiers: dom.Tuple[Const]  # conjunto de valores constantes construidos
+    scheme: Scheme  # tipo de destino estructural o nominal
     # Meta provider
 
 
@@ -84,16 +93,4 @@ class TypeScheme(Node, frozen=True, consed=True):
 
 
 class Struct(TypeScheme, frozen=True, consed=True):
-    fields: builtins.Tuple[Bound]
-
-
-#type INDEX[K] = dict[K, INDEX[K]] | set[K]
-
-
-"""
-Closure
-
-struct + Callable 
-
-
-"""
+    fields: dom.Tuple[Bound]

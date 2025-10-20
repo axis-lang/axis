@@ -4,12 +4,19 @@ grammar Axis;
 unitItem: 'unit' expr EOF;
 modItem: 'mod' expr EOF;
 defItem: 'def' expr EOF;
-valItem: 'val' expr (':' expr)? ('=' expr)? ';'? EOF;
+valItem: 'val' expr (':' expr)? ('=' expr)? EOF;
+
+
+tupleBlockValElement: 'val' expr (':' expr)? ('=' expr)? EOF;
+tupleBlockVarElement: 'var' expr (':' expr)? ('=' expr)? EOF;
+tupleBlockLetElement: 'let' expr (':' expr)? ('=' expr)? EOF;
+tupleBlockDynElement: 'dyn' expr (':' expr)? ('=' expr)? EOF;
+tupleBlockMutElement: 'mut' expr (':' expr)? ('=' expr)? EOF;
 
 useBlock: 'use' expr EOF;
-takesBlock: 'takes' expr? ':' EOF;
-whereBlock: 'where' ':' EOF;
-returnsBlock: 'returns' expr EOF;
+defWhereBlock: 'where' ':' EOF;
+defTakesBlock: 'takes' expr? ':' EOF;
+defReturnsBlock: 'returns' expr EOF;
 suiteBlock: 'suite' statement* EOF;
 
 suite: statement*;
@@ -21,7 +28,7 @@ statement
     ;
 
 valStatement
-    : 'val' (pattern) (':' expr)? ('=' expr)? ';'?
+    : 'val' (pattern) (':' expr)? ('=' expr)?
     ;
 
 pattern

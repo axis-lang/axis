@@ -6,22 +6,25 @@ from typing import Callable, Iterable, Iterator, Optional, Self, overload
 from protobase import Record, frozendict
 
 
+class Map[K, V](Record, frozen=True, consed=True):
+    "def Map[K] V"
 
-class Map[V, K](Record, frozen=True, consed=True):
     _inner: frozendict[K, V]
 
+    @property
+    def keys(self):
+        return self._inner.keys()
+
     @classmethod
-    def from_iter(cls, seq: Iterable[tuple[K, V]]) -> Self:
-        return cls(
-            _inner=frozendict((k, v) for k, v in seq)
-        )
+    def new(cls, seq: Iterable[tuple[K, V]]) -> Self:
+        return cls(frozendict(seq))
 
     def __len__(self) -> int:
         return len(self._inner)
 
     def __iter__(self) -> Iterator[V]:
         return iter(self._inner.values())
-    
+
     @overload
     def get(self, key: K) -> V: ...
 
@@ -35,14 +38,16 @@ class Map[V, K](Record, frozen=True, consed=True):
         try:
             return self._inner[key]
         except KeyError:
-            if 'default' in kwargs:
-                return kwargs['default']
-            if 'fallback' in kwargs:
-                return kwargs['fallback']()
+            if "default" in kwargs:
+                return kwargs["default"]
+            if "fallback" in kwargs:
+                return kwargs["fallback"]()
             raise
 
     def has(self, key: K) -> bool:
         return key in self._inner
 
-    def map[R](self, func: Callable[[V], R]) -> Map[R, K]:
-        return Map(_inner=frozendict((k, func(v)) for k, v in self._inner.items()))
+    def apply[R](self, fn: Callable[[V], R]) -> Map[K, R]:
+        return Map(frozendict((k, fn(v)) for k, v in self._inner.items()))
+
+    

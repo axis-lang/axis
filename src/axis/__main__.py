@@ -13,26 +13,15 @@ def print_eval(str: str):
 def print_syn(str: str):
     print(syn.Expr.from_str(str))
 
-
 for item in pkg.all_items:
-    if isinstance(item, items.Def):
-        print(f"{item.expr=}")
-
-
-#        print(f"  {item.expr=}")
-# print(pkg.all_items)
-# print(syn.Expr.from_str('Array[3,3] Natural'))
-
-# a::[Shape]
-
-# print_syn("if(a < b) {a} else {b}")
-# print_eval("((a=1,2,3), b=(x=1, y=2))")
+    print(item)
+  
 print_eval(
     """
     (
         (1,0,0),
         (0,1,0),
-        (0,0,1)
+        (0,0,1),
     )
     """
 )

@@ -1,50 +1,34 @@
 unit std
 
-def Domain T
-takes Set:
-    val set: Set T
-
-takes Range:
-    val range: Range T
-
-
 def Number
-
-def Natural[domain: Domain Natural = None]
-
-def Optional T
-takes None:
-takes Some(value):
-    val value: T
-
-def Range T
-where:
-    val T: Number
-takes: 
-    val start: T
-    val stop: T
-    val step: T = 1
+    ------
+    Number es un trait
 
 
-def start..<stop
-takes: 
-    val start: T
-    val stop: T
-where:
-    val T: Ordenable
-returns Range[start, stop] T
-
-def Range[start: T, stop: T, step: T = 1] T
-where: 
-    val T: Ordenable
-
-
-def Array[..extent] T
-where:
-    val extent: Array[rank] Optional Natural = (None)
-    val rank: Natural
-
+def Boolean
+def Natural
+def Whole
+def Integer
+def Real
 def Text
---------
-    extends Buffer
-    extends List[Glyph]
+
+
+def Set V
+    -----
+where: 
+    val V: Bound    
+
+
+def Map[K] V
+    --------
+where: 
+    val K: Bound
+    val V: Bound
+
+
+def Index[arity] key
+    ----------------
+takes: 
+    val arity: Whole
+    val key: Bound
+

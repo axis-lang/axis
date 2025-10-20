@@ -1,95 +1,77 @@
-# %%
-'''
-Tipos de reglas: 
-
-## Infix
-- Productive: *, /, %, ·
-- Additive: +, -
-- Comparison: ==, !=, <, <=, >, >=
-- Logic: &&, ||
-- Range: ..=, ..<
-- Pipe: |>
-
-## Prefix
-- Sign: +, -, !, ~
-- Etc: ..
-
-## Assign
-- Simple: =
-
-
-'''
 from __future__ import annotations
-from protobase import Object, Record, cached_property
 from typing import ClassVar, Literal, Optional
-from axis import items, syn, sem, log, expr, val
+from axis import syn, expr
+from .blocks import TupleBlock
 
 
-class Def(syn.Item, frozen=True):
+class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
-    class Kind(syn.MatchClass, abstract=True, frozen=True):
-        ...
+    class Where(TupleBlock, frozen=True):
+        outline_keyword: ClassVar = "where"
 
-    class InfixKind(Kind, frozen=True):
-        '''
-        def a + b
-        takes:
-            val a: T
-            val b: T
-        where: 
-            val T: Numeric
-        '''
-        op: expr.Infix.Op
-        lhs: expr.Sym
-        rhs: expr.Sym
+    class Takes(TupleBlock, frozen=True):  # ExprBlock
+        outline_keyword: ClassVar = "takes"
+        expr: Optional[syn.Expr]
 
-    class PrefixKind(Kind, frozen=True):
-        '''
-        def -a
-        takes:
-            val a: T
-        where:
-            val T: Numeric
-        '''
-        op: expr.Prefix.Op
-        rhs: expr.Sym
+        @classmethod
+        def build(
+            cls,
+            kw: Literal["takes"],
+            *args: Optional[tuple[syn.Expr, Literal[":"]]],
+            **kwargs,
+        ):
+            match args:
+                case (":",):
+                    expr, sep = None, ":"
+                case (expr, ":"):
+                    expr, sep = expr, ":"
+                case _:
+                    raise ValueError(f"Invalid args for {cls.__name__}: {args}")
 
+            return super().build(kw, sep, expr=expr, **kwargs)
 
-    class QualKind(Kind, frozen=True):
-        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.from_str("$sym@Sym $qualified@Sym"),
-            syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
-        )
+    class Returns(syn.Block, frozen=True):
+        outline_keyword: ClassVar = "returns"
+        expr: syn.Expr
 
-        qualified: expr.Sym
-        generics: Optional[expr.Tuple] = None
+        @classmethod
+        def build(
+            cls,
+            kw: Literal["returns"],
+            expr: syn.Expr,
+            # *args,
+            *,
+            children: syn.Block.Children,
+            **kwargs,
+        ):
 
-    class ClassKind(Kind, frozen=True):
-        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.from_str("$sym@Sym"),
-            syn.Expr.from_str("$sym@Sym[..$generics]"),
-        )
+            return cls(expr=expr, **kwargs)
 
-        generics: Optional[expr.Tuple] = None
+    # class Expose(TupleBlock, frozen=True):
+    #     outline_keyword: ClassVar = 'expose'
 
-    class FunctionKind(Kind, frozen=True):
-        match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-            syn.Expr.from_str("$sym@Sym(..$params)"),
-            syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
-            syn.Expr.from_str("$context.$sym(..$params)"),
-            syn.Expr.from_str("$context.$sym[..$generics](..$params)"),
-        )
+    # class Inherits(TupleBlock, frozen=True):
+    #     outline_keyword: ClassVar = 'inherits'
 
-        params: Optional[expr.Tuple] = None
-        context: Optional[syn.Expr] = None
+    # class Derives(TupleBlock, frozen=True):
+    #     outline_keyword: ClassVar = 'derives'
 
+    outline_keyword: ClassVar = "def"
+    outline_children: ClassVar = {
+        Where: False,
+        Takes: False,
+        Returns: False,
+        # Expose: False,
+        # Inherits: False,
+        # Derives: False,
+    }
 
-    # grammar: ClassVar[str] = "def: 'def' expression EOF;"
-    pkg: items.Package
-
+    # pkg: items.Package
     expr: syn.Expr
 
-    outline_keyword: ClassVar[str] = "def"
+    where: Optional[Where] = None
+    takes: tuple[Takes, ...] = ()
+    returns: tuple[Returns, ...] = ()
 
     @classmethod
     def build(
@@ -97,37 +79,173 @@ class Def(syn.Item, frozen=True):
         kw: Literal["def"],
         expr: syn.Expr,
         *,
-        parent: syn.Item,
-        pkg: items.Package,
+        # parent: Optional[syn.Item],
+        # pkg: items.Package,
         children: tuple[syn.Block, ...],
+        **kwargs,
     ):
-        return cls(expr=expr, parent=parent, pkg=pkg)
+        assert (
+            kw == cls.outline_keyword
+        ), f"Expected keyword {cls.outline_keyword}, got {kw}"
+        # procesa las directivas where, takes, returns, expose, inherits, derive, etc..
 
-    @cached_property
-    def kind(self):
-        match self.expr:
-            case expr.Sym(at=at) as sym:
-                return self.ClassKind(sym=sym)
-            case expr.Index(origin=expr.Sym() as sym, index=expr.Tuple() as generics):
-                return self.ClassKind(sym=sym, generics=generics)
-            case expr.Infix(op=op) as infix:
-                ...
-            case expr.Prefix(op=op) as prefix:
-                ...
-            case expr.Apply(function=function, argument=arguments):
-                ...
+        where: Optional[Def.Where] = None
+        takes: list[Def.Takes] = []
+        returns: list[Def.Returns] = []
+        # expose: Optional[Def.Expose] = None
+        # inherits: Optional[Def.Inherits] = None
+        # derives: Optional[Def.Derives] = None
+        for child in children:
+            match child:
+                case cls.Where() as w:
+                    where = w
+                case cls.Takes() as t:
+                    takes.append(t)
+                case cls.Returns() as r:
+                    returns.append(r)
+                # case cls.Expose() as e:
+                #     expose = e
+                # case cls.Inherits() as i:
+                #     inherits = i
+                # case cls.Derives() as d:
+                #     derives = d
 
-        kind = self.Kind.match(self.expr)
-        if kind is None:
+        # procesa la estructura de la expresion para determinar el tipo de definicion
+        self = cls.match(
+            expr,
+            expr=expr,
+            where=where,
+            takes=tuple(takes),
+            returns=tuple(returns),
+            **kwargs,
+        )
+        if self is not None:
+            return self
 
-            with log.error(
-                f"Definition expression does not match any known kind: {self.expr}"
-            ) as err:
-                err.with_label(self.as_label("Unknown def kind"))
+        return cls(
+            expr=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
+        )
 
-            raise ValueError(f"Invalid definition expression: {self.expr}")
-        return kind
+    # def ingest(self, ingestor: Ingestor):
+    #     ...
+
+    # class Kind(syn.MatchClass, abstract=True, frozen=True): ...
+
+    # class InfixKind(Kind, frozen=True):
+    #     """
+    #     def a + b
+    #     takes:
+    #         val a: T
+    #         val b: T
+    #     where:
+    #         val T: Numeric
+    #     """
+
+    #     op: expr.Infix.Op
+    #     lhs: expr.Sym
+    #     rhs: expr.Sym
+
+    # class PrefixKind(Kind, frozen=True):
+    #     """
+    #     def -a
+    #     takes:
+    #         val a: T
+    #     where:
+    #         val T: Numeric
+    #     """
+
+    #     op: expr.Prefix.Op
+    #     rhs: expr.Sym
+
+    # class QualKind(Kind, frozen=True):
+    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+    #         syn.Expr.from_str("$sym@Sym $qualified@Sym"),
+    #         syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
+    #     )
+
+    #     qualified: expr.Sym
+    #     generics: Optional[expr.Tuple] = None
+
+    # class ClassKind(Kind, frozen=True):
+    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+    #         syn.Expr.from_str("$sym@Sym"),
+    #         syn.Expr.from_str("$sym@Sym[..$generics]"),
+    #     )
+
+    #     generics: Optional[expr.Tuple] = None
+
+    # class FunctionKind(Kind, frozen=True):
+    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
+    #         syn.Expr.from_str("$sym@Sym(..$params)"),
+    #         syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
+    #         syn.Expr.from_str("$context.$sym(..$params)"),
+    #         syn.Expr.from_str("$context.$sym[..$generics](..$params)"),
+    #     )
+
+    #     params: Optional[expr.Tuple] = None
+    #     context: Optional[syn.Expr] = None
+
+    # @cached_property
+    # def kind(self):
+    #     match self.expr:
+    #         case expr.Sym(at=at) as sym:
+    #             return self.ClassKind(sym=sym)
+    #         case expr.Index(origin=expr.Sym() as sym, index=expr.Tuple() as generics):
+    #             return self.ClassKind(sym=sym, generics=generics)
+    #         case expr.Infix(op=op) as infix:
+    #             ...
+    #         case expr.Prefix(op=op) as prefix:
+    #             ...
+    #         case expr.Apply(function=function, argument=arguments):
+    #             ...
+
+    #     kind = self.Kind.match(self.expr)
+    #     if kind is None:
+
+    #         with log.error(
+    #             f"Definition expression does not match any known kind: {self.expr}"
+    #         ) as err:
+    #             err.with_label(self.as_label("Unknown def kind"))
+
+    #         raise ValueError(f"Invalid definition expression: {self.expr}")
+    #     return kind
 
 
-if __name__ == "__main__":
-    def_classes = Def.Kind.__subclasses__()  # filter non abstracts for each pattern
+class ClassDef(Def, frozen=True):
+    '''
+    Tambien representara funciones,  
+    '''
+    match_patterns: ClassVar = (
+        syn.Expr.from_str("$sym@Sym"),
+        syn.Expr.from_str("$sym@Sym[..$spec@Tuple]"),
+        syn.Expr.from_str("$sym@Sym(..args@Tuple)"),
+        syn.Expr.from_str("$sym@Sym[..$spec@Tuple](..args@Tuple)"),
+    )
+
+    # spec son 
+
+    sym: expr.Sym
+    spec: Optional[expr.Tuple] = None
+    args: Optional[expr.Tuple] = None
+
+    def __invariants__(self):
+        assert len(self.returns) == 0, "ClassDef cannot have returns"
+
+
+class QualDef(Def, frozen=True):
+    match_patterns: ClassVar = (
+        syn.Expr.from_str("$sym@Sym $target"),
+        syn.Expr.from_str("$sym@Sym[..$spec@Tuple] $target"),
+    )
+
+    sym: expr.Sym
+    # target y spec son parametros (takes)
+    spec: Optional[expr.Tuple] = None
+    target: syn.Expr
+
+
+# class CohertionDef(Def, frozen=True):
+#     match_patterns: ClassVar = (
+#         syn.Expr.from_str("T@Sym -> U@Sym"), # implicit cohertion
+#         syn.Expr.from_str("T@Sym => U@Sym"), # explicit cohertion
+#     )

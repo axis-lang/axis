@@ -1,6 +1,6 @@
 from __future__ import annotations
 from functools import cache
-from typing import ClassVar, Iterable, Optional, Self
+from typing import ClassVar, Iterable, Literal, Optional, Self
 from axis import src
 from protobase import Record, attrs_of, classproperty, frozendict, is_abstract
 from rich.tree import Tree
@@ -10,7 +10,7 @@ from .building import FromSrcMixin
 from .outline import OutlineTree, OutlineRule, OutlineSpec
 
 
-#alpha -> {}
+# alpha -> {}
 
 
 class Node(FromSrcMixin, Record, frozen=True, abstract=True):
@@ -83,14 +83,14 @@ class OutlineNode(Node, frozen=True, abstract=True):
     type Children = tuple[EmbeddedOutlineNode, ...]
 
     outline_keyword: ClassVar[str]
-    outline_keyword_sep: ClassVar[str] = " \t"
+    outline_keyword_sep: ClassVar[str] = ": \t"
     outline_children: ClassVar[dict[type[OutlineNode], Optional[bool]]]
-
 
     @classmethod
     def __class_post_build__(cls):
         super().__class_post_build__()
-        cls.outline_children = {}
+        if "outline_children" not in vars(cls):  # .__dict__:
+            cls.outline_children = {}
         if not is_abstract(cls):
             assert (
                 getattr(cls, "outline_keyword", None) is not None
@@ -116,7 +116,8 @@ class OutlineNode(Node, frozen=True, abstract=True):
     def outline_spec(cls) -> OutlineSpec[type[OutlineNode]]:
         rules: dict[type[OutlineNode], OutlineRule[type[OutlineNode]]] = {}
 
-        def process_block(node_cls: type[OutlineNode]):
+        def process_cls(node_cls: type[OutlineNode]):
+            # debe procesar node_cls junto a todas sus subclasses, y solo agregar clases no abstractas
             if node_cls in rules:
                 return
 
@@ -138,9 +139,9 @@ class OutlineNode(Node, frozen=True, abstract=True):
             rules[node_cls] = rule
 
             for child in rule.children.values():
-                process_block(child.tag)
+                process_cls(child.tag)
 
-        process_block(cls)
+        process_cls(cls)
 
         return OutlineSpec(cls, frozendict(rules))
 
@@ -163,6 +164,7 @@ class OutlineNode(Node, frozen=True, abstract=True):
         embedded_children = []
 
         for child_tree in tree.children:
+
             if issubclass(child_tree.tag, EmbeddedOutlineNode):
                 child, segnodes = child_tree.tag.from_outline(child_tree, **kwargs)
                 embedded_children.append(child)
@@ -170,12 +172,17 @@ class OutlineNode(Node, frozen=True, abstract=True):
 
         if issubclass(tree.tag, SegregatedOutlineNode):
             self = tree.tag.from_str(
-                tree.content, children=tuple(embedded_children), parent=parent, **kwargs
+                tree.content,
+                children=tuple(embedded_children),
+                parent=parent,
+                **kwargs,
             )
             parent = self
         elif issubclass(tree.tag, EmbeddedOutlineNode):
             self = tree.tag.from_str(
-                tree.content, children=tuple(embedded_children), **kwargs
+                tree.content,
+                children=tuple(embedded_children),
+                **kwargs,
             )
         else:
             raise TypeError("Class must be either Embedded or Segregated")
@@ -183,7 +190,9 @@ class OutlineNode(Node, frozen=True, abstract=True):
         for child_tree in tree.children:
             if issubclass(child_tree.tag, SegregatedOutlineNode):
                 child, segnodes = child_tree.tag.from_outline(
-                    child_tree, parent=parent, **kwargs
+                    child_tree,
+                    parent=parent,
+                    **kwargs,
                 )
                 segregated_nodes.append(child)
                 segregated_nodes.extend(segnodes)
@@ -205,22 +214,25 @@ class EmbeddedOutlineNode(OutlineNode, frozen=True, abstract=True):
 
 
 class SegregatedOutlineNode(OutlineNode, frozen=True, abstract=True):
-    parent: Optional[SegregatedOutlineNode] = None
+    parent: Optional[OutlineNode] = None
 
     @classmethod
     def build(
         cls,
         *args,
-        parent: Optional[SegregatedOutlineNode],
+        parent: Optional[OutlineNode],
         children: OutlineNode.Children,
         **kwargs,
     ) -> Self:
         return super().build(*args, parent=parent, children=children, **kwargs)
 
     @classmethod
-    def from_file(cls, src_file: src.File, **kwargs) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
+    def from_file(
+        cls, src_file: src.File, **kwargs
+    ) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
         tree = cls.parse_outline_tree(src_file)
         from rich import print
+
         print(tree)
         self, more = cls.from_outline(tree, **kwargs)
         return (self, *more)
@@ -240,5 +252,15 @@ class Block(EmbeddedOutlineNode, Node, frozen=True, abstract=True):
     grammar_context_infix: ClassVar[str] = "Block"
 
 
-class Item(SegregatedOutlineNode, Node, frozen=True, abstract=True):
+class Item(OutlineNode, Node, frozen=True, abstract=True):
     grammar_context_infix: ClassVar[str] = "Item"
+
+
+class SegregatedItem(Item, SegregatedOutlineNode, frozen=True, abstract=True):
+    """"""
+
+    # pkg:
+
+
+class EmbeddedItem(Item, EmbeddedOutlineNode, frozen=True, abstract=True):
+    """"""
