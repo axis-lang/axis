@@ -19,6 +19,7 @@ from typing import (
     get_args,
     get_origin,
     get_type_hints,
+    TypeAliasType, 
 )
 from warnings import warn
 from weakref import WeakKeyDictionary
@@ -31,13 +32,39 @@ from .type import Type
 AnnotatedType = type(Annotated[int, ...])
 
 
-def anno_get_type(anno: Any):
+def _unwrap_type_alias(anno: Any):
+    while isinstance(anno, TypeAliasType):
+        anno = anno.__value__
+    return anno
+
+
+def normalize_type(anno: Any):
+    anno = _unwrap_type_alias(anno)
 
     if get_origin(anno) is Annotated:
-        return anno.__origin__
-    elif isinstance(anno, (type, GenericAlias, UnionType, TypeVar)):
-        return anno
-    elif get_origin(anno) in (Union,):
+        anno = anno.__origin__
+
+    if isinstance(anno, (type, GenericAlias, UnionType, TypeVar)):
+        origin = get_origin(anno)
+        if origin is None:
+            return anno
+
+        args = get_args(anno)
+        if not args:
+            return anno
+
+        normalized_args = tuple(_unwrap_type_alias(arg) for arg in args)
+        if normalized_args == args:
+            return anno
+
+        try:
+            if origin is Union:
+                return Union[normalized_args]
+            return origin[normalized_args]
+        except TypeError:
+            return anno
+
+    if get_origin(anno) in (Union,):
         return anno
 
     raise TypeError(f"Invalid annotation type {type(anno)}")
@@ -54,15 +81,15 @@ class AttrInfo(NamedTuple):
         return self.default is not MISSING
 
     @property
-    def type(self) -> tuple[Any, ...]:
+    def type(self) -> Any:
         try:
-            return anno_get_type(self.annotation)
+            return normalize_type(self.annotation)
         except TypeError as e:
             e.add_note(f"Error in attribute '{self.name}'")
             raise
 
     @property
-    def type_origin(self) -> tuple[Any, ...]:
+    def type_origin(self) -> Any:
         return get_origin(self.type) or self.type
 
     @property
@@ -371,4 +398,3 @@ class Object(metaclass=Type, abstract=True):
 
 def attrs_of(obj: Object) -> dict[str, Any]:
     return obj.__state__()
-

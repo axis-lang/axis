@@ -107,7 +107,7 @@ class Type(type):
                 postbuilder(cls)
 
             if hasattr(cls, "__class_post_build__"):
-                cls.__class_post_build__(cls)
+                cls.__class_post_build__()
 
             return cls
 

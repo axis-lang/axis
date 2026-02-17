@@ -3,3 +3,14 @@ __pycache__
 .mypy_cache
 **/target
 *.so
+.venv
+*.pyc
+**/__pycache__/
+.antlr
+**/.antlr/
+*.tokens
+*.interp
+*.java
+dist
+build
+*.egg-info

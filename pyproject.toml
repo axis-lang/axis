@@ -5,6 +5,14 @@ description = ""
 authors = ["jdluque <jdluque@leitat.org>"]
 readme = "README.md"
 
+[[tool.poetry.packages]]
+include = "axis"
+from = "src"
+
+[[tool.poetry.packages]]
+include = "protobase"
+from = "src"
+
 [tool.poetry.dependencies]
 python = "^3.13"
 # protobase = { path = "../protobase", develop = true }

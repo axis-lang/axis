@@ -25,3 +25,8 @@
 
 * Packages: Librerias transversales a los modulos de axis
 * Submodule: modulos que componen el sistema
+
+# Notas de build
+
+- El grammar y los generados viven en `src/axis/syn/grammar/`; para regenerar: `just gen-parser`.
+- `protobase` es parte interna del ecosistema y vive en `src/protobase` (no es paquete independiente por ahora).

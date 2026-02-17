@@ -109,7 +109,7 @@ class Index[K](Record, frozen=True, consed=True):
 
 
 class Tuple[K, V](Record, frozen=True, consed=True):
-    index: Index[K]  # Index[L] K
+    index: Index  # Index[L] K
     values: tuple[V, ...]  # inner representation
 
     @property

@@ -58,7 +58,10 @@ def is_inmutable(cls: type) -> bool:
         >>> is_inmutable(dict)
         False
     """
-    for base in cls.__mro__:
+    if cls is None:
+        return False
+
+    for base in reversed(cls.__mro__):
         if base in _INMUTABLE_TYPES:
             return True
     return False
@@ -68,14 +71,9 @@ def check_inmutable(tp: GenericAlias | type):
     if tp in (Self, Ellipsis):
         return # a priori lo damos por bueno
 
-    if(tp is type):
+    if tp is type:
         return True
 
-    if isinstance(tp, type):
-
-        if not is_inmutable(tp):
-            raise TypeError(f"Type '{tp}' is not a know inmutable.")
-        return
 
     if isinstance(tp, TypeVar):
         if tp.__bound__ is not None:
@@ -97,11 +95,19 @@ def check_inmutable(tp: GenericAlias | type):
         return
     
     
-    origin = get_origin(tp)
-    if origin is type:
+    if isinstance(tp, type):
+        if not is_inmutable(tp):
+            raise TypeError(f"Type '{tp}' is not a know inmutable.")
         return
+
+    origin = get_origin(tp)
+    if origin is None:
+        raise TypeError(f"Type '{tp}' is not a know inmutable.")
+
+    if not is_inmutable(origin):
+        raise TypeError(f"Type '{tp}' is not a know inmutable.")
     
-    check_inmutable(origin)
+    #check_inmutable(origin)
 
     for arg in get_args(tp):
         check_inmutable(arg)
