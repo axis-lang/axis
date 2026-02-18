@@ -27,6 +27,7 @@ class Shape[K](Record, frozen=True, consed=True):
         return not self.is_empty and not self.is_full
 
     def __invariants__(self):
+        """Invariant: arity >= 0 and keys ⊆ [0..arity)."""
         assert self.arity >= 0
         assert len(self.keys) <= self.arity
 
@@ -53,6 +54,7 @@ class Index[K](Record, frozen=True, consed=True):
     keys: tuple[K | None, ...]  # Set[sparse=True] K
 
     def __invariants__(self) -> None:
+        """Invariant: keyed indices are unique and consistent."""
         # Check for duplicate keys
         assert len(self._keyed_indices) == len(
             self._indexed_keys
@@ -109,7 +111,7 @@ class Index[K](Record, frozen=True, consed=True):
 
 
 class Tuple[K, V](Record, frozen=True, consed=True):
-    index: Index  # Index[L] K
+    index: Index[K]  # Index[L] K
     values: tuple[V, ...]  # inner representation
 
     @property
@@ -121,6 +123,7 @@ class Tuple[K, V](Record, frozen=True, consed=True):
         return self.index.shape
 
     def __invariants__(self):
+        """Invariant: index keys and values share the same arity."""
         assert len(self.index) == len(self.values)
 
     def __iter__(self):
@@ -206,4 +209,3 @@ class Tuple[K, V](Record, frozen=True, consed=True):
 
 
 Tuple.EMPTY = Tuple(Index(()), ())
-

@@ -81,7 +81,7 @@ class Type(BuiltinConst, frozen=True, consed=True):
     class NominalScheme(Scheme, frozen=True, consed=True):
         ...
 
-    qualifiers: dom.Tuple[Const]  # conjunto de valores constantes construidos
+    qualifiers: dom.Tuple[str, dom.Meta]
     scheme: Scheme  # tipo de destino estructural o nominal
     # Meta provider
 
@@ -93,4 +93,4 @@ class TypeScheme(Node, frozen=True, consed=True):
 
 
 class Struct(TypeScheme, frozen=True, consed=True):
-    fields: dom.Tuple[Bound]
+    fields: dom.Tuple[str, Bound]

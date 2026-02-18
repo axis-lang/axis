@@ -12,39 +12,36 @@ type Data = Atom | tuple | frozenset | frozendict
 
 class Meta(Record, frozen=True, consed=True, abstract=True): ...
 
-class Const(Meta, frozen=True, consed=True, abstract=True):
-    '''
-    Un valor constante es un valor completamente determinado 
-    y conocido en tiempo de compilacion.
-    '''
 
-class ConstStruct(Const, frozen=True, consed=True):
-    '''
-    Meta de un valor constante estructural:
-    val a = (x: 1, y: 2)
-    '''
-    fields: Tuple[str, Const]
+class TupleSpec(Meta, frozen=True, consed=True):
+    """
+    Meta de un valor estructural (tupla/record posicional, nominal o mixto).
+    """
 
-class ConstSymbol(Const, frozen=True, consed=True):
-    '''
-    Meta de un valor constante symbolico:
+    fields: Tuple[str, Meta]
+
+
+class TypeSymbol(Meta, frozen=True, consed=True):
+    """
+    Meta de un valor nominal:
     val a = MySymbol[K: Text](x: 1, y: 2)
-    '''
+    """
+
     symbol: tuple[str, ...]
-    params: Tuple[str, Const] | Atom
-
-class ConstQualification(Const, frozen=True, consed=True, abstract=True):
-    '''
-    '''
-    qualifiers: tuple[Const, ...]
-    base: ConstStruct | ConstSymbol
+    params: Val | Atom
 
 
-class Val(Node, frozen=True, consed=True):
-    meta: Meta
-    data: Data
+class QualifiedType(Meta, frozen=True, consed=True, abstract=True):
+    """
+    Meta de un valor calificado:
+        Array[3, 3] Natural
+        Map[Id] (name: String, age: Natural)
+    """
 
-    @property
-    def is_const(self) -> bool:
-        return isinstance(self.meta, Const)
+    qualifiers: tuple[Val, ...]
+    base: Val
 
+
+class Val[M: Meta = Meta, D: Data = Data](Node, frozen=True, consed=True):
+    meta: M
+    data: D

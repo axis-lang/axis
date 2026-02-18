@@ -44,30 +44,26 @@ def normalize_type(anno: Any):
     if get_origin(anno) is Annotated:
         anno = anno.__origin__
 
-    if isinstance(anno, (type, GenericAlias, UnionType, TypeVar)):
-        origin = get_origin(anno)
-        if origin is None:
+    origin = get_origin(anno)
+    if origin is None:
+        if isinstance(anno, (type, GenericAlias, UnionType, TypeVar)):
             return anno
+        raise TypeError(f"Invalid annotation type {type(anno)}")
 
-        args = get_args(anno)
-        if not args:
-            return anno
-
-        normalized_args = tuple(_unwrap_type_alias(arg) for arg in args)
-        if normalized_args == args:
-            return anno
-
-        try:
-            if origin is Union:
-                return Union[normalized_args]
-            return origin[normalized_args]
-        except TypeError:
-            return anno
-
-    if get_origin(anno) in (Union,):
+    args = get_args(anno)
+    if not args:
         return anno
 
-    raise TypeError(f"Invalid annotation type {type(anno)}")
+    normalized_args = tuple(_unwrap_type_alias(arg) for arg in args)
+    if normalized_args == args:
+        return anno
+
+    try:
+        if origin is Union:
+            return Union[normalized_args]
+        return origin[normalized_args]
+    except TypeError:
+        return anno
 
 
 class AttrInfo(NamedTuple):

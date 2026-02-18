@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from re import Pattern
 from types import GenericAlias, UnionType
-from typing import Self, get_args, get_origin, Union, TypeVar
+from typing import Self, get_args, get_origin, Union, TypeAliasType, TypeVar
 
 
 _INMUTABLE_TYPES: set[type] = {
@@ -68,6 +68,9 @@ def is_inmutable(cls: type) -> bool:
 
 
 def check_inmutable(tp: GenericAlias | type):
+    if isinstance(tp, TypeAliasType):
+        tp = tp.__value__
+
     if tp in (Self, Ellipsis):
         return # a priori lo damos por bueno
 
@@ -101,6 +104,8 @@ def check_inmutable(tp: GenericAlias | type):
         return
 
     origin = get_origin(tp)
+    if origin is None and hasattr(tp, "__origin__"):
+        origin = tp.__origin__
     if origin is None:
         raise TypeError(f"Type '{tp}' is not a know inmutable.")
 
@@ -109,7 +114,11 @@ def check_inmutable(tp: GenericAlias | type):
     
     #check_inmutable(origin)
 
-    for arg in get_args(tp):
+    args = get_args(tp)
+    if not args and hasattr(tp, "__args__"):
+        args = tp.__args__
+
+    for arg in args:
         check_inmutable(arg)
 
     #raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")

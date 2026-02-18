@@ -1,46 +1,76 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Iterable
-from protobase import Record
-from axis import syn, expr, dom
+from typing import Any, Iterable, Mapping, cast
+from protobase import Record, frozendict, mutate
+from axis import log, syn, expr, dom
 from functools import singledispatchmethod
-
-type R = tuple[R, int]
 
 
 class Evaluator(Record, frozen=True):
     # type Bound = type
     type EvalResult = tuple[dom.Meta, dom.Data]
+    type EnvValue = dom.Val | EvalResult
+
+    env: frozendict = frozendict()
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, "Evaluator.EnvValue"]):
+        return cls(env=_coerce_env(env))
+
+    def with_env(self, env: Mapping[str, "Evaluator.EnvValue"]):
+        return mutate(self, env=_coerce_env(env))
 
     def __call__(self, node: syn.Node) -> dom.Val:
         meta, data = self.eval(node)
         return dom.Val(meta=meta, data=data)
 
     def boolean(self, value: bool) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Boolean'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Boolean'), dom.Tuple.EMPTY), value
 
     def natural(self, value: int) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Natural'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Natural'), dom.Tuple.EMPTY), value
 
     def whole(self, value: int) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Whole'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Whole'), dom.Tuple.EMPTY), value
 
     def integer(self, value: int) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Integer'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Integer'), dom.Tuple.EMPTY), value
     
     def decimal(self, value: Decimal) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Decimal'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Decimal'), dom.Tuple.EMPTY), value
     
     def text(self, value: str) -> EvalResult:
-        return dom.ConstSymbol(('std', 'Text'), dom.Tuple.EMPTY), value
+        return dom.TypeSymbol(('std', 'Text'), dom.Tuple.EMPTY), value
 
     def struct(self, keys: Iterable[str], bounds: Iterable[dom.Meta], values: Iterable[dom.Data]):
         index = dom.Index(tuple(keys))
         fields = dom.Tuple(index=index, values=tuple(bounds))
-        if all(isinstance(b, dom.Const) for b in bounds):
-            struct = dom.ConstStruct(fields=fields) # type: ignore
-            return struct, tuple(values)
-        raise NotImplementedError("Only constant structs are implemented")
+        struct = dom.TupleSpec(fields=fields)
+        return struct, tuple(values)
+
+    def _error(self, node: syn.Node, message: str):
+        diag = log.error(message)
+        if node.span is not None:
+            diag = diag.with_label(node.as_label(message))
+        diag.throw()
+
+    def _resolve_env(self, sym: expr.Sym) -> EvalResult:
+        key = str(sym)
+        if key not in self.env:
+            self._error(sym, f"Unbound symbol: {key}")
+        value = self.env[key]
+        if isinstance(value, dom.Val):
+            return value.meta, value.data
+        if isinstance(value, tuple) and len(value) == 2:
+            return value  # type: ignore[return-value]
+        raise TypeError(f"Invalid env value for {key}: {type(value)}")
+
+    def _numeric_result(self, value: int | Decimal) -> EvalResult:
+        if isinstance(value, Decimal):
+            return self.decimal(value)
+        if isinstance(value, bool):
+            return self.boolean(value)
+        return self.integer(value)
 
 
     @singledispatchmethod
@@ -50,7 +80,9 @@ class Evaluator(Record, frozen=True):
     @classmethod
     def impl(cls, node_type: type[syn.Node]):
         def decorator(func):
-            cls.eval.register(node_type, func)  # type: ignore
+            dispatch = cast(Any, cls.eval)
+            register = cast(Any, dispatch.register)
+            register(node_type)(func)
             return func
 
         return decorator
@@ -97,3 +129,108 @@ def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.EvalResult:
 
     return evaluator.struct(keys, bounds, values)
 
+
+@Evaluator.impl(expr.Sym)
+def eval_sym(evaluator: Evaluator, node: expr.Sym) -> Evaluator.EvalResult:
+    return evaluator._resolve_env(node)
+
+
+@Evaluator.impl(expr.Additive)
+def eval_additive(evaluator: Evaluator, node: expr.Additive) -> Evaluator.EvalResult:
+    lhs_meta, lhs = evaluator.eval(node.lhs)
+    rhs_meta, rhs = evaluator.eval(node.rhs)
+
+    if not isinstance(lhs, (int, Decimal)) or not isinstance(rhs, (int, Decimal)):
+        evaluator._error(node, "Additive operator requires numeric operands")
+
+    op = node.op.symbol.value
+    if isinstance(lhs, Decimal) or isinstance(rhs, Decimal):
+        lhs = Decimal(lhs)
+        rhs = Decimal(rhs)
+
+    match op:
+        case "+":
+            return evaluator._numeric_result(lhs + rhs)  # type: ignore[arg-type]
+        case "-":
+            return evaluator._numeric_result(lhs - rhs)  # type: ignore[arg-type]
+    evaluator._error(node, f"Unsupported additive operator: {op}")
+
+
+@Evaluator.impl(expr.Productive)
+def eval_productive(evaluator: Evaluator, node: expr.Productive) -> Evaluator.EvalResult:
+    lhs_meta, lhs = evaluator.eval(node.lhs)
+    rhs_meta, rhs = evaluator.eval(node.rhs)
+
+    if not isinstance(lhs, (int, Decimal)) or not isinstance(rhs, (int, Decimal)):
+        evaluator._error(node, "Productive operator requires numeric operands")
+
+    op = node.op.symbol.value
+    if isinstance(lhs, Decimal) or isinstance(rhs, Decimal) or op == "/":
+        lhs = Decimal(lhs)
+        rhs = Decimal(rhs)
+
+    match op:
+        case "*" | "·":
+            return evaluator._numeric_result(lhs * rhs)  # type: ignore[arg-type]
+        case "/":
+            return evaluator.decimal(cast(Decimal, Decimal(lhs) / Decimal(rhs)))
+        case "%":
+            return evaluator._numeric_result(lhs % rhs)  # type: ignore[arg-type]
+    evaluator._error(node, f"Unsupported productive operator: {op}")
+
+
+@Evaluator.impl(expr.Sign)
+def eval_sign(evaluator: Evaluator, node: expr.Sign) -> Evaluator.EvalResult:
+    meta, value = evaluator.eval(node.rhs)
+    op = node.op.symbol.value
+
+    match op:
+        case "+":
+            if not isinstance(value, (int, Decimal)):
+                evaluator._error(node, "Unary + requires a numeric operand")
+            return evaluator._numeric_result(value)
+        case "-":
+            if not isinstance(value, (int, Decimal)):
+                evaluator._error(node, "Unary - requires a numeric operand")
+            return evaluator._numeric_result(-value)
+        case "!":
+            if not isinstance(value, bool):
+                evaluator._error(node, "Unary ! requires a boolean operand")
+            return evaluator.boolean(not value)
+        case "~":
+            if not isinstance(value, int):
+                evaluator._error(node, "Unary ~ requires an integer operand")
+            return evaluator.integer(~value)
+
+    evaluator._error(node, f"Unsupported unary operator: {op}")
+
+
+@Evaluator.impl(expr.Compound)
+def eval_compound(evaluator: Evaluator, node: expr.Compound) -> Evaluator.EvalResult:
+    last_result: Evaluator.EvalResult | None = None
+    for component in node.components:
+        last_result = evaluator.eval(component)
+    if last_result is None:
+        evaluator._error(node, "Empty compound expression")
+    return last_result
+
+
+@Evaluator.impl(expr.Apply)
+def eval_apply(evaluator: Evaluator, node: expr.Apply) -> Evaluator.EvalResult:
+    evaluator._error(node, "Apply expressions are not implemented yet")
+
+
+@Evaluator.impl(expr.Index)
+def eval_index(evaluator: Evaluator, node: expr.Index) -> Evaluator.EvalResult:
+    evaluator._error(node, "Index expressions are not implemented yet")
+
+
+@Evaluator.impl(expr.Member)
+def eval_member(evaluator: Evaluator, node: expr.Member) -> Evaluator.EvalResult:
+    evaluator._error(node, "Member expressions are not implemented yet")
+
+
+def _coerce_env(env: Mapping[str, "Evaluator.EnvValue"]) -> frozendict:
+    if isinstance(env, frozendict):
+        return env
+    return frozendict(env)
