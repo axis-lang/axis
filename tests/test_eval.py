@@ -12,7 +12,7 @@ class EvalTest(unittest.TestCase):
     def test_eval_literal(self):
         result = self.eval("12")
         self.assertEqual(result.data, 12)
-        self.assertTrue(isinstance(result.meta, dom.TypeSymbol))
+        self.assertTrue(isinstance(result.meta, dom.Type))
 
     def test_eval_additive(self):
         result = self.eval("1 + 2")
@@ -29,10 +29,10 @@ class EvalTest(unittest.TestCase):
     def test_eval_tuple(self):
         result = self.eval("(1, 2, 3)")
         self.assertEqual(result.data, (1, 2, 3))
-        self.assertTrue(isinstance(result.meta, dom.TupleSpec))
+        self.assertTrue(isinstance(result.meta.form, dom.Struct))
 
     def test_eval_symbol_from_env(self):
-        result = self.eval("alpha", env={"alpha": (dom.TypeSymbol(("std", "Natural"), dom.Tuple.EMPTY), 5)})
+        result = self.eval("alpha", env={"alpha": (dom.Type(form=dom.Nominal(ref=dom.Ref.from_str("std.Natural"), params=dom.Const(meta=dom.Type(form=dom.Struct(fields=dom.Tuple.EMPTY)), data=()), schema=None)), 5)})
         self.assertEqual(result.data, 5)
 
     def test_eval_unbound_symbol(self):

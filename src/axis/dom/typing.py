@@ -1,47 +1,83 @@
 from __future__ import annotations
+from typing import TypeAlias
 from protobase import Record, frozendict
+#from protobase.inmutable import inmutable, register_inmutable
 from axis.dom.tuple_ import Tuple, Shape, Index
 
 
 class Node(Record, frozen=True, consed=True, abstract=True): ...
 
 
-type Atom = int | float | str | bool | None
-type Data = Atom | tuple | frozenset | frozendict
+Atom: TypeAlias = int | float | str | bool | None
+Data: TypeAlias = Atom | tuple | frozenset | frozendict
+
+class Ref(Record, frozen=True, consed=True):
+    segments: tuple[str, ...]
+
+    @classmethod
+    def from_str(cls, value: str) -> "Ref":
+        parts = [part.strip() for part in value.split(".")]
+        segments = tuple(part for part in parts if part)
+        if not segments:
+            raise ValueError("Ref.from_str requires at least one segment")
+        return cls(segments=segments)
 
 
-class Meta(Record, frozen=True, consed=True, abstract=True): ...
+class TypeForm(Record, frozen=True, consed=True, abstract=True): ...
 
 
-class TupleSpec(Meta, frozen=True, consed=True):
-    """
-    Meta de un valor estructural (tupla/record posicional, nominal o mixto).
-    """
-
-    fields: Tuple[str, Meta]
+class Nominal(TypeForm, frozen=True, consed=True):
+    ref: Ref
+    params: "Const"
+    schema: "Type | None"
 
 
-class TypeSymbol(Meta, frozen=True, consed=True):
-    """
-    Meta de un valor nominal:
-    val a = MySymbol[K: Text](x: 1, y: 2)
-    """
-
-    symbol: tuple[str, ...]
-    params: Val | Atom
+class Struct(TypeForm, frozen=True, consed=True):
+    fields: Tuple[str, "Type"]
 
 
-class QualifiedType(Meta, frozen=True, consed=True, abstract=True):
-    """
-    Meta de un valor calificado:
-        Array[3, 3] Natural
-        Map[Id] (name: String, age: Natural)
-    """
-
-    qualifiers: tuple[Val, ...]
-    base: Val
+class Function(TypeForm, frozen=True, consed=True):
+    args: tuple["Type", ...]
+    ret: "Type"
 
 
-class Val[M: Meta = Meta, D: Data = Data](Node, frozen=True, consed=True):
-    meta: M
-    data: D
+class Union(TypeForm, frozen=True, consed=True):
+    members: tuple["Type", ...]
+
+
+class Literal(TypeForm, frozen=True, consed=True):
+    value: Data
+
+
+class TypeVar(TypeForm, frozen=True, consed=True):
+    id: str
+
+
+class Type(Record, frozen=True, consed=True):
+    form: TypeForm
+    qualifiers: tuple["Type", ...] = ()
+
+
+Meta = Type
+
+
+class Val(Node, frozen=True, consed=True, abstract=True):
+    meta: Type
+    data: Data
+
+    def __invariants__(self) -> None:
+        if not isinstance(self.data, (int, float, str, bool, type(None), tuple, frozenset, frozendict)):
+            raise TypeError(f"Val.data must be primitive, got {type(self.data)}")
+
+
+class Const(Val, frozen=True, consed=True):
+    ...
+
+
+class Var(Val, frozen=True, consed=True):
+    def __invariants__(self) -> None:
+        assert isinstance(self.data, tuple)
+        assert len(self.data) == 2
+        tag, ident = self.data
+        assert tag == "var"
+        assert isinstance(ident, str)

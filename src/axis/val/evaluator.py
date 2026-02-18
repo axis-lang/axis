@@ -8,7 +8,7 @@ from functools import singledispatchmethod
 
 class Evaluator(Record, frozen=True):
     # type Bound = type
-    type EvalResult = tuple[dom.Meta, dom.Data]
+    type EvalResult = tuple[dom.Type, object]
     type EnvValue = dom.Val | EvalResult
 
     env: frozendict = frozendict()
@@ -22,30 +22,30 @@ class Evaluator(Record, frozen=True):
 
     def __call__(self, node: syn.Node) -> dom.Val:
         meta, data = self.eval(node)
-        return dom.Val(meta=meta, data=data)
+        return dom.Const(meta=meta, data=data)
 
     def boolean(self, value: bool) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Boolean'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Boolean"), value
 
     def natural(self, value: int) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Natural'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Natural"), value
 
     def whole(self, value: int) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Whole'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Whole"), value
 
     def integer(self, value: int) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Integer'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Integer"), value
     
     def decimal(self, value: Decimal) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Decimal'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Decimal"), value
     
     def text(self, value: str) -> EvalResult:
-        return dom.TypeSymbol(('std', 'Text'), dom.Tuple.EMPTY), value
+        return _builtin_nominal("Text"), value
 
-    def struct(self, keys: Iterable[str], bounds: Iterable[dom.Meta], values: Iterable[dom.Data]):
-        index = dom.Index(tuple(keys))
+    def struct(self, keys: Iterable[object], bounds: Iterable[dom.Type], values: Iterable[object]):
+        index = dom.Index(tuple(cast(object, k) for k in keys))
         fields = dom.Tuple(index=index, values=tuple(bounds))
-        struct = dom.TupleSpec(fields=fields)
+        struct = dom.Type(form=dom.Struct(fields=fields))
         return struct, tuple(values)
 
     def _error(self, node: syn.Node, message: str):
@@ -106,9 +106,9 @@ def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
 
 @Evaluator.impl(expr.Tuple)
 def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.EvalResult:
-    keys: list[dom.Data] = []
-    bounds: list[dom.Meta] = []
-    values: list[dom.Data] = []
+    keys: list[object] = []
+    bounds: list[dom.Type] = []
+    values: list[object] = []
 
     for element in node.elements:
         match element:
@@ -234,3 +234,20 @@ def _coerce_env(env: Mapping[str, "Evaluator.EnvValue"]) -> frozendict:
     if isinstance(env, frozendict):
         return env
     return frozendict(env)
+
+
+def _empty_params() -> dom.Const:
+    return dom.Const(
+        meta=dom.Type(form=dom.Struct(fields=dom.Tuple.EMPTY)),
+        data=(),
+    )
+
+
+def _builtin_nominal(name: str) -> dom.Type:
+    return dom.Type(
+        form=dom.Nominal(
+            ref=dom.Ref.from_str(f"std.{name}"),
+            params=_empty_params(),
+            schema=None,
+        )
+    )
