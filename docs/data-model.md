@@ -23,6 +23,11 @@ All values in the language flow as `Val`, even in partial and lazy phases.
 
 `Val` is the only container used across evaluation phases.
 
+Serialization principle:
+
+- `data` is the serialized, canonical form.
+- `meta` is the deserialized, structural form.
+
 Concrete variants:
 - `Const`: a known value with concrete data.
 - `Var`: a placeholder value with stable identity.
@@ -99,6 +104,18 @@ All descriptors in the system are instances of `Type`.
 - `meta` is created once; many values share it.
 - `data` is shaped by `meta` but does not carry meaning by itself.
 
+Two meta-operations are defined:
+
+- serialize (reflection): convert meta to data by using `Type.to_val()` and
+  `Ref.to_val()` canonical encodings.
+- reify (deserialization): convert data back into meta by reconstructing
+  `Type`/`Ref` (potentially creating new meta instances).
+
+Planned API surface in `axis.dom`:
+
+- `Ref.from_val(data)` / `Ref.from_data(data)`
+- `Type.from_val(data)` / `Type.from_data(data)`
+
 
 #### Type and TypeForm
 
@@ -110,15 +127,14 @@ All descriptors in the system are instances of `Type`.
 
 Standard nominal types:
 
-- `std.Type` has no parameters.
-- Its `params` value is the empty struct: `Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=())`.
-- Its `schema` is `None` (opaque by default).
+- `std.Type` has no parameters; nominal parameters live in `Ref` when needed.
+- Its `schema` is computed from the `Ref` and may be omitted when opaque.
 - This keeps reflection simple and avoids universe levels for now.
 
 `TypeForm` is a closed family of variants that describes the structure
 of the type:
 
-- `Nominal(ref, params, schema)`
+- `Nominal(ref)`
 - `Struct(fields)`
 - `Function(args, ret)`
 - `Union(members)`
@@ -129,9 +145,8 @@ Only these variants define the meaning of `Type`.
 
 Shorthand:
 
-- `Ref("X")` stands for `Ref(segments=("X",))`.
-- `Type(Nominal(Ref("X")))` stands for a nominal type with empty params:
-  `Type(Nominal(ref=Ref("X"), params=Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=()), schema=None))`.
+- `Ref("X")` stands for `Ref(parent=None, member="X")`.
+- `Type(Nominal(Ref("X")))` stands for a nominal type identified by `Ref("X")`.
 
 
 #### TypeForm: Struct
@@ -160,47 +175,25 @@ Example:
 
 #### TypeForm: Nominal
 
-Descriptor for nominal types with parameters.
+Descriptor for nominal types.
 
 Shape:
 - `ref: Ref` is a stable, interned nominal reference (e.g. `std.Natural`).
-- `params` represents the parameter list of the nominal reference.
-- `schema` is the structural description of the nominal type, or `None` if opaque.
-
-Canonical representation (decision):
-- `params` is a `Const` whose `meta` is `Type` with `form=Struct` and whose
-  `data` is the canonical parameter tuple.
-- This keeps all phases using `Val` while preserving the `meta`/`data`
-  separation.
-
-Why this form:
-- Supports positional and nominal parameters via `Struct.fields.index`.
-- Keeps `Data` primitive; no `Val` is embedded inside `data`.
-- Avoids `Meta` containing non-primitive data directly.
+- The `ref` may carry hyperparameters; specialization lives in `Ref`.
+- The structural description of the nominal type is computed from the `Ref`.
 
 Invariants:
 - `ref` is interned and canonical.
-- `params.meta` must be `Type(form=Struct)`.
-- `params.data` length matches `params.meta.form.fields.arity`.
-- `params.data` is a primitive tuple; unknowns use the `Var` encoding.
-- `params` is always a `Const`; unknowns are encoded inside `params.data`.
-- `schema` may be `None` to represent an opaque nominal type.
-- A ref may appear with different schemas (e.g. visibility, specialization, or
-  opacification rules).
-
-Type parameters that are themselves types:
-- The parameter meta should be `std.Type`.
-- The parameter data stores `Type.to_val().data` for that type.
+- Hyperparameters are encoded in `ref.params` (meta-level) and serialized in
+  `ref.to_val().data`.
 
 Example:
 - `Array[3]` =>
-  `Type(Nominal(ref=Ref("Array"), params=Const(meta=Type(Struct(...)), data=(3,)), schema=<Type or None>))`
+  `Type(Nominal(ref=Ref(parent=Ref("Array"), member="[...]") ...))`
 - `Array[W]` =>
-  `Type(Nominal(ref=Ref("Array"), params=Const(meta=Type(Struct(...)), data=(("var", "W"),)), schema=<Type or None>))`
-- `Map[Id]` =>
-  `Type(Nominal(ref=Ref("Map"), params=Const(meta=Type(Struct(...)), data=(Type(Nominal(Ref("Id"))).to_val().data,)), schema=<Type or None>))`
+  `Type(Nominal(ref=<Ref with param ("var","W")>))`
 - `Person` =>
-  `Type(Nominal(ref=Ref("Person"), params=Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=()), schema=<Struct ...>))`
+  `Type(Nominal(ref=Ref("Person")))`
 
 
 #### TypeForm: Qualified Types
@@ -242,16 +235,20 @@ It replaces the generic notion of “Symbol” and is used by `Type`.
 
 ### Shape
 
-`Ref` is a path with ordered segments:
+`Ref` is a path with explicit structure and optional parameters:
 
-- `segments: tuple[str, ...]`
+- `parent: Ref | None`
+- `member: str`
+- `params: Tuple[str, Val]`
+
+`segments` is a derived view of the full path.
 
 ### Examples
 
 - `std.Array` =>
-  `Ref(segments=("std", "Array"))`
+  `Ref(parent=None, member="std").member_ref("Array")`
 - `std.Map` =>
-  `Ref(segments=("std", "Map"))`
+  `Ref(parent=None, member="std").member_ref("Map")`
 
 
 ## Ref Reflection
@@ -259,8 +256,17 @@ It replaces the generic notion of “Symbol” and is used by `Type`.
 `Ref` can be reflected into a value for metaprogramming:
 
 - `Ref.to_val()` returns `Val` with:
-  - `meta = Type(form=Nominal(ref=Ref("std.Ref"), params=Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=()), schema=None))`
-  - `data = segments` (a `tuple[str, ...]`)
+  - `meta = Type(Nominal(ref=Ref("std.Ref")))` where the `std.Ref` reference
+    is parametrized with `(parent_ref, params_type_tuple)`.
+  - `data = (parent_data, member, params_data)`
+
+Where:
+- `parent_data` is `None` or `parent.to_val().data`
+- `member` is a `str`
+- `params_data` is `tuple(p.data for p in params)`
+- `parent_ref` is `parent.to_val()` (or `Const(meta=Type(Literal(None)), data=None)` if no parent)
+- `params_type_tuple` is a value holding the tuple of parameter types:
+  `Const(meta=Type(Struct(fields=Tuple(index=params.index, values=std.Type))), data=tuple(p.meta.to_val().data for p in params))`
 
 The encoding is deterministic and should be cached for performance.
 
@@ -303,7 +309,7 @@ This conversion must produce:
 Discriminated unions are encoded as a tuple `(tag, data)` for performance.
 
 Top-level encoding:
-- `Type.to_val().meta = Type(form=Nominal(ref=Ref("std.Type"), params=Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=()), schema=None))`
+- `Type.to_val().meta = Type(form=Nominal(ref=Ref("std.Type")))`
 - `Type.to_val().data = ("type", (qualifiers_data, form_data))`
 
 Where:
@@ -324,7 +330,7 @@ Tag encoding:
 
 TypeForm encodings:
 
-- `Nominal(ref, params, schema)` => `( Ref("std.Type.Nominal").to_val().data, (ref.to_val().data, params.data, schema_data) )`
+- `Nominal(ref)` => `( Ref("std.Type.Nominal").to_val().data, ref.to_val().data )`
 - `Struct(fields)` => `( Ref("std.Type.Struct").to_val().data, (index_data, fields_data) )`
 - `Function(args, ret)` => `( Ref("std.Type.Function").to_val().data, (args_data, ret_data) )`
 - `Union(members)` => `( Ref("std.Type.Union").to_val().data, (members_data,) )`
@@ -337,19 +343,19 @@ Where:
 - `args_data = tuple(t.to_val().data for t in args)`
 - `ret_data = ret.to_val().data`
 - `members_data = tuple(t.to_val().data for t in members)`
-- `schema_data = None` if `schema` is `None`, otherwise `schema.to_val().data`
+- `schema` is computed from `ref` and is not encoded here
 
 
 ## Compact Examples
 
-Nominal (no params, opaque):
+Nominal (no params):
 
-- `Type(Nominal(ref=Ref("std.Text"), params=Const(meta=Type(Struct(fields=Tuple.EMPTY)), data=()), schema=None))`
+- `Type(Nominal(ref=Ref("std.Text")))`
 
-Nominal (with params and schema):
+Nominal (with params in Ref):
 
 - `Array[3]` =>
-  `Type(Nominal(ref=Ref("Array"), params=Const(meta=Type(Struct(...)), data=(3,)), schema=<Struct ...>))`
+  `Type(Nominal(ref=<Ref("Array") with param 3>))`
 
 Struct (record):
 
@@ -379,16 +385,16 @@ Type variable:
 Qualified:
 
 - `Array[3] Natural` =>
-  `Type(qualifiers=(Type(Nominal(Ref("Array")), params=Const(...), schema=<Type or None>),), form=Nominal(ref=Ref("std.Natural"), params=Const(...), schema=None))`
+  `Type(qualifiers=(Type(Nominal(ref=<Ref("Array") with param 3>)),), form=Nominal(ref=Ref("std.Natural")))`
 
 Value (nominal instance):
 
 - `Person("john", 33)` =>
-  `Const(meta=Type(Nominal(ref=Ref("Person"), params=Const(...), schema=<Struct ...>)), data=("john", 33))`
+  `Const(meta=Type(Nominal(ref=Ref("Person"))), data=("john", 33))`
 
 Ref:
 
-- `Ref("std.Array")` => `Ref(segments=("std", "Array"))`
+- `Ref("std.Array")` => `Ref(parent=None, member="std").member_ref("Array")`
 
 ## Evaluation Phases
 
@@ -401,11 +407,10 @@ Phase 2: Elaboration and Normalization
 
 - Convert AST into canonical `Val` forms (`Const` or `Var`).
 - Build `Type` and `Ref` objects.
-- Attach `schema` inside `TypeForm.Nominal` (or `None` for opaque types).
-- Build `Type.Nominal.params` as `Const(meta=Type(Struct), data=<primitive tuple>)`.
+- Encode hyperparameters into `Ref.params` when specializing entities.
 - Validate structural invariants (Index uniqueness, positional before nominal).
-- Example: `Array[3]` becomes `Type(Nominal(ref=Ref("Array"), params=Const(...), schema=<Type or None>))`.
-- Example: `Person("john", 33)` becomes `Const(meta=Type(Nominal(ref=Ref("Person"), params=Const(...), schema=<Struct ...>)), data=("john", 33))`.
+- Example: `Array[3]` becomes `Type(Nominal(ref=<Ref("Array") with param 3>))`.
+- Example: `Person("john", 33)` becomes `Const(meta=Type(Nominal(ref=Ref("Person"))), data=("john", 33))`.
 
 Phase 3: Type Resolution and Constraints
 

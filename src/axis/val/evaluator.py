@@ -236,18 +236,9 @@ def _coerce_env(env: Mapping[str, "Evaluator.EnvValue"]) -> frozendict:
     return frozendict(env)
 
 
-def _empty_params() -> dom.Const:
-    return dom.Const(
-        meta=dom.Type(form=dom.Struct(fields=dom.Tuple.EMPTY)),
-        data=(),
-    )
-
-
 def _builtin_nominal(name: str) -> dom.Type:
     return dom.Type(
         form=dom.Nominal(
             ref=dom.Ref.from_str(f"std.{name}"),
-            params=_empty_params(),
-            schema=None,
         )
     )

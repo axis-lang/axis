@@ -28,7 +28,7 @@ class Package(Record, frozen=True):
     def file_items(self, path: src.Path):
         from axis import items
         file = src.File.from_path(self.dir.path / path)
-        return items.Unit.from_file(file)
+        return items.Unit.from_file(file)#, pkg=self)
 
     @property
     def all_items(self) -> frozenset[syn.SegregatedOutlineNode]:

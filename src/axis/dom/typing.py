@@ -12,7 +12,9 @@ type Atom = TypingUnion[int, float, str, bool, None]
 type Data = TypingUnion[Atom, tuple, frozenset, frozendict]
 
 class Ref(Record, frozen=True, consed=True):
-    segments: tuple[str, ...]
+    member: str
+    parent: "Ref | None" = None
+    params: Tuple[str, "Val"] = Tuple.EMPTY
 
     @classmethod
     def from_str(cls, value: str) -> "Ref":
@@ -20,19 +22,25 @@ class Ref(Record, frozen=True, consed=True):
         segments = tuple(part for part in parts if part)
         if not segments:
             raise ValueError("Ref.from_str requires at least one segment")
-        return cls(segments=segments)
+        ref = cls(parent=None, member=segments[0])
+        for segment in segments[1:]:
+            ref = ref.member_ref(segment)
+        return ref
 
     @property
-    def parent(self) -> "Ref":
-        if len(self.segments) <= 1:
-            return Ref(segments=())
-        return Ref(segments=self.segments[:-1])
+    def segments(self) -> tuple[str, ...]:
+        if self.parent is None:
+            return (self.member,)
+        return self.parent.segments + (self.member,)
 
-    def member(self, name: str) -> "Ref":
-        return Ref(segments=self.segments + (name,))
+    def member_ref(self, name: str, *, params: Tuple[str, "Val"] = Tuple.EMPTY) -> "Ref":
+        return Ref(parent=self, member=name, params=params)
 
     def to_val(self) -> "Const":
-        return Const(meta=_std_ref_meta(), data=self.segments)
+        parent_data = None if self.parent is None else self.parent.to_val().data
+        params_data = tuple(p.data for p in self.params.values)
+        data = (parent_data, self.member, params_data)
+        return Const(meta=_ref_value_meta(self), data=data)
 
 
 class TypeForm(Record, frozen=True, consed=True, abstract=True): ...
@@ -40,8 +48,6 @@ class TypeForm(Record, frozen=True, consed=True, abstract=True): ...
 
 class Nominal(TypeForm, frozen=True, consed=True):
     ref: Ref
-    params: "Const"
-    schema: "Type | None"
 
 
 class Struct(TypeForm, frozen=True, consed=True):
@@ -104,12 +110,8 @@ class Var(Val, frozen=True, consed=True):
         assert isinstance(ident, str)
 
 
-def _empty_params() -> Const:
-    return Const(meta=Type(form=Struct(fields=Tuple.EMPTY)), data=())
-
-
 def _std_nominal(ref: Ref) -> Type:
-    return Type(form=Nominal(ref=ref, params=_empty_params(), schema=None))
+    return Type(form=Nominal(ref=ref))
 
 
 def _std_type_meta() -> Type:
@@ -139,8 +141,7 @@ def _typeform_tag_data(form: TypeForm) -> Data:
 def _encode_typeform(form: TypeForm) -> tuple[Data, Data]:
     tag_data = _typeform_tag_data(form)
     if isinstance(form, Nominal):
-        schema_data = None if form.schema is None else form.schema.to_val().data
-        payload: Data = (form.ref.to_val().data, form.params.data, schema_data)
+        payload: Data = form.ref.to_val().data
         return (tag_data, payload)
     if isinstance(form, Struct):
         index_data = tuple(form.fields.index.keys)
@@ -158,3 +159,27 @@ def _encode_typeform(form: TypeForm) -> tuple[Data, Data]:
     if isinstance(form, TypeVar):
         return (tag_data, form.id)
     raise TypeError(f"Unsupported TypeForm: {type(form)}")
+
+
+def _ref_value_meta(ref: Ref) -> Type:
+    if ref.parent is None:
+        parent_val = Const(meta=Type(form=Literal(None)), data=None)
+    else:
+        parent_val = ref.parent.to_val()
+
+    params_type_meta = Type(
+        form=Struct(
+            fields=Tuple(
+                index=ref.params.index,
+                values=tuple(_std_type_meta() for _ in ref.params.values),
+            )
+        )
+    )
+    params_type_val = Const(
+        meta=params_type_meta,
+        data=tuple(p.meta.to_val().data for p in ref.params.values),
+    )
+    std_ref_ref = Ref.from_str("std.Ref")
+    std_ref_params = Tuple.new(parent_val, params_type_val)
+    std_ref_ref = Ref(parent=std_ref_ref.parent, member=std_ref_ref.member, params=std_ref_params)
+    return Type(form=Nominal(ref=std_ref_ref))

@@ -231,9 +231,8 @@ class SegregatedOutlineNode(OutlineNode, frozen=True, abstract=True):
         cls, src_file: src.File, **kwargs
     ) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
         tree = cls.parse_outline_tree(src_file)
-        from rich import print
-
-        print(tree)
+        #from rich import print
+        #print(tree)
         self, more = cls.from_outline(tree, **kwargs)
         return (self, *more)
 
