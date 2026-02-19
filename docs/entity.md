@@ -159,83 +159,11 @@ The consolidation rules require:
 - resolvable overload sets.
 
 
-## Logical Rules (Datalog)
+## Logical System
 
-Entities may include logical facts and rules. These rules are used for
-inference (e.g. type resolution) and operate over the consolidated entity
-system. Rules are attached to entities and must remain consistent with their
-semantic behavior.
-
-The `where` block expresses constraints and logical relations; it does not
-classify an entity as extensional or intensional. Entities may mix explicit
-facts with derived facts, and `where` only constrains the rule semantics.
-
-The `where` block also establishes constraints for hyperparameters and
-type parameters, and may leave types to be inferred when omitted.
-
-### Logical System Overview
-
-Instances of entities are treated as facts in a logical universe. Rules are
-used to derive new facts, resolve types, and validate constraints. The logical
-system operates over primitive, canonical data encodings.
-
-Key points:
-
-- facts are instances of entities (extensional),
-- rules derive new facts (intensional),
-- entities can mix explicit facts and derived facts,
-- rules are evaluated on demand (experimental).
-
-### Facts (Instances)
-
-An entity instance provides a fact whose predicate is the entity ref and whose
-arguments are the slot values.
-
-Example entities:
-
-```
-def Person(name: string)
-def Parent(parent: Person, child: Person)
-```
-
-Example facts:
-
-```
-Person("alice")
-Person("bob")
-Parent("alice", "bob")
-```
-
-### Rules (where)
-
-Rules are expressed with `where` and can leave types to inference:
-
-```
-def grandchild(a, b)
-where
-  Parent(a, x)
-  Parent(x, b)
-```
-
-Rules can also constrain types explicitly:
-
-```
-def grandchild(a: Person, b: Person)
-where
-  Parent(a, x)
-  Parent(x, b)
-```
-
-Constraints inside `where` are treated as logical predicates and are used for
-type inference, overload routing, and validation.
-
-### Encoding
-
-The logical system only consumes primitive data:
-
-- `Ref` values are encoded as `Ref.to_val().data` (tuple of segments),
-- `Type` values are encoded as `Type.to_val().data`,
-- variables use the tagged encoding `("var", id)`.
+Logical inference, facts, rules, and queries are specified in
+`docs/logic-design.md`. This document focuses on entity consolidation,
+overload resolution, and runtime behavior.
 
 
 ## Examples

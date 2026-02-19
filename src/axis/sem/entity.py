@@ -65,6 +65,22 @@ class Entity(Record, frozen=True):
     facts: frozendict
     fact_contexts: frozendict
 
+    class View(Record, frozen=True):
+        base: "Entity"
+        ref: RefShape
+
+        @property
+        def overload_buckets(self):
+            return self.base.overload_buckets
+
+        @property
+        def members(self):
+            return self.base.members
+
+        @property
+        def facts(self):
+            return self.base.facts
+
     class Builder:
         def __init__(self, ref_shape: RefShape) -> None:
             self.ref_shape = ref_shape
@@ -158,3 +174,6 @@ class Entity(Record, frozen=True):
                     for args, contexts in self._fact_contexts.items()
                 }),
             )
+
+    def view(self, ref: RefShape) -> "Entity.View":
+        return Entity.View(base=self, ref=ref)

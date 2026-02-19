@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from itertools import combinations
-from typing import Iterable, Optional
+from typing import Iterable, Optional, TYPE_CHECKING, TypeAlias
 
 from protobase import Record, frozendict
 
@@ -12,9 +12,28 @@ from .ref_shape import RefShape
 from .shapes import SlotShape, TupleShape
 
 
+
 class Database(Record, frozen=True):
-    entities_by_shape: frozendict
-    members_by_scope: frozendict
+    type EntitiesByShape = frozendict[RefShape, Entity]
+    type MembersByScope = frozendict[RefShape, frozendict[str, RefShape]]
+
+    entities_by_shape: EntitiesByShape
+    members_by_scope: MembersByScope
+
+    def specialize(self, ref: RefShape) -> Entity.View | None:
+        base = self.entities_by_shape.get(ref)
+        if base is None:
+            base = next(
+                (
+                    entity
+                    for shape, entity in self.entities_by_shape.items()
+                    if shape.segments == ref.segments
+                ),
+                None,
+            )
+        if base is None:
+            return None
+        return base.view(ref)
 
     class Builder:
         def __init__(self) -> None:
@@ -72,94 +91,6 @@ class Database(Record, frozen=True):
                 case _:
                     raise ValueError(f"Unsupported ref expression: {node}")
 
-        def _slot_name_from_key(self, key: syn.Expr) -> Optional[str]:
-            if isinstance(key, expr.Sym):
-                return key.name
-            return str(key)
-
-        def shape_from_tuple(self, tup: expr.Tuple) -> TupleShape:
-            slots: list[SlotShape] = []
-            for pos, element in enumerate(tup.elements):
-                match element:
-                    case expr.Tuple.Positional(value=value):
-                        slots.append(SlotShape(name=None, pos=pos, bound=value))
-                    case expr.Tuple.Nominal(key=key, bound=bound, value=_):
-                        slots.append(
-                            SlotShape(
-                                name=self._slot_name_from_key(key),
-                                pos=pos,
-                                bound=bound,
-                            )
-                        )
-                    case _:
-                        raise ValueError(f"Unsupported tuple element: {element}")
-
-            return TupleShape(slots=tuple(slots))
-
-        def shape_from_expr(self, node: syn.Expr) -> TupleShape:
-            if isinstance(node, expr.Tuple):
-                return self.shape_from_tuple(node)
-            return TupleShape(slots=(SlotShape(name=None, pos=0, bound=node),))
-
-        def defaults_from_tuple(self, tup: expr.Tuple) -> tuple[int | str, ...]:
-            defaults: list[int | str] = []
-            for pos, element in enumerate(tup.elements):
-                match element:
-                    case expr.Tuple.Nominal(key=key, value=value) if value is not None:
-                        name = self._slot_name_from_key(key)
-                        defaults.append(name if name is not None else pos)
-            return tuple(defaults)
-
-        def _normalize_default_positions(
-            self, shape: TupleShape, defaults: Iterable[int | str]
-        ) -> tuple[int, ...]:
-            name_to_pos = {
-                slot.name: slot.pos for slot in shape.slots if slot.name is not None
-            }
-            positions: list[int] = []
-            for default in defaults:
-                if isinstance(default, int):
-                    positions.append(default)
-                else:
-                    pos = name_to_pos.get(default)
-                    if pos is None:
-                        continue
-                    positions.append(pos)
-            return tuple(dict.fromkeys(positions))
-
-        def _shape_without_positions(
-            self, shape: TupleShape, positions: set[int]
-        ) -> TupleShape:
-            slots = tuple(slot for slot in shape.slots if slot.pos not in positions)
-            return TupleShape(slots=slots)
-
-        def expand_default_shapes(
-            self, shape: TupleShape, defaults: Iterable[int | str]
-        ) -> tuple[TupleShape, ...]:
-            positions = self._normalize_default_positions(shape, defaults)
-            if not positions:
-                return (shape,)
-
-            expanded: list[TupleShape] = []
-            positions_list = list(positions)
-            for r in range(len(positions_list) + 1):
-                for combo in combinations(positions_list, r):
-                    expanded.append(self._shape_without_positions(shape, set(combo)))
-            return tuple(expanded)
-
-        def name_from_expr(self, node: syn.Expr) -> str:
-            match node:
-                case expr.Sym(name=name):
-                    return name
-                case expr.Member(name=name):
-                    return name
-                case expr.Index(origin=origin_expr):
-                    return self.name_from_expr(origin_expr)
-                case expr.Apply(function=function_expr):
-                    return self.name_from_expr(function_expr)
-                case _:
-                    return str(node)
-
         def scope_from_ctx(self, ctx: syn.Item) -> RefShape:
             parent = getattr(ctx, "parent", None)
             if isinstance(parent, syn.Item):
@@ -188,7 +119,7 @@ class Database(Record, frozen=True):
 
         def member(self, member_expr: syn.Expr, origin: syn.Node, ctx: syn.Item) -> None:
             scope = self.scope_from_ctx(ctx)
-            name = self.name_from_expr(member_expr)
+            name = _name_from_expr(member_expr)
             target = self.ref_shape_from_expr(member_expr, scope)
             self._members_by_scope.setdefault(scope, {})[name] = target
             self._builder(scope).add_member(name, target, origin, ctx)
@@ -202,22 +133,22 @@ class Database(Record, frozen=True):
             ctx: syn.Item,
         ) -> None:
             owner = self.ref_shape_from_expr(owner_expr, self.scope_from_ctx(ctx))
-            takes_shape = self.shape_from_expr(takes_expr)
+            takes_shape = _shape_from_expr(takes_expr)
             takes_defaults = (
-                self.defaults_from_tuple(takes_expr)
+                _defaults_from_tuple(takes_expr)
                 if isinstance(takes_expr, expr.Tuple)
                 else ()
             )
-            where_shape = self.shape_from_expr(where_expr) if where_expr else None
+            where_shape = _shape_from_expr(where_expr) if where_expr else None
             where_defaults = (
-                self.defaults_from_tuple(where_expr)
+                _defaults_from_tuple(where_expr)
                 if isinstance(where_expr, expr.Tuple)
                 else ()
             )
 
-            takes_shapes = self.expand_default_shapes(takes_shape, takes_defaults)
+            takes_shapes = _expand_default_shapes(takes_shape, takes_defaults)
             where_shapes = (
-                self.expand_default_shapes(where_shape, where_defaults)
+                _expand_default_shapes(where_shape, where_defaults)
                 if where_shape
                 else (None,)
             )
@@ -237,27 +168,27 @@ class Database(Record, frozen=True):
             ctx: syn.Item,
         ) -> None:
             owner = self.ref_shape_from_expr(owner_expr, self.scope_from_ctx(ctx))
-            takes_shape = self.shape_from_expr(takes_expr) if takes_expr else None
+            takes_shape = _shape_from_expr(takes_expr) if takes_expr else None
             takes_defaults = (
-                self.defaults_from_tuple(takes_expr)
+                _defaults_from_tuple(takes_expr)
                 if isinstance(takes_expr, expr.Tuple)
                 else ()
             )
-            where_shape = self.shape_from_expr(where_expr) if where_expr else None
+            where_shape = _shape_from_expr(where_expr) if where_expr else None
             where_defaults = (
-                self.defaults_from_tuple(where_expr)
+                _defaults_from_tuple(where_expr)
                 if isinstance(where_expr, expr.Tuple)
                 else ()
             )
-            returns_shape = self.shape_from_expr(returns_expr)
+            returns_shape = _shape_from_expr(returns_expr)
 
             takes_shapes = (
-                self.expand_default_shapes(takes_shape, takes_defaults)
+                _expand_default_shapes(takes_shape, takes_defaults)
                 if takes_shape
                 else (None,)
             )
             where_shapes = (
-                self.expand_default_shapes(where_shape, where_defaults)
+                _expand_default_shapes(where_shape, where_defaults)
                 if where_shape
                 else (None,)
             )
@@ -297,3 +228,95 @@ class Database(Record, frozen=True):
                 entities_by_shape=frozendict(entities),
                 members_by_scope=frozendict(members_by_scope),
             )
+
+
+def _slot_name_from_key(key: syn.Expr) -> Optional[str]:
+    if isinstance(key, expr.Sym):
+        return key.name
+    return str(key)
+
+
+def _shape_from_tuple(tup: expr.Tuple) -> TupleShape:
+    slots: list[SlotShape] = []
+    for pos, element in enumerate(tup.elements):
+        match element:
+            case expr.Tuple.Positional(value=value):
+                slots.append(SlotShape(name=None, pos=pos, bound=value))
+            case expr.Tuple.Nominal(key=key, bound=bound, value=_):
+                slots.append(
+                    SlotShape(
+                        name=_slot_name_from_key(key),
+                        pos=pos,
+                        bound=bound,
+                    )
+                )
+            case _:
+                raise ValueError(f"Unsupported tuple element: {element}")
+
+    return TupleShape(slots=tuple(slots))
+
+
+def _shape_from_expr(node: syn.Expr) -> TupleShape:
+    if isinstance(node, expr.Tuple):
+        return _shape_from_tuple(node)
+    return TupleShape(slots=(SlotShape(name=None, pos=0, bound=node),))
+
+
+def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
+    defaults: list[int | str] = []
+    for pos, element in enumerate(tup.elements):
+        match element:
+            case expr.Tuple.Nominal(key=key, value=value) if value is not None:
+                name = _slot_name_from_key(key)
+                defaults.append(name if name is not None else pos)
+    return tuple(defaults)
+
+
+def _normalize_default_positions(
+    shape: TupleShape, defaults: Iterable[int | str]
+) -> tuple[int, ...]:
+    name_to_pos = {slot.name: slot.pos for slot in shape.slots if slot.name is not None}
+    positions: list[int] = []
+    for default in defaults:
+        if isinstance(default, int):
+            positions.append(default)
+        else:
+            pos = name_to_pos.get(default)
+            if pos is None:
+                continue
+            positions.append(pos)
+    return tuple(dict.fromkeys(positions))
+
+
+def _shape_without_positions(shape: TupleShape, positions: set[int]) -> TupleShape:
+    slots = tuple(slot for slot in shape.slots if slot.pos not in positions)
+    return TupleShape(slots=slots)
+
+
+def _expand_default_shapes(
+    shape: TupleShape, defaults: Iterable[int | str]
+) -> tuple[TupleShape, ...]:
+    positions = _normalize_default_positions(shape, defaults)
+    if not positions:
+        return (shape,)
+
+    expanded: list[TupleShape] = []
+    positions_list = list(positions)
+    for r in range(len(positions_list) + 1):
+        for combo in combinations(positions_list, r):
+            expanded.append(_shape_without_positions(shape, set(combo)))
+    return tuple(expanded)
+
+
+def _name_from_expr(node: syn.Expr) -> str:
+    match node:
+        case expr.Sym(name=name):
+            return name
+        case expr.Member(name=name):
+            return name
+        case expr.Index(origin=origin_expr):
+            return _name_from_expr(origin_expr)
+        case expr.Apply(function=function_expr):
+            return _name_from_expr(function_expr)
+        case _:
+            return str(node)

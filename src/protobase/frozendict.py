@@ -1,7 +1,6 @@
 from typing import Mapping, Optional, Self
 from protobase.inmutable import inmutable
 
-@inmutable
 class frozendict[K, V](dict[K, V]): # IDEA: utilizar dict view
     
 
@@ -66,6 +65,8 @@ class frozendict[K, V](dict[K, V]): # IDEA: utilizar dict view
             d = {}
         return self.__class__(self, **d, **kwargs)
 
+inmutable(frozendict)
 
 if __name__ == "__main__":
     ...
+
