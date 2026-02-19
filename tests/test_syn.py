@@ -2,10 +2,8 @@
 import unittest
 from decimal import Decimal
 
-from rich import print
-
 from axis import expr
-from axis import sem, src, syn
+from axis import items, syn
 
 # SRCBLOCK_SPEC_PATH = Path("src/axis/codebase/grammar/srcblock-spec.yaml")
 # SOURCE_UNIT_PATH = Path("src/std.base.tests.src/test.ax")
@@ -67,7 +65,7 @@ class ExprReificationTest(unittest.TestCase):
 
     def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
         if isinstance(expected, str):
-            expected = syn.Expr.parse(expected)
+            expected = syn.Expr.from_str(expected)
         self.assertEqual(expr, expected)
 
     def test_reify(self):
@@ -96,6 +94,14 @@ class ExprReificationTest(unittest.TestCase):
 
 # scoping = sem.ScopingPass(None, std.Sym.ROOT)
 # scoping.process_item(unit)
+
+
+class DatabaseSmokeTest(unittest.TestCase):
+    def test_database_build(self):
+        pkg = items.Package.from_path("codebase/std-core")
+        db = pkg.database
+        self.assertGreater(len(db.entities_by_shape), 0)
+        self.assertGreater(len(db.members_by_scope), 0)
 
 
 # def test_parser(self):

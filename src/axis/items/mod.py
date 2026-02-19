@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from axis import syn, items
+from axis import syn
 
 
 class Mod(syn.SegregatedItem, frozen=True):
@@ -21,7 +21,7 @@ class Mod(syn.SegregatedItem, frozen=True):
 
     #pkg: items.Package
 
-    path: syn.Expr
+    path: syn.Expr | None = None
 
     @classmethod
     def build(
@@ -36,6 +36,12 @@ class Mod(syn.SegregatedItem, frozen=True):
     ):
         # procesa imports desde children
         return cls(path=path, **kwargs)
+
+    def contribute(self, collector) -> None:
+        if self.path is None:
+            return
+        collector.namespace(self.path, origin=self.path, ctx=self)
+        collector.member(self.path, origin=self, ctx=self)
 
     # class Binding(sem.Binding):
     #     item: Mod

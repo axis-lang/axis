@@ -1,7 +1,8 @@
 from typing import Self
-from protobase import Record, cached_property
+from protobase import Record
 
-from axis import src, syn, val
+from axis import src, syn
+from axis.sem import Database
 #from .index import GlobalIndex
 
 class Package(Record, frozen=True):
@@ -31,12 +32,20 @@ class Package(Record, frozen=True):
         return items.Unit.from_file(file)#, pkg=self)
 
     @property
-    def all_items(self) -> frozenset[syn.SegregatedOutlineNode]:
+    def all_items(self):
         return frozenset(
             item
             for path in self.source_paths
             for item in self.file_items(path)
         )
+
+    @property
+    def database(self):
+        collector = Database.Builder()
+        for item in self.all_items:
+            if hasattr(item, "contribute"):
+                item.contribute(collector)  # type: ignore[attr-defined]
+        return collector.build()
 
 
     # @property

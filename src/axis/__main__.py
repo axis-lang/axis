@@ -1,9 +1,10 @@
 # %%
 from rich import print
-from axis import sem, src, syn, val, expr, items
+from axis import syn, val, items
 
 
-pkg = items.Package.from_path('codebase/std-core')
+pkg = items.Package.from_path("codebase/std-core")
+db = pkg.database
 
 eval = val.Evaluator()
 
@@ -13,8 +14,15 @@ def print_eval(str: str):
 def print_syn(str: str):
     print(syn.Expr.from_str(str))
 
-for item in pkg.all_items:
-    print(item)
+print("database.entities", len(db.entities_by_shape))
+print("database.namespaces", len(db.members_by_scope))
+
+std_entity = next(
+    (entity for ref, entity in db.entities_by_shape.items() if ref.segments == ("std",)),
+    None,
+)
+if std_entity is not None:
+    print("std.members", tuple(std_entity.members.keys()))
   
 print_eval(
     """

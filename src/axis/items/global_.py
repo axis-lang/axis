@@ -1,8 +1,6 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
-from axis import syn
 
-from typing import ClassVar, Literal
 from axis import syn
 
 
@@ -14,9 +12,9 @@ class Global(syn.SegregatedItem, frozen=True, abstract=True): ## expr.Tuple.Nomi
     """
     outline_keyword: ClassVar[Literal["val", "var", "let", "dyn", "mut"]]
 
-    key: syn.Expr
-    bound: Optional[syn.Expr]
-    value: Optional[syn.Expr]
+    key: syn.Expr | None = None
+    bound: Optional[syn.Expr] = None
+    value: Optional[syn.Expr] = None
 
     @classmethod
     def build(
@@ -47,6 +45,14 @@ class Global(syn.SegregatedItem, frozen=True, abstract=True): ## expr.Tuple.Nomi
                     f"Invalid syntax for named element: {key} {args}"
                 )
 
+    def contribute(self, collector) -> None:
+        if self.key is None:
+            return
+        if self.value is not None:
+            collector.fact(self.key, (self.value,), origin=self.value, ctx=self)
+        if self.bound is not None:
+            collector.constraint(self.key, self.bound, origin=self.bound, ctx=self)
+
 class Val(Global, frozen=True):
     outline_keyword: ClassVar = "val"
 
@@ -61,4 +67,3 @@ class Dyn(Global, frozen=True):
 
 class Mut(Global, frozen=True):
     outline_keyword: ClassVar = "mut"
-

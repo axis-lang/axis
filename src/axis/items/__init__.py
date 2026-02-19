@@ -15,4 +15,3 @@ Unit.register_outline_children(Mod, must_be_indented=False)
 Unit.register_outline_children(blocks.Use, must_be_indented=False)
 Unit.register_outline_children(Def, must_be_indented=False)
 Unit.register_outline_children(Val, must_be_indented=False)
-

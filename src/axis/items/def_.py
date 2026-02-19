@@ -11,13 +11,13 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
     class Takes(TupleBlock, frozen=True):  # ExprBlock
         outline_keyword: ClassVar = "takes"
-        expr: Optional[syn.Expr]
+        expr: Optional[syn.Expr] = None
 
         @classmethod
         def build(
             cls,
-            kw: Literal["takes"],
-            *args: Optional[tuple[syn.Expr, Literal[":"]]],
+            kw: str,
+            *args,
             **kwargs,
         ):
             match args:
@@ -32,7 +32,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
     class Returns(syn.Block, frozen=True):
         outline_keyword: ClassVar = "returns"
-        expr: syn.Expr
+        expr: syn.Expr | None = None
 
         @classmethod
         def build(
@@ -67,8 +67,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     }
 
     # pkg: items.Package
-    expr: syn.Expr
-
+    expr: syn.Expr | None = None
     where: Optional[Where] = None
     takes: tuple[Takes, ...] = ()
     returns: tuple[Returns, ...] = ()
@@ -125,6 +124,53 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
         return cls(
             expr=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
         )
+
+    def contribute(self, collector) -> None:
+        if self.expr is None:
+            return
+
+        where_expr = self.where
+        if self.takes:
+            for takes in self.takes:
+                takes_expr = takes.expr
+                if takes_expr is None:
+                    continue
+                collector.overload(
+                    self.expr,
+                    takes_expr,
+                    where_expr,
+                    origin=takes_expr,
+                    ctx=self,
+                )
+
+                if self.returns:
+                    for ret in self.returns:
+                        if ret.expr is None:
+                            continue
+                        collector.returns(
+                            self.expr,
+                            takes_expr,
+                            where_expr,
+                            ret.expr,
+                            origin=ret.expr,
+                            ctx=self,
+                        )
+        elif self.returns:
+            for ret in self.returns:
+                if ret.expr is None:
+                    continue
+                collector.returns(
+                    self.expr,
+                    None,
+                    where_expr,
+                    ret.expr,
+                    origin=ret.expr,
+                    ctx=self,
+                )
+
+        if self.where is not None:
+            for elem in self.where.elements:
+                collector.constraint(self.expr, elem, origin=elem, ctx=self)
 
     # def ingest(self, ingestor: Ingestor):
     #     ...
@@ -224,7 +270,7 @@ class ClassDef(Def, frozen=True):
 
     # spec son 
 
-    sym: expr.Sym
+    sym: expr.Sym | None = None
     spec: Optional[expr.Tuple] = None
     args: Optional[expr.Tuple] = None
 
@@ -238,10 +284,10 @@ class QualDef(Def, frozen=True):
         syn.Expr.from_str("$sym@Sym[..$spec@Tuple] $target"),
     )
 
-    sym: expr.Sym
+    sym: expr.Sym | None = None
     # target y spec son parametros (takes)
     spec: Optional[expr.Tuple] = None
-    target: syn.Expr
+    target: syn.Expr | None = None
 
 
 # class CohertionDef(Def, frozen=True):
