@@ -1,3 +1,5 @@
+# Modelado y metadatos
+
 ```
 
 DateTime
@@ -21,5 +23,10 @@ MyObject
 
 
 
-
 ```
+
+Un modelador de datos abstracto, mas alla del objeto.
+# Types and StereoTypes (interfaces)
+
+
+

@@ -1,12 +1,13 @@
-# Syntax
+# Sintaxis y patrones
+
+## Callable e indexable
 
 Callable e indexable
 
 indexable [Key]:> Value
 callable (Arg1, Arg2, Arg3):> Value
 
-
-## deestructuring Patterns
+## Deestructuring Patterns
 
 ### Object destructuring
 

@@ -1,10 +1,9 @@
-# Pattern maching is dispatching.
+# Semantica y resolucion
 
+## Pattern maching is dispatching.
 
-## Optimization
-
-Dado el conjunto de soluciones 'S' donde cada solucion es definida por un conjunto de condiciones 'C'. Se puede definir un algoritmo por el cual comprobar si T tiene solucion en S practicando una busqueda en un arbol binario del conjunto de condiciones.
-
+### Optimization
+Dado el conjunto de soluciones "S" donde cada solucion es definida por un conjunto de condiciones "C". Se puede definir un algoritmo por el cual comprobar si T tiene solucion en S practicando una busqueda en un arbol binario del conjunto de condiciones.
 
 ```axis
 
@@ -15,8 +14,6 @@ match v:
 
 
 ```
-
-
 
 Aproximacion 1: A cada condicion se le asigna un peso igualal numero de soluciones que la requieren para ser evaluada*
 
@@ -29,3 +26,6 @@ Aproximacion 2: A cada solucion se le asigna un peso en funcion de la frecuencia
 
 
 *Manejo de ambiguedad*
+
+## Semantic scoping
+Construye el arbol de entidades y espacios de nombres.

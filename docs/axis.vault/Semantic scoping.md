@@ -1,1 +1,0 @@
-Construye el árbol de entidades y espacios de nombres.

@@ -1,3 +1,58 @@
+# Experimentos y prototipos
+
+```
+
+conexion y unificacion entre "generico" y "abstracto"
+
+
+
+```
+
+```python
+#%%
+"""
+map reduce eample
+
+def Axis(
+    length: Option Natural = None
+)
+
+def Collection[
+  ..axis: Tuple Axis
+]
+
+einsum = map_reduce.with(map=mul, reduce=sum)
+
+"""
+from protobase import Object, Record
+
+class Collection(Record, frozen=True):
+    axis: dict[str, int]
+
+
+def map_reduce(*inputs: Collection, map, reduce) -> Collection:
+    ...
+
+    
+
+```
+
+```python
+#%%
+from axis import syn
+from axis import _std
+from rich import print
+
+e = syn.Expr.parse('Array[t:0..1, m:nat, n:nat] Real')
+e = syn.Expr.parse('.. Disposition[key:String, t:Slice Nat, ] ..')
+
+
+
+
+print(e)
+```
+
+```python
 #%%
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -236,3 +291,4 @@ def meet(a: TypeExpr, b: TypeExpr, oracle: SubtypingOracle) -> TypeNF:
             K = inter_prune(frozenset(set(I) | set(J)), oracle)
             if K is not None: out.add(K)
     return union_prune(frozenset(out), oracle)
+```
