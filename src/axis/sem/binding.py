@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Iterable, Optional, Self
 from protobase import Record
-from axis import syn, val, sem
+from axis import syn, dom, sem
 
 from .scope import Scope
 
@@ -30,7 +30,7 @@ class Binding(Record, frozen=True, abstract=True):
             yield from cls.generate_from(subitem, pkg=pkg, parent=binding)
 
     @property
-    def ref(self) -> val.Ref:
+    def ref(self) -> dom.Ref:
         raise NotImplementedError(f"Binding.ref not implemented in {type(self)}")
 
     @property 

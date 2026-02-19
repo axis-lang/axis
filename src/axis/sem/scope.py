@@ -5,7 +5,7 @@ from xml.sax.handler import EntityResolver
 
 from protobase import Record, frozendict, inmutable
 
-from axis import syn, val, log, sem
+from axis import syn, dom, log, sem
 
 
 
@@ -16,8 +16,8 @@ class Scope(Record, frozen=True):
     """
     #class Entry(Record, frozen=True):
     type Key = str
-    type Value = val.Ref
-    type Entry = val.Ref
+    type Value = dom.Ref
+    type Entry = dom.Ref
         
 
     class Builder(Record):

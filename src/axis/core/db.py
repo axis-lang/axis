@@ -1,6 +1,6 @@
 from protobase import Record
 
-from axis import val
+from axis import dom
 
 
 class GlobalIndex(Record):
@@ -13,5 +13,4 @@ class GlobalIndex(Record):
 
 class Database(Record):
 
-    global_indices: dict[val.GlobalPath, GlobalIndex]
-
+    global_indices: dict[dom.Ref, GlobalIndex]

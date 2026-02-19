@@ -2,19 +2,19 @@ from functools import cached_property
 from typing import Self, Sequence
 from protobase import Record, frozendict
 
-from axis import src, val, syn
+from axis import src, dom, syn
 from .binding import Binding
 
 class GlobalIndex(Record, frozen=True):
 
     class Entry(Record, frozen=True):
-        ref: val.Ref
-        children: frozenset[val.Ref]
-        bindings: tuple[Binding]
+        ref: dom.Ref
+        children: frozenset[dom.Ref]
+        bindings: tuple[Binding, ...]
 
     @classmethod
     def from_bindings(cls, bindings: Sequence[Binding]) -> Self:
-        entry_map: dict[val.Ref, tuple[list[Binding], list[val.Ref]]] = {}
+        entry_map: dict[dom.Ref, tuple[list[Binding], list[dom.Ref]]] = {}
         for binding in bindings:
             ref = binding.ref
 
@@ -35,7 +35,7 @@ class GlobalIndex(Record, frozen=True):
             )
         )
 
-    entries: frozendict[val.Ref, Entry]
+    entries: frozendict[dom.Ref, Entry]
 
 
 # # la tabla de bindings es para cada package (por sus dependencias y definiciones propias)

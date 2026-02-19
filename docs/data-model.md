@@ -308,16 +308,28 @@ Top-level encoding:
 
 Where:
 - `qualifiers_data = tuple(q.to_val().data for q in qualifiers)`
-- `form_data = (tag, payload)` following the union encoding
+- `form_data = (tag_data, payload)` following the union encoding
+
+Tag encoding:
+
+- `tag_data` is always a primitive `Data` value.
+- Each `TypeForm` tag is represented by a `Ref` and encoded as `Ref.to_val().data`.
+- Current tag refs:
+  - `std.Type.Nominal`
+  - `std.Type.Struct`
+  - `std.Type.Function`
+  - `std.Type.Union`
+  - `std.Type.Literal`
+  - `std.Type.Var`
 
 TypeForm encodings:
 
-- `Nominal(ref, params, schema)` => `( "nominal", (ref.to_val().data, params.data, schema_data) )`
-- `Struct(fields)` => `( "struct", (index_data, fields_data) )`
-- `Function(args, ret)` => `( "fn", (args_data, ret_data) )`
-- `Union(members)` => `( "union", (members_data,) )`
-- `Literal(value)` => `( "lit", value )`
-- `Var(id)` => `( "var", id )`
+- `Nominal(ref, params, schema)` => `( Ref("std.Type.Nominal").to_val().data, (ref.to_val().data, params.data, schema_data) )`
+- `Struct(fields)` => `( Ref("std.Type.Struct").to_val().data, (index_data, fields_data) )`
+- `Function(args, ret)` => `( Ref("std.Type.Function").to_val().data, (args_data, ret_data) )`
+- `Union(members)` => `( Ref("std.Type.Union").to_val().data, (members_data,) )`
+- `Literal(value)` => `( Ref("std.Type.Literal").to_val().data, value )`
+- `Var(id)` => `( Ref("std.Type.Var").to_val().data, id )`
 
 Where:
 - `index_data = tuple(index.keys)`
