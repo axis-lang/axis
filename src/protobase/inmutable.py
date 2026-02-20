@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from re import Pattern
 from types import GenericAlias, UnionType
-from typing import Self, get_args, get_origin, Union, TypeAliasType, TypeVar
+from typing import ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar
 
 
 _INMUTABLE_TYPES: set[type] = {
@@ -67,9 +67,21 @@ def is_inmutable(cls: type) -> bool:
     return False
 
 
-def check_inmutable(tp: GenericAlias | type):
+def check_inmutable(tp: GenericAlias | type, _seen_aliases: set[TypeAliasType] | None = None):
+    if _seen_aliases is None:
+        _seen_aliases = set()
+
     if isinstance(tp, TypeAliasType):
+        if tp in _seen_aliases:
+            return
+        _seen_aliases.add(tp)
         tp = tp.__value__
+
+    if isinstance(tp, ForwardRef):
+        return
+
+    if isinstance(tp, str):
+        return
 
     if tp in (Self, Ellipsis):
         return # a priori lo damos por bueno
@@ -80,10 +92,10 @@ def check_inmutable(tp: GenericAlias | type):
 
     if isinstance(tp, TypeVar):
         if tp.__bound__ is not None:
-            check_inmutable(tp.__bound__)
+            check_inmutable(tp.__bound__, _seen_aliases)
         if tp.__constraints__:
             for constraint in tp.__constraints__:
-                check_inmutable(constraint)
+                check_inmutable(constraint, _seen_aliases)
         return
 
     # if isinstance(tp, GenericAlias):
@@ -94,7 +106,7 @@ def check_inmutable(tp: GenericAlias | type):
     
     if isinstance(tp, UnionType) or get_origin(tp) is Union:
         for arg in get_args(tp):
-            check_inmutable(arg)
+            check_inmutable(arg, _seen_aliases)
         return
     
     
@@ -109,7 +121,15 @@ def check_inmutable(tp: GenericAlias | type):
     if origin is None:
         raise TypeError(f"Type '{tp}' is not a know inmutable.")
 
-    if not is_inmutable(origin):
+    if isinstance(origin, TypeAliasType):
+        check_inmutable(origin, _seen_aliases)
+        return
+
+    if not isinstance(origin, type):
+        raise TypeError(f"Type '{tp}' is not a know inmutable.")
+
+    origin_type = cast(type, origin)
+    if not is_inmutable(origin_type):
         raise TypeError(f"Type '{tp}' is not a know inmutable.")
     
     #check_inmutable(origin)
@@ -119,7 +139,7 @@ def check_inmutable(tp: GenericAlias | type):
         args = tp.__args__
 
     for arg in args:
-        check_inmutable(arg)
+        check_inmutable(arg, _seen_aliases)
 
     #raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")
     

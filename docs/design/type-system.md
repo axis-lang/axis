@@ -1,11 +1,35 @@
 # Sistema de tipos y cualificadores
 
+Nota: el sistema de cualificadores esta en pausa mientras se rediseña.
+
 ## Tipos y cualificadores
 
 ```
 
 def None = 
 def Optional $T = $T | None
+```
+
+## Algebra de tipos: referencias, indices y aplicacion
+
+Valores (expresiones) del algebra de tipos. Cuando los valores actuan como
+tipos algebraicos, se evalua lo siguiente:
+
+- una referencia a una entidad engloba a cualquier construccion posible de esa entidad
+- un indice a una entidad selecciona total o parcialmente las construcciones de la entidad
+  en las que los valores genericos quedan atados
+- una aplicacion a una entidad indica un tipo de construccion especifico de la entidad
+
+Ejemplos:
+
+```rust
+Entity[bitlength: 0..32]      // atado a dominio
+Entity[bitlength=32]          // atado a valor
+Entity[bitlength:0..32=BL]    // atado a dominio y asignado a variable
+
+Entity(value: str)            // la propiedad value esta atada a str
+Entity(name='foo')            // la propiedad name esta asignada a 'foo'
+Entity(name: Rex('[a-zA-Z_][a-zA-Z0-9_]*')) // expresion regular
 ```
 
 ### Propagation throught qualifiers

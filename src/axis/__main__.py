@@ -81,15 +81,15 @@ origin_entity = find_entity("sandbox", "demo", "origin")
 if origin_entity is not None:
     print("sandbox.demo.origin.facts", len(origin_entity.facts))
   
-# print_eval(
-#     """
-#     (
-#         (1,0,0),
-#         (0,1,0),
-#         (0,0,1),
-#     )
-#     """
-# )
+print_eval(
+    """
+    (
+        (1,0,0),
+        (0,1,0),
+        (0,0,1),
+    )
+    """
+)
 
 # zip
 # (..(a,b)): (..a, ..b) = ((1,2,3), (4,5,6))

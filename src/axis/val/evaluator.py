@@ -8,8 +8,8 @@ from functools import singledispatchmethod
 
 class Evaluator(Record, frozen=True):
     # type Bound = type
-    type EvalResult = tuple[dom.Type, object]
-    type EnvValue = dom.Val | EvalResult
+    type EvalResult = tuple[dom.Type, dom.Data]
+    type EnvValue = dom.ValueBase | EvalResult
 
     env: frozendict = frozendict()
 
@@ -21,8 +21,8 @@ class Evaluator(Record, frozen=True):
         return mutate(self, env=_coerce_env(env))
 
     def __call__(self, node: syn.Node) -> dom.Val:
-        meta, data = self.eval(node)
-        return dom.Const(meta=meta, data=data)
+        type_, data = self.eval(node)
+        return dom.Val(type=type_, data=cast(dom.Data, data))
 
     def boolean(self, value: bool) -> EvalResult:
         return _builtin_nominal("Boolean"), value
@@ -42,10 +42,15 @@ class Evaluator(Record, frozen=True):
     def text(self, value: str) -> EvalResult:
         return _builtin_nominal("Text"), value
 
-    def struct(self, keys: Iterable[object], bounds: Iterable[dom.Type], values: Iterable[object]):
-        index = dom.Index(tuple(cast(object, k) for k in keys))
-        fields = dom.Tuple(index=index, values=tuple(bounds))
-        struct = dom.Type(form=dom.Struct(fields=fields))
+    def struct(
+        self,
+        keys: Iterable[str | None],
+        bounds: Iterable[dom.Type],
+        values: Iterable[dom.Data],
+    ):
+        index = cast(dom.Index[str | None], dom.Index(tuple(cast(str | None, k) for k in keys)))
+        fields = cast(dom.Tuple[str | None, dom.Type], dom.Tuple(index=index, values=tuple(bounds)))
+        struct = dom.StructType(fields=cast(dom.Tuple[str | None, dom.Type], fields))
         return struct, tuple(values)
 
     def _error(self, node: syn.Node, message: str):
@@ -59,8 +64,8 @@ class Evaluator(Record, frozen=True):
         if key not in self.env:
             self._error(sym, f"Unbound symbol: {key}")
         value = self.env[key]
-        if isinstance(value, dom.Val):
-            return value.meta, value.data
+        if isinstance(value, dom.ValueBase):
+            return value.type, _env_data(value)
         if isinstance(value, tuple) and len(value) == 2:
             return value  # type: ignore[return-value]
         raise TypeError(f"Invalid env value for {key}: {type(value)}")
@@ -90,25 +95,18 @@ class Evaluator(Record, frozen=True):
 
 @Evaluator.impl(expr.Lit)
 def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
-    match node.value:
-        case bool() as b:
-            return evaluator.boolean(b)
-        case int() as i:
-            return evaluator.integer(i)
-        case float() as f:
-            return evaluator.decimal(Decimal(f))
-        case str() as s:
-            return evaluator.text(s)
-        case Decimal() as d:
-            return evaluator.decimal(d)
-    raise NotImplementedError(f"Literal of type {type(node.value)} not implemented")
+    value = node.value
+    if isinstance(value, float):
+        value = Decimal(value)
+    literal = dom.Val.from_literal(value)
+    return literal.type, literal.data
 
 
 @Evaluator.impl(expr.Tuple)
 def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.EvalResult:
-    keys: list[object] = []
+    keys: list[str | None] = []
     bounds: list[dom.Type] = []
-    values: list[object] = []
+    values: list[dom.Data] = []
 
     for element in node.elements:
         match element:
@@ -181,7 +179,7 @@ def eval_productive(evaluator: Evaluator, node: expr.Productive) -> Evaluator.Ev
 
 @Evaluator.impl(expr.Sign)
 def eval_sign(evaluator: Evaluator, node: expr.Sign) -> Evaluator.EvalResult:
-    meta, value = evaluator.eval(node.rhs)
+    type_, value = evaluator.eval(node.rhs)
     op = node.op.symbol.value
 
     match op:
@@ -237,8 +235,10 @@ def _coerce_env(env: Mapping[str, "Evaluator.EnvValue"]) -> frozendict:
 
 
 def _builtin_nominal(name: str) -> dom.Type:
-    return dom.Type(
-        form=dom.Nominal(
-            ref=dom.Ref.from_str(f"std.{name}"),
-        )
-    )
+    return dom.NominalType.from_str(f"std.{name}")
+
+
+def _env_data(value: dom.ValueBase) -> dom.Data:
+    if hasattr(value, "data"):
+        return cast(dom.Data, getattr(value, "data"))
+    raise TypeError("Env values must carry data")

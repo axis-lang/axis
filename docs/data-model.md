@@ -6,7 +6,7 @@ This document specifies the domain data model used by Axis during parsing,
 partial evaluation, type resolution, and final evaluation.
 
 The core idea is a strict separation between:
-- the descriptor of a datum (`Meta`), and
+- the descriptor of a datum (`Type`), and
 - the datum itself (`Data`).
 
 All values in the language flow as `Val`, even in partial and lazy phases.
@@ -16,29 +16,33 @@ All values in the language flow as `Val`, even in partial and lazy phases.
 
 ### Value
 
-`Val` represents a value in the language. It is immutable and hash-consed.
+`ValueBase` represents a value in the language. It is immutable and hash-consed.
 
-- `meta`: a descriptor that defines the shape/meaning of the value.
-- `data`: the underlying datum (always primitive).
+- `type`: a descriptor that defines the shape/meaning of the value.
+- `data`: the underlying datum (only present on concrete values).
 
-`Val` is the only container used across evaluation phases.
+`ValueBase` is the only container used across evaluation phases. `Val` is the
+general-purpose concrete value type.
 
 Serialization principle:
 
 - `data` is the serialized, canonical form.
-- `meta` is the deserialized, structural form.
+- `type` is the deserialized, structural form.
 
 Concrete variants:
-- `Const`: a known value with concrete data.
+- `Const`: a known value with concrete data (abstract base).
+- `Val`: literal/general-purpose value.
+- `Meta`: literal value representing a `Type` directly.
 - `Var`: a placeholder value with stable identity.
 
 
 ### Const and Var
 
-`Const` and `Var` are the two concrete forms of `Val`.
+`Const` and `Var` are concrete forms of `ValueBase` (with `Const` as an
+abstract base and `Val`/`Meta` as concrete implementations).
 
-- `Const` always contains concrete, immutable data.
-- `Var` represents an unknown value that is still well-typed.
+`Const` always contains concrete, immutable data.
+`Var` represents an unknown value that is still well-typed.
 
 `Var` is used for generics and placeholders. It does not carry AST or runtime
 environments.
@@ -52,9 +56,9 @@ Canonical encoding for `Var` data:
 
 Type-level vs value-level placeholders:
 
-- `Type.Var("T")` is a type-level placeholder.
-- `Var(meta=Type(form=Var("T")), data=("var", "T"))` is a value placeholder
-  typed by that `Type.Var`.
+- `Type.var("T")` is a type-level placeholder.
+- `Var(type=VarType("T"), data=("var", "T"))` is a value placeholder
+  typed by that `Type.var`.
 
 Var and context:
 
@@ -66,10 +70,10 @@ Var and context:
 ### Data
 
 `Data` is a primitive, structural representation. It does not encode meaning.
-The meaning is entirely in `Meta`.
+The meaning is entirely in `Type`.
 
 Base forms:
-- `Atom`: `int | float | str | bool | None`
+- `Atom`: `int | float | Decimal | str | bool | None`
 - `tuple`
 - `frozenset`
 - `frozendict`
@@ -81,80 +85,74 @@ Default encoding preference:
 `Data` does not include executable structures.
 
 
-### Meta
+### Type
 
-`Meta` is univocal and represented by a single class: `Type`.
-All descriptors in the system are instances of `Type`.
+`Type` is the descriptor class for values. All descriptors in the system are
+instances of a closed set of `Type` variants.
 
 `Type` is immutable, hash-consed, and independent of runtime values or AST.
 
 
-#### Meta Principles
+#### Type Principles
 
-- Canonical and hash-consed: equal metas are a single shared instance.
-- Context-free: a meta does not depend on runtime values or AST nodes.
-- Descriptive only: meta defines the domain and invariants of `data`.
-- Stable across phases: meta can be used for dispatch, unification, and
+- Canonical and hash-consed: equal types are a single shared instance.
+- Context-free: a type does not depend on runtime values or AST nodes.
+- Descriptive only: type defines the domain and invariants of `data`.
+- Stable across phases: type can be used for dispatch, unification, and
   constraint solving independently of evaluation phase.
 
 
-#### Meta and Val
+#### Qualifiers
 
-- `Val` carries one `meta` and one `data`.
-- `meta` is created once; many values share it.
-- `data` is shaped by `meta` but does not carry meaning by itself.
+A qualifier is a `Type` that wraps an underlying type. It is used to express
+qualified values while keeping the type system explicit.
 
-Two meta-operations are defined:
-
-- serialize (reflection): convert meta to data by using `Type.to_val()` and
-  `Ref.to_val()` canonical encodings.
-- reify (deserialization): convert data back into meta by reconstructing
-  `Type`/`Ref` (potentially creating new meta instances).
-
-Planned API surface in `axis.dom`:
-
-- `Ref.from_val(data)` / `Ref.from_data(data)`
-- `Type.from_val(data)` / `Type.from_data(data)`
+- `Qualifier(underlying)` is an abstract base.
+- `NominalQualifier(ref, underlying)` is the concrete qualifier used today.
 
 
-#### Type and TypeForm
+#### Type and Values
 
-`Type` is the single meta class. It is parameterized by:
-- `qualifiers: tuple[Type, ...]` (ordered, can repeat)
-- `form: TypeForm`
+- `ValueBase` carries one `type`.
+- `Const` is an abstract literal base; concrete literal values (`Val`, `Ref`) carry `data`.
+- `Meta` is a literal value with no data; it represents a `Type` as a value.
+- `Var` is a non-literal value used in patterns and bounds.
+- `type` is created once; many values share it.
+- `data` is shaped by `type` but does not carry meaning by itself.
+
+
+#### Type and Variants
+
+`Type` is the single descriptor class. It is abstract and specialized by
+variants.
 
 `std.Type` reflects the same model as `axis.dom.Type`.
 
-Standard nominal types:
+Variants:
 
-- `std.Type` has no parameters; nominal parameters live in `Ref` when needed.
-- Its `schema` is computed from the `Ref` and may be omitted when opaque.
-- This keeps reflection simple and avoids universe levels for now.
-
-`TypeForm` is a closed family of variants that describes the structure
-of the type:
-
-- `Nominal(ref)`
-- `Struct(fields)`
-- `Function(args, ret)`
-- `Union(members)`
-- `Literal(value)`
-- `Var(id)`
+- `NominalType(ref)`
+- `StructType(fields)`
+- `FnType(args, ret)`
+- `UnionType(members)`
+- `VarType(id)`
+- `RefType(parent, params)`
+- `Qualifier(underlying)`
+- `NominalQualifier(ref, underlying)`
 
 Only these variants define the meaning of `Type`.
 
 Shorthand:
 
 - `Ref("X")` stands for `Ref(parent=None, member="X")`.
-- `Type(Nominal(Ref("X")))` stands for a nominal type identified by `Ref("X")`.
+- `NominalType(ref=Ref("X"))` stands for a nominal type identified by `Ref("X")`.
 
 
-#### TypeForm: Struct
+#### StructType
 
 Descriptor for structural tuples/records.
 
 Shape:
-- `fields: Tuple[str, Type]` where the `Tuple` is aligned to an `Index`.
+- `fields: Tuple[str | None, Type]` where the `Tuple` is aligned to an `Index`.
 - Positional elements are represented with `None` keys in the `Index`.
 - Nominal elements carry their key as the `Index` entry.
 
@@ -170,10 +168,10 @@ Invariants:
 Example:
 - `(x: Natural, y: Text)` =>
   `Index(keys=("x", "y"))` and
-  `fields.values=(Type(Nominal(Ref("Natural"))), Type(Nominal(Ref("Text"))))`
+  `fields.values=(NominalType(ref=Ref("Natural")), NominalType(ref=Ref("Text")))`
 
 
-#### TypeForm: Nominal
+#### NominalType
 
 Descriptor for nominal types.
 
@@ -184,36 +182,14 @@ Shape:
 
 Invariants:
 - `ref` is interned and canonical.
-- Hyperparameters are encoded in `ref.params` (meta-level) and serialized in
-  `ref.to_val().data`.
+- Hyperparameters are encoded in `ref.params` (value-level) and serialized in
+  `ref.data`.
 
 Example:
 - `Array[3]` =>
-  `Type(Nominal(ref=Ref(parent=Ref("Array"), member="[...]") ...))`
-- `Array[W]` =>
-  `Type(Nominal(ref=<Ref with param ("var","W")>))`
+  `NominalType(ref=Ref(parent=Ref("Array"), member="[...]" ) ...))`
 - `Person` =>
-  `Type(Nominal(ref=Ref("Person")))`
-
-
-#### TypeForm: Qualified Types
-
-Qualification is not a separate meta class. It is represented directly
-by `Type.qualifiers`.
-
-Interpretation:
-- Qualifiers are ordered and can repeat.
-- The `base` is the `form` in `Type`, qualifiers apply to it.
-
-Invariants:
-- Each qualifier must be a type value (not an arbitrary value).
-- No reordering or deduplication of qualifiers.
-
-Examples:
-- `Array[3] Natural` =>
-  `Type(qualifiers=(Type(Nominal(Ref("Array")), params=Const(...)),), form=Nominal(Ref("Natural")))`
-- `Map[Id] (name: Text, age: Natural)` =>
-  `Type(qualifiers=(Type(Nominal(Ref("Map")), params=Const(...)),), form=Struct(...))`
+  `NominalType(ref=Ref("Person"))`
 
 
 ## Structural Data (Tuple/Index/Shape)
@@ -225,13 +201,13 @@ Examples:
 - `Shape` describes arity and keyed positions.
 
 These structures define local invariants and are reused as descriptors
-inside `TypeForm.Struct`.
+inside `StructType`.
 
 
 ## Ref (Nominal Reference)
 
 `Ref` is the canonical, interned representation of a nominal reference.
-It replaces the generic notion of “Symbol” and is used by `Type`.
+It is a concrete value: `Ref` is `Const[RefType, RefData]`.
 
 ### Shape
 
@@ -239,7 +215,12 @@ It replaces the generic notion of “Symbol” and is used by `Type`.
 
 - `parent: Ref | None`
 - `member: str`
-- `params: Tuple[str, Val]`
+- `params: Tuple[str | None, Const]`
+
+`RefType` describes the structural type of a reference:
+
+- `parent: RefType | None`
+- `params: Tuple[str | None, Const]`
 
 `segments` is a derived view of the full path.
 
@@ -251,26 +232,6 @@ It replaces the generic notion of “Symbol” and is used by `Type`.
   `Ref(parent=None, member="std").member_ref("Map")`
 
 
-## Ref Reflection
-
-`Ref` can be reflected into a value for metaprogramming:
-
-- `Ref.to_val()` returns `Val` with:
-  - `meta = Type(Nominal(ref=Ref("std.Ref")))` where the `std.Ref` reference
-    is parametrized with `(parent_ref, params_type_tuple)`.
-  - `data = (parent_data, member, params_data)`
-
-Where:
-- `parent_data` is `None` or `parent.to_val().data`
-- `member` is a `str`
-- `params_data` is `tuple(p.data for p in params)`
-- `parent_ref` is `parent.to_val()` (or `Const(meta=Type(Literal(None)), data=None)` if no parent)
-- `params_type_tuple` is a value holding the tuple of parameter types:
-  `Const(meta=Type(Struct(fields=Tuple(index=params.index, values=std.Type))), data=tuple(p.meta.to_val().data for p in params))`
-
-The encoding is deterministic and should be cached for performance.
-
-
 ## Partial Evaluation (Lazy Values)
 
 Partial evaluation normalizes AST into canonical DOM structures and
@@ -279,118 +240,66 @@ propagates constants. Unresolved values are represented as `Var`.
 Key properties:
 - No new AST node types are introduced.
 - The same `Val` container is used in all phases.
-- `meta` must always be valid even when the value is a `Var`.
+- `type` must always be valid even when the value is a `Var`.
 
 
 ## Validation and Constraints
 
 Validation is separated from construction:
-- First, build canonical structures (`Type`, `Ref`, `Struct`, etc.).
+- First, build canonical structures (`Type`, `Ref`, `StructType`, etc.).
 - Then, validate invariants and type constraints.
 
 Examples:
 - `Array[3]` validates that `3` is a `Natural`.
-- `Struct` validates positional-before-nominal ordering.
+- `StructType` validates positional-before-nominal ordering.
 
 
 ## Types as Values
 
-The system may represent types as values by using `Meta` as data
-descriptors. A meta can be converted into a `Val` if needed.
-
-This conversion must produce:
-- a concrete `meta` for the resulting value, and
-- a primitive `data` representation (not the meta itself).
-
-
-## Type Reflection (Canonical Encoding)
-
-`Type.to_val()` produces a `Val` whose data is a canonical encoding.
-Discriminated unions are encoded as a tuple `(tag, data)` for performance.
-
-Top-level encoding:
-- `Type.to_val().meta = Type(form=Nominal(ref=Ref("std.Type")))`
-- `Type.to_val().data = ("type", (qualifiers_data, form_data))`
-
-Where:
-- `qualifiers_data = tuple(q.to_val().data for q in qualifiers)`
-- `form_data = (tag_data, payload)` following the union encoding
-
-Tag encoding:
-
-- `tag_data` is always a primitive `Data` value.
-- Each `TypeForm` tag is represented by a `Ref` and encoded as `Ref.to_val().data`.
-- Current tag refs:
-  - `std.Type.Nominal`
-  - `std.Type.Struct`
-  - `std.Type.Function`
-  - `std.Type.Union`
-  - `std.Type.Literal`
-  - `std.Type.Var`
-
-TypeForm encodings:
-
-- `Nominal(ref)` => `( Ref("std.Type.Nominal").to_val().data, ref.to_val().data )`
-- `Struct(fields)` => `( Ref("std.Type.Struct").to_val().data, (index_data, fields_data) )`
-- `Function(args, ret)` => `( Ref("std.Type.Function").to_val().data, (args_data, ret_data) )`
-- `Union(members)` => `( Ref("std.Type.Union").to_val().data, (members_data,) )`
-- `Literal(value)` => `( Ref("std.Type.Literal").to_val().data, value )`
-- `Var(id)` => `( Ref("std.Type.Var").to_val().data, id )`
-
-Where:
-- `index_data = tuple(index.keys)`
-- `fields_data = tuple(t.to_val().data for t in fields.values)`
-- `args_data = tuple(t.to_val().data for t in args)`
-- `ret_data = ret.to_val().data`
-- `members_data = tuple(t.to_val().data for t in members)`
-- `schema` is computed from `ref` and is not encoded here
+The system may represent types as values by using `Meta`, which is a literal
+value that carries only a `type` (no `data`). This avoids serialization or
+reflection mechanisms while preserving expressiveness.
 
 
 ## Compact Examples
 
 Nominal (no params):
 
-- `Type(Nominal(ref=Ref("std.Text")))`
+- `NominalType(ref=Ref("std.Text"))`
 
 Nominal (with params in Ref):
 
 - `Array[3]` =>
-  `Type(Nominal(ref=<Ref("Array") with param 3>))`
+  `NominalType(ref=<Ref("Array") with param 3>)`
 
 Struct (record):
 
 - `(name: Text, age: Natural)` =>
-  `Type(Struct(fields=Tuple(Index(("name", "age")), (Type(Nominal(Ref("std.Text"))), Type(Nominal(Ref("std.Natural")))))))`
+  `StructType(fields=Tuple(Index(("name", "age")), (NominalType(ref=Ref("std.Text")), NominalType(ref=Ref("std.Natural")))))`
 
 Function:
 
 - `(Natural, Natural) -> Natural` =>
-  `Type(Function(args=(Type(Nominal(Ref("std.Natural"))), Type(Nominal(Ref("std.Natural")))), ret=Type(Nominal(Ref("std.Natural")))))`
+  `FnType(args=(NominalType(ref=Ref("std.Natural")), NominalType(ref=Ref("std.Natural"))), ret=NominalType(ref=Ref("std.Natural")))`
 
 Union:
 
 - `Natural | Text` =>
-  `Type(Union(members=(Type(Nominal(Ref("std.Natural"))), Type(Nominal(Ref("std.Text"))))))`
+  `UnionType(members=(NominalType(ref=Ref("std.Natural")), NominalType(ref=Ref("std.Text"))))`
 
 Literal type:
 
-- `Literal(3)` =>
-  `Type(Literal(3))`
+- `Val(type=NominalType(ref=Ref("std.Integer")), data=3)`
 
 Type variable:
 
-- `Type.Var("T")` =>
-  `Type(Var("T"))`
-
-Qualified:
-
-- `Array[3] Natural` =>
-  `Type(qualifiers=(Type(Nominal(ref=<Ref("Array") with param 3>)),), form=Nominal(ref=Ref("std.Natural")))`
+- `Type.var("T")` =>
+  `VarType("T")`
 
 Value (nominal instance):
 
 - `Person("john", 33)` =>
-  `Const(meta=Type(Nominal(ref=Ref("Person"))), data=("john", 33))`
+  `Val(type=NominalType(ref=Ref("Person")), data=("john", 33))`
 
 Ref:
 
@@ -405,16 +314,16 @@ Phase 1: Parse
 
 Phase 2: Elaboration and Normalization
 
-- Convert AST into canonical `Val` forms (`Const` or `Var`).
+- Convert AST into canonical `ValueBase` forms (`Const` or `Var`).
 - Build `Type` and `Ref` objects.
 - Encode hyperparameters into `Ref.params` when specializing entities.
 - Validate structural invariants (Index uniqueness, positional before nominal).
-- Example: `Array[3]` becomes `Type(Nominal(ref=<Ref("Array") with param 3>))`.
-- Example: `Person("john", 33)` becomes `Const(meta=Type(Nominal(ref=Ref("Person"))), data=("john", 33))`.
+- Example: `Array[3]` becomes `NominalType(ref=<Ref("Array") with param 3>)`.
+- Example: `Person("john", 33)` becomes `Val(type=NominalType(ref=Ref("Person")), data=("john", 33))`.
 
 Phase 3: Type Resolution and Constraints
 
-- Resolve `Type.Var` and `Var` placeholders using constraints.
+- Resolve `Type.var` and `Var` placeholders using constraints.
 - Specialize schemas using parameter values.
 - Validate qualifiers and enforce type constraints.
 - Resolve overloads/dispatch using the resolved types.
@@ -427,7 +336,7 @@ Phase 4: Final Evaluation
   runtime-dependent values.
 - Example: arithmetic with known literals reduces to a `Const` value.
 
-Reflection is available in any phase via `Type.to_val()` and `Ref.to_val()`.
+Reflection is intentionally omitted from the core model.
 
 
 ## Open Decisions (To Iterate)

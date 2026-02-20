@@ -10,7 +10,7 @@ Conjunto de tipos de datos que actuan como layout nativo de axis.
 
 from .tuple_ import *
 from .map import *
-from .typing import *
+from .core import *
 
 # type Natural = int
 # type Integer = int

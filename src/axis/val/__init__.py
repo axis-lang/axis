@@ -1,5 +1,3 @@
-"""
-Modelo de datos expresivo para los valores en Axis.
-"""
-from .val import *
+"""Helpers de evaluacion para valores en Axis."""
+
 from .evaluator import *

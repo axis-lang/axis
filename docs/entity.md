@@ -54,11 +54,7 @@ value that captures:
 Providers are first-class values and are reflectable. They can be passed
 around and materialized later when a return type is required.
 
-`Ref` reflection preserves meta information via a parametrized `std.Ref`:
 
-- `Ref.to_val().meta = Type(Nominal(ref=Ref("std.Ref")))` where the `std.Ref`
-  reference is parametrized with `(parent_ref, params_type_tuple)`.
-- `Ref.to_val().data = (parent_data, member, params_data)`.
 
 
 ## Indexation vs Construction
@@ -109,24 +105,10 @@ let b: Array[2,2] Real = init
 implementation to produce the final value.
 
 
-## Meta Serialization and Reification
+## Meta Values
 
-Meta is a deserialized structure, while data is its canonical serialized form.
-Two operations are defined in `axis.dom`:
-
-- serialize: meta to data (reflection),
-- reify: data to meta (deserialization).
-
-Serialization uses the canonical encodings described in the data model
-(`Type.to_val()`, `Ref.to_val()`). Reification reconstructs meta structures
-from primitive data and may create new meta instances.
-
-Planned API surface in `axis.dom`:
-
-- `Ref.from_val(data)` / `Ref.from_data(data)`
-- `Type.from_val(data)` / `Type.from_data(data)`
-
-Reification errors must raise exceptions at the Python level or produce an
+Types are represented as values via `Meta`, which carries a `Type` directly
+without serialization or reflection.
 `Err` result at the Axis level.
 
 
