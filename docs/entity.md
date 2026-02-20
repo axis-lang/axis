@@ -105,10 +105,11 @@ let b: Array[2,2] Real = init
 implementation to produce the final value.
 
 
-## Meta Values
+## Types as Values
 
-Types are represented as values via `Meta`, which carries a `Type` directly
-without serialization or reflection.
+Types are represented as values via `Const` by storing a `Type` directly in
+`data` (which accepts `Builtin` values). This avoids serialization or
+reflection mechanisms.
 `Err` result at the Axis level.
 
 

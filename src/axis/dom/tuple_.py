@@ -151,6 +151,14 @@ class Tuple[K, V](Record, frozen=True, consed=True):
         values = positional + tuple(nominal.values())
         return Tuple(index, values)
 
+    @classmethod
+    def from_index(cls, index: Index[K], values: tuple[V, ...]) -> Tuple[K, V]:
+        return Tuple(index=index, values=values)
+
+    @classmethod
+    def from_keys(cls, keys: tuple[K | None, ...], values: tuple[V, ...]) -> Tuple[K, V]:
+        return Tuple.from_index(Index(keys), values)
+
     EMPTY: ClassVar[Tuple[Any, Any]]
 
     # @classmethod

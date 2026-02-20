@@ -5,11 +5,11 @@ from typing import Iterable, Optional, TYPE_CHECKING, TypeAlias
 
 from protobase import Record, frozendict
 
-from axis import expr, syn
+from axis import dom, expr, syn
 
 from .entity import Entity, OverloadBucket, ReturnEntry
 from .ref_shape import RefShape
-from .shapes import SlotShape, TupleShape
+# Tuple shapes are represented as dom.Tuple[str, syn.Expr]
 
 
 
@@ -236,30 +236,27 @@ def _slot_name_from_key(key: syn.Expr) -> Optional[str]:
     return str(key)
 
 
-def _shape_from_tuple(tup: expr.Tuple) -> TupleShape:
-    slots: list[SlotShape] = []
-    for pos, element in enumerate(tup.elements):
+def _shape_from_tuple(tup: expr.Tuple) -> dom.Tuple[str, syn.Expr]:
+    keys: list[str | None] = []
+    values: list[syn.Expr] = []
+    for element in tup.elements:
         match element:
             case expr.Tuple.Positional(value=value):
-                slots.append(SlotShape(name=None, pos=pos, bound=value))
+                keys.append(None)
+                values.append(value)
             case expr.Tuple.Nominal(key=key, bound=bound, value=_):
-                slots.append(
-                    SlotShape(
-                        name=_slot_name_from_key(key),
-                        pos=pos,
-                        bound=bound,
-                    )
-                )
+                keys.append(_slot_name_from_key(key))
+                values.append(bound)
             case _:
                 raise ValueError(f"Unsupported tuple element: {element}")
 
-    return TupleShape(slots=tuple(slots))
+    return dom.Tuple.from_keys(tuple(keys), tuple(values))
 
 
-def _shape_from_expr(node: syn.Expr) -> TupleShape:
+def _shape_from_expr(node: syn.Expr) -> dom.Tuple[str, syn.Expr]:
     if isinstance(node, expr.Tuple):
         return _shape_from_tuple(node)
-    return TupleShape(slots=(SlotShape(name=None, pos=0, bound=node),))
+    return dom.Tuple.from_keys((None,), (node,))
 
 
 def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
@@ -273,34 +270,36 @@ def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
 
 
 def _normalize_default_positions(
-    shape: TupleShape, defaults: Iterable[int | str]
+    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
 ) -> tuple[int, ...]:
-    name_to_pos = {slot.name: slot.pos for slot in shape.slots if slot.name is not None}
     positions: list[int] = []
     for default in defaults:
         if isinstance(default, int):
             positions.append(default)
         else:
-            pos = name_to_pos.get(default)
+            pos = shape.index.get(default, default=None)
             if pos is None:
                 continue
             positions.append(pos)
     return tuple(dict.fromkeys(positions))
 
 
-def _shape_without_positions(shape: TupleShape, positions: set[int]) -> TupleShape:
-    slots = tuple(slot for slot in shape.slots if slot.pos not in positions)
-    return TupleShape(slots=slots)
+def _shape_without_positions(
+    shape: dom.Tuple[str, syn.Expr], positions: set[int]
+) -> dom.Tuple[str, syn.Expr]:
+    keys = tuple(k for i, k in enumerate(shape.index.keys) if i not in positions)
+    values = tuple(v for i, v in enumerate(shape.values) if i not in positions)
+    return dom.Tuple.from_keys(keys, values)
 
 
 def _expand_default_shapes(
-    shape: TupleShape, defaults: Iterable[int | str]
-) -> tuple[TupleShape, ...]:
+    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
+) -> tuple[dom.Tuple[str, syn.Expr], ...]:
     positions = _normalize_default_positions(shape, defaults)
     if not positions:
         return (shape,)
 
-    expanded: list[TupleShape] = []
+    expanded: list[dom.Tuple[str, syn.Expr]] = []
     positions_list = list(positions)
     for r in range(len(positions_list) + 1):
         for combo in combinations(positions_list, r):

@@ -7,7 +7,7 @@ from protobase import Record, frozendict
 from axis import syn
 
 from .ref_shape import RefShape
-from .shapes import TupleShape
+from axis import dom
 
 
 class ReturnEntry(Record, frozen=True):
@@ -35,10 +35,10 @@ class OverloadBucket(Record, frozen=True):
         def __init__(self) -> None:
             self.origins: set[syn.Node] = set()
             self.contexts: set[syn.Item] = set()
-            self.returns: dict[TupleShape, ReturnEntry.Builder] = {}
+            self.returns: dict[dom.Tuple[str, syn.Expr], ReturnEntry.Builder] = {}
 
         def add_return(
-            self, returns_shape: TupleShape, origin: syn.Node, ctx: syn.Item
+            self, returns_shape: dom.Tuple[str, syn.Expr], origin: syn.Node, ctx: syn.Item
         ) -> None:
             entry = self.returns.setdefault(returns_shape, ReturnEntry.Builder())
             entry.origins.add(origin)
@@ -88,7 +88,8 @@ class Entity(Record, frozen=True):
             self._member_origins: dict[str, set[syn.Node]] = {}
             self._member_contexts: dict[str, set[syn.Item]] = {}
             self._overload_buckets: dict[
-                tuple[TupleShape | None, TupleShape | None], OverloadBucket.Builder
+                tuple[dom.Tuple[str, syn.Expr] | None, dom.Tuple[str, syn.Expr] | None],
+                OverloadBucket.Builder,
             ] = {}
             self._constraints: dict[syn.Node, set[syn.Node]] = {}
             self._constraint_contexts: dict[syn.Node, set[syn.Item]] = {}
@@ -108,8 +109,8 @@ class Entity(Record, frozen=True):
 
         def add_overload(
             self,
-            takes_shape: TupleShape,
-            where_shape: TupleShape | None,
+            takes_shape: dom.Tuple[str, syn.Expr],
+            where_shape: dom.Tuple[str, syn.Expr] | None,
             origin: syn.Node,
             ctx: syn.Item,
         ) -> None:
@@ -120,9 +121,9 @@ class Entity(Record, frozen=True):
 
         def add_return(
             self,
-            takes_shape: TupleShape | None,
-            where_shape: TupleShape | None,
-            returns_shape: TupleShape,
+            takes_shape: dom.Tuple[str, syn.Expr] | None,
+            where_shape: dom.Tuple[str, syn.Expr] | None,
+            returns_shape: dom.Tuple[str, syn.Expr],
             origin: syn.Node,
             ctx: syn.Item,
         ) -> None:

@@ -32,14 +32,14 @@ Serialization principle:
 Concrete variants:
 - `Val`: abstract base for literal values.
 - `Const`: concrete literal value with `data`.
-- `Meta`: literal value representing a `Type` directly (no `data`).
+- `Ref`: concrete literal nominal value.
 - `Var`: a placeholder value with stable identity.
 
 
 ### Val and Var
 
 `Val` and `Var` are forms of `Dom` (with `Val` as an
-abstract base and `Const`/`Meta` as concrete implementations).
+abstract base and `Const`/`Ref` as concrete implementations).
 
 `Const` always contains concrete, immutable data.
 `Var` represents an unknown value that is still well-typed.
@@ -57,7 +57,7 @@ Canonical encoding for `Var` data:
 Type-level vs value-level placeholders:
 
 - `Type.var("T")` is a type-level placeholder.
-- `Var(type=VarType("T"), data=("var", "T"))` is a value placeholder
+- `Var(type=Var.Type("T"), data=("var", "T"))` is a value placeholder
   typed by that `Type.var`.
 
 Var and context:
@@ -69,11 +69,12 @@ Var and context:
 
 ### Data
 
-`Data` is a primitive, structural representation. It does not encode meaning.
+`Data` is a structural representation. It does not encode meaning.
 The meaning is entirely in `Type`.
 
 Base forms:
 - `Atom`: `int | float | Decimal | str | bool | None`
+- `Builtin` (hash-consed immutable records)
 - `tuple`
 - `frozenset`
 - `frozendict`
@@ -82,7 +83,7 @@ Default encoding preference:
 - Use low-level `tuple` for canonical encodings and discriminated unions.
 - Use `frozendict` when JSON-like key/value shape is required.
 
-`Data` does not include executable structures.
+`Data` does not include mutable or non-deterministic structures.
 
 
 ### Type
@@ -115,7 +116,6 @@ qualified values while keeping the type system explicit.
 
 - `Dom` carries one `type`.
 - `Val` is an abstract literal base; concrete literal values (`Const`, `Ref`) carry `data`.
-- `Meta` is a literal value with no data; it represents a `Type` as a value.
 - `Var` is a non-literal value used in patterns and bounds.
 - `type` is created once; many values share it.
 - `data` is shaped by `type` but does not carry meaning by itself.
@@ -134,7 +134,7 @@ Variants:
 - `StructType(fields)`
 - `FnType(args, ret)`
 - `UnionType(members)`
-- `VarType(id)`
+- `Var.Type(id)`
 - `Ref.Type(parent, params)`
 - `Qualifier(underlying)`
 - `NominalQualifier(ref, underlying)`
@@ -215,21 +215,21 @@ It is a concrete literal value in the `Val` branch.
 
 - `parent: Ref | None`
 - `member: str`
-- `params: Tuple[str | None, Val]`
+- `params: Tuple[str | None, Const]`
 
 `Ref.Type` describes the structural type of a reference:
 
 - `parent: Ref.Type | None`
-- `params: Tuple[str | None, Val]`
+- `params: Tuple[str | None, Type]`
 
-`segments` is a derived view of the full path.
+`segments` can be derived via `dom.ref_segments(ref)`.
 
 ### Examples
 
 - `std.Array` =>
-  `Ref(parent=None, member="std").member_ref("Array")`
+  `Ref.root("std").child("Array")`
 - `std.Map` =>
-  `Ref(parent=None, member="std").member_ref("Map")`
+  `Ref.root("std").child("Map")`
 
 
 ## Partial Evaluation (Lazy Values)
@@ -256,9 +256,9 @@ Examples:
 
 ## Types as Values
 
-The system may represent types as values by using `Meta`, which is a literal
-value that carries only a `type` (no `data`). This avoids serialization or
-reflection mechanisms while preserving expressiveness.
+The system represents types as values by using `Const` with a `Type` stored in
+`data` (which accepts `Builtin` values). This avoids serialization or reflection
+mechanisms while preserving expressiveness.
 
 
 ## Compact Examples
@@ -294,7 +294,7 @@ Literal type:
 Type variable:
 
 - `Type.var("T")` =>
-  `VarType("T")`
+  `Var.Type("T")`
 
 Value (nominal instance):
 
@@ -303,7 +303,7 @@ Value (nominal instance):
 
 Ref:
 
-- `Ref("std.Array")` => `Ref(parent=None, member="std").member_ref("Array")`
+- `Ref("std.Array")` => `Ref.root("std").child("Array")`
 
 ## Evaluation Phases
 

@@ -15,7 +15,7 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(result.data, 12)
         self.assertTrue(isinstance(result.type, dom.NominalType))
         if isinstance(result.type, dom.NominalType):
-            self.assertEqual(result.type.ref.segments, ("std", "Integer"))
+            self.assertEqual(dom.ref_segments(result.type.ref), ("std", "Integer"))
 
     def test_eval_additive(self):
         result = self.eval("1 + 2")
@@ -52,12 +52,12 @@ class EvalTest(unittest.TestCase):
 
     def test_ref_from_str(self):
         ref = dom.Ref.from_str("std.Array")
-        self.assertEqual(ref.segments, ("std", "Array"))
+        self.assertEqual(dom.ref_segments(ref), ("std", "Array"))
 
     def test_type_var_helper(self):
         meta = dom.Type.var("T")
-        self.assertTrue(isinstance(meta, dom.VarType))
-        if isinstance(meta, dom.VarType):
+        self.assertTrue(isinstance(meta, dom.Var.Type))
+        if isinstance(meta, dom.Var.Type):
             self.assertEqual(meta.id, "T")
 
     def test_nominal_schema_opaque(self):
@@ -67,9 +67,9 @@ class EvalTest(unittest.TestCase):
 
     def test_nominal_params_with_var_encoding(self):
         param = dom.Const.from_literal(3)
-        params = cast(dom.Tuple[str | None, dom.Val], dom.Tuple.new(param))
-        base = dom.Ref.from_str("std.Array")
-        ref = dom.Ref.from_parts(base.member, parent=base.parent, params=params)
+        params = cast(dom.Tuple[str | None, dom.Const], dom.Tuple.new(param))
+        base = dom.Ref.root("std")
+        ref = dom.Ref.from_parts("Array", parent=base, params=params)
         meta = dom.NominalType.from_ref(ref)
         if isinstance(meta, dom.NominalType):
             self.assertTrue(isinstance(meta.ref, dom.Ref))

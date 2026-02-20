@@ -3,4 +3,3 @@
 from .database import Database
 from .entity import Entity, OverloadBucket, ReturnEntry
 from .ref_shape import RefShape
-from .shapes import SlotShape, TupleShape
