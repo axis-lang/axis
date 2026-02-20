@@ -6,7 +6,7 @@ from axis import dom, syn, val
 
 
 class EvalTest(unittest.TestCase):
-    def eval(self, source: str, env=None) -> dom.Val:
+    def eval(self, source: str, env=None) -> dom.Const:
         evaluator = val.Evaluator.from_env(env or {})
         return evaluator(syn.Expr.from_str(source))
 
@@ -38,7 +38,7 @@ class EvalTest(unittest.TestCase):
         result = self.eval(
             "alpha",
             env={
-                "alpha": dom.Val(
+                "alpha": dom.Const(
                     type=dom.NominalType.from_str("std.Natural"),
                     data=5,
                 )
@@ -66,8 +66,8 @@ class EvalTest(unittest.TestCase):
             self.assertTrue(isinstance(meta.ref, dom.Ref))
 
     def test_nominal_params_with_var_encoding(self):
-        param = dom.Val.from_literal(3)
-        params = cast(dom.Tuple[str | None, dom.Const], dom.Tuple.new(param))
+        param = dom.Const.from_literal(3)
+        params = cast(dom.Tuple[str | None, dom.Val], dom.Tuple.new(param))
         base = dom.Ref.from_str("std.Array")
         ref = dom.Ref.from_parts(base.member, parent=base.parent, params=params)
         meta = dom.NominalType.from_ref(ref)

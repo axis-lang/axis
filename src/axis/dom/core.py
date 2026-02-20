@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Union as TypingUnion, cast
+from typing import Union as TypingUnion, cast
 
 from protobase import Record, cached_property, frozendict
 
 from axis.dom.tuple_ import Tuple
 
 
-class Node(Record, frozen=True, consed=True, abstract=True): ...
-
-
 type Atom = TypingUnion[int, float, Decimal, str, bool, None]
-type Data = TypingUnion[Atom, tuple, frozenset, frozendict]
-
+type Data = TypingUnion[Atom, tuple["Data", ...], frozenset["Data"], frozendict["Data", "Data"]]
 
 def _is_data(value: object) -> bool:
     return isinstance(
@@ -26,11 +22,6 @@ class Type(Record, frozen=True, consed=True, abstract=True):
     @classmethod
     def var(cls, ident: str) -> "VarType":
         return VarType(id=ident)
-
-
-class RefType(Type, frozen=True, consed=True):
-    parent: "RefType | None" = None
-    params: Tuple[str | None, "Const"] = Tuple.EMPTY
 
 
 class Qualifier(Type, frozen=True, consed=True, abstract=True):
@@ -78,23 +69,23 @@ class VarType(Type, frozen=True, consed=True):
     id: str
 
 
-class ValueBase[T: Type = Type](Node, frozen=True, consed=True, abstract=True):
+class Dom[T: Type = Type](Record, frozen=True, consed=True, abstract=True):
     type: T
 
 
-class Const[T: Type = Type](ValueBase[T], frozen=True, consed=True, abstract=True):
+class Val[T: Type = Type](Dom[T], frozen=True, consed=True, abstract=True):
     ...
 
 
-class Val(Const, frozen=True, consed=True):
+class Const[T: Type = Type](Val[T], frozen=True, consed=True):
     data: Data
 
     @classmethod
-    def from_type_data(cls, type_: Type, data: Data) -> "Val":
+    def from_type_data(cls, type_: Type, data: Data) -> "Const":
         return cls(type=type_, data=data)
 
     @classmethod
-    def from_literal(cls, value: Data) -> "Val":
+    def from_literal(cls, value: Data) -> "Const":
         if isinstance(value, bool):
             type_ = NominalType.from_str("std.Boolean")
         elif isinstance(value, int):
@@ -113,10 +104,10 @@ class Val(Const, frozen=True, consed=True):
 
     def __invariants__(self) -> None:
         if not _is_data(self.data):
-            raise TypeError(f"Val.data must be primitive, got {type(self.data)}")
+            raise TypeError(f"Const.data must be primitive, got {type(self.data)}")
 
 
-class Var(ValueBase[VarType], frozen=True, consed=True):
+class Var(Dom[VarType], frozen=True, consed=True):
     type: VarType
     data: tuple[str, str]
 
@@ -134,16 +125,19 @@ class Var(ValueBase[VarType], frozen=True, consed=True):
             raise TypeError("Var.type id must match Var.data id")
 
 
-class Meta(Const, frozen=True, consed=True):
+class Meta(Val[Type], frozen=True, consed=True):
     ...
 
 
-type RefData = tuple["RefData | None", str, tuple[Data, ...]]
+class Ref(Val["Ref.Type"], frozen=True, consed=True):
+    class Type(Type, frozen=True, consed=True):
+        parent: "Ref.Type | None" = None
+        params: Tuple[str | None, "Val"] = Tuple.EMPTY
 
+    type Data = tuple["Ref.Data | None", str, tuple[Data, ...]]
 
-class Ref(Const[RefType], frozen=True, consed=True):
-    type: RefType
-    data: RefData
+    type: Type
+    data: Data
 
     @classmethod
     def from_parts(
@@ -151,18 +145,18 @@ class Ref(Const[RefType], frozen=True, consed=True):
         member: str,
         *,
         parent: "Ref | None" = None,
-        params: Tuple[str | None, Const] = Tuple.EMPTY,
+        params: Tuple[str | None, Val] = Tuple.EMPTY,
     ) -> "Ref":
-        ref_type = RefType(parent=parent.type if parent else None, params=params)
+        ref_type = Ref.Type(parent=parent.type if parent else None, params=params)
         ref_data = (
             None if parent is None else parent.data,
             member,
-            tuple(_const_data(p) for p in params.values),
+            tuple(_val_data(p) for p in params.values),
         )
         return cls(type=ref_type, data=ref_data)
 
     @classmethod
-    def from_str(cls, value: str) -> "Ref":
+    def from_str(cls, value: str) -> "Ref":Val
         parts = [part.strip() for part in value.split(".")]
         segments = tuple(part for part in parts if part)
         if not segments:
@@ -180,14 +174,14 @@ class Ref(Const[RefType], frozen=True, consed=True):
         parent_type = self.type.parent
         if parent_type is None:
             raise ValueError("Ref data has parent but type has no parent")
-        return Ref(type=parent_type, data=cast(RefData, parent_data))
+        return Ref(type=parent_type, data=cast(Ref.Data, parent_data))
 
     @property
     def member(self) -> str:
         return self.data[1]
 
     @cached_property
-    def params(self) -> Tuple[str | None, Const]:
+    def params(self) -> Tuple[str | None, Val]:
         return self.type.params
 
     @property
@@ -200,35 +194,35 @@ class Ref(Const[RefType], frozen=True, consed=True):
         self,
         name: str,
         *,
-        params: Tuple[str | None, Const] = Tuple.EMPTY,
+        params: Tuple[str | None, Val] = Tuple.EMPTY,
     ) -> "Ref":
         return Ref.from_parts(name, parent=self, params=params)
 
     def __invariants__(self) -> None:
-        if not isinstance(self.type, RefType):
-            raise TypeError(f"Ref.type must be RefType, got {type(self.type).__name__}")
+        if not isinstance(self.type, Ref.Type):
+            raise TypeError(f"Ref.type must be Ref.Type, got {type(self.type).__name__}")
         parent_data, member, params_data = self.data
         if not isinstance(member, str) or not member:
             raise TypeError("Ref.member must be a non-empty string")
         if parent_data is None:
             if self.type.parent is not None:
-                raise TypeError("RefType parent is set but data has no parent")
+                raise TypeError("Ref.Type parent is set but data has no parent")
         else:
             if self.type.parent is None:
-                raise TypeError("RefType parent is None but data has a parent")
+                raise TypeError("Ref.Type parent is None but data has a parent")
         if not isinstance(params_data, tuple):
             raise TypeError("Ref.params data must be a tuple")
         if len(params_data) != len(self.type.params.values):
-            raise TypeError("Ref params length does not match RefType params")
+            raise TypeError("Ref params length does not match Ref.Type params")
 
 
-def _const_data(value: Const) -> Data:
+def _val_data(value: Val) -> Data:
     if isinstance(value, Meta):
         return None
-    if isinstance(value, Val):
-        return cast(Val, value).data
+    if isinstance(value, Const):
+        return value.data
     if isinstance(value, Ref):
-        return cast(Ref, value).data
+        return value.data
     if hasattr(value, "data"):
         return cast(Data, getattr(value, "data"))
-    raise TypeError("Const must carry data to be encoded")
+    raise TypeError("Val must carry data to be encoded")

@@ -9,7 +9,7 @@ from functools import singledispatchmethod
 class Evaluator(Record, frozen=True):
     # type Bound = type
     type EvalResult = tuple[dom.Type, dom.Data]
-    type EnvValue = dom.ValueBase | EvalResult
+    type EnvValue = dom.Dom | EvalResult
 
     env: frozendict = frozendict()
 
@@ -20,9 +20,9 @@ class Evaluator(Record, frozen=True):
     def with_env(self, env: Mapping[str, "Evaluator.EnvValue"]):
         return mutate(self, env=_coerce_env(env))
 
-    def __call__(self, node: syn.Node) -> dom.Val:
+    def __call__(self, node: syn.Node) -> dom.Const:
         type_, data = self.eval(node)
-        return dom.Val(type=type_, data=cast(dom.Data, data))
+        return dom.Const(type=type_, data=cast(dom.Data, data))
 
     def boolean(self, value: bool) -> EvalResult:
         return _builtin_nominal("Boolean"), value
@@ -64,7 +64,7 @@ class Evaluator(Record, frozen=True):
         if key not in self.env:
             self._error(sym, f"Unbound symbol: {key}")
         value = self.env[key]
-        if isinstance(value, dom.ValueBase):
+        if isinstance(value, dom.Dom):
             return value.type, _env_data(value)
         if isinstance(value, tuple) and len(value) == 2:
             return value  # type: ignore[return-value]
@@ -98,7 +98,7 @@ def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
     value = node.value
     if isinstance(value, float):
         value = Decimal(value)
-    literal = dom.Val.from_literal(value)
+    literal = dom.Const.from_literal(value)
     return literal.type, literal.data
 
 
@@ -238,7 +238,7 @@ def _builtin_nominal(name: str) -> dom.Type:
     return dom.NominalType.from_str(f"std.{name}")
 
 
-def _env_data(value: dom.ValueBase) -> dom.Data:
+def _env_data(value: dom.Dom) -> dom.Data:
     if hasattr(value, "data"):
         return cast(dom.Data, getattr(value, "data"))
     raise TypeError("Env values must carry data")

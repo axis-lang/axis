@@ -9,20 +9,20 @@ The core idea is a strict separation between:
 - the descriptor of a datum (`Type`), and
 - the datum itself (`Data`).
 
-All values in the language flow as `Val`, even in partial and lazy phases.
+All values in the language flow as `Dom`, even in partial and lazy phases.
 
 
 ## Core Concepts
 
 ### Value
 
-`ValueBase` represents a value in the language. It is immutable and hash-consed.
+`Dom` represents a value in the language. It is immutable and hash-consed.
 
 - `type`: a descriptor that defines the shape/meaning of the value.
 - `data`: the underlying datum (only present on concrete values).
 
-`ValueBase` is the only container used across evaluation phases. `Val` is the
-general-purpose concrete value type.
+`Dom` is the only container used across evaluation phases. `Val` is the literal
+value branch, and `Const` is the general-purpose concrete value type.
 
 Serialization principle:
 
@@ -30,16 +30,16 @@ Serialization principle:
 - `type` is the deserialized, structural form.
 
 Concrete variants:
-- `Const`: a known value with concrete data (abstract base).
-- `Val`: literal/general-purpose value.
-- `Meta`: literal value representing a `Type` directly.
+- `Val`: abstract base for literal values.
+- `Const`: concrete literal value with `data`.
+- `Meta`: literal value representing a `Type` directly (no `data`).
 - `Var`: a placeholder value with stable identity.
 
 
-### Const and Var
+### Val and Var
 
-`Const` and `Var` are concrete forms of `ValueBase` (with `Const` as an
-abstract base and `Val`/`Meta` as concrete implementations).
+`Val` and `Var` are forms of `Dom` (with `Val` as an
+abstract base and `Const`/`Meta` as concrete implementations).
 
 `Const` always contains concrete, immutable data.
 `Var` represents an unknown value that is still well-typed.
@@ -113,8 +113,8 @@ qualified values while keeping the type system explicit.
 
 #### Type and Values
 
-- `ValueBase` carries one `type`.
-- `Const` is an abstract literal base; concrete literal values (`Val`, `Ref`) carry `data`.
+- `Dom` carries one `type`.
+- `Val` is an abstract literal base; concrete literal values (`Const`, `Ref`) carry `data`.
 - `Meta` is a literal value with no data; it represents a `Type` as a value.
 - `Var` is a non-literal value used in patterns and bounds.
 - `type` is created once; many values share it.
@@ -135,7 +135,7 @@ Variants:
 - `FnType(args, ret)`
 - `UnionType(members)`
 - `VarType(id)`
-- `RefType(parent, params)`
+- `Ref.Type(parent, params)`
 - `Qualifier(underlying)`
 - `NominalQualifier(ref, underlying)`
 
@@ -207,7 +207,7 @@ inside `StructType`.
 ## Ref (Nominal Reference)
 
 `Ref` is the canonical, interned representation of a nominal reference.
-It is a concrete value: `Ref` is `Const[RefType, RefData]`.
+It is a concrete literal value in the `Val` branch.
 
 ### Shape
 
@@ -215,12 +215,12 @@ It is a concrete value: `Ref` is `Const[RefType, RefData]`.
 
 - `parent: Ref | None`
 - `member: str`
-- `params: Tuple[str | None, Const]`
+- `params: Tuple[str | None, Val]`
 
-`RefType` describes the structural type of a reference:
+`Ref.Type` describes the structural type of a reference:
 
-- `parent: RefType | None`
-- `params: Tuple[str | None, Const]`
+- `parent: Ref.Type | None`
+- `params: Tuple[str | None, Val]`
 
 `segments` is a derived view of the full path.
 
@@ -239,7 +239,7 @@ propagates constants. Unresolved values are represented as `Var`.
 
 Key properties:
 - No new AST node types are introduced.
-- The same `Val` container is used in all phases.
+ - The same `Dom` container is used in all phases.
 - `type` must always be valid even when the value is a `Var`.
 
 
@@ -289,7 +289,7 @@ Union:
 
 Literal type:
 
-- `Val(type=NominalType(ref=Ref("std.Integer")), data=3)`
+- `Const(type=NominalType(ref=Ref("std.Integer")), data=3)`
 
 Type variable:
 
@@ -299,7 +299,7 @@ Type variable:
 Value (nominal instance):
 
 - `Person("john", 33)` =>
-  `Val(type=NominalType(ref=Ref("Person")), data=("john", 33))`
+  `Const(type=NominalType(ref=Ref("Person")), data=("john", 33))`
 
 Ref:
 
@@ -314,12 +314,12 @@ Phase 1: Parse
 
 Phase 2: Elaboration and Normalization
 
-- Convert AST into canonical `ValueBase` forms (`Const` or `Var`).
+- Convert AST into canonical `Dom` forms (`Const` or `Var`).
 - Build `Type` and `Ref` objects.
 - Encode hyperparameters into `Ref.params` when specializing entities.
 - Validate structural invariants (Index uniqueness, positional before nominal).
 - Example: `Array[3]` becomes `NominalType(ref=<Ref("Array") with param 3>)`.
-- Example: `Person("john", 33)` becomes `Val(type=NominalType(ref=Ref("Person")), data=("john", 33))`.
+- Example: `Person("john", 33)` becomes `Const(type=NominalType(ref=Ref("Person")), data=("john", 33))`.
 
 Phase 3: Type Resolution and Constraints
 
