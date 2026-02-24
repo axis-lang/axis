@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from functools import partial
 from time import perf_counter
 from typing import Any, Callable, Optional, cast
 import weakref
@@ -10,6 +11,7 @@ from protobase.record import Inmutable, Record
 __all__ = [
     "method",
     "property",
+    "iter",
     "emit",
     "collect",
     "collect_all",
@@ -205,17 +207,36 @@ class Runtime:
         if memo.verified_at == self._revision:
             return False
 
-        for dep in memo.deps:
-            dep_memo = self._memos.get(dep.key)
-            if dep_memo is None:
+        stack: list[tuple[Memo, int, int]] = [(memo, since, 0)]
+        while stack:
+            current, current_since, idx = stack.pop()
+            if current.stale:
                 return True
-            if dep_memo.stale:
+            if current.changed_at > current_since:
                 return True
-            if dep_memo.changed_at > dep.changed_at:
-                return True
-            if dep_memo.verified_at != self._revision:
-                if self._maybe_changed_after(dep_memo, dep.changed_at):
+            if current.verified_at == self._revision:
+                continue
+
+            deps = current.deps
+            while idx < len(deps):
+                dep = deps[idx]
+                dep_memo = self._memos.get(dep.key)
+                if dep_memo is None:
                     return True
+                if dep_memo.stale:
+                    return True
+                if dep_memo.changed_at > dep.changed_at:
+                    return True
+                if dep_memo.verified_at != self._revision:
+                    stack.append((current, current_since, idx + 1))
+                    current = dep_memo
+                    current_since = dep.changed_at
+                    idx = 0
+                    deps = current.deps
+                    continue
+                idx += 1
+
+            current.verified_at = self._revision
 
         memo.verified_at = self._revision
         return False
@@ -428,19 +449,14 @@ class Query:
         if obj is None:
             return self
 
-        def bound(*args, **kwargs):
-            return self._call(obj, *args, **kwargs)
-
-        return bound
+        return partial(self._call_obj, obj)
 
     def __call__(self, *args, **kwargs):
-        return self._call(None, *args, **kwargs)
+        argkey = _runtime._args_key(self.func_id, args, kwargs)
+        key = Key(self.func_id, None, argkey[1], argkey[2])
+        return _runtime.fetch(key, None, self.func, args, kwargs)
 
-    def _call(self, obj: object | None, *args, **kwargs):
-        if obj is None:
-            argkey = _runtime._args_key(self.func_id, args, kwargs)
-            key = Key(self.func_id, None, argkey[1], argkey[2])
-            return _runtime.fetch(key, None, self.func, args, kwargs)
+    def _call_obj(self, obj: object, *args, **kwargs):
         _runtime._self_ref(obj)
         argkey = _runtime._args_key(self.func_id, args, kwargs)
         key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
@@ -481,7 +497,10 @@ class Property(Query):
     def __get__(self, obj: object | None, objtype: type | None = None):
         if obj is None:
             return self
-        return self._call(obj)
+        _runtime._self_ref(obj)
+        argkey = _runtime._args_key(self.func_id, (), {})
+        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
+        return _runtime.fetch(key, obj, self.func, (), {})
 
     def invalidate(self, obj: object) -> None:  # type: ignore[override]
         super().invalidate(obj)
@@ -497,6 +516,39 @@ def property(func: Callable[..., Any]) -> Property:
 
 def in_query() -> bool:
     return _runtime._current_key.get() is not None
+
+
+def iter(
+    root: object | None,
+    *,
+    next: Callable[[object], object | None] | None = None,
+    children: Callable[[object], Any] | None = None,
+):
+    if root is None:
+        return
+    if (next is None) == (children is None):
+        raise TypeError("flux.iter expects exactly one of next or children")
+    if next is not None:
+        node = root
+        while node is not None:
+            yield node
+            node = next(node)
+        return
+
+    children_fn = cast(Callable[[object], Any], children)
+
+    stack = [root]
+    seen: set[int] = set()
+    while stack:
+        node = stack.pop()
+        node_id = id(node)
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        yield node
+        for child in children_fn(node):
+            if child is not None:
+                stack.append(child)
 
 
 def emit(item: object) -> None:

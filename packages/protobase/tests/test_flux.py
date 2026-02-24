@@ -1,7 +1,7 @@
 import gc
 import unittest
 import weakref
-from typing import cast
+from typing import Callable, cast
 
 from protobase import flux
 
@@ -281,3 +281,38 @@ class FluxMiscTest(unittest.TestCase):
         second.emit_value()
         collected = flux.collect_all(cast(flux.Query, Box.emit_value))
         self.assertEqual(collected, frozenset({1, 2}))
+
+
+class FluxIterTest(unittest.TestCase):
+    def test_iter_linear(self):
+        class Node:
+            __slots__ = ("value", "next")
+
+            def __init__(self, value: int, next: "Node | None" = None) -> None:
+                self.value = value
+                self.next = next
+
+        head = Node(1, Node(2, Node(3)))
+        def next_node(node: "Node") -> "Node | None":
+            return node.next
+
+        next_fn = cast(Callable[[object], object | None], next_node)
+        values = [cast(Node, node).value for node in flux.iter(head, next=next_fn)]
+        self.assertEqual(values, [1, 2, 3])
+
+    def test_iter_children(self):
+        class Node:
+            __slots__ = ("value", "children")
+
+            def __init__(self, value: int, children: list["Node"] | None = None) -> None:
+                self.value = value
+                self.children = children or []
+
+        shared = Node(3)
+        root = Node(1, [Node(2, [shared]), shared])
+        def child_nodes(node: "Node") -> list["Node"]:
+            return node.children
+
+        children_fn = cast(Callable[[object], object], child_nodes)
+        values = [cast(Node, node).value for node in flux.iter(root, children=children_fn)]
+        self.assertEqual(set(values), {1, 2, 3})
