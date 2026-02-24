@@ -1,6 +1,7 @@
 import gc
 import unittest
 import weakref
+from typing import cast
 
 from protobase import flux
 
@@ -45,7 +46,7 @@ class FluxMethodTest(unittest.TestCase):
         self.assertEqual(counter.add(4), 5)
         self.assertEqual(counter.add(4), 5)
         self.assertEqual(calls["add"], 1)
-        Counter.add.invalidate(counter, 4)
+        cast(flux.Query, Counter.add).invalidate(counter, 4)
         self.assertEqual(counter.add(4), 5)
         self.assertEqual(calls["add"], 2)
 
@@ -67,7 +68,7 @@ class FluxMethodTest(unittest.TestCase):
         self.assertEqual(counter.add(1), 11)
         self.assertEqual(counter.add(2), 12)
         self.assertEqual(calls["add"], 2)
-        Counter.add.invalidate_for(counter)
+        cast(flux.Query, Counter.add).invalidate_for(counter)
         self.assertEqual(counter.add(1), 11)
         self.assertEqual(counter.add(2), 12)
         self.assertEqual(calls["add"], 4)
@@ -92,7 +93,7 @@ class FluxPropertyTest(unittest.TestCase):
         self.assertEqual(box.doubled, 14)
         self.assertEqual(box.doubled, 14)
         self.assertEqual(calls["value"], 1)
-        Box.doubled.invalidate(box)
+        cast(flux.Query, Box.doubled).invalidate(box)
         self.assertEqual(box.doubled, 14)
         self.assertEqual(calls["value"], 2)
 
@@ -122,7 +123,7 @@ class FluxDependencyTest(unittest.TestCase):
         self.assertEqual(node.derived(), 6)
         self.assertEqual(calls["base"], 1)
         self.assertEqual(calls["derived"], 1)
-        Node.base.invalidate(node)
+        cast(flux.Query, Node.base).invalidate(node)
         self.assertEqual(node.derived(), 6)
         self.assertEqual(calls["base"], 2)
         self.assertEqual(calls["derived"], 2)
@@ -193,3 +194,90 @@ class FluxWeakrefTest(unittest.TestCase):
         obj = None
         gc.collect()
         self.assertIsNone(ref())
+
+
+class FluxKwargsTest(unittest.TestCase):
+    def test_kwargs_order_cache(self):
+        calls = {"sum": 0}
+
+        class Counter:
+            __slots__ = ("value", "__weakref__")
+
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+            @flux.method
+            def add(self, *, a: int, b: int) -> int:
+                calls["sum"] += 1
+                return self.value + a + b
+
+        counter = Counter(1)
+        self.assertEqual(counter.add(a=1, b=2), 4)
+        self.assertEqual(counter.add(b=2, a=1), 4)
+        self.assertEqual(calls["sum"], 1)
+
+
+class FluxEmitCollectTest(unittest.TestCase):
+    def test_emit_and_collect(self):
+        class Node:
+            __slots__ = ("value", "child", "__weakref__")
+
+            def __init__(self, value: int, child: "Node | None" = None) -> None:
+                self.value = value
+                self.child = child
+
+            @flux.method
+            def visit(self) -> int:
+                flux.emit(self.value)
+                if self.child is not None:
+                    return self.child.visit()
+                return self.value
+
+        leaf = Node(1)
+        root = Node(2, child=leaf)
+        _ = root.visit()
+
+        collected = cast(flux.Query, Node.visit).collect(obj=root)
+        self.assertEqual(collected, frozenset({1, 2}))
+
+        direct = cast(flux.Query, Node.visit).collect(obj=root, transitive=False)
+        self.assertEqual(direct, frozenset({2}))
+
+    def test_emit_outside_query_raises(self):
+        flux._runtime._current_key.set(None)
+        flux._runtime._current_emits.set(None)
+        with self.assertRaises(RuntimeError):
+            flux.emit("x")
+
+    def test_collect_requires_query(self):
+        with self.assertRaises(TypeError):
+            flux.collect(cast(flux.Query, object()))
+
+
+class FluxMiscTest(unittest.TestCase):
+    def test_unhashable_args_raise(self):
+        @flux.method
+        def total(values: list[int]) -> int:
+            return sum(values)
+
+        with self.assertRaises(TypeError):
+            total([1, 2, 3])
+
+    def test_collect_all(self):
+        class Box:
+            __slots__ = ("value", "__weakref__")
+
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+            @flux.method
+            def emit_value(self) -> int:
+                flux.emit(self.value)
+                return self.value
+
+        first = Box(1)
+        second = Box(2)
+        first.emit_value()
+        second.emit_value()
+        collected = flux.collect_all(cast(flux.Query, Box.emit_value))
+        self.assertEqual(collected, frozenset({1, 2}))
