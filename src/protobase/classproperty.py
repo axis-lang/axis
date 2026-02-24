@@ -28,4 +28,3 @@ class classproperty[T]:
             raise AttributeError("can't set attribute")
         type_ = type(obj)
         return self.fset.__get__(obj, type_)(value)
-

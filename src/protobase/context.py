@@ -2,9 +2,9 @@
 from functools import wraps
 from typing import Callable, ClassVar, Optional, Self
 from weakref import WeakKeyDictionary
-from protobase.core import Object
+from protobase.object import Object
 from contextvars import ContextVar, Token
-from protobase.core.classproperty import classproperty
+from protobase.classproperty import classproperty
 
 class Context(Object, abstract=True):
     __contextvar__: ClassVar[ContextVar]

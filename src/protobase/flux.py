@@ -8,46 +8,48 @@ import weakref
 from protobase.inmutable import register_inmutable
 from protobase.record import Inmutable
 __all__ = [
-    "flux",
+    "method",
+    "property",
+    "emit",
     "collect",
     "collect_all",
-    "FluxCycleError",
-    "FluxKey",
-    "FluxQuery",
-    "FluxProperty",
-    "emit",
     "in_query",
+    "Query",
+    "Property",
+    "Key",
+    "Runtime",
+    "CycleError",
 ]
 
 
-class FluxCycleError(RuntimeError):
-    def __init__(self, cycle: list["FluxKey"], message: str):
+class CycleError(RuntimeError):
+    def __init__(self, cycle: list["Key"], message: str):
         super().__init__(message)
         self.cycle = cycle
 
 
-class FluxKey(Inmutable):
+class Key(Inmutable):
     func_id: int
     self_ref: Optional[weakref.ReferenceType]
     args: tuple
     kwargs: tuple
 
 
-class FluxRuntime:
+class Runtime:
     def __init__(self) -> None:
         self._cache_global: dict[tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]], Any] = {}
         self._cache_by_self: weakref.WeakKeyDictionary[object, dict[tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]], Any]] = weakref.WeakKeyDictionary()
-        self._deps: dict[FluxKey, set[FluxKey]] = {}
-        self._rdeps: dict[FluxKey, set[FluxKey]] = {}
+        self._deps: dict[Key, set[Key]] = {}
+        self._rdeps: dict[Key, set[Key]] = {}
         self._self_refs: weakref.WeakKeyDictionary[object, weakref.ref] = weakref.WeakKeyDictionary()
-        self._self_keys: dict[weakref.ref, set[FluxKey]] = {}
-        self._stack: list[FluxKey] = []
-        self._current_key: ContextVar[Optional[FluxKey]] = ContextVar("flux_current_key", default=None)
-        self._current_deps: ContextVar[Optional[set[FluxKey]]] = ContextVar("flux_current_deps", default=None)
+        self._self_keys: dict[weakref.ref, set[Key]] = {}
+        self._stack: list[Key] = []
+        self._current_key: ContextVar[Optional[Key]] = ContextVar("flux_current_key", default=None)
+        self._current_deps: ContextVar[Optional[set[Key]]] = ContextVar("flux_current_deps", default=None)
         self._current_emits: ContextVar[Optional[set[object]]] = ContextVar("flux_current_emits", default=None)
         self._func_registry: dict[int, Callable[..., Any]] = {}
         self._stats: dict[int, dict[str, Any]] = {}
-        self._emits: dict[FluxKey, set[object]] = {}
+        self._emits: dict[Key, set[object]] = {}
 
     def register_func(self, func: Callable[..., Any]) -> int:
         func_id = id(func)
@@ -82,33 +84,33 @@ class FluxRuntime:
         try:
             ref = self._self_refs.get(obj)
         except TypeError as exc:
-            raise TypeError("Flux requires hashable objects for cache keys") from exc
+            raise TypeError("flux requires hashable objects for cache keys") from exc
         if ref is not None:
             return ref
         try:
             ref = weakref.ref(obj, self._gc_self)
         except TypeError as exc:
             raise TypeError(
-                "Flux requires weak-referenceable objects; add '__weakref__' to __slots__"
+                "flux requires weak-referenceable objects; add '__weakref__' to __slots__"
             ) from exc
         self._self_refs[obj] = ref
         return ref
 
-    def _record_dep(self, key: FluxKey) -> None:
+    def _record_dep(self, key: Key) -> None:
         current_deps = self._current_deps.get()
         if current_deps is not None:
             current_deps.add(key)
 
     def _enter(
-        self, key: FluxKey
+        self, key: Key
     ) -> tuple[
-        Token[Optional[FluxKey]],
-        Token[Optional[set[FluxKey]]],
+        Token[Optional[Key]],
+        Token[Optional[set[Key]]],
         Token[Optional[set[object]]],
     ]:
         if key in self._stack:
             cycle = self._stack[self._stack.index(key) :] + [key]
-            raise FluxCycleError(cycle, self._format_cycle(cycle))
+            raise CycleError(cycle, self._format_cycle(cycle))
         self._stack.append(key)
         token_key = self._current_key.set(key)
         token_deps = self._current_deps.set(set())
@@ -117,11 +119,11 @@ class FluxRuntime:
 
     def _exit(
         self,
-        key: FluxKey,
-        token_key: Token[Optional[FluxKey]],
-        token_deps: Token[Optional[set[FluxKey]]],
+        key: Key,
+        token_key: Token[Optional[Key]],
+        token_deps: Token[Optional[set[Key]]],
         token_emits: Token[Optional[set[object]]],
-    ) -> tuple[set[FluxKey], set[object]]:
+    ) -> tuple[set[Key], set[object]]:
         self._current_key.reset(token_key)
         deps = self._current_deps.get() or set()
         self._current_deps.reset(token_deps)
@@ -134,11 +136,11 @@ class FluxRuntime:
                 self._stack.remove(key)
         return deps, emits
 
-    def _format_cycle(self, cycle: list[FluxKey]) -> str:
+    def _format_cycle(self, cycle: list[Key]) -> str:
         parts = [self._format_key(k) for k in cycle]
-        return "Flux cycle detected: " + " -> ".join(parts)
+        return "flux cycle detected: " + " -> ".join(parts)
 
-    def _format_key(self, key: FluxKey) -> str:
+    def _format_key(self, key: Key) -> str:
         func = self._func_registry.get(key.func_id)
         name = getattr(func, "__qualname__", "<flux>") if func else "<flux>"
         if key.self_ref is None:
@@ -148,12 +150,12 @@ class FluxRuntime:
             return f"{name}(<dead>)"
         return f"{name}({obj!r})"
 
-    def _register_key(self, key: FluxKey) -> None:
+    def _register_key(self, key: Key) -> None:
         if key.self_ref is None:
             return
         self._self_keys.setdefault(key.self_ref, set()).add(key)
 
-    def _unregister_key(self, key: FluxKey) -> None:
+    def _unregister_key(self, key: Key) -> None:
         if key.self_ref is None:
             return
         keys = self._self_keys.get(key.self_ref)
@@ -173,7 +175,7 @@ class FluxRuntime:
 
     def execute(
         self,
-        key: FluxKey,
+        key: Key,
         argkey: tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]],
         obj: object | None,
         func: Callable[..., Any],
@@ -214,7 +216,7 @@ class FluxRuntime:
         self._record_dep(key)
         return value
 
-    def _update_graph(self, key: FluxKey, deps: set[FluxKey]) -> None:
+    def _update_graph(self, key: Key, deps: set[Key]) -> None:
         old_deps = self._deps.get(key, set())
         for dep in old_deps:
             rset = self._rdeps.get(dep)
@@ -226,7 +228,7 @@ class FluxRuntime:
             self._rdeps.setdefault(dep, set()).add(key)
         self._deps[key] = deps
 
-    def invalidate_key(self, key: FluxKey) -> None:
+    def invalidate_key(self, key: Key) -> None:
         dependents = self._rdeps.pop(key, set())
         for dep in dependents:
             self.invalidate_key(dep)
@@ -243,7 +245,7 @@ class FluxRuntime:
         stats = self._stats_for(key.func_id)
         stats["invalidations"] += 1
 
-    def _remove_cache(self, key: FluxKey) -> None:
+    def _remove_cache(self, key: Key) -> None:
         argkey = (key.func_id, key.args, key.kwargs)
         if key.self_ref is None:
             self._cache_global.pop(argkey, None)
@@ -298,19 +300,19 @@ class FluxRuntime:
 
     def collect(
         self,
-        key: FluxKey,
+        key: Key,
         *,
         cls: type | None = None,
         transitive: bool = True,
     ) -> frozenset[object]:
         items: set[object] = set()
 
-        def add_from(target: FluxKey) -> None:
+        def add_from(target: Key) -> None:
             items.update(self._emits.get(target, set()))
 
         if transitive:
             stack = [key]
-            seen: set[FluxKey] = set()
+            seen: set[Key] = set()
             while stack:
                 current = stack.pop()
                 if current in seen:
@@ -339,27 +341,23 @@ class FluxRuntime:
         return frozenset(items)
 
 
-_runtime = FluxRuntime()
+_runtime = Runtime()
 
 register_inmutable(weakref.ReferenceType)
 
 
 def _supports_weakref(owner: type) -> bool:
-    has_slots = False
     for base in owner.__mro__:
         if "__slots__" in base.__dict__:
-            has_slots = True
             slots = base.__dict__.get("__slots__", ())
             if isinstance(slots, str):
                 slots = (slots,)
             if "__weakref__" in slots:
                 return True
-    if not has_slots:
-        return True
     return False
 
 
-class FluxQuery:
+class Query:
     def __init__(self, func: Callable[..., Any]) -> None:
         self.func = func
         self.func_id = _runtime.register_func(func)
@@ -373,7 +371,7 @@ class FluxQuery:
             return
         if not _supports_weakref(owner):
             raise TypeError(
-                f"@flux requires '__weakref__' in __slots__ for {owner.__qualname__}"
+                f"flux.method requires '__weakref__' in __slots__ for {owner.__qualname__}"
             )
 
     def __get__(self, obj: object | None, objtype: type | None = None):
@@ -391,22 +389,22 @@ class FluxQuery:
     def _call(self, obj: object | None, *args, **kwargs):
         if obj is None:
             argkey = _runtime._args_key(self.func_id, args, kwargs)
-            key = FluxKey(self.func_id, None, argkey[1], argkey[2])
+            key = Key(self.func_id, None, argkey[1], argkey[2])
             return _runtime.execute(key, argkey, None, self.func, args, kwargs)
         _runtime._self_ref(obj)
         argkey = _runtime._args_key(self.func_id, args, kwargs)
-        key = FluxKey(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
+        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
         return _runtime.execute(key, argkey, obj, lambda *a, **k: self.func(obj, *a, **k), args, kwargs)
 
     def invalidate(self, obj: object | None, *args, **kwargs) -> None:
         if obj is None:
             argkey = _runtime._args_key(self.func_id, args, kwargs)
-            key = FluxKey(self.func_id, None, argkey[1], argkey[2])
+            key = Key(self.func_id, None, argkey[1], argkey[2])
             _runtime.invalidate_key(key)
             return
         _runtime._self_ref(obj)
         argkey = _runtime._args_key(self.func_id, args, kwargs)
-        key = FluxKey(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
+        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
         _runtime.invalidate_key(key)
 
     def invalidate_for(self, obj: object) -> None:
@@ -429,7 +427,7 @@ class FluxQuery:
         return collect(self, *args, obj=obj, cls=cls, transitive=transitive, **kwargs)
 
 
-class FluxProperty(FluxQuery):
+class Property(Query):
     def __get__(self, obj: object | None, objtype: type | None = None):
         if obj is None:
             return self
@@ -439,19 +437,12 @@ class FluxProperty(FluxQuery):
         super().invalidate(obj)
 
 
-class _FluxDecorator:
-    def __call__(self, func: Callable[..., Any]) -> FluxQuery:
-        if isinstance(func, property):
-            if func.fget is None:
-                raise TypeError("@flux property requires a getter")
-            return FluxProperty(cast(Callable[..., Any], func.fget))
-        return FluxQuery(func)
-
-    def property(self, func: Callable[..., Any]) -> FluxProperty:
-        return FluxProperty(func)
+def method(func: Callable[..., Any]) -> Query:
+    return Query(func)
 
 
-flux = _FluxDecorator()
+def property(func: Callable[..., Any]) -> Property:
+    return Property(func)
 
 
 def in_query() -> bool:
@@ -463,43 +454,43 @@ def emit(item: object) -> None:
 
 
 def _query_key(
-    query: FluxQuery,
+    query: Query,
     *,
     obj: object | None,
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-) -> FluxKey:
+) -> Key:
     if obj is None:
         argkey = _runtime._args_key(query.func_id, args, kwargs)
-        return FluxKey(query.func_id, None, argkey[1], argkey[2])
+        return Key(query.func_id, None, argkey[1], argkey[2])
     _runtime._self_ref(obj)
     argkey = _runtime._args_key(query.func_id, args, kwargs)
-    return FluxKey(query.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
+    return Key(query.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
 
 
 def collect(
-    query: FluxQuery,
+    query: Query,
     *args,
     obj: object | None = None,
     cls: type | None = None,
     transitive: bool = True,
     **kwargs,
 ) -> frozenset[object]:
-    if not isinstance(query, FluxQuery):
-        raise TypeError("collect expects a FluxQuery")
+    if not isinstance(query, Query):
+        raise TypeError("collect expects a Query")
     key = _query_key(query, obj=obj, args=args, kwargs=kwargs)
     return _runtime.collect(key, cls=cls, transitive=transitive)
 
 
 def collect_all(
-    func: FluxQuery | None = None,
+    func: Query | None = None,
     *,
     cls: type | None = None,
     transitive: bool = True,
 ) -> frozenset[object]:
     func_id = None
     if func is not None:
-        if not isinstance(func, FluxQuery):
-            raise TypeError("collect_all expects a FluxQuery or None")
+        if not isinstance(func, Query):
+            raise TypeError("collect_all expects a Query or None")
         func_id = func.func_id
     return _runtime.collect_all(func_id, cls=cls, transitive=transitive)

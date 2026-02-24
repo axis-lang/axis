@@ -3,8 +3,9 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, dataclass_transform
 from weakref import WeakKeyDictionary, ref
 
-from .core import attr_info_of, derived, attrs_of
-from .core.object import Object, Type
+from .object import attr_info_of, attrs_of, Object
+from .derived import derived
+from .type import Type
 from .inmutable import check_inmutable, register_inmutable
 from .utils import compile_function, dict_split
 

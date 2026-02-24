@@ -90,23 +90,23 @@ class FileSystemBase(Object, abstract=True):
     def _now(self) -> timedelta:
         return timedelta(microseconds=time.time_ns() // 1000)
 
-    @flux
+    @flux.method
     def read_text(self, path: Path | str) -> str:
         raise NotImplementedError
 
-    @flux
+    @flux.method
     def stat(self, path: Path | str) -> FSStat:
         raise NotImplementedError
 
-    @flux
+    @flux.method
     def exists(self, path: Path | str) -> bool:
         raise NotImplementedError
 
-    @flux
+    @flux.method
     def listdir(self, path: Path | str) -> tuple[Path, ...]:
         raise NotImplementedError
 
-    @flux
+    @flux.method
     def glob(self, root: Path | str, pattern: str) -> tuple[Path, ...]:
         root_path = self._normalize(root)
         root_rel = Path(pattern)
@@ -178,12 +178,12 @@ class PhysicalFileSystem(FileSystemBase):
         target = self._normalize(path)
         self.invalidate_path(target)
 
-    @flux
+    @flux.method
     def read_text(self, path: Path | str) -> str:
         target = self._normalize(path)
         return target.read_text(encoding="utf-8")
 
-    @flux
+    @flux.method
     def stat(self, path: Path | str) -> FSStat:
         target = self._normalize(path)
         if not target.exists():
@@ -198,12 +198,12 @@ class PhysicalFileSystem(FileSystemBase):
             mtime=_mtime_from_ns(stat.st_mtime_ns),
         )
 
-    @flux
+    @flux.method
     def exists(self, path: Path | str) -> bool:
         target = self._normalize(path)
         return target.exists()
 
-    @flux
+    @flux.method
     def listdir(self, path: Path | str) -> tuple[Path, ...]:
         target = self._normalize(path)
         if not target.is_dir():
@@ -257,7 +257,7 @@ class VirtualFileSystem(FileSystemBase):
             self.invalidate_path(target)
             self.invalidate_dir(target.parent)
 
-    @flux
+    @flux.method
     def read_text(self, path: Path | str) -> str:
         target = self._normalize(path)
         buffer = self.files.get(target)
@@ -265,7 +265,7 @@ class VirtualFileSystem(FileSystemBase):
             raise FileNotFoundError(f"File not found: {target}")
         return buffer.text
 
-    @flux
+    @flux.method
     def stat(self, path: Path | str) -> FSStat:
         target = self._normalize(path)
         buffer = self.files.get(target)
@@ -289,12 +289,12 @@ class VirtualFileSystem(FileSystemBase):
             )
         return _missing_stat(target)
 
-    @flux
+    @flux.method
     def exists(self, path: Path | str) -> bool:
         target = self._normalize(path)
         return target in self.files or _has_descendant(self.files.keys(), target)
 
-    @flux
+    @flux.method
     def listdir(self, path: Path | str) -> tuple[Path, ...]:
         target = self._normalize(path)
         return tuple(sorted(_children_from_files(self.files.keys(), target)))
@@ -352,7 +352,7 @@ class FSOverlay(FileSystemBase):
             self.invalidate_path(target)
             self.invalidate_dir(target.parent)
 
-    @flux
+    @flux.method
     def read_text(self, path: Path | str) -> str:
         target = self._normalize(path)
         buffer = self.overlay.get(target)
@@ -365,7 +365,7 @@ class FSOverlay(FileSystemBase):
             return buffer.text
         return self.base.read_text(target)
 
-    @flux
+    @flux.method
     def stat(self, path: Path | str) -> FSStat:
         target = self._normalize(path)
         buffer = self.overlay.get(target)
@@ -397,7 +397,7 @@ class FSOverlay(FileSystemBase):
             return overlay_stat
         return base_stat
 
-    @flux
+    @flux.method
     def exists(self, path: Path | str) -> bool:
         target = self._normalize(path)
         if target in self.overlay:
@@ -406,7 +406,7 @@ class FSOverlay(FileSystemBase):
             return True
         return bool(self.base.exists(target))
 
-    @flux
+    @flux.method
     def listdir(self, path: Path | str) -> tuple[Path, ...]:
         target = self._normalize(path)
         base_entries = tuple(self.base.listdir(target))

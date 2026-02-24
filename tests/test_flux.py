@@ -2,7 +2,7 @@ import gc
 import unittest
 import weakref
 
-from protobase import FluxCycleError, flux
+from protobase import flux
 
 
 class FluxMethodTest(unittest.TestCase):
@@ -15,7 +15,7 @@ class FluxMethodTest(unittest.TestCase):
             def __init__(self, value: int) -> None:
                 self.value = value
 
-            @flux
+            @flux.method
             def add(self, delta: int) -> int:
                 calls["add"] += 1
                 return self.value + delta
@@ -36,7 +36,7 @@ class FluxMethodTest(unittest.TestCase):
             def __init__(self, value: int) -> None:
                 self.value = value
 
-            @flux
+            @flux.method
             def add(self, delta: int) -> int:
                 calls["add"] += 1
                 return self.value + delta
@@ -58,7 +58,7 @@ class FluxMethodTest(unittest.TestCase):
             def __init__(self, value: int) -> None:
                 self.value = value
 
-            @flux
+            @flux.method
             def add(self, delta: int) -> int:
                 calls["add"] += 1
                 return self.value + delta
@@ -107,12 +107,12 @@ class FluxDependencyTest(unittest.TestCase):
             def __init__(self, value: int) -> None:
                 self.value = value
 
-            @flux
+            @flux.method
             def base(self) -> int:
                 calls["base"] += 1
                 return self.value
 
-            @flux
+            @flux.method
             def derived(self) -> int:
                 calls["derived"] += 1
                 return self.base() + 1
@@ -133,25 +133,25 @@ class FluxCycleTest(unittest.TestCase):
         class Loop:
             __slots__ = ("__weakref__",)
 
-            @flux
+            @flux.method
             def left(self) -> int:
                 return self.right()
 
-            @flux
+            @flux.method
             def right(self) -> int:
                 return self.left()
 
         loop = Loop()
-        with self.assertRaises(FluxCycleError) as ctx:
+        with self.assertRaises(flux.CycleError) as ctx:
             loop.left()
-        self.assertIn("Flux cycle detected", str(ctx.exception))
+        self.assertIn("flux cycle detected", str(ctx.exception))
 
 
 class FluxFunctionTest(unittest.TestCase):
     def test_global_function_cache(self):
         calls = {"add": 0}
 
-        @flux
+        @flux.method
         def add(a: int, b: int) -> int:
             calls["add"] += 1
             return a + b
@@ -171,7 +171,7 @@ class FluxWeakrefTest(unittest.TestCase):
             class BadSlots:
                 __slots__ = ("value",)
 
-                @flux
+                @flux.method
                 def compute(self) -> int:
                     return 1
 
@@ -182,7 +182,7 @@ class FluxWeakrefTest(unittest.TestCase):
             def __init__(self, value: int) -> None:
                 self.value = value
 
-            @flux
+            @flux.method
             def read(self) -> int:
                 return self.value
 

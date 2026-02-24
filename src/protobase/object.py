@@ -24,7 +24,7 @@ from typing import (
 from warnings import warn
 from weakref import WeakKeyDictionary
 
-from ..utils import compile_function, dict_split
+from .utils import compile_function, dict_split
 from .derived import derived
 from .type import Type
 
@@ -359,8 +359,6 @@ class Object(metaclass=Type, abstract=True):
                     # already defined slots
                     seen=set(slots_of(bld.mro)),
                 )
-                if not abstract
-                else ()
             )
 
             bld.namespace["__slots__"] = slots

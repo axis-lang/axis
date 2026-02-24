@@ -1,7 +1,8 @@
 #%%
 from typing import Any, ClassVar, Self
 from weakref import WeakKeyDictionary
-from protobase.core import Object, Type
+from protobase.object import Object
+from protobase.type import Type
 
 class Metadata[T](Object, abstract=True):
     __slots__ = '__weakref__',
@@ -48,4 +49,3 @@ class Metadata[T](Object, abstract=True):
         for obj in objs:
             storage[obj] = self
         
-
