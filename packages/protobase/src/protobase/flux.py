@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, cast
 import weakref
 
 from protobase.inmutable import register_inmutable
-from protobase.record import Inmutable
+from protobase.record import Inmutable, Record
 __all__ = [
     "method",
     "property",
@@ -35,12 +35,24 @@ class Key(Inmutable):
     kwargs: tuple
 
 
+class Dep(Record):
+    key: Key
+    changed_at: int
+
+
+class Memo(Record):
+    value: Any
+    changed_at: int
+    verified_at: int
+    deps: tuple[Dep, ...] = ()
+    emits: frozenset[object] = frozenset()
+    stale: bool = False
+
+
 class Runtime:
     def __init__(self) -> None:
-        self._cache_global: dict[tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]], Any] = {}
-        self._cache_by_self: weakref.WeakKeyDictionary[object, dict[tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]], Any]] = weakref.WeakKeyDictionary()
-        self._deps: dict[Key, set[Key]] = {}
-        self._rdeps: dict[Key, set[Key]] = {}
+        self._revision: int = 0
+        self._memos: dict[Key, Memo] = {}
         self._self_refs: weakref.WeakKeyDictionary[object, weakref.ref] = weakref.WeakKeyDictionary()
         self._self_keys: dict[weakref.ref, set[Key]] = {}
         self._stack: list[Key] = []
@@ -49,7 +61,6 @@ class Runtime:
         self._current_emits: ContextVar[Optional[set[object]]] = ContextVar("flux_current_emits", default=None)
         self._func_registry: dict[int, Callable[..., Any]] = {}
         self._stats: dict[int, dict[str, Any]] = {}
-        self._emits: dict[Key, set[object]] = {}
 
     def register_func(self, func: Callable[..., Any]) -> int:
         func_id = id(func)
@@ -171,115 +182,146 @@ class Runtime:
         except Exception:
             return
         for key in list(keys):
-            self.invalidate_key(key)
+            self._drop_key(key)
 
-    def execute(
+    def _drop_key(self, key: Key) -> None:
+        self._memos.pop(key, None)
+        self._unregister_key(key)
+
+    def _memo_deps(self, deps: set[Key]) -> tuple[Dep, ...]:
+        result: list[Dep] = []
+        for dep in deps:
+            memo = self._memos.get(dep)
+            if memo is None:
+                continue
+            result.append(Dep(dep, memo.changed_at))
+        return tuple(result)
+
+    def _maybe_changed_after(self, memo: Memo, since: int) -> bool:
+        if memo.stale:
+            return True
+        if memo.changed_at > since:
+            return True
+        if memo.verified_at == self._revision:
+            return False
+
+        for dep in memo.deps:
+            dep_memo = self._memos.get(dep.key)
+            if dep_memo is None:
+                return True
+            if dep_memo.stale:
+                return True
+            if dep_memo.changed_at > dep.changed_at:
+                return True
+            if dep_memo.verified_at != self._revision:
+                if self._maybe_changed_after(dep_memo, dep.changed_at):
+                    return True
+
+        memo.verified_at = self._revision
+        return False
+
+    def _fetch_key(self, key: Key) -> Any | None:
+        func = self._func_registry.get(key.func_id)
+        if func is None:
+            return None
+        kwargs = dict(key.kwargs)
+        if key.self_ref is None:
+            return self.fetch(key, None, func, key.args, kwargs)
+        obj = key.self_ref()
+        if obj is None:
+            self._drop_key(key)
+            return None
+        return self.fetch(key, obj, func, key.args, kwargs)
+
+    def fetch(
         self,
         key: Key,
-        argkey: tuple[int, tuple[Any, ...], tuple[tuple[str, Any], ...]],
         obj: object | None,
         func: Callable[..., Any],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> Any:
         stats = self._stats_for(key.func_id)
-        if obj is None:
-            if argkey in self._cache_global:
+        memo = self._memos.get(key)
+        if memo is not None and not memo.stale:
+            if memo.verified_at == self._revision:
                 stats["hits"] += 1
                 self._record_dep(key)
-                return self._cache_global[argkey]
-        else:
-            bucket = self._cache_by_self.get(obj)
-            if bucket is not None and argkey in bucket:
+                return memo.value
+            if not self._maybe_changed_after(memo, memo.changed_at):
                 stats["hits"] += 1
                 self._record_dep(key)
-                return bucket[argkey]
+                return memo.value
 
         stats["misses"] += 1
         token_key, token_deps, token_emits = self._enter(key)
         start = perf_counter()
         try:
-            value = func(*args, **kwargs)
-        finally:
-            elapsed = perf_counter() - start
+            if obj is None:
+                value = func(*args, **kwargs)
+            else:
+                value = func(obj, *args, **kwargs)
+        except Exception:
+            self._exit(key, token_key, token_deps, token_emits)
+            raise
         deps, emits = self._exit(key, token_key, token_deps, token_emits)
-        self._update_graph(key, deps)
-        self._register_key(key)
-        self._emits[key] = emits
-        if obj is None:
-            self._cache_global[argkey] = value
+        elapsed = perf_counter() - start
+
+        dep_list = self._memo_deps(deps)
+        emits_frozen = frozenset(emits)
+        if memo is None:
+            memo = Memo(value, self._revision, self._revision, dep_list, emits_frozen, False)
+            self._memos[key] = memo
+            self._register_key(key)
         else:
-            bucket = self._cache_by_self.setdefault(obj, {})
-            bucket[argkey] = value
+            if memo.value != value:
+                memo.changed_at = self._revision
+            memo.value = value
+            memo.verified_at = self._revision
+            memo.deps = dep_list
+            memo.emits = emits_frozen
+            memo.stale = False
+
         stats["recomputes"] += 1
         stats["time"] += elapsed
         self._record_dep(key)
-        return value
+        return memo.value
 
-    def _update_graph(self, key: Key, deps: set[Key]) -> None:
-        old_deps = self._deps.get(key, set())
-        for dep in old_deps:
-            rset = self._rdeps.get(dep)
-            if rset is not None:
-                rset.discard(key)
-                if not rset:
-                    self._rdeps.pop(dep, None)
-        for dep in deps:
-            self._rdeps.setdefault(dep, set()).add(key)
-        self._deps[key] = deps
+    def _bump_revision(self) -> None:
+        self._revision += 1
 
-    def invalidate_key(self, key: Key) -> None:
-        dependents = self._rdeps.pop(key, set())
-        for dep in dependents:
-            self.invalidate_key(dep)
-        deps = self._deps.pop(key, set())
-        for dep in deps:
-            rset = self._rdeps.get(dep)
-            if rset is not None:
-                rset.discard(key)
-                if not rset:
-                    self._rdeps.pop(dep, None)
-        self._remove_cache(key)
-        self._unregister_key(key)
-        self._emits.pop(key, None)
+    def _mark_stale(self, key: Key) -> None:
+        memo = self._memos.get(key)
+        if memo is None:
+            return
+        memo.stale = True
+        memo.verified_at = 0
         stats = self._stats_for(key.func_id)
         stats["invalidations"] += 1
 
-    def _remove_cache(self, key: Key) -> None:
-        argkey = (key.func_id, key.args, key.kwargs)
-        if key.self_ref is None:
-            self._cache_global.pop(argkey, None)
-            return
-        obj = key.self_ref()
-        if obj is None:
-            return
-        bucket = self._cache_by_self.get(obj)
-        if bucket is None:
-            return
-        bucket.pop(argkey, None)
-        if not bucket:
-            try:
-                del self._cache_by_self[obj]
-            except KeyError:
-                pass
+    def invalidate_key(self, key: Key) -> None:
+        self._bump_revision()
+        self._mark_stale(key)
 
     def invalidate_for(self, obj: object, func_id: int | None = None) -> None:
         ref = self._self_refs.get(obj)
         if ref is None:
             return
+        self._bump_revision()
         keys = self._self_keys.get(ref, set())
         for key in list(keys):
             if func_id is not None and key.func_id != func_id:
                 continue
-            self.invalidate_key(key)
+            self._mark_stale(key)
 
     def invalidate_all(self, func_id: int | None = None) -> None:
+        self._bump_revision()
         if func_id is None:
-            keys = list(self._deps.keys())
+            keys = list(self._memos.keys())
         else:
-            keys = [key for key in self._deps if key.func_id == func_id]
+            keys = [key for key in self._memos if key.func_id == func_id]
         for key in keys:
-            self.invalidate_key(key)
+            self._mark_stale(key)
 
     def stats(self, func_id: int | None = None) -> dict[str, Any] | dict[int, dict[str, Any]]:
         if func_id is None:
@@ -308,7 +350,10 @@ class Runtime:
         items: set[object] = set()
 
         def add_from(target: Key) -> None:
-            items.update(self._emits.get(target, set()))
+            memo = self._memos.get(target)
+            if memo is None:
+                return
+            items.update(memo.emits)
 
         if transitive:
             stack = [key]
@@ -318,9 +363,14 @@ class Runtime:
                 if current in seen:
                     continue
                 seen.add(current)
+                self._fetch_key(current)
                 add_from(current)
-                stack.extend(self._deps.get(current, set()))
+                memo = self._memos.get(current)
+                if memo is None:
+                    continue
+                stack.extend(dep.key for dep in memo.deps)
         else:
+            self._fetch_key(key)
             add_from(key)
 
         if cls is not None:
@@ -335,8 +385,8 @@ class Runtime:
         transitive: bool = True,
     ) -> frozenset[object]:
         items: set[object] = set()
-        keys = [key for key in self._emits if func_id is None or key.func_id == func_id]
-        for key in keys:
+        keys = [key for key in self._memos if func_id is None or key.func_id == func_id]
+        for key in list(keys):
             items.update(self.collect(key, cls=cls, transitive=transitive))
         return frozenset(items)
 
@@ -390,11 +440,11 @@ class Query:
         if obj is None:
             argkey = _runtime._args_key(self.func_id, args, kwargs)
             key = Key(self.func_id, None, argkey[1], argkey[2])
-            return _runtime.execute(key, argkey, None, self.func, args, kwargs)
+            return _runtime.fetch(key, None, self.func, args, kwargs)
         _runtime._self_ref(obj)
         argkey = _runtime._args_key(self.func_id, args, kwargs)
         key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
-        return _runtime.execute(key, argkey, obj, lambda *a, **k: self.func(obj, *a, **k), args, kwargs)
+        return _runtime.fetch(key, obj, self.func, args, kwargs)
 
     def invalidate(self, obj: object | None, *args, **kwargs) -> None:
         if obj is None:
