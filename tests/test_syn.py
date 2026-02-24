@@ -103,6 +103,12 @@ class DatabaseSmokeTest(unittest.TestCase):
         self.assertGreater(len(db.entities_by_shape), 0)
         self.assertGreater(len(db.members_by_scope), 0)
 
+    def test_database_is_cached(self):
+        pkg = items.Package.from_path("codebase/std-core")
+        db1 = pkg.database
+        db2 = pkg.database
+        self.assertIs(db1, db2)
+
 
 # def test_parser(self):
 #     unit = self.parser.parse_unit(SOURCE_UNIT_PATH)

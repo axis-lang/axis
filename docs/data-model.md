@@ -215,12 +215,12 @@ It is a concrete literal value in the `Val` branch.
 
 - `parent: Ref | None`
 - `member: str`
-- `params: Tuple[str | None, Const]`
+- `params: Tuple[str, Const]`
 
 `Ref.Type` describes the structural type of a reference:
 
 - `parent: Ref.Type | None`
-- `params: Tuple[str | None, Type]`
+- `params: Tuple[str, Type]`
 
 `segments` can be derived via `dom.ref_segments(ref)`.
 

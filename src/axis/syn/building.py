@@ -205,7 +205,7 @@ class FromSrcMixin(Record, frozen=True, abstract=True):
 
     @property
     def span(self) -> src.Span | None:
-        return src.Span.of(self)
+        return src.span_of(self)
 
     #@property
     def as_label(self, *args, **kwargs):

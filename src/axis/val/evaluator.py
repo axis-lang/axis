@@ -48,9 +48,9 @@ class Evaluator(Record, frozen=True):
         bounds: Iterable[dom.Type],
         values: Iterable[dom.Data],
     ):
-        index = cast(dom.Index[str | None], dom.Index(tuple(cast(str | None, k) for k in keys)))
-        fields = cast(dom.Tuple[str | None, dom.Type], dom.Tuple(index=index, values=tuple(bounds)))
-        struct = dom.StructType(fields=cast(dom.Tuple[str | None, dom.Type], fields))
+        index = dom.Index(tuple(k for k in keys))
+        fields = cast(dom.Tuple[str, dom.Type], dom.Tuple(index=index, values=tuple(bounds)))
+        struct = dom.StructType(fields=cast(dom.Tuple[str, dom.Type], fields))
         return struct, tuple(values)
 
     def _error(self, node: syn.Node, message: str):

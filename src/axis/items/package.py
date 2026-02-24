@@ -2,10 +2,12 @@ from typing import Self
 from protobase import Record
 
 from axis import src, syn
+from protobase import flux
 from axis.sem import Database
 #from .index import GlobalIndex
 
 class Package(Record, frozen=True):
+    __slots__ = ("__weakref__",)
     dir: src.Dir
 
     """
@@ -40,6 +42,7 @@ class Package(Record, frozen=True):
         )
 
     @property
+    @flux.property
     def database(self):
         collector = Database.Builder()
         for item in self.all_items:

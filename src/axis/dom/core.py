@@ -5,6 +5,7 @@ from typing import Self, Union as TypingUnion, cast
 
 from protobase import Record, frozendict, inmutable
 
+from axis import syn
 from axis.dom.tuple_ import Tuple
 
 
@@ -73,7 +74,7 @@ class NominalType(Type, frozen=True, consed=True):
 
 
 class StructType(Type, frozen=True, consed=True):
-    fields: Tuple[str | None, "Type"]
+    fields: Tuple[str, "Type"]
 
 
 class FnType(Type, frozen=True, consed=True):
@@ -143,10 +144,19 @@ class Var(Dom, frozen=True, consed=True):
             raise TypeError("Var.type id must match Var.data id")
 
 
+class Err(Val, frozen=True, consed=True):
+    message: str
+    origin: "syn.Node | None" = None
+
+    def __invariants__(self) -> None:
+        if not isinstance(self.message, str) or not self.message:
+            raise TypeError("Err.message must be a non-empty string")
+
+
 class Ref(Val, frozen=True, consed=True):
     class Type(Type, frozen=True, consed=True):
         parent: "Ref.Type | None" = None
-        params: Tuple[str | None, "Type"] = Tuple.EMPTY
+        params: Tuple[str, "Type"] = Tuple.EMPTY
 
     class Data(Builtin, frozen=True, consed=True):
         member: str
@@ -162,7 +172,7 @@ class Ref(Val, frozen=True, consed=True):
         member: str,
         *,
         parent: "Ref | None" = None,
-        params: Tuple[str | None, Const] = Tuple.EMPTY,
+        params: Tuple[str, Const] = Tuple.EMPTY,
     ) -> "Ref":
         parent_type = cast(Ref.Type | None, parent.type) if parent else None
         param_types = Tuple(index=params.index, values=tuple(p.type for p in params.values))
@@ -195,7 +205,7 @@ class Ref(Val, frozen=True, consed=True):
         self,
         name: str,
         *,
-        params: Tuple[str | None, Const] = Tuple.EMPTY,
+        params: Tuple[str, Const] = Tuple.EMPTY,
     ) -> "Ref":
         return Ref.from_parts(name, parent=self, params=params)
 
@@ -204,7 +214,10 @@ class Ref(Val, frozen=True, consed=True):
             raise TypeError("Ref.with_args requires a StructType value")
         if not isinstance(args.data, tuple):
             raise TypeError("Ref.with_args requires tuple data")
-        ref_type = Ref.Type(parent=self.type.parent, params=args.type.fields)
+        ref_type = Ref.Type(
+            parent=self.type.parent,
+            params=cast(Tuple[str, Type], args.type.fields),
+        )
         ref_data = Ref.Data(parent=self.data.parent, member=self.data.member, params=args.data)
         return Ref(type=ref_type, data=ref_data)
 

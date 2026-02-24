@@ -5,4 +5,5 @@ from protobase.context import *
 from protobase.metadata import *
 from protobase.dispatch import *
 from protobase.frozendict import *
-from dataclasses import MISSING, _MISSING_TYPE as MissingType
+from protobase.flux import *
+from dataclasses import MISSING as Missing, _MISSING_TYPE as MissingType
