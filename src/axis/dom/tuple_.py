@@ -1,10 +1,10 @@
 # %%
 from __future__ import annotations
 from typing import Any, Callable, ClassVar, Iterator, overload
-from protobase import Record, cached_property, classproperty
+from protobase import Consed, cached_property, classproperty
 from axis.dom.map import Map
 
-class Shape[K](Record, frozen=True, consed=True):
+class Shape[K](Consed):
     """
     def Shape[arity] K
 
@@ -45,7 +45,7 @@ class Shape[K](Record, frozen=True, consed=True):
         return key in self.keys
 
 
-class Index[K](Record, frozen=True, consed=True):
+class Index[K](Consed):
     """
     def Index[K] Whole
     Index[K]('a', 'b', None, 'x', 'y')
@@ -110,7 +110,7 @@ class Index[K](Record, frozen=True, consed=True):
         return self._keyed_indices.has
 
 
-class Tuple[K, V](Record, frozen=True, consed=True):
+class Tuple[K, V](Consed):
     index: Index[K]  # Index[L] K
     values: tuple[V, ...]  # inner representation
 

@@ -2,11 +2,8 @@ from __future__ import annotations
 from typing import ClassVar, Literal
 from axis import syn, expr
 
-from typing import ClassVar, Literal
-from axis import syn, expr
 
-
-class TupleBlock(syn.Block, expr.Tuple, frozen=True, abstract=True):
+class TupleBlock(syn.Block, expr.Tuple, abstract=True):
     """
     <block>
         val N: Number
@@ -15,7 +12,6 @@ class TupleBlock(syn.Block, expr.Tuple, frozen=True, abstract=True):
     class Element(
         expr.Tuple.Nominal,
         syn.EmbeddedItem,
-        frozen=True,
         abstract=True,
     ):  ## expr.Tuple.Nominal ValueMixin or ElementMixin
         """
@@ -23,7 +19,7 @@ class TupleBlock(syn.Block, expr.Tuple, frozen=True, abstract=True):
         where <kw> in ["val", "var", "let", "dyn", "mut"]
         """
 
-        outline_keyword: ClassVar[Literal["val", "var", "let", "dyn", "mut"]]
+        outline_keyword: ClassVar[str]  # type: ignore[override]
 
         @classmethod
         def build(
@@ -38,19 +34,19 @@ class TupleBlock(syn.Block, expr.Tuple, frozen=True, abstract=True):
             ), f"Expected keyword {cls.outline_keyword}, got {kw}"
             return super().build(*args, **kwargs)
 
-    class Val(Element, frozen=True):
+    class Val(Element):
         outline_keyword: ClassVar = "val"
 
-    class Var(Element, frozen=True):
+    class Var(Element):
         outline_keyword: ClassVar = "var"
 
-    class Let(Element, frozen=True):
+    class Let(Element):
         outline_keyword: ClassVar = "let"
 
-    class Dyn(Element, frozen=True):
+    class Dyn(Element):
         outline_keyword: ClassVar = "dyn"
 
-    class Mut(Element, frozen=True):
+    class Mut(Element):
         outline_keyword: ClassVar = "mut"
 
     # outline_keyword_sep: ClassVar[str] = ": \t"
@@ -63,14 +59,14 @@ class TupleBlock(syn.Block, expr.Tuple, frozen=True, abstract=True):
     }
 
     @classmethod
-    def build(
-        cls,
-        kw: str,
-        sep: Literal[":"],
-        *,
-        children: syn.Block.Children,
-        **kwargs
-    ):
-        assert kw == cls.outline_keyword, f'Expected keyword {cls.outline_keyword}, got {kw}'
+    def build(cls, elements, *args, **kwargs):
+        children = kwargs.pop("children", ())
+        match args:
+            case (kw, sep):
+                assert kw == cls.outline_keyword, f"Expected keyword {cls.outline_keyword}, got {kw}"
+            case (sep,):
+                pass
+            case _:
+                raise ValueError(f"Invalid args for {cls.__name__}: {args}")
         elements = tuple(child for child in children if isinstance(child, cls.Element))
         return cls(elements=elements, **kwargs)

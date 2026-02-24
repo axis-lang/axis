@@ -1,4 +1,4 @@
 from axis import syn
 
-class Suite(syn.Expr, frozen=True):
+class Suite(syn.Expr):
     statements: tuple[syn.Statement, ...]

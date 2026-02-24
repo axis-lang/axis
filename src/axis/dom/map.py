@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, Iterator, Optional, Self, overload
 
-from protobase import Record, frozendict
+from protobase import Consed, frozendict
 
 
-class Map[K, V](Record, frozen=True, consed=True):
+class Map[K, V](Consed):
     "def Map[K] V"
 
     _inner: frozendict[K, V]

@@ -1,7 +1,7 @@
 from typing import Self
 from axis import syn
 
-class Trail(syn.Expr, frozen=True):
+class Trail(syn.Expr):
     'base {suite}'
 
     base: syn.Expr

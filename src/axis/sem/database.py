@@ -3,7 +3,7 @@ from __future__ import annotations
 from itertools import combinations
 from typing import Iterable, Optional, TYPE_CHECKING, TypeAlias
 
-from protobase import Record, frozendict
+from protobase import Inmutable, frozendict
 
 from axis import dom, expr, syn
 
@@ -13,7 +13,7 @@ from .ref_shape import RefShape
 
 
 
-class Database(Record, frozen=True):
+class Database(Inmutable):
     type EntitiesByShape = frozendict[RefShape, Entity]
     type MembersByScope = frozendict[RefShape, frozendict[str, RefShape]]
 

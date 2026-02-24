@@ -2,15 +2,16 @@ from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
 from axis import syn
+from protobase import Inmutable
 
 
 
-class Global(syn.SegregatedItem, frozen=True, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
+class Global(syn.SegregatedItem, syn.MatchClass, Inmutable, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
     """
     <kw> <name>: <type> = <value>
     where <kw> in ["val", "var", "let", 'dyn', 'mut']
     """
-    outline_keyword: ClassVar[Literal["val", "var", "let", "dyn", "mut"]]
+    outline_keyword: ClassVar[str]  # type: ignore[override]
 
     key: syn.Expr | None = None
     bound: Optional[syn.Expr] = None
@@ -53,17 +54,17 @@ class Global(syn.SegregatedItem, frozen=True, abstract=True): ## expr.Tuple.Nomi
         if self.bound is not None:
             collector.constraint(self.key, self.bound, origin=self.bound, ctx=self)
 
-class Val(Global, frozen=True):
+class Val(Global):
     outline_keyword: ClassVar = "val"
 
-class Var(Global, frozen=True):
+class Var(Global):
     outline_keyword: ClassVar = "var"
 
-class Let(Global, frozen=True):
+class Let(Global):
     outline_keyword: ClassVar = "let"
 
-class Dyn(Global, frozen=True):
+class Dyn(Global):
     outline_keyword: ClassVar = "dyn"
 
-class Mut(Global, frozen=True):
+class Mut(Global):
     outline_keyword: ClassVar = "mut"

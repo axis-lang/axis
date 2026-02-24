@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from typing import Iterable, Mapping, Sequence, cast
 
-from protobase import Object, Record, flux
+from protobase import Inmutable, Object, flux
 
 from .proto import FileSystem
 
@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-class FSStat(Record, frozen=True):
+class FSStat(Inmutable):
     path: Path
     exists: bool
     is_file: bool
@@ -116,7 +116,7 @@ class FileSystemBase(Object, abstract=True):
                 rel = entry.relative_to(root_path)
             except ValueError:
                 continue
-            if rel.match(pattern) or entry.match(root_rel):
+            if rel.match(pattern) or entry.match(str(root_rel)):  # type: ignore[arg-type]
                 matches.append(entry)
         return tuple(sorted(matches))
 

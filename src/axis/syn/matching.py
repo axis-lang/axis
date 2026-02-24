@@ -1,6 +1,6 @@
 from functools import singledispatchmethod
 from typing import Any, ClassVar, Self, Sequence
-from protobase import Object, Record, attrs_of, frozendict, is_abstract
+from protobase import Inmutable, Object, attrs_of, frozendict, is_abstract
 from .node import Node, Expr
 
 class Matcher(Object):
@@ -94,7 +94,7 @@ class Match(Object):
         patterns = tuple(Expr.from_str(target) if isinstance(target, str) else target for target in patterns)
         return cls(patterns=patterns)
 
-class MatchClass(Record, abstract=True, frozen=True):
+class MatchClass(Inmutable, abstract=True):
     """
     Match an expression against multiple target patterns
     and return the first successful match's captured values.

@@ -5,7 +5,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, List, NoReturn, Optional, Self
 
-from protobase import Record, mutate
+from protobase import Inmutable, mutate
 from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.style import Style
@@ -42,7 +42,7 @@ _LABEL_STYLE = {
 }
 
 
-class Label(Record, frozen=True):
+class Label(Inmutable):
     span: src.Span
     message: Optional[str] = None
     style: LabelStyle = LabelStyle.PRIMARY
@@ -51,7 +51,7 @@ class Label(Record, frozen=True):
     def file(self):
         return self.span.file
 
-class Diagnostic(Record, frozen=True):
+class Diagnostic(Inmutable):
     severity: Severity
     message: str
     code: Optional[str] = None

@@ -2,7 +2,7 @@ from typing import Self
 from axis import syn, val
 from .sym import Sym
 
-class Member(syn.Expr, frozen=True):
+class Member(syn.Expr):
     of: syn.Expr
     name: str
 

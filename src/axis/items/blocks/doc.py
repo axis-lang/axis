@@ -1,8 +1,9 @@
 from textwrap import dedent
 from typing import ClassVar, Self
 from axis import syn, src
+from protobase import Inmutable
 
-class Doc(syn.Block, frozen=True):
+class Doc(syn.Block, Inmutable):
     outline_keyword: ClassVar[str] = "---"
     outline_keyword_sep: ClassVar[str] = ""
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from protobase import Record, frozendict
+from protobase import Inmutable, frozendict
 
 from axis import syn
 
@@ -10,7 +10,7 @@ from .ref_shape import RefShape
 from axis import dom
 
 
-class ReturnEntry(Record, frozen=True):
+class ReturnEntry(Inmutable):
     origins: frozenset[syn.Node]
     contexts: frozenset[syn.Item]
 
@@ -26,7 +26,7 @@ class ReturnEntry(Record, frozen=True):
             )
 
 
-class OverloadBucket(Record, frozen=True):
+class OverloadBucket(Inmutable):
     origins: frozenset
     contexts: frozenset
     returns: frozendict
@@ -54,7 +54,7 @@ class OverloadBucket(Record, frozen=True):
             )
 
 
-class Entity(Record, frozen=True):
+class Entity(Inmutable):
     ref_shape: RefShape
     members: frozendict
     member_origins: frozendict
@@ -65,7 +65,7 @@ class Entity(Record, frozen=True):
     facts: frozendict
     fact_contexts: frozendict
 
-    class View(Record, frozen=True):
+    class View(Inmutable):
         base: "Entity"
         ref: RefShape
 

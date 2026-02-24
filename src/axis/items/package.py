@@ -1,12 +1,12 @@
 from typing import Self
-from protobase import Record
+from protobase import Inmutable
 
 from axis import src, syn
 from protobase import flux
 from axis.sem import Database
 #from .index import GlobalIndex
 
-class Package(Record, frozen=True):
+class Package(Inmutable):
     __slots__ = ("__weakref__",)
     dir: src.Dir
 

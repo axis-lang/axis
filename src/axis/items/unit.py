@@ -1,7 +1,8 @@
 from typing import ClassVar
+from protobase import Inmutable
 from .mod import Mod
 
-class Unit(Mod, frozen=True):
+class Unit(Mod, Inmutable):
     outline_keyword: ClassVar[str] = "unit"
 
     def contribute(self, collector) -> None:

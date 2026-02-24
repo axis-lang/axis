@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from protobase import Record, frozendict
+from protobase import Consed, frozendict
 
 from axis import dom, expr, syn
 
 
-class ScopeBinding(Record, frozen=True, consed=True):
+class ScopeBinding(Consed):
     name: str | None
     parent: Optional["ScopeBinding"] = None
     bindings: frozendict[str, dom.Val] = frozendict()
@@ -35,10 +35,7 @@ class ScopeBinding(Record, frozen=True, consed=True):
         if sym.at:
             scope = self._find_scope(sym.at)
             if scope is None:
-                return dom.Err(
-                    message=f"Scope not found: {sym.at}",
-                    origin=sym,
-                )
+                return dom.Err(message=f"Scope not found: {sym.at}", origin=sym)
             return scope._lookup_name(sym.name, origin=sym)
         return self._lookup_name(sym.name, origin=sym)
 

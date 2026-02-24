@@ -9,7 +9,7 @@ from warnings import warn
 from antlr4 import (CommonTokenStream, InputStream, ParserRuleContext,
                     TerminalNode, Token)
 from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl
-from protobase import Record, mutate, is_abstract
+from protobase import Inmutable, mutate, is_abstract
 
 from axis import log, src, syn
 
@@ -30,7 +30,7 @@ IGNORED_TOKENS = {
 }
 
 
-class Builder(Record, frozen=True):
+class Builder(Inmutable):
 
     source: src.Span
 
@@ -49,9 +49,13 @@ class Builder(Record, frozen=True):
 
             try:
                 span = self.source[start:stop]
-            except Exception as e:
+            except Exception:
                 span = self.source
+            if isinstance(span, src.File.Position):
+                span = span.line
 
+            if isinstance(span, src.File.Position):
+                span = span.line
             log.error("Syntax error").with_label(log.Label(span, message)).throw()
 
             raise ValueError(
@@ -79,7 +83,10 @@ class Builder(Record, frozen=True):
                 raise
 
         if isinstance(result, syn.Node):
-            self.source[start:stop].tag(result)
+            span = self.source[start:stop]
+            if isinstance(span, src.File.Position):
+                span = span.line
+            span.tag(result)
 
         return result
 
@@ -137,7 +144,7 @@ class Builder(Record, frozen=True):
         return intern(token.text)
 
 
-class FromSrcMixin(Record, frozen=True, abstract=True):
+class FromSrcMixin(Inmutable, abstract=True):
     __slots__ = ('__weakref__',)
 
     grammar_context_infix: ClassVar[str] = ''

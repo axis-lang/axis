@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import ClassVar
 
 from axis import syn
+from protobase import Inmutable
 
 
-class Mod(syn.SegregatedItem, frozen=True):
+class Mod(syn.SegregatedItem, Inmutable):
     """
     Cometido: agrupar semanticamente un conjunto de sub-items.
 

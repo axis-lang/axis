@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Any, Self
 from axis import syn
 
-class Lit(syn.Expr, frozen=True):
+class Lit(syn.Expr):
     type Value = Decimal | int | str | bool
     value: Value
 

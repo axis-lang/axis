@@ -8,7 +8,7 @@ from .prefix import Etc
 from .sym import Sym
 
 
-class Tuple(syn.Expr, frozen=True):
+class Tuple(syn.Expr):
     """
     Represents a tuple expression in the AST.
     It can contain elements that are:
@@ -18,14 +18,14 @@ class Tuple(syn.Expr, frozen=True):
 
     """
 
-    class Element(syn.Node, frozen=True, abstract=True):
+    class Element(syn.Node, abstract=True):
         grammar_context_infix: ClassVar[str] = "Element"
 
         @property
         def is_spread(self) -> bool:
             raise NotImplementedError
 
-    class Positional(Element, frozen=True):  # PositionalElement
+    class Positional(Element):  # PositionalElement
         "value"
 
         value: Optional[syn.Expr]
@@ -41,7 +41,7 @@ class Tuple(syn.Expr, frozen=True):
         def is_spread(self) -> bool:
             return isinstance(self.value, Etc)
 
-    class Nominal(Element, frozen=True): # es un elemento que implementa value mixin
+    class Nominal(Element): # es un elemento que implementa value mixin
         "name: bound = value"
 
         key: syn.Expr
@@ -163,7 +163,7 @@ class Tuple(syn.Expr, frozen=True):
         return head_elements, rest_elements, tail_elements
 
 
-class Shape(Tuple, frozen=True): ...
+class Shape(Tuple): ...
 
 
 @syn.Matcher.impl(Tuple)

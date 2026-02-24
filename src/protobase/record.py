@@ -8,7 +8,7 @@ from .core.object import Object, Type
 from .inmutable import check_inmutable, register_inmutable
 from .utils import compile_function, dict_split
 
-__all__ = ["Record", 'mutate']
+__all__ = ["Record", "Inmutable", "Consed", "mutate"]
 
 
 def impl_rich_repr_method(cls):
@@ -104,100 +104,18 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
     eq, hash, order,
     """
 
-    __consign__: ClassVar[WeakKeyDictionary[Self, ref[Self]]]
-    __isfrozen__: ClassVar[bool]
-    __isconsed__: ClassVar[bool]
-
-    @staticmethod
-    def __class_build__(bld: Type.Builder):  # Type.Proto
-        inherited_consed = any(bld.mro_data("consed").values())
-        inherited_frozen = any(bld.mro_data("frozen").values())
-
-        consed = bld.args.pop("consed", inherited_consed)
-        frozen = bld.args.pop("frozen", consed or inherited_frozen)
-
-        if inherited_frozen and not frozen:
-            raise TypeError("Cannot inherit from a frozen class and not be frozen")
-
-        if inherited_consed and not consed:
-            raise TypeError("Cannot inherit from a consed class and not be consed")
-
-        if consed and not frozen:
-            raise TypeError("Cannot be consed a not frozen class")
-
-        if frozen:
-            bld.add_slots("__hash_cache__")
-
-        if consed:
-            bld.add_slots("__weakref__")
-
-        bld.data(frozen=frozen, consed=consed)
-
-        @bld.postbuild
-        def post(cls):
-            cls.__isfrozen__ = frozen
-            cls.__isconsed__ = consed
-
-            if frozen:
-                cls.__setattr__ = _frozen_setattr
-                register_inmutable(cls)
-
-            if consed and not cls.__isabstract__:
-                cls.__consign__ = WeakKeyDictionary()
-
-    @classmethod
-    def __class_check__(cls):
-        if cls.__isfrozen__:
-
-            inmutability_errors = []
-
-            for nm, attr in attr_info_of(cls).items():
-                try:
-                    check_inmutable(attr.type)
-                except TypeError as exc:
-                    exc.add_note(
-                        f"Attribute {nm!r} of {cls.__name__!r} is not inmutable"
-                    )
-                    inmutability_errors.append(exc)
-
-            if inmutability_errors:
-                raise ExceptionGroup(
-                    f"Errors in inmutability of {cls.__name__!r}",
-                    inmutability_errors,
-                )
-
     if not TYPE_CHECKING:
 
         def __new__(cls, *args, **kwargs):
             self = super().__new__(cls)
             self.__init__(*args, **kwargs)
-            if cls.__isconsed__:
-                try:
-                    return cls.__consign__.setdefault(self, ref(self))()
-                except TypeError as exc:
-                    raise ValueError(f"Cannot hash-consed object {self}") from exc
             return self
-
-        def __hash__(self):
-            if not self.__class__.__isfrozen__:
-                return super().__hash__()
-
-            try:
-                return self.__hash_cache__
-            except AttributeError:
-                pass
-            hash = super().__hash__()
-            object.__setattr__(self, "__hash_cache__", hash)
-            return hash
 
         @derived(impl_rich_repr_method)
         def __rich_repr__(self): ...
 
         @derived(impl_repr_method)
         def __repr__(self): ...
-
-        @derived(impl_hash_method)
-        def __hash__(self): ...
 
         @derived(impl_eq_method)
         def __eq__(self, other): ...
@@ -207,6 +125,9 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
 
         @derived(impl_cmp_method, "__gt__")
         def __gt__(self, other): ...
+
+        def __hash__(self):
+            return object.__hash__(self)
 
         def __ne__(self, other):
             res = self.__eq__(other)
@@ -221,9 +142,6 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
             return NotImplemented if res is NotImplemented else not res
 
         def __copy__(self):
-            if self.__isfrozen__:
-                return self
-            
             copy = object.__new__(self.__class__)
             for nm, attr in attr_info_of(self).items():
                 if nm == "__weakref__":
@@ -234,12 +152,8 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
                 setattr(copy, nm, value)
 
             return copy
-            
 
         def __deepcopy__(self, memo):
-            if self.__isfrozen__:
-                return self
-            
             if id(self) in memo:
                 return memo[id(self)]
             copy = object.__new__(self.__class__)
@@ -251,8 +165,82 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
                 value = deepcopy(value, memo)
                 setattr(copy, nm, value)
             return copy
-            
-            
+
+
+def _frozen_setattr(self, name, value):
+    raise AttributeError(
+        f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
+    )
+
+
+class Inmutable(Record, abstract=True):
+    @staticmethod
+    def __class_build__(bld: Type.Builder):
+        bld.add_slots("__hash_cache__")
+
+        @bld.postbuild
+        def post(cls):
+            cls.__setattr__ = _frozen_setattr
+            register_inmutable(cls)
+
+    @classmethod
+    def __class_check__(cls):
+        inmutability_errors = []
+
+        for nm, attr in attr_info_of(cls).items():
+            try:
+                check_inmutable(attr.type)
+            except TypeError as exc:
+                exc.add_note(
+                    f"Attribute {nm!r} of {cls.__name__!r} is not inmutable"
+                )
+                inmutability_errors.append(exc)
+
+        if inmutability_errors:
+            raise ExceptionGroup(
+                f"Errors in inmutability of {cls.__name__!r}",
+                inmutability_errors,
+            )
+
+    if not TYPE_CHECKING:
+
+        @derived(impl_hash_method)
+        def __structural_hash__(self): ...
+
+        def __hash__(self):
+            try:
+                return self.__hash_cache__
+            except AttributeError:
+                pass
+            hash_value = self.__structural_hash__()
+            object.__setattr__(self, "__hash_cache__", hash_value)
+            return hash_value
+
+        def __copy__(self):
+            return self
+
+        def __deepcopy__(self, memo):
+            return self
+
+
+class Consed(Inmutable, abstract=True):
+    __consign__: ClassVar[WeakKeyDictionary]
+
+    @staticmethod
+    def __class_build__(bld: Type.Builder):
+        @bld.postbuild
+        def post(cls):
+            if not cls.__isabstract__:
+                cls.__consign__ = WeakKeyDictionary()
+
+    if not TYPE_CHECKING:
+        def __new__(cls, *args, **kwargs):
+            self = super().__new__(cls, *args, **kwargs)
+            try:
+                return cls.__consign__.setdefault(self, ref(self))()
+            except TypeError as exc:
+                raise ValueError(f"Cannot hash-consed object {self}") from exc
+
 
 def mutate[T: Record](record: T, **new_attrs) -> T:
     """
@@ -261,8 +249,3 @@ def mutate[T: Record](record: T, **new_attrs) -> T:
     attrs = attrs_of(record)
     attrs.update(new_attrs)
     return record.__class__(**attrs)
-
-def _frozen_setattr(self, name, value):
-    raise AttributeError(
-        f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
-    )

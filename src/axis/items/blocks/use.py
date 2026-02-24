@@ -1,12 +1,12 @@
 from functools import singledispatchmethod
 from typing import ClassVar, Literal, Optional, Self
 
-from protobase import Object, cached_property
+from protobase import Inmutable, Object, cached_property
 
 from axis import expr, log, syn
 
 
-class Use(syn.Block, frozen=True):
+class Use(syn.Block, Inmutable):
     """
     Represents a 'use' entity:
     use x
@@ -83,7 +83,8 @@ class Destructuring(Object):
             if isinstance(elem, expr.Member):
                 ' convierte "a.b.c" en "c: a.b.c" '
                 return expr.Tuple.Nominal(
-                    key=elem.as_sym(), 
+                    key=elem.as_sym(),
+                    bound=None,
                     value=elem,
                 ).with_span_of(elem)
             
@@ -131,7 +132,6 @@ class Destructuring(Object):
     def eval_tuple_nominal_elem(self, elem: expr.Tuple.Nominal, prefix: syn.Expr):
         return elem.with_attr(
             key=elem.value,
-            bound=elem.bound,
             value=self.transform(elem.key, prefix),
         )
     
@@ -153,4 +153,3 @@ def deep_flatten(lst, leaf_types=(str, bytes)):
         while (hasattr(lst[i], "__iter__") and not isinstance(lst[i], leaf_types)):
             lst[i:i + 1] = lst[i]
     return lst
-

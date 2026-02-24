@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Optional, Self, Sequence
 
-from protobase import Record, cached_property, frozendict
+from protobase import Inmutable, Record, cached_property, frozendict
 
 from axis import src
 
@@ -12,7 +12,7 @@ from axis import src
 EMPTY_LINE = re.compile(r"^\s*$", re.MULTILINE)
 
 
-class OutlineTree[T](Record, frozen=True):
+class OutlineTree[T](Inmutable):
     tag: T
     content: src.Span
     children: tuple[OutlineTree, ...]
@@ -39,9 +39,9 @@ class OutlineTree[T](Record, frozen=True):
         return tree
 
 
-class OutlineRule[T](Record, frozen=True):
+class OutlineRule[T](Inmutable):
 
-    class Child[CT](Record, frozen=True):
+    class Child[CT](Inmutable):
         tag: CT
         identation: Optional[bool]
         keyword: str
@@ -99,7 +99,7 @@ class OutlineRule[T](Record, frozen=True):
         return None
 
 
-class OutlineSpec[T](Record, frozen=True):
+class OutlineSpec[T](Inmutable):
 
     # @classmethod
     # def from_rules(cls, *rules: Rule[E]) -> Self:
@@ -197,7 +197,7 @@ class OutlineSpec[T](Record, frozen=True):
 # if __name__ == "__main__":
 #     from rich import print
 
-#     class Elem(Record, frozen=True):
+    #     class Elem(Inmutable):
 #         keyword: str
 #         keyword_sep: str = " \t"
 

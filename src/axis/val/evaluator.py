@@ -1,12 +1,12 @@
 from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
-from protobase import Record, frozendict, mutate
+from protobase import Inmutable, frozendict, mutate
 from axis import log, syn, expr, dom
 from functools import singledispatchmethod
 
 
-class Evaluator(Record, frozen=True):
+class Evaluator(Inmutable):
     # type Bound = type
     type EvalResult = tuple[dom.Type, dom.Data]
     type EnvValue = dom.Dom | EvalResult

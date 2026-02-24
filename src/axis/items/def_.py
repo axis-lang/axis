@@ -1,15 +1,16 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 from axis import syn, expr
+from protobase import Inmutable
 from .blocks import TupleBlock
 
 
-class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
+class Def(syn.SegregatedItem, syn.MatchClass, Inmutable):
 
-    class Where(TupleBlock, frozen=True):
+    class Where(TupleBlock):
         outline_keyword: ClassVar = "where"
 
-    class Takes(TupleBlock, frozen=True):  # ExprBlock
+    class Takes(TupleBlock):  # ExprBlock
         outline_keyword: ClassVar = "takes"
         expr: Optional[syn.Expr] = None
 
@@ -30,7 +31,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
             return super().build(kw, sep, expr=expr, **kwargs)
 
-    class Returns(syn.Block, frozen=True):
+    class Returns(syn.Block):
         outline_keyword: ClassVar = "returns"
         expr: syn.Expr | None = None
 
@@ -47,13 +48,13 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
             return cls(expr=expr, **kwargs)
 
-    # class Expose(TupleBlock, frozen=True):
+    # class Expose(TupleBlock):
     #     outline_keyword: ClassVar = 'expose'
 
-    # class Inherits(TupleBlock, frozen=True):
+    # class Inherits(TupleBlock):
     #     outline_keyword: ClassVar = 'inherits'
 
-    # class Derives(TupleBlock, frozen=True):
+    # class Derives(TupleBlock):
     #     outline_keyword: ClassVar = 'derives'
 
     outline_keyword: ClassVar = "def"
@@ -175,9 +176,9 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     # def ingest(self, ingestor: Ingestor):
     #     ...
 
-    # class Kind(syn.MatchClass, abstract=True, frozen=True): ...
+    # class Kind(syn.MatchClass, abstract=True): ...
 
-    # class InfixKind(Kind, frozen=True):
+    # class InfixKind(Kind):
     #     """
     #     def a + b
     #     takes:
@@ -191,7 +192,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     #     lhs: expr.Sym
     #     rhs: expr.Sym
 
-    # class PrefixKind(Kind, frozen=True):
+    # class PrefixKind(Kind):
     #     """
     #     def -a
     #     takes:
@@ -203,7 +204,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     #     op: expr.Prefix.Op
     #     rhs: expr.Sym
 
-    # class QualKind(Kind, frozen=True):
+    # class QualKind(Kind):
     #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
     #         syn.Expr.from_str("$sym@Sym $qualified@Sym"),
     #         syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
@@ -212,7 +213,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     #     qualified: expr.Sym
     #     generics: Optional[expr.Tuple] = None
 
-    # class ClassKind(Kind, frozen=True):
+    # class ClassKind(Kind):
     #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
     #         syn.Expr.from_str("$sym@Sym"),
     #         syn.Expr.from_str("$sym@Sym[..$generics]"),
@@ -220,7 +221,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
 
     #     generics: Optional[expr.Tuple] = None
 
-    # class FunctionKind(Kind, frozen=True):
+    # class FunctionKind(Kind):
     #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
     #         syn.Expr.from_str("$sym@Sym(..$params)"),
     #         syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
@@ -257,7 +258,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, frozen=True):
     #     return kind
 
 
-class ClassDef(Def, frozen=True):
+class ClassDef(Def):
     '''
     Tambien representara funciones,  
     '''
@@ -278,7 +279,7 @@ class ClassDef(Def, frozen=True):
         assert len(self.returns) == 0, "ClassDef cannot have returns"
 
 
-class QualDef(Def, frozen=True):
+class QualDef(Def):
     match_patterns: ClassVar = (
         syn.Expr.from_str("$sym@Sym $target"),
         syn.Expr.from_str("$sym@Sym[..$spec@Tuple] $target"),
@@ -290,7 +291,7 @@ class QualDef(Def, frozen=True):
     target: syn.Expr | None = None
 
 
-# class CohertionDef(Def, frozen=True):
+# class CohertionDef(Def):
 #     match_patterns: ClassVar = (
 #         syn.Expr.from_str("T@Sym -> U@Sym"), # implicit cohertion
 #         syn.Expr.from_str("T@Sym => U@Sym"), # explicit cohertion

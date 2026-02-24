@@ -2,7 +2,7 @@ from __future__ import annotations
 from functools import cache
 from typing import ClassVar, Iterable, Literal, Optional, Self
 from axis import src
-from protobase import Record, attrs_of, classproperty, frozendict, is_abstract
+from protobase import Inmutable, attrs_of, classproperty, frozendict, is_abstract
 from rich.tree import Tree
 from rich.text import Text
 from textwrap import shorten
@@ -13,7 +13,7 @@ from .outline import OutlineTree, OutlineRule, OutlineSpec
 # alpha -> {}
 
 
-class Node(FromSrcMixin, Record, frozen=True, abstract=True):
+class Node(FromSrcMixin, Inmutable, abstract=True):
     grammar_context_infix: ClassVar[str] = "Node"
 
     def __rich__(self):
@@ -79,7 +79,7 @@ class Node(FromSrcMixin, Record, frozen=True, abstract=True):
         return tree
 
 
-class OutlineNode(Node, frozen=True, abstract=True):
+class OutlineNode(Node, abstract=True):
     type Children = tuple[EmbeddedOutlineNode, ...]
 
     outline_keyword: ClassVar[str]
@@ -201,7 +201,7 @@ class OutlineNode(Node, frozen=True, abstract=True):
         return self, tuple(segregated_nodes)
 
 
-class EmbeddedOutlineNode(OutlineNode, frozen=True, abstract=True):
+class EmbeddedOutlineNode(OutlineNode, abstract=True):
 
     @classmethod
     def build(
@@ -213,7 +213,7 @@ class EmbeddedOutlineNode(OutlineNode, frozen=True, abstract=True):
         return super().build(*args, children=children, **kwargs)
 
 
-class SegregatedOutlineNode(OutlineNode, frozen=True, abstract=True):
+class SegregatedOutlineNode(OutlineNode, abstract=True):
     parent: Optional[OutlineNode] = None
 
     @classmethod
@@ -237,29 +237,29 @@ class SegregatedOutlineNode(OutlineNode, frozen=True, abstract=True):
         return (self, *more)
 
 
-class Statement(Node, frozen=True, abstract=True):
+class Statement(Node, abstract=True):
     grammar_context_infix: ClassVar[str] = "Statement"
     grammar_parser_name: ClassVar[str] = "statement"
 
 
-class Expr(Statement, frozen=True, abstract=True):
+class Expr(Statement, abstract=True):
     grammar_context_infix: ClassVar[str] = "Expr"
     grammar_parser_name: ClassVar[str] = "expr"
 
 
-class Block(EmbeddedOutlineNode, Node, frozen=True, abstract=True):
+class Block(EmbeddedOutlineNode, Node, abstract=True):
     grammar_context_infix: ClassVar[str] = "Block"
 
 
-class Item(OutlineNode, Node, frozen=True, abstract=True):
+class Item(OutlineNode, Node, abstract=True):
     grammar_context_infix: ClassVar[str] = "Item"
 
 
-class SegregatedItem(Item, SegregatedOutlineNode, frozen=True, abstract=True):
+class SegregatedItem(Item, SegregatedOutlineNode, abstract=True):
     """"""
 
     # pkg:
 
 
-class EmbeddedItem(Item, EmbeddedOutlineNode, frozen=True, abstract=True):
+class EmbeddedItem(Item, EmbeddedOutlineNode, abstract=True):
     """"""

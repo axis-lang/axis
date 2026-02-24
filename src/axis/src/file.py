@@ -4,14 +4,13 @@ import re
 from pathlib import Path
 from textwrap import dedent
 
-from protobase import Metadata, Record, cached_property, flux
+from protobase import Metadata, Inmutable, cached_property, flux
 
 from .fs import VirtualFileSystem, default_fs
 from .proto import FileSystem
 
 
-class File(Record, frozen=True):
-    __slots__ = ("__weakref__",)
+class File(Inmutable):
     fs: FileSystem
     path: Path
 
@@ -98,7 +97,7 @@ class File(Record, frozen=True):
         col = offset - line.start + 1
         return File.Position(line=line, col_no=col)
 
-    class Span(Metadata, Record, frozen=True, hub=True): # type: ignore
+    class Span(Metadata, Inmutable, hub=True): # type: ignore
         file: "File"
         start: int
         end: int
@@ -173,7 +172,7 @@ class File(Record, frozen=True):
         def __str__(self):
             return self.content
 
-    class Line(Span, frozen=True):
+    class Line(Span):
         line_no: int
 
         def __str__(self) -> str:
@@ -187,7 +186,7 @@ class File(Record, frozen=True):
         def startswith(self, prefix: str) -> bool:
             return self.file.content.startswith(prefix, self.start, self.end)  # type: ignore[operator]
 
-    class Position(Record, frozen=True):
+    class Position(Inmutable):
         line: "File.Span"
         col_no: int
 

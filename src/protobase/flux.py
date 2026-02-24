@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, cast
 import weakref
 
 from protobase.inmutable import register_inmutable
-from protobase.record import Record
+from protobase.record import Inmutable
 __all__ = [
     "flux",
     "collect",
@@ -26,7 +26,7 @@ class FluxCycleError(RuntimeError):
         self.cycle = cycle
 
 
-class FluxKey(Record, frozen=True):
+class FluxKey(Inmutable):
     func_id: int
     self_ref: Optional[weakref.ReferenceType]
     args: tuple

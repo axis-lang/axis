@@ -3,14 +3,14 @@ from typing import ClassVar
 from axis import conf, syn
 
 
-class Prefix(syn.Expr, frozen=True, abstract=True):
-    class Op(syn.Node, frozen=True, abstract=True):
+class Prefix(syn.Expr, abstract=True):
+    class Op(syn.Node, abstract=True):
         grammar_context_infix: ClassVar[str] = ""
 
         class Symbol(str, Enum):
             ...
 
-        symbol: Symbol
+        symbol: "Symbol"  # type: ignore[override]
 
         @classmethod
         def build(cls, s: str):
@@ -27,19 +27,19 @@ class Prefix(syn.Expr, frozen=True, abstract=True):
         return cls(op=op, rhs=rhs)
 
 
-class Etc(Prefix, frozen=True):
-    class Op(Prefix.Op, frozen=True):
+class Etc(Prefix):
+    class Op(Prefix.Op):
         class Symbol(Prefix.Op.Symbol):
             ETC = ".."
 
-        symbol: Symbol
+        symbol: "Symbol"  # type: ignore[override]
 
-class Sign(Prefix, frozen=True):
-    class Op(Prefix.Op, frozen=True):
+class Sign(Prefix):
+    class Op(Prefix.Op):
         class Symbol(Prefix.Op.Symbol):
             POS = "+"
             NEG = "-"
             NOT = "!"
             INV = "~"
 
-        symbol: Symbol
+        symbol: "Symbol"  # type: ignore[override]

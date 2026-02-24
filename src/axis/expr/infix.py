@@ -3,13 +3,14 @@ from typing import ClassVar, Union
 from axis import conf, syn
 from rich.text import Text
 
-class Infix(syn.Expr, frozen=True, abstract=True):
-    class Op(syn.Node, frozen=True, abstract=True):
+class Infix(syn.Expr, abstract=True):
+    class Op(syn.Node, abstract=True):
         grammar_context_infix: ClassVar[str] = ""
 
         class Symbol(str, Enum): ...
 
-        symbol: Symbol
+        symbol: "Symbol"  # type: ignore[override]
+
 
         @classmethod
         def build(cls, s: str):
@@ -40,8 +41,8 @@ class Infix(syn.Expr, frozen=True, abstract=True):
         return f"{self.lhs} {self.op.symbol.value} {self.rhs}"
         
 
-class Productive(Infix, frozen=True):
-    class Op(Infix.Op, frozen=True):
+class Productive(Infix):
+    class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):
             MUL = "*"
             DOT = "·"
@@ -49,22 +50,20 @@ class Productive(Infix, frozen=True):
             MOD = "%"
             POW = "**"
 
-        symbol: Symbol
 
     precedence: ClassVar[int] = 1
 
-class Additive(Infix, frozen=True):
-    class Op(Infix.Op, frozen=True):
+class Additive(Infix):
+    class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):
             ADD = "+"
             SUB = "-"
 
-        symbol: Symbol
 
     precedence: ClassVar[int] = 2
 
-class Comparison(Infix, frozen=True):
-    class Op(Infix.Op, frozen=True):
+class Comparison(Infix):
+    class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):
             EQ = "=="
             NEQ = "!="
@@ -73,26 +72,22 @@ class Comparison(Infix, frozen=True):
             GT = ">"
             GTE = ">="
 
-        symbol: Symbol
 
     precedence: ClassVar[int] = 3
 
-class Logic(Infix, frozen=True):
-    class Op(Infix.Op, frozen=True):
+class Logic(Infix):
+    class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):
             AND = "&&"
             OR = "||"
 
-        symbol: Symbol
 
     precedence: ClassVar[int] = 4
 
-class Range(Infix, frozen=True):
-    class Op(Infix.Op, frozen=True):
+class Range(Infix):
+    class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):
             RANGE_INCL = "..="
             RANGE_EXCL = "..<"
-
-        symbol: Symbol
 
     precedence: ClassVar[int] = 5

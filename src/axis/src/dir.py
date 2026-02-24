@@ -1,11 +1,11 @@
 from pathlib import Path
 from typing import Self
 
-from protobase import Record
+from protobase import Consed
 
 from .fs import FileSystem, default_fs
 
-class Dir(Record, consed=True):
+class Dir(Consed):
     """
     Encapsula la logica de watcher de un directorio de codigo fuente.
     observando cuando se agregan nuevos archivos, etc.

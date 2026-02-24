@@ -310,6 +310,16 @@ class Object(metaclass=Type, abstract=True):
             if isinstance(v, Type.SlotMember)  #  TODO: Type.SlotMember
         )
 
+        inherited_slots = set(slots_of(bld.mro))
+        has_weakref = (
+            "__weakref__" in inherited_slots
+            or "__weakref__" in user_slots
+            or "__weakref__" in member_slots
+            or "__weakref__" in attr_slots
+        )
+        if not has_weakref:
+            bld.add_slots("__weakref__")
+
         bld.add_slots(*user_slots, *member_slots, *attr_slots)
 
         for k, v in bld.namespace.items():

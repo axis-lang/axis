@@ -3,13 +3,13 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Self, Union as TypingUnion, cast
 
-from protobase import Record, frozendict, inmutable
+from protobase import Consed, frozendict, inmutable
 
 from axis import syn
 from axis.dom.tuple_ import Tuple
 
 
-class Builtin(Record, frozen=True, consed=True, abstract=True): ...
+class Builtin(Consed, abstract=True): ...
 
 
 inmutable(Builtin)
@@ -39,17 +39,17 @@ def _is_data(value: object) -> bool:
     )
 
 
-class Type(Builtin, frozen=True, consed=True, abstract=True):
+class Type(Builtin, abstract=True):
     @classmethod
     def var(cls, ident: str) -> "Var.Type":
         return Var.Type(id=ident)
 
 
-class Qualifier(Type, frozen=True, consed=True, abstract=True):
+class Qualifier(Type, abstract=True):
     underlying: "Type"
 
 
-class NominalQualifier(Qualifier, frozen=True, consed=True):
+class NominalQualifier(Qualifier):
     ref: "Ref"
 
     @classmethod
@@ -61,7 +61,7 @@ class NominalQualifier(Qualifier, frozen=True, consed=True):
         return cls.from_ref(Ref.from_str(value), underlying)
 
 
-class NominalType(Type, frozen=True, consed=True):
+class NominalType(Type):
     ref: "Ref"
 
     @classmethod
@@ -73,27 +73,27 @@ class NominalType(Type, frozen=True, consed=True):
         return cls.from_ref(Ref.from_str(value))
 
 
-class StructType(Type, frozen=True, consed=True):
+class StructType(Type):
     fields: Tuple[str, "Type"]
 
 
-class FnType(Type, frozen=True, consed=True):
+class FnType(Type):
     args: tuple["Type", ...]
     ret: "Type"
 
 
-class UnionType(Type, frozen=True, consed=True):
+class UnionType(Type):
     members: tuple["Type", ...]
 
 
-class Dom(Record, frozen=True, consed=True, abstract=True):
+class Dom(Consed, abstract=True):
     type: Type
 
 
-class Val(Dom, frozen=True, consed=True, abstract=True): ...
+class Val(Dom, abstract=True): ...
 
 
-class Const(Val, frozen=True, consed=True):
+class Const(Val):
     data: Data
 
     @classmethod
@@ -123,11 +123,11 @@ class Const(Val, frozen=True, consed=True):
             raise TypeError(f"Const.data must be primitive, got {type(self.data)}")
 
 
-class Var(Dom, frozen=True, consed=True):
-    class Type(Type, frozen=True, consed=True):
+class Var(Dom):
+    class Type(Type):
         id: str
 
-    type: "Var.Type"
+    type: "Var.Type"  # type: ignore[override]
     data: tuple[str, str]
 
     @classmethod
@@ -144,26 +144,36 @@ class Var(Dom, frozen=True, consed=True):
             raise TypeError("Var.type id must match Var.data id")
 
 
-class Err(Val, frozen=True, consed=True):
+class Err(Val):
     message: str
     origin: "syn.Node | None" = None
+    type: "Ref.Type | None" = None  # type: ignore[override]
+    data: "Ref.Data | None" = None  # type: ignore[override]
 
     def __invariants__(self) -> None:
         if not isinstance(self.message, str) or not self.message:
             raise TypeError("Err.message must be a non-empty string")
+        if self.type is None:
+            object.__setattr__(self, "type", Ref.Type(parent=None, params=Tuple.EMPTY))
+        if self.data is None:
+            object.__setattr__(
+                self,
+                "data",
+                Ref.Data(parent=None, member="", params=()),
+            )
 
 
-class Ref(Val, frozen=True, consed=True):
-    class Type(Type, frozen=True, consed=True):
+class Ref(Val):
+    class Type(Type):
         parent: "Ref.Type | None" = None
         params: Tuple[str, "Type"] = Tuple.EMPTY
 
-    class Data(Builtin, frozen=True, consed=True):
+    class Data(Builtin):
         member: str
         params: tuple[Data, ...]
         parent: "Ref.Data | None"
 
-    type: "Ref.Type"
+    type: "Ref.Type"  # type: ignore[override]
     data: "Ref.Data"
 
     @classmethod
