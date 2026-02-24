@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "protobase"
+version = "0.1.0"
+description = ""
+authors = ["jdluque <jdluque@leitat.org>"]
+
+[[tool.poetry.packages]]
+include = "protobase"
+from = "src"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+[tool.poetry-monoranger-plugin]
+enabled = true
+monorepo-root = "../.."
+version-pinning-rule = "=="
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

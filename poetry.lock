@@ -575,6 +575,20 @@ files = [
 wcwidth = "*"
 
 [[package]]
+name = "protobase"
+version = "0.1.0"
+description = ""
+optional = false
+python-versions = "^3.13"
+groups = ["main"]
+files = []
+develop = true
+
+[package.source]
+type = "directory"
+url = "packages/protobase"
+
+[[package]]
 name = "psutil"
 version = "7.0.0"
 description = "Cross-platform lib for process and system monitoring in Python.  NOTE: the syntax of this script MUST be kept compatible with Python 2.7."
@@ -1033,4 +1047,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "7e10ed67f6498a3e969bb59ff5412b7c91b88af5441b05630f374a89e1563f26"
+content-hash = "eaa5b88497e6bbc601b09944789939e3d47c5b9931679fe78993a9ac88fa41fb"

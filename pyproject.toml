@@ -9,13 +9,9 @@ readme = "README.md"
 include = "axis"
 from = "src"
 
-[[tool.poetry.packages]]
-include = "protobase"
-from = "src"
-
 [tool.poetry.dependencies]
 python = "^3.13"
-# protobase = { path = "../protobase", develop = true }
+protobase = { path = "packages/protobase", develop = true }
 antlr4-tools = "^0.2.1"
 antlr4-python3-runtime = "^4.13.2"
 interegular = "^0.3.3"
@@ -28,6 +24,11 @@ semver = "^3.0.4"
 ipykernel = "^6.28.0"
 rich = {extras = ["jupyter"], version = "^13.9.4"}
 watchdog = "^3.0.0"
+
+[tool.poetry-monoranger-plugin]
+enabled = true
+monorepo-root = "."
+version-pinning-rule = "=="
 
 [build-system]
 requires = ["poetry-core"]

@@ -34,4 +34,4 @@ modelo de datos canónico. El flujo general separa estrictamente:
 
 - La gramática y los generados viven en `src/axis/syn/grammar/`.
 - Para regenerar el parser: `just gen-parser`.
-- `protobase` es interno y vive en `src/protobase`.
+- `protobase` es interno y vive en `packages/protobase/src/protobase`.

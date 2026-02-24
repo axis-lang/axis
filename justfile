@@ -9,6 +9,14 @@ test:
     @clear && printf '\e[3J'
     @poetry run python -m unittest discover -s tests
 
+test-all:
+    @for d in packages/*; do \
+        if [ -d "$$d" ] && [ -f "$$d/justfile" ]; then \
+            just -f "$$d/justfile" test; \
+        fi; \
+    done
+    @just test
+
 watch:
     #@just tests
     watchexec -r -e py,ax -- 'just test && just launch'

@@ -72,15 +72,15 @@ class Type(type):
         def add_slots(self, *slots):
             self._slots.extend(slots)
 
-        prebuilders: list[Callable[[Self], None]] = field(
+        prebuilders: list[Callable[[], None]] = field(
             default_factory=list, init=False
         )
 
-        def prebuild(self, func: Callable[[Self], None]):
+        def prebuild(self, func: Callable[[], None]):
             self.prebuilders.append(func)
             return func
 
-        postbuilders: list[Callable[[type], None]] = field(
+        postbuilders: list[Callable[[Self], None]] = field(
             default_factory=list, init=False
         )
 
@@ -117,7 +117,7 @@ class Type(type):
         bases: tuple[type, ...],
         namespace: dict[str, Any],
         **kwargs,
-    ) -> Self:
+    ):
         return mcs.Builder(
             metaclass=mcs,
             name=name,
@@ -148,7 +148,7 @@ class Type(type):
 
         if parent is None:
             warn(
-                f"Could not resolve parent for class {self.__qualname__}: ",
+                f"Could not resolve parent for class {self.__qualname__}: "
                 f"Module {self.__module__} not found in sys.modules",
                 UserWarning,
                 2,
@@ -166,8 +166,8 @@ class Type(type):
             parent = getattr(parent, part, None)
             if parent is None:
                 warn(
-                    f"Could not resolve parent for class {self.__qualname__}: "
-                    f"{part} not found in {parent.__name__}",
+                    f"Could not resolve parent for class {self.__qualname__}: ",
+                    #f"{part} not found in {parent.__name__}",
                     UserWarning,
                     2,
                 )
