@@ -247,21 +247,29 @@ class Runtime:
             return None
         kwargs = dict(key.kwargs)
         if key.self_ref is None:
-            return self.fetch(key, None, func, key.args, kwargs)
+            return self.fetch(key.func_id, None, func, *key.args, **kwargs)
         obj = key.self_ref()
         if obj is None:
             self._drop_key(key)
             return None
-        return self.fetch(key, obj, func, key.args, kwargs)
+        return self.fetch(key.func_id, obj, func, *key.args, **kwargs)
 
     def fetch(
         self,
-        key: Key,
+        func_id: int,
         obj: object | None,
         func: Callable[..., Any],
-        args: tuple[Any, ...],
-        kwargs: dict[str, Any],
+        *args,
+        **kwargs,
     ) -> Any:
+        if obj is None:
+            argkey = self._args_key(func_id, args, kwargs)
+            key = Key(func_id, None, argkey[1], argkey[2])
+        else:
+            self._self_ref(obj)
+            argkey = self._args_key(func_id, args, kwargs)
+            key = Key(func_id, self._self_refs[obj], argkey[1], argkey[2])
+
         stats = self._stats_for(key.func_id)
         memo = self._memos.get(key)
         if memo is not None and not memo.stale:
@@ -449,18 +457,10 @@ class Query:
         if obj is None:
             return self
 
-        return partial(self._call_obj, obj)
+        return partial(_runtime.fetch, self.func_id, obj, self.func)
 
     def __call__(self, *args, **kwargs):
-        argkey = _runtime._args_key(self.func_id, args, kwargs)
-        key = Key(self.func_id, None, argkey[1], argkey[2])
-        return _runtime.fetch(key, None, self.func, args, kwargs)
-
-    def _call_obj(self, obj: object, *args, **kwargs):
-        _runtime._self_ref(obj)
-        argkey = _runtime._args_key(self.func_id, args, kwargs)
-        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
-        return _runtime.fetch(key, obj, self.func, args, kwargs)
+        return _runtime.fetch(self.func_id, None, self.func, *args, **kwargs)
 
     def invalidate(self, obj: object | None, *args, **kwargs) -> None:
         if obj is None:
@@ -497,10 +497,7 @@ class Property(Query):
     def __get__(self, obj: object | None, objtype: type | None = None):
         if obj is None:
             return self
-        _runtime._self_ref(obj)
-        argkey = _runtime._args_key(self.func_id, (), {})
-        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
-        return _runtime.fetch(key, obj, self.func, (), {})
+        return _runtime.fetch(self.func_id, obj, self.func)
 
     def invalidate(self, obj: object) -> None:  # type: ignore[override]
         super().invalidate(obj)
