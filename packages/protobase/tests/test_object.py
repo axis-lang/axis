@@ -31,7 +31,7 @@ class ObjectTest(unittest.TestCase):
         self.assertEqual(box.__state__(), {"value": 7})
 
     def test_normalize_type(self) -> None:
-        type Alias = list[int]
+        Alias = list[int]
         normalized = normalize_type(Alias)
         self.assertIs(get_origin(normalized), list)
         self.assertEqual(get_args(normalized), (int,))

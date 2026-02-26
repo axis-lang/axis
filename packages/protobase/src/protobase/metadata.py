@@ -5,8 +5,8 @@ from protobase.object import Object
 from protobase.type import Type
 
 class Metadata[T](Object, abstract=True):
-    __slots__ = '__weakref__',
-    __storage__: ClassVar[WeakKeyDictionary[T, Self]]
+    __slots__ = "__weakref__",
+    __storage__: ClassVar[WeakKeyDictionary[object, object]]
     
     @staticmethod
     def __class_build__(bld: Type.Builder):  # Type.Proto

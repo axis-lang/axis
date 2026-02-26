@@ -6,8 +6,7 @@ from textwrap import dedent
 
 from protobase import Metadata, Inmutable, cached_property, flux
 
-from .fs import VirtualFileSystem, default_fs
-from .proto import FileSystem
+from .fs import FileSystem, VirtualFileSystem, default_fs
 
 
 class File(Inmutable):

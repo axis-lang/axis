@@ -1,6 +1,6 @@
 # %%
 from types import MethodType
-from typing import Callable, Concatenate
+from typing import Callable, Concatenate, Optional, cast
 
 from .type import Type
 
@@ -26,12 +26,17 @@ class derived[**P](Type.StickyMember):
             hasattr(self, "owner") is False and hasattr(self, "name") is False
         ), "Cannot reassign the implementation function."
 
-        self.owner = owner
+        self.owner: Optional[type] = owner
         self.name = name
 
     def __get__(self, obj, objtype=None):
+        if objtype is None:
+            objtype = type(obj) if obj is not None else self.owner
+        if objtype is None:
+            raise TypeError("derived descriptor requires an owner type")
 
-        fn = self.implementor(objtype, *self.args, **self.kwargs)
+        target_type = cast(type, objtype)
+        fn = self.implementor(target_type, *self.args, **self.kwargs)
 
         if fn is None:
             raise NotImplementedError(

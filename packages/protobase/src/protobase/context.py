@@ -1,33 +1,39 @@
 # %%
 from functools import wraps
-from typing import Callable, ClassVar, Optional, Self
+from typing import Any, Callable, ClassVar, Concatenate, Optional, ParamSpec, Self, TypeVar, cast
 from weakref import WeakKeyDictionary
 from protobase.object import Object
 from contextvars import ContextVar, Token
 from protobase.classproperty import classproperty
 
 class Context(Object, abstract=True):
-    __contextvar__: ClassVar[ContextVar]
+    __contextvar__: ClassVar[ContextVar[Optional["Context"]]]
 
     def __init_subclass__(cls, context_base: bool = False, **kwargs): 
         super().__init_subclass__(**kwargs)
-        print(context_base)
         if context_base:
-            cls.__contextvar__ = ContextVar(f"{cls.__module__}:{cls.__qualname__}")
+            cls.__contextvar__ = ContextVar(
+                f"{cls.__module__}:{cls.__qualname__}",
+                default=None,
+            )
 
     def __enter__(self):
         assert not hasattr(self, "__contexttoken__"), "Context already entered"
-        print('enter', self.__contextvar__)
-        _CONTEXT_STACK.setdefault(self, []).append(self.__contextvar__.set(self))
+        stack = _CONTEXT_STACK.setdefault(self, [])
+        stack.append(self.__contextvar__.set(self))
 
     def __exit__(self, exc_type, exc_value, traceback):
-        token = _CONTEXT_STACK.get(self, []).pop()
+        stack = _CONTEXT_STACK.get(self)
+        if not stack:
+            return
+        token = stack.pop()
         self.__contextvar__.reset(token)
+        if not stack:
+            _CONTEXT_STACK.pop(self, None)
 
     @classproperty
     def context(cls) -> Optional[Self]:
-        print('ctx', cls, cls.__contextvar__)
-        return cls.__contextvar__.get(None)
+        return cast(Optional[Self], cls.__contextvar__.get(None))
 
     @property
     def is_current_context(self) -> bool:
@@ -35,15 +41,23 @@ class Context(Object, abstract=True):
     
     @property
     def is_context_activated(self) -> bool:
-        return len(_CONTEXT_STACK.get(self, [])) > 0
+        return bool(_CONTEXT_STACK.get(self))
 
 # PER THREAD
-_CONTEXT_STACK = WeakKeyDictionary[Context, list[Token]]
+_CONTEXT_STACK: WeakKeyDictionary[
+    Context,
+    list[Token[Optional[Context]]],
+] = WeakKeyDictionary()
 
 
-def contextmethod[*A, R](fn: Callable[[*A], R]) :
+P = ParamSpec("P")
+R = TypeVar("R")
+C = TypeVar("C", bound="Context")
+
+
+def contextmethod(fn: Callable[Concatenate[C, P], R]) -> Callable[Concatenate[C, P], R]:
     @wraps(fn)
-    def wrapper(self: Context, *args: *A, **kwargs):
+    def wrapper(self: C, *args: P.args, **kwargs: P.kwargs) -> R:
         if self.is_current_context:
             return fn(self, *args, **kwargs)
         with self:
@@ -63,11 +77,11 @@ if __name__ == "__main__":
         a: int = 9
         pass
 
-    with MyContext() as ctx:
-        assert ctx.is_active
+    ctx = MyContext()
+    with ctx:
+        assert ctx.is_context_activated
         assert MyContext.context == ctx
         c = MyContext.context
 
-    assert not ctx.is_active
+    assert not ctx.is_context_activated
     # assert not MyContext.current()
-    print("Context passed")

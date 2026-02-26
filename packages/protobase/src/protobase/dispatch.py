@@ -1,11 +1,17 @@
 #%%
 from functools import update_wrapper
 from logging import warning
-from typing import Any, Callable, Dict, get_type_hints, Literal, get_origin, get_args
+from typing import Any, Callable, Dict, Protocol, cast, get_type_hints, Literal, get_origin, get_args
 import inspect
 from warnings import warn
 
-def valuedispatch(func):
+class _DispatchFunc(Protocol):
+    def __call__(self, *args: Any, **kw: Any) -> Any: ...
+
+    def register(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+def valuedispatch(func) -> _DispatchFunc:
     """
     Single-dispatch generic function decorator that dispatches based on the value
     of the first argument.
@@ -47,15 +53,16 @@ def valuedispatch(func):
             return func(*args, **kw)
         return dispatch(args[0])(*args, **kw)
     
-    dispatch_wrapper.register = register
-    update_wrapper(dispatch_wrapper, func)
-    return dispatch_wrapper
+    setattr(cast(Any, dispatch_wrapper), "register", register)
+    wrapped = cast(_DispatchFunc, dispatch_wrapper)
+    update_wrapper(wrapped, func)
+    return wrapped
 
 def takefirst(x, *_):
     return next(iter(x), *_)
 
 
-def litdispatch(func):
+def litdispatch(func) -> _DispatchFunc:
     """
     Single-dispatch generic function decorator that dispatches based on the value
     of the first argument, which must match a typing.Literal annotation in registered functions.
@@ -115,9 +122,10 @@ def litdispatch(func):
             return func(*args, **kw)
         return dispatch(args[0])(*args, **kw)
     
-    dispatch_wrapper.register = register
-    update_wrapper(dispatch_wrapper, func)
-    return dispatch_wrapper
+    setattr(cast(Any, dispatch_wrapper), "register", register)
+    wrapped = cast(_DispatchFunc, dispatch_wrapper)
+    update_wrapper(wrapped, func)
+    return wrapped
 
 
 # Example usage - replace the commented example

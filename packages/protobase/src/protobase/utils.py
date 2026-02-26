@@ -1,6 +1,6 @@
 # %%
 import re
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol, cast
 
 
 def dict_split[K, V](
@@ -20,12 +20,20 @@ def dict_filter[K, V](d: dict[K, V], fn: Callable[[V], bool]) -> dict[K, V]:
 FN_NAME_RE = re.compile(r"^def\s(\w+)")
 
 
+class CompiledFunction(Protocol):
+    __source__: str
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def __getattr__(self, name: str) -> Any: ...
+
+
 def compile_function(
     *source,
     locals: dict[str, Any] | None = None,
     globals: dict[str, Any] | None = None,
     **kwargs,
-) -> Callable:
+) -> CompiledFunction:
     """
     Compile a function from source code.
 
@@ -55,17 +63,17 @@ def compile_function(
 
     source = "\n".join(source)
 
-    try:
-        fn_name = FN_NAME_RE.match(source).group(1)
-    except:
+    match = FN_NAME_RE.match(source)
+    if match is None:
         raise ValueError("Cannot find function name in source code.")
+    fn_name = match.group(1)
 
     try:
         exec(source, globals, locals)
     except SyntaxError as e:
         raise SyntaxError(f"{e.msg} in source code:\n{source}")
 
-    fn = locals[fn_name]
+    fn = cast(CompiledFunction, locals[fn_name])
     fn.__source__ = source
 
     for nm, val in kwargs.items():

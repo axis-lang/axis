@@ -3,7 +3,7 @@ import unittest
 import weakref
 from typing import Callable, cast
 
-from protobase import flux
+from protobase import Inmutable, flux
 
 
 class FluxMethodTest(unittest.TestCase):
@@ -98,6 +98,50 @@ class FluxPropertyTest(unittest.TestCase):
         self.assertEqual(calls["value"], 2)
 
 
+class FluxInputTest(unittest.TestCase):
+    def test_input_set_and_invalidate(self):
+        calls = {"doubled": 0}
+
+        class Config:
+            __slots__ = ("__weakref__",)
+
+            @flux.input
+            def value(self) -> int:
+                raise NotImplementedError
+
+            @flux.property
+            def doubled(self) -> int:
+                calls["doubled"] += 1
+                return cast(int, self.value) * 2
+
+        cfg = Config()
+        cfg.value = 2
+        self.assertEqual(cfg.value, 2)
+        self.assertEqual(cfg.doubled, 4)
+        self.assertEqual(cfg.doubled, 4)
+        self.assertEqual(calls["doubled"], 1)
+
+        cfg.value = 3
+        self.assertEqual(cfg.doubled, 6)
+        self.assertEqual(calls["doubled"], 2)
+
+        Config.value.invalidate(cfg)
+        self.assertEqual(cfg.doubled, 6)
+        self.assertEqual(calls["doubled"], 3)
+
+    def test_input_set_on_inmutable(self):
+        class Token(Inmutable):
+            name: str
+
+            @flux.input
+            def version(self) -> int:
+                raise NotImplementedError
+
+        token = Token("alpha")
+        token.version = 1
+        self.assertEqual(token.version, 1)
+
+
 class FluxDependencyTest(unittest.TestCase):
     def test_dependency_invalidation(self):
         calls = {"base": 0, "derived": 0}
@@ -152,7 +196,7 @@ class FluxFunctionTest(unittest.TestCase):
     def test_global_function_cache(self):
         calls = {"add": 0}
 
-        @flux.method
+        @flux.functions
         def add(a: int, b: int) -> int:
             calls["add"] += 1
             return a + b
@@ -256,7 +300,7 @@ class FluxEmitCollectTest(unittest.TestCase):
 
 class FluxMiscTest(unittest.TestCase):
     def test_unhashable_args_raise(self):
-        @flux.method
+        @flux.functions
         def total(values: list[int]) -> int:
             return sum(values)
 

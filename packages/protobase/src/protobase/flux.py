@@ -3,12 +3,25 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from functools import partial
 from time import perf_counter
-from typing import Any, Callable, Optional, cast
+from typing import (
+    Any,
+    Callable,
+    Concatenate,
+    Generic,
+    Optional,
+    ParamSpec,
+    TYPE_CHECKING,
+    TypeVar,
+    cast,
+    overload,
+)
 import weakref
 
 from protobase.inmutable import register_inmutable
 from protobase.record import Inmutable, Record
 __all__ = [
+    "functions",
+    "input",
     "method",
     "property",
     "iter",
@@ -18,10 +31,15 @@ __all__ = [
     "in_query",
     "Query",
     "Property",
+    "Input",
     "Key",
     "Runtime",
     "CycleError",
 ]
+
+ObjT = TypeVar("ObjT", bound=object)
+R = TypeVar("R")
+P = ParamSpec("P")
 
 
 class CycleError(RuntimeError):
@@ -62,11 +80,17 @@ class Runtime:
         self._current_deps: ContextVar[Optional[set[Key]]] = ContextVar("flux_current_deps", default=None)
         self._current_emits: ContextVar[Optional[set[object]]] = ContextVar("flux_current_emits", default=None)
         self._func_registry: dict[int, Callable[..., Any]] = {}
+        self._input_funcs: set[int] = set()
         self._stats: dict[int, dict[str, Any]] = {}
 
     def register_func(self, func: Callable[..., Any]) -> int:
         func_id = id(func)
         self._func_registry[func_id] = func
+        return func_id
+
+    def register_input(self, func: Callable[..., Any]) -> int:
+        func_id = self.register_func(func)
+        self._input_funcs.add(func_id)
         return func_id
 
     def _stats_for(self, func_id: int) -> dict[str, Any]:
@@ -93,6 +117,12 @@ class Runtime:
             kwargs_key = ()
         return (func_id, args, kwargs_key)
 
+    def _input_key(self, func_id: int, obj: object | None) -> Key:
+        if obj is None:
+            return Key(func_id, None, (), ())
+        self._self_ref(obj)
+        return Key(func_id, self._self_refs[obj], (), ())
+
     def _self_ref(self, obj: object) -> weakref.ref:
         try:
             ref = self._self_refs.get(obj)
@@ -113,6 +143,10 @@ class Runtime:
         current_deps = self._current_deps.get()
         if current_deps is not None:
             current_deps.add(key)
+
+    def _ensure_not_in_query(self, action: str) -> None:
+        if self._current_key.get() is not None:
+            raise RuntimeError(f"{action} cannot run inside a flux query")
 
     def _enter(
         self, key: Key
@@ -262,6 +296,12 @@ class Runtime:
         *args,
         **kwargs,
     ) -> Any:
+        if func_id in self._input_funcs:
+            if args or kwargs:
+                raise TypeError("flux.input does not accept arguments")
+            if obj is None:
+                raise TypeError("flux.input requires an instance")
+            return self.input_get(func_id, obj)
         if obj is None:
             argkey = self._args_key(func_id, args, kwargs)
             key = Key(func_id, None, argkey[1], argkey[2])
@@ -315,6 +355,69 @@ class Runtime:
         stats["time"] += elapsed
         self._record_dep(key)
         return memo.value
+
+    def input_get(self, func_id: int, obj: object | None) -> Any:
+        key = self._input_key(func_id, obj)
+        stats = self._stats_for(func_id)
+        memo = self._memos.get(key)
+        if memo is None:
+            stats["misses"] += 1
+            func = self._func_registry.get(func_id)
+            name = getattr(func, "__qualname__", "<flux.input>")
+            raise RuntimeError(f"flux.input {name} has no value; set it before reading")
+        stats["hits"] += 1
+        memo.verified_at = self._revision
+        memo.stale = False
+        self._record_dep(key)
+        return memo.value
+
+    def input_set(self, func_id: int, obj: object | None, value: Any) -> None:
+        self._ensure_not_in_query("flux.input.set")
+        key = self._input_key(func_id, obj)
+        self._bump_revision()
+        memo = self._memos.get(key)
+        if memo is None:
+            memo = Memo(value, self._revision, self._revision, (), frozenset(), False)
+            self._memos[key] = memo
+            self._register_key(key)
+            return
+        memo.value = value
+        memo.changed_at = self._revision
+        memo.verified_at = self._revision
+        memo.deps = ()
+        memo.emits = frozenset()
+        memo.stale = False
+
+    def input_invalidate(self, func_id: int, obj: object | None) -> None:
+        self._ensure_not_in_query("flux.input.invalidate")
+        key = self._input_key(func_id, obj)
+        self._bump_revision()
+        memo = self._memos.get(key)
+        if memo is None:
+            return
+        memo.changed_at = self._revision
+        memo.verified_at = self._revision
+        memo.deps = ()
+        memo.emits = frozenset()
+        memo.stale = False
+        stats = self._stats_for(func_id)
+        stats["invalidations"] += 1
+
+    def input_invalidate_all(self, func_id: int) -> None:
+        self._ensure_not_in_query("flux.input.invalidate_all")
+        self._bump_revision()
+        stats = self._stats_for(func_id)
+        keys = [key for key in self._memos if key.func_id == func_id]
+        for key in keys:
+            memo = self._memos.get(key)
+            if memo is None:
+                continue
+            memo.changed_at = self._revision
+            memo.verified_at = self._revision
+            memo.deps = ()
+            memo.emits = frozenset()
+            memo.stale = False
+            stats["invalidations"] += 1
 
     def _bump_revision(self) -> None:
         self._revision += 1
@@ -436,79 +539,258 @@ def _supports_weakref(owner: type) -> bool:
     return False
 
 
-class Query:
-    def __init__(self, func: Callable[..., Any]) -> None:
-        self.func = func
-        self.func_id = _runtime.register_func(func)
-        self._owner: type | None = None
-        self._name: str | None = None
+if TYPE_CHECKING:
+    class Query(Generic[ObjT, P, R]):
+        func: Callable[..., Any]
+        func_id: int
 
-    def __set_name__(self, owner: type, name: str) -> None:
-        self._owner = owner
-        self._name = name
-        if getattr(owner, "__isabstract__", False):
-            return
-        if not _supports_weakref(owner):
-            raise TypeError(
-                f"flux.method requires '__weakref__' in __slots__ for {owner.__qualname__}"
-            )
+        @overload
+        def __get__(
+            self,
+            obj: None,
+            objtype: type | None = None,
+        ) -> "Query[ObjT, P, R]": ...
 
-    def __get__(self, obj: object | None, objtype: type | None = None):
-        if obj is None:
-            return self
+        @overload
+        def __get__(
+            self,
+            obj: ObjT,
+            objtype: type | None = None,
+        ) -> Callable[P, R]: ...
 
-        return partial(_runtime.fetch, self.func_id, obj, self.func)
+        def __get__(self, obj: object | None, objtype: type | None = None) -> Any: ...
 
-    def __call__(self, *args, **kwargs):
-        return _runtime.fetch(self.func_id, None, self.func, *args, **kwargs)
+        def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
-    def invalidate(self, obj: object | None, *args, **kwargs) -> None:
-        if obj is None:
+        def invalidate(
+            self,
+            obj: ObjT | None,
+            *args: P.args,
+            **kwargs: P.kwargs,
+        ) -> None: ...
+
+        def invalidate_for(self, obj: ObjT) -> None: ...
+
+        def invalidate_all(self) -> None: ...
+
+        def stats(self) -> dict[str, Any]: ...
+
+        def collect(
+            self,
+            obj: ObjT | None = None,
+            *args: Any,
+            **kwargs: Any,
+        ) -> frozenset[object]: ...
+
+    class Property(Generic[R]):
+        @overload
+        def __get__(
+            self,
+            obj: None,
+            objtype: type | None = None,
+        ) -> "Property[R]": ...
+
+        @overload
+        def __get__(
+            self,
+            obj: object,
+            objtype: type | None = None,
+        ) -> R: ...
+
+        def __get__(self, obj: object | None, objtype: type | None = None) -> Any: ...
+
+        def invalidate(self, obj: object) -> None: ...
+
+        def invalidate_for(self, obj: object) -> None: ...
+
+        def invalidate_all(self) -> None: ...
+
+        def stats(self) -> dict[str, Any]: ...
+
+        def collect(
+            self,
+            obj: object | None = None,
+            *args: Any,
+            **kwargs: Any,
+        ) -> frozenset[object]: ...
+
+    class Input(Generic[R]):
+        @overload
+        def __get__(
+            self,
+            obj: None,
+            objtype: type | None = None,
+        ) -> "Input[R]": ...
+
+        @overload
+        def __get__(
+            self,
+            obj: object,
+            objtype: type | None = None,
+        ) -> R: ...
+
+        def __get__(self, obj: object | None, objtype: type | None = None) -> Any: ...
+
+        def __set__(self, obj: object, value: R) -> None: ...
+
+        def set(self, obj: object, value: R) -> None: ...
+
+        def invalidate(self, obj: object) -> None: ...
+
+        def invalidate_for(self, obj: object) -> None: ...
+
+        def invalidate_all(self) -> None: ...
+
+        def stats(self) -> dict[str, Any]: ...
+
+        def collect(
+            self,
+            obj: object | None = None,
+            *args: Any,
+            **kwargs: Any,
+        ) -> frozenset[object]: ...
+
+    def method(func: Callable[Concatenate[ObjT, P], R]) -> Query[ObjT, P, R]: ...
+
+    def functions(func: Callable[P, R]) -> Query[None, P, R]: ...
+
+    def property(func: Callable[[ObjT], R]) -> Property[R]: ...
+
+    def input(func: Callable[[ObjT], R]) -> Input[R]: ...
+
+else:
+    class Query:
+        def __init__(self, func: Callable[..., Any]) -> None:
+            self.func = func
+            self.func_id = _runtime.register_func(func)
+            self._owner: type | None = None
+            self._name: str | None = None
+            self._requires_owner = False
+
+        def __set_name__(self, owner: type, name: str) -> None:
+            self._owner = owner
+            self._name = name
+            if getattr(owner, "__isabstract__", False):
+                return
+            if not _supports_weakref(owner):
+                raise TypeError(
+                    f"flux.method requires '__weakref__' in __slots__ for {owner.__qualname__}"
+                )
+
+        def __get__(self, obj: object | None, objtype: type | None = None):
+            if obj is None:
+                return self
+
+            return partial(_runtime.fetch, self.func_id, obj, self.func)
+
+        def __call__(self, *args, **kwargs):
+            if self._requires_owner:
+                raise TypeError(
+                    "flux.method requires an instance; use flux.functions for global functions"
+                )
+            return _runtime.fetch(self.func_id, None, self.func, *args, **kwargs)
+
+        def invalidate(self, obj: object | None, *args, **kwargs) -> None:
+            if obj is None:
+                if self._requires_owner:
+                    raise TypeError(
+                        "flux.method requires an instance; use flux.functions for global functions"
+                    )
+                argkey = _runtime._args_key(self.func_id, args, kwargs)
+                key = Key(self.func_id, None, argkey[1], argkey[2])
+                _runtime.invalidate_key(key)
+                return
+            _runtime._self_ref(obj)
             argkey = _runtime._args_key(self.func_id, args, kwargs)
-            key = Key(self.func_id, None, argkey[1], argkey[2])
+            key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
             _runtime.invalidate_key(key)
-            return
-        _runtime._self_ref(obj)
-        argkey = _runtime._args_key(self.func_id, args, kwargs)
-        key = Key(self.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
-        _runtime.invalidate_key(key)
 
-    def invalidate_for(self, obj: object) -> None:
-        _runtime.invalidate_for(obj, func_id=self.func_id)
+        def invalidate_for(self, obj: object) -> None:
+            _runtime.invalidate_for(obj, func_id=self.func_id)
 
-    def invalidate_all(self) -> None:
-        _runtime.invalidate_all(func_id=self.func_id)
+        def invalidate_all(self) -> None:
+            _runtime.invalidate_all(func_id=self.func_id)
 
-    def stats(self) -> dict[str, Any]:
-        return cast(dict[str, Any], _runtime.stats(self.func_id))
+        def stats(self) -> dict[str, Any]:
+            return cast(dict[str, Any], _runtime.stats(self.func_id))
 
-    def collect(
-        self,
-        obj: object | None = None,
-        *args,
-        cls: type | None = None,
-        transitive: bool = True,
-        **kwargs,
-    ) -> frozenset[object]:
-        return collect(self, *args, obj=obj, cls=cls, transitive=transitive, **kwargs)
-
-
-class Property(Query):
-    def __get__(self, obj: object | None, objtype: type | None = None):
-        if obj is None:
-            return self
-        return _runtime.fetch(self.func_id, obj, self.func)
-
-    def invalidate(self, obj: object) -> None:  # type: ignore[override]
-        super().invalidate(obj)
+        def collect(
+            self,
+            obj: object | None = None,
+            *args,
+            cls: type | None = None,
+            transitive: bool = True,
+            **kwargs,
+        ) -> frozenset[object]:
+            if obj is None and self._requires_owner:
+                raise TypeError(
+                    "flux.method requires an instance; use flux.functions for global functions"
+                )
+            return collect(self, *args, obj=obj, cls=cls, transitive=transitive, **kwargs)
 
 
-def method(func: Callable[..., Any]) -> Query:
-    return Query(func)
+    class Property(Query):
+        def __init__(self, func: Callable[..., Any]) -> None:
+            super().__init__(func)
+            self._requires_owner = True
+
+        def __get__(self, obj: object | None, objtype: type | None = None):
+            if obj is None:
+                return self
+            return _runtime.fetch(self.func_id, obj, self.func)
+
+        def invalidate(self, obj: object) -> None:  # type: ignore[override]
+            super().invalidate(obj)
 
 
-def property(func: Callable[..., Any]) -> Property:
-    return Property(func)
+    class Input(Property):
+        __flux_set__ = True
+
+        def __init__(self, func: Callable[..., Any]) -> None:
+            self.func = func
+            self.func_id = _runtime.register_input(func)
+            self._owner: type | None = None
+            self._name: str | None = None
+            self._requires_owner = True
+
+        def __call__(self, *args, **kwargs):
+            raise TypeError("flux.input is not callable; access it as an attribute")
+
+        def __get__(self, obj: object | None, objtype: type | None = None):
+            return super().__get__(obj, objtype)
+
+        def __set__(self, obj: object, value: Any) -> None:
+            self.set(obj, value)
+
+        def set(self, obj: object, value: Any) -> None:
+            _runtime.input_set(self.func_id, obj, value)
+
+        def invalidate(self, obj: object) -> None:  # type: ignore[override]
+            _runtime.input_invalidate(self.func_id, obj)
+
+        def invalidate_for(self, obj: object) -> None:
+            _runtime.input_invalidate(self.func_id, obj)
+
+        def invalidate_all(self) -> None:
+            _runtime.input_invalidate_all(self.func_id)
+
+
+    def method(func: Callable[..., Any]) -> Query:
+        query = Query(func)
+        query._requires_owner = True
+        return query
+
+
+    def functions(func: Callable[..., Any]) -> Query:
+        return Query(func)
+
+
+    def property(func: Callable[..., Any]) -> Property:
+        return Property(func)
+
+
+    def input(func: Callable[..., Any]) -> Input:
+        return Input(func)
 
 
 def in_query() -> bool:

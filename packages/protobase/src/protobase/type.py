@@ -1,6 +1,6 @@
 # %%
 from abc import ABC, abstractmethod
-from dataclasses import MISSING, dataclass, field
+from dataclasses import MISSING as _MISSING, dataclass, field
 from typing import Any, Callable, Optional, Self, Sequence
 from functools import cache
 from sys import modules
@@ -140,7 +140,6 @@ class Type(type):
 
         """
         path = self.__qualname__.split('.')
-        print(path)
         if len(path) == 1:
             return None
 
@@ -196,7 +195,7 @@ def get_mro_protodata(cls_or_mro: type | Sequence[type], name: str):
         base: baseval
         for base in reversed(mro)
         if (basemeta := getattr(base, '__protodata__', None)) is not None
-        and (baseval := basemeta.get(name, MISSING)) is not MISSING
+        and (baseval := basemeta.get(name, _MISSING)) is not _MISSING
     }
 
 

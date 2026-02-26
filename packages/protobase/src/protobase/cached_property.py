@@ -1,7 +1,7 @@
 # %%
 
 from types import GenericAlias
-from typing import Any, Callable, Literal, Self, overload
+from typing import Any, Callable, Generic, Literal, Self, TypeVar, overload
 from weakref import WeakKeyDictionary
 
 from .object import slots_of
@@ -13,7 +13,10 @@ def _has_weakref_slot(owner: type) -> bool:
     return "__weakref__" in slots
 
 
-class slot_cached_property[T](Type.SlotMember):
+T = TypeVar("T")
+
+
+class slot_cached_property(Generic[T], Type.SlotMember):
 
     def slotname(self, owner_name: str, name: str) -> str:
         return f"_{owner_name}__{name}"
@@ -36,10 +39,10 @@ class slot_cached_property[T](Type.SlotMember):
         self._slotname = slotname
 
     @overload
-    def __get__(self, instance, owner: Literal[None]) -> Self: ...
+    def __get__(self, instance: None, owner: Any) -> Self: ...
 
     @overload
-    def __get__(self, instance, owner: Any) -> T: ...
+    def __get__(self, instance: Any, owner: Any) -> T: ...
 
     def __get__(self, instance, owner=None) -> Self | T:
         if instance is None:
@@ -64,7 +67,7 @@ class slot_cached_property[T](Type.SlotMember):
     __class_getitem__ = classmethod(GenericAlias)
 
 
-class cached_property[T]:
+class cached_property(Generic[T]):
     def __init__(self, func: Callable[..., T]):
         self.func = func
         self.__doc__ = func.__doc__
@@ -78,10 +81,10 @@ class cached_property[T]:
             )
 
     @overload
-    def __get__(self, instance, owner: Literal[None]) -> Self: ...
+    def __get__(self, instance: None, owner: Any) -> Self: ...
 
     @overload
-    def __get__(self, instance, owner: Any) -> T: ...
+    def __get__(self, instance: Any, owner: Any) -> T: ...
 
     def __get__(self, instance, owner=None) -> Self | T:
         if instance is None:

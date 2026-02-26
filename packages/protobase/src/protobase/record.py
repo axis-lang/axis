@@ -1,5 +1,7 @@
 # %%
 from copy import deepcopy
+from inspect import getattr_static
+from types import GetSetDescriptorType, MemberDescriptorType
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, dataclass_transform
 from weakref import WeakKeyDictionary, ref
 
@@ -168,7 +170,16 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
             return copy
 
 
+_FROZEN_SET_BLOCKLIST = (MemberDescriptorType, GetSetDescriptorType)
+
+
 def _frozen_setattr(self, name, value):
+    descriptor = getattr_static(self.__class__, name, None)
+    if descriptor is not None and not isinstance(descriptor, _FROZEN_SET_BLOCKLIST):
+        set_method = getattr(descriptor, "__set__", None)
+        if set_method is not None:
+            set_method(self, value)
+            return
     raise AttributeError(
         f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
     )

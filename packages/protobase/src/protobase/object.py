@@ -1,6 +1,6 @@
 # %%
 from copy import deepcopy
-from dataclasses import MISSING
+from dataclasses import MISSING as _MISSING
 from functools import cached_property
 from itertools import chain, filterfalse
 from types import GenericAlias, MappingProxyType, UnionType
@@ -9,12 +9,14 @@ from typing import (
     Annotated,
     Any,
     ClassVar,
+    Mapping,
     NamedTuple,
     TypeVar,
     Optional,
     Self,
     Sequence,
     Union,
+    cast,
     dataclass_transform,
     get_args,
     get_origin,
@@ -74,7 +76,7 @@ class AttrInfo(NamedTuple):
 
     @property
     def has_default(self):
-        return self.default is not MISSING
+        return self.default is not _MISSING
 
     @property
     def type(self) -> Any:
@@ -99,7 +101,7 @@ class AttrInfo(NamedTuple):
         return ()
 
 
-def protodata_of(cls: Type):
+def protodata_of(cls: Type) -> Mapping[str, Any] | None:
     if not issubclass(cls.__class__, Type):
         raise TypeError(f"{cls} is not a protobase type")
 
@@ -109,7 +111,7 @@ def protodata_of(cls: Type):
 _ATTRS_CACHE = WeakKeyDictionary()
 
 
-def attr_info_of(cls) -> dict[str, AttrInfo]:
+def attr_info_of(cls) -> Mapping[str, AttrInfo]:
     if not isinstance(cls, type):
         cls = type(cls)
 
@@ -118,7 +120,7 @@ def attr_info_of(cls) -> dict[str, AttrInfo]:
 
     def _collect_proto_attrs(cls):
         try:
-            meta = protodata_of(cls)
+            meta = cast(Mapping[str, Any], protodata_of(cls) or {})
         except TypeError:
             return {}
 
@@ -129,7 +131,7 @@ def attr_info_of(cls) -> dict[str, AttrInfo]:
             for attr, info in _collect_proto_attrs(base).items():
                 attrs.setdefault(attr, []).extend(info)
 
-        for attr, default_value in meta.get("attrs").items():
+        for attr, default_value in meta.get("attrs", {}).items():
             info = (cls, hints.get(attr), default_value)
             attrs.setdefault(attr, []).append(info)
 
@@ -150,13 +152,13 @@ def attr_info_of(cls) -> dict[str, AttrInfo]:
 
         attrs[attr_name] = attr
 
-    attrs = MappingProxyType(attrs)
-    _ATTRS_CACHE[cls] = attrs
+    attrs_view = cast(Mapping[str, AttrInfo], MappingProxyType(attrs))
+    _ATTRS_CACHE[cls] = attrs_view
 
     if hasattr(cls, "__class_check__"):
         cls.__class_check__()
 
-    return attrs
+    return attrs_view
 
 
 class DefaultFactory:
@@ -182,12 +184,12 @@ def impl_init_method(cls):
             args = ["self", *positional_attrs, "*", *nominal_attrs]
         else:
             args = ["self", *positional_attrs]
-        kwdefaults = {k: MISSING for k, in nominal_attrs}
+        kwdefaults = {k: _MISSING for k, in nominal_attrs}
         defaults = ()
     else:
         args = ["self", *positional_attrs, *nominal_attrs]
         kwdefaults = {}
-        defaults = (MISSING,) * len(nominal_attrs)
+        defaults = (_MISSING,) * len(nominal_attrs)
 
     attrs_factories = {
         f"_{attr}_factory": DefaultFactory(info.default)
@@ -205,7 +207,7 @@ def impl_init_method(cls):
             for attr in nominal_attrs
         ],
         "    return",
-        globals={**attrs_factories, "__MISSING__": MISSING},
+        globals={**attrs_factories, "__MISSING__": _MISSING},
         __kwdefaults__=kwdefaults,
         __defaults__=defaults,
     )
@@ -242,8 +244,11 @@ def _unique_everseen(iterable, seen: set):
 
 
 def _is_classvar_annotation(anno, module):
+    import dataclasses
     import typing
-    from dataclasses import _is_classvar, _is_type
+
+    _is_classvar = getattr(dataclasses, "_is_classvar")
+    _is_type = getattr(dataclasses, "_is_type")
 
     # workaround for cls param
     def cls(): ...
@@ -265,6 +270,9 @@ class Object(metaclass=Type, abstract=True):
     """
 
     __isabstract__: ClassVar[bool]
+
+    if TYPE_CHECKING:
+        def __state__(self) -> dict[str, Any]: ...
 
     @staticmethod
     def __class_build__(bld: Type.Builder):  # Type.Proto
@@ -288,14 +296,17 @@ class Object(metaclass=Type, abstract=True):
             raise TypeError("Cannot inherit from a nested class and not be nested")
 
         if nested:
-            if len(bld.namespace.get("__qualname__").split(".")) <= 1:
+            qualname = bld.namespace.get("__qualname__")
+            if not isinstance(qualname, str):
+                raise TypeError("Nested classes must be member of another class")
+            if len(qualname.split(".")) <= 1:
                 raise TypeError("Nested classes must be member of another class")
 
         def is_attr_member(nm, anno):
             return not _is_classvar_annotation(anno, bld.module)
 
         attrs = {
-            nm: bld.namespace.pop(nm, MISSING)
+            nm: bld.namespace.pop(nm, _MISSING)
             for nm, anno in bld.annotations.items()
             if is_attr_member(nm, anno)
         }

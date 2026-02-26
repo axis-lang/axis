@@ -8,14 +8,11 @@ from pathlib import Path
 import time
 from typing import Iterable, Mapping, Sequence, cast
 
-from protobase import Inmutable, Object, flux
-
-from .proto import FileSystem
+from protobase import Inmutable, Object, flux, register_inmutable
 
 
 __all__ = [
     "FileSystem",
-    "FileSystemBase",
     "PhysicalFileSystem",
     "VirtualFileSystem",
     "FSOverlay",
@@ -75,7 +72,7 @@ class TextBuffer(Object):
         self.line_starts = _line_starts(text)
 
 
-class FileSystemBase(Object, abstract=True):
+class FileSystem(Object, abstract=True):
     __slots__ = ("__weakref__",)
 
     __weakref__: object
@@ -139,7 +136,10 @@ class FileSystemBase(Object, abstract=True):
         self._invalidate("listdir", target)
 
 
-class PhysicalFileSystem(FileSystemBase):
+register_inmutable(FileSystem)
+
+
+class PhysicalFileSystem(FileSystem):
     __slots__ = ("__weakref__", "mount_point", "watcher")
 
     mount_point: Path
@@ -211,7 +211,7 @@ class PhysicalFileSystem(FileSystemBase):
         return tuple(sorted(entry for entry in target.iterdir()))
 
 
-class VirtualFileSystem(FileSystemBase):
+class VirtualFileSystem(FileSystem):
     __slots__ = ("__weakref__", "mount_point", "files")
 
     def __init__(self, files: dict[Path, TextBuffer] | None = None, *, mount_point: Path | str = "/") -> None:
@@ -300,7 +300,7 @@ class VirtualFileSystem(FileSystemBase):
         return tuple(sorted(_children_from_files(self.files.keys(), target)))
 
 
-class FSOverlay(FileSystemBase):
+class FSOverlay(FileSystem):
     __slots__ = ("__weakref__", "base", "overlay", "prefer_overlay")
 
     def __init__(self, base: FileSystem, overlay: dict[Path, TextBuffer] | None = None, *, prefer_overlay: bool = False) -> None:
@@ -419,11 +419,11 @@ class FSOverlay(FileSystemBase):
 class WatchFS(Object):
     __slots__ = ("__weakref__", "fs", "root", "backend", "_observer", "_handler")
 
-    fs: FileSystemBase
+    fs: FileSystem
     root: Path
     backend: str
 
-    def __init__(self, fs: FileSystemBase, root: Path | str, *, backend: str = "watchdog") -> None:
+    def __init__(self, fs: FileSystem, root: Path | str, *, backend: str = "watchdog") -> None:
         self.fs = fs
         self.root = Path(root).resolve()
         self.backend = backend

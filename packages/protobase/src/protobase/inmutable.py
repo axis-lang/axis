@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from re import Pattern
 from types import GenericAlias, UnionType
-from typing import ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar
+from typing import Any, ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar
 
 
 _INMUTABLE_TYPES: set[type] = {
@@ -67,7 +67,7 @@ def is_inmutable(cls: type) -> bool:
     return False
 
 
-def check_inmutable(tp: GenericAlias | type, _seen_aliases: set[TypeAliasType] | None = None):
+def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None):
     if _seen_aliases is None:
         _seen_aliases = set()
 
@@ -115,9 +115,10 @@ def check_inmutable(tp: GenericAlias | type, _seen_aliases: set[TypeAliasType] |
             raise TypeError(f"Type '{tp}' is not a know inmutable.")
         return
 
+    tp_any = cast(Any, tp)
     origin = get_origin(tp)
-    if origin is None and hasattr(tp, "__origin__"):
-        origin = tp.__origin__
+    if origin is None:
+        origin = getattr(tp_any, "__origin__", None)
     if origin is None:
         raise TypeError(f"Type '{tp}' is not a know inmutable.")
 
@@ -135,8 +136,8 @@ def check_inmutable(tp: GenericAlias | type, _seen_aliases: set[TypeAliasType] |
     #check_inmutable(origin)
 
     args = get_args(tp)
-    if not args and hasattr(tp, "__args__"):
-        args = tp.__args__
+    if not args:
+        args = getattr(tp_any, "__args__", None) or ()
 
     for arg in args:
         check_inmutable(arg, _seen_aliases)

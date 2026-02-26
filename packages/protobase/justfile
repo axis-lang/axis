@@ -5,5 +5,8 @@ test:
     @clear && printf '\e[3J'
     @poetry run python -m unittest discover -s tests
 
+pyright:
+    @poetry run pyright
+
 run example:
     @poetry run python "examples/{{example}}.py"

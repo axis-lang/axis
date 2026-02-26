@@ -34,7 +34,7 @@ class InmutableTest(unittest.TestCase):
             check_inmutable(U)
 
     def test_check_inmutable_alias(self) -> None:
-        type Alias = tuple[int, str]
+        Alias = tuple[int, str]
         check_inmutable(Alias)
 
     def test_check_inmutable_special_cases(self) -> None:

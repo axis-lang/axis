@@ -23,9 +23,11 @@ class ClassPropertyTest(unittest.TestCase):
             def value(cls) -> int:
                 return cls._value
 
-            @value.setter
-            def value(cls, v: int) -> None:
+            @classmethod
+            def set_value(cls, v: int) -> None:
                 cls._value = v
+
+            value = value.setter(set_value)
 
         box = Box()
         box.value = 3
