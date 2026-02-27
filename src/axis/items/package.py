@@ -41,7 +41,6 @@ class Package(Inmutable):
             for item in self.file_items(path)
         )
 
-    @property
     @flux.property
     def database(self):
         collector = Database.Builder()

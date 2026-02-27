@@ -1,6 +1,6 @@
 from __future__ import annotations
 from functools import cache
-from typing import ClassVar, Iterable, Literal, Optional, Self
+from typing import Any, Callable, ClassVar, Iterable, Literal, Optional, Self
 from axis import src
 from protobase import Inmutable, attrs_of, classproperty, frozendict, is_abstract
 from rich.tree import Tree
@@ -15,6 +15,41 @@ from .outline import OutlineTree, OutlineRule, OutlineSpec
 
 class Node(FromSrcMixin, Inmutable, abstract=True):
     grammar_context_infix: ClassVar[str] = "Node"
+    _as_registry: ClassVar[dict[type, Callable[[Any], Any]]] = {}
+
+    @property
+    def match_spec(self) -> "MatchSpec":
+        return MatchSpec()
+
+    @classmethod
+    def as_impl(cls, target_type: type):
+        def decorator(func: Callable[[Any], Any]):
+            registry = dict(getattr(cls, "_as_registry", {}))
+            registry[target_type] = func
+            cls._as_registry = registry
+            return func
+        return decorator
+
+    @classmethod
+    def can_project(cls, target_type: type) -> bool:
+        if issubclass(cls, target_type):
+            return True
+        for base in cls.__mro__:
+            registry = getattr(base, "_as_registry", None)
+            if registry and target_type in registry:
+                return True
+        return False
+
+    def as_(self, target_type: type):
+        if not isinstance(target_type, type):
+            raise TypeError(f"Expected type for projection, got {target_type!r}")
+        if isinstance(self, target_type):
+            return self
+        for base in type(self).__mro__:
+            registry = getattr(base, "_as_registry", None)
+            if registry and target_type in registry:
+                return registry[target_type](self)
+        return NotImplemented
 
     def __rich__(self):
 
@@ -263,3 +298,9 @@ class SegregatedItem(Item, SegregatedOutlineNode, abstract=True):
 
 class EmbeddedItem(Item, EmbeddedOutlineNode, abstract=True):
     """"""
+
+
+class MatchSpec(Inmutable):
+    capture_name: str | None = None
+    match_all: bool = False
+    filter_any: frozenset[str] = frozenset()

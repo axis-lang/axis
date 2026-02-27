@@ -45,7 +45,7 @@ class ExprMatchingTest(unittest.TestCase):
 
     def test_unify(self):
 
-        match_test = syn.Match.from_expr("$ctx.$name($a, ..$b, $c)")
+        match_test = syn.Matcher.from_str("$ctx.$name($a, ..$b, $c)")
         #print(match_test.patterns[0])
 
         match = match_test("Natural.alpha(1,2,3,4,5)")
@@ -53,7 +53,7 @@ class ExprMatchingTest(unittest.TestCase):
 
         self.assertEqualExpr(match["ctx"], "Natural")
         #self.assertEqualExpr(match["$name"], "Natural.alpha")
-        self.assertEqualExpr(match["name"], "alpha")
+        self.assertEqualExpr(match["name"].as_(expr.Sym), "alpha")
         self.assertEqualExpr(match["a"], "1")
         self.assertEqualExpr(match["b"], "(2, 3, 4)")
         self.assertEqualExpr(match["c"], "5")
@@ -69,7 +69,7 @@ class ExprReificationTest(unittest.TestCase):
         self.assertEqual(expr, expected)
 
     def test_reify(self):
-        match = syn.Match.from_expr("$m.$n($a, ..$etc, $b)")
+        match = syn.Matcher.from_str("$m.$n($a, ..$etc, $b)")
         reify = syn.Reify.expr("$n.$m($b, ..$etc, $a)")
 
         vals = match("foo.bar(1, 2, 3, 4, 5)")
@@ -77,6 +77,44 @@ class ExprReificationTest(unittest.TestCase):
 
 
         #print(reify(vals))
+
+
+class ProjectionMatchTest(unittest.TestCase):
+    def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
+        if isinstance(expected, str):
+            expected = syn.Expr.from_str(expected)
+        self.assertEqual(expr, expected)
+
+    class MemberNameStr(syn.ClassMatcher):
+        match_patterns = (syn.Expr.from_str("$ctx.$name"),)
+        ctx: expr.Sym
+        name: str
+
+    class MemberNameUnion(syn.ClassMatcher):
+        match_patterns = (syn.Expr.from_str("$ctx.$name"),)
+        ctx: expr.Sym
+        name: str | expr.Sym
+
+    class SymNameStr(syn.ClassMatcher):
+        match_patterns = (syn.Expr.from_str("$sym"),)
+        sym: str
+
+    def test_member_name_str_projection(self):
+        result = self.MemberNameStr.match("Natural.alpha")
+        assert result is not None
+        self.assertEqual(result.name, "alpha")
+        self.assertEqualExpr(result.ctx, "Natural")
+
+    def test_member_name_union_projection(self):
+        result = self.MemberNameUnion.match("Natural.alpha")
+        assert result is not None
+        self.assertIsInstance(result.name, str)
+        self.assertEqual(result.name, "alpha")
+
+    def test_sym_name_str_projection(self):
+        result = self.SymNameStr.match("Natural")
+        assert result is not None
+        self.assertEqual(result.sym, "Natural")
 
 
 

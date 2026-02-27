@@ -6,7 +6,7 @@ from protobase import Inmutable
 
 
 
-class Global(syn.SegregatedItem, syn.MatchClass, Inmutable, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
+class Global(syn.SegregatedItem, syn.ClassMatcher, Inmutable, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
     """
     <kw> <name>: <type> = <value>
     where <kw> in ["val", "var", "let", 'dyn', 'mut']

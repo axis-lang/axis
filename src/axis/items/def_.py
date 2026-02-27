@@ -5,7 +5,7 @@ from protobase import Inmutable
 from .blocks import TupleBlock
 
 
-class Def(syn.SegregatedItem, syn.MatchClass, Inmutable):
+class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
 
     class Where(TupleBlock):
         outline_keyword: ClassVar = "where"
@@ -176,7 +176,7 @@ class Def(syn.SegregatedItem, syn.MatchClass, Inmutable):
     # def ingest(self, ingestor: Ingestor):
     #     ...
 
-    # class Kind(syn.MatchClass, abstract=True): ...
+    # class Kind(syn.ClassMatcher, abstract=True): ...
 
     # class InfixKind(Kind):
     #     """
@@ -257,16 +257,15 @@ class Def(syn.SegregatedItem, syn.MatchClass, Inmutable):
     #         raise ValueError(f"Invalid definition expression: {self.expr}")
     #     return kind
 
-
 class ClassDef(Def):
     '''
     Tambien representara funciones,  
     '''
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym@Sym"),
-        syn.Expr.from_str("$sym@Sym[..$spec@Tuple]"),
-        syn.Expr.from_str("$sym@Sym(..args@Tuple)"),
-        syn.Expr.from_str("$sym@Sym[..$spec@Tuple](..args@Tuple)"),
+        syn.Expr.from_str("$sym"),
+        syn.Expr.from_str("$sym[..$spec]"),
+        syn.Expr.from_str("$sym(..args)"),
+        syn.Expr.from_str("$sym[..$spec](..args)"),
     )
 
     # spec son 
@@ -281,8 +280,8 @@ class ClassDef(Def):
 
 class QualDef(Def):
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym@Sym $target"),
-        syn.Expr.from_str("$sym@Sym[..$spec@Tuple] $target"),
+        syn.Expr.from_str("$sym $target"),
+        syn.Expr.from_str("$sym[..$spec] $target"),
     )
 
     sym: expr.Sym | None = None

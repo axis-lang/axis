@@ -26,6 +26,18 @@ class Sym(syn.Expr):
     def is_placeholder(self) -> bool:
         return self.name == "_"
 
+    @property
+    def match_spec(self) -> syn.MatchSpec:
+        if self.is_placeholder:
+            return syn.MatchSpec(match_all=True)
+        if self.is_wildcard:
+            return syn.MatchSpec(
+                capture_name=self.name[1:],
+                match_all=True,
+                filter_any=frozenset({"name"}),
+            )
+        return syn.MatchSpec()
+
     @classmethod
     def build(cls, name: str, at: Literal["@"] | None = None, scope: Optional[str] = None):
         return cls(name=name, at=scope)
@@ -44,15 +56,24 @@ Sym.ROOT = Sym("@root")
 #     return Sym(name=name, at=at)
 
 
-@syn.Matcher.impl(Sym)
-def match_sym(self: syn.Matcher, sym: Sym, value: syn.Expr):
-    if not sym.is_wildcard:
-        return self.match_node(sym, value)
+@syn.Matcher.impl_rule(Sym)
+def match_sym(self: syn.Matcher, sym: Sym, value: syn.Expr) -> syn.MatchResult | None:
+    spec = sym.match_spec
+    if spec.match_all:
+        if sym.at and sym.at != value.__class__.__name__:
+            return None
+        return syn.MatchResult.empty()
 
-    if sym.at and sym.at != value.__class__.__name__:
-        raise self.NoMatch
+    if not isinstance(value, Sym):
+        return None
+    if sym.name != value.name or sym.at != value.at:
+        return None
+    return syn.MatchResult.empty()
 
-    self.capture_value(sym.name, value)
+
+@Sym.as_impl(str)
+def _sym_as_str(self: Sym) -> str:
+    return self.name
 
 
 @syn.Reifier.impl(Sym)

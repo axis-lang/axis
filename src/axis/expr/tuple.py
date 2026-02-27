@@ -166,11 +166,11 @@ class Tuple(syn.Expr):
 class Shape(Tuple): ...
 
 
-@syn.Matcher.impl(Tuple)
-def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
+@syn.Matcher.impl_rule(Tuple)
+def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchResult | None:
 
     if not isinstance(value, Tuple):
-        raise self.NoMatch
+        return None
 
     try:
         head_and_tail_count = tuple.head_and_tail_count
@@ -182,31 +182,64 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr):
             *head_and_tail_count
         )
 
-    except:
-        raise self.NoMatch
+    except Exception:
+        return None
+
+    result = syn.MatchResult.empty()
 
     for a, b in zip(target_head, value_head):
-        self.match_node(a, b)
+        head_result = self.match(a, b)
+        if head_result is None:
+            return None
+        result = syn.MatchResult.unify(result, head_result)
 
     match target_rest:
         case (
-            Tuple.Positional(value=Etc(rhs=Sym(name=wildcard_name) as target_sym)),
-        ) if target_sym.is_wildcard:
+            Tuple.Positional(value=Etc(rhs=rhs_pattern)),
+        ):
+            if isinstance(rhs_pattern, syn.MatchCapture):
+                if not rhs_pattern.variadic:
+                    rhs_pattern = syn.MatchCapture(
+                        name=rhs_pattern.name,
+                        subpattern=rhs_pattern.subpattern,
+                        variadic=True,
+                    )
+            elif isinstance(rhs_pattern, syn.MatchGoal):
+                subpattern = rhs_pattern.subpattern
+                if isinstance(subpattern, syn.MatchCapture) and not subpattern.variadic:
+                    subpattern = syn.MatchCapture(
+                        name=subpattern.name,
+                        subpattern=subpattern.subpattern,
+                        variadic=True,
+                    )
+                rhs_pattern = syn.MatchGoal(
+                    subpattern=subpattern,
+                    result_type=rhs_pattern.result_type,
+                    schema=rhs_pattern.schema,
+                )
+            elif isinstance(rhs_pattern, Sym) and rhs_pattern.is_wildcard:
+                rhs_pattern = syn.MatchCapture(
+                    name=rhs_pattern.name[1:],
+                    subpattern=rhs_pattern,
+                    variadic=True,
+                )
+            else:
+                rhs_pattern = None
 
-            # target_etc = target_rest[0]
-            # assert target_etc.is_spread, "Expected a spread element in the rest of the tuple"
-            # TODO: logica de captura de valores, ampliar con bounds etc
-            self.capture_value(wildcard_name, value.with_attr(elements=value_rest))
-
-    # if len(target_rest) == 1:
-    #     target_etc = target_rest[0]
-    #     assert target_etc.is_spread, "Expected a spread element in the rest of the tuple"
-    #     # TODO: logica de captura de valores, ampliar con bounds etc
-    #     if isinstance(target_etc.expr, Sym) and target_etc.expr.is_wildcard:
-    #         self.capture_value(target_etc.expr.name, value.with_attr(elements=value_rest))
+            if rhs_pattern is not None:
+                rest_tuple = value.with_attr(elements=value_rest)
+                rest_result = self.match(rhs_pattern, rest_tuple)
+                if rest_result is None:
+                    return None
+                result = syn.MatchResult.unify(result, rest_result)
 
     for a, b in zip(target_tail, value_tail):
-        self.match_node(a, b)
+        tail_result = self.match(a, b)
+        if tail_result is None:
+            return None
+        result = syn.MatchResult.unify(result, tail_result)
+
+    return result
 
 
 @syn.Reifier.impl(Tuple)

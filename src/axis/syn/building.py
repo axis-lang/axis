@@ -170,7 +170,8 @@ class FromSrcMixin(Inmutable, abstract=True):
 
         ctx_class = getattr(AxisParser, cls.grammar_context_name, None)
         if ctx_class is None:
-            return warn(f'Grammar context not found for {cls.__qualname__} ({cls.grammar_context_name})', stacklevel=4)
+            #warn(f'Grammar context not found for {cls.__qualname__} ({cls.grammar_context_name})', stacklevel=4)
+            return
 
         @Builder.build.register(ctx_class) # type: ignore
         def build_ast(builder, ctx, *args, **kwargs):
