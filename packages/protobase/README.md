@@ -47,6 +47,7 @@ canonical, comparable, and efficiently recomputed.
 - Subproblem reuse: shared subgraphs correspond to shared subproblem results.
 - Incremental recomputation: only affected queries are invalidated and
   recomputed when dependencies change.
+- Flux queries must return concrete values; generators and awaitables are not supported.
 
 \## Dynamic programming and DAGs
 
@@ -89,14 +90,40 @@ adjusting recomputation.
 - Incremental invalidation: selective recomputation based on dependency edges.
 - Emit/collect: a mechanism to gather derived items from query execution.
 
+\## Default values and deepcopy
+
+Protobase treats attribute defaults as *template values* rather than shared
+instances. During initialization, any attribute with a default value is
+assigned by **deep-copying** that default. This prevents mutable defaults
+(lists, dicts, nested records) from being shared across instances.
+
+Behavioral summary:
+
+- Positional attributes are assigned directly from constructor arguments.
+- Nominal attributes (with defaults) use the provided argument if present.
+- If a nominal attribute is omitted, its default is **deep-copied** and stored
+  in the instance.
+
+Implications:
+
+- Each instance gets an independent copy of mutable defaults.
+- Defaults that are already immutable (numbers, strings, tuples, records) are
+  safe; deepcopy is still applied but cheap.
+
+\## Documentation
+
+Extended documentation lives in `docs/README.md` and includes guides for the
+class system, immutability, hash-consing, and flux.
+
 \## Key components
 
 - `src/protobase/type.py` - metaclass and class construction
 - `src/protobase/object.py` - slots, init, and attribute collection
-- `src/protobase/record.py` - Record, Inmutable, Consed
+- `src/protobase/record.py` - Record base class and mutation helper
 - `src/protobase/derived.py` - derived method generation
 - `src/protobase/flux.py` - dependency-tracked memoization
-- `src/protobase/inmutable.py` - immutability checks and registry
+- `src/protobase/inmutable.py` - Inmutable base class and immutability checks
+- `src/protobase/consed.py` - hash-consed immutable base class
 
 \## Requirements
 

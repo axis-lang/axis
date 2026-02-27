@@ -161,14 +161,11 @@ def attr_info_of(cls) -> Mapping[str, AttrInfo]:
     return attrs_view
 
 
-class DefaultFactory:
-    __slots__ = ("value",)
+def _default_factory(value):
+    def factory():
+        return deepcopy(value)
 
-    def __init__(self, value):
-        self.value = value
-
-    def __call__(self):
-        return deepcopy(self.value)
+    return factory
 
 
 def impl_init_method(cls):
@@ -192,7 +189,7 @@ def impl_init_method(cls):
         defaults = (_MISSING,) * len(nominal_attrs)
 
     attrs_factories = {
-        f"_{attr}_factory": DefaultFactory(info.default)
+        f"_{attr}_factory": _default_factory(info.default)
         for attr, info in nominal_attrs.items()
     }
 

@@ -2,10 +2,24 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
+from inspect import getattr_static
 from pathlib import Path
 from re import Pattern
-from types import GenericAlias, UnionType
-from typing import Any, ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar
+from types import GenericAlias, UnionType, GetSetDescriptorType, MemberDescriptorType
+from typing import Any, ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar, TYPE_CHECKING
+
+from .derived import derived
+from .object import attr_info_of
+from .record import Record, impl_hash_method
+from .type import Type
+
+__all__ = [
+    "Inmutable",
+    "check_inmutable",
+    "inmutable",
+    "is_inmutable",
+    "register_inmutable",
+]
 
 
 _INMUTABLE_TYPES: set[type] = {
@@ -143,4 +157,67 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
         check_inmutable(arg, _seen_aliases)
 
     #raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")
+
+
+_FROZEN_SET_BLOCKLIST = (MemberDescriptorType, GetSetDescriptorType)
+
+
+def _frozen_setattr(self, name, value):
+    descriptor = getattr_static(self.__class__, name, None)
+    if descriptor is not None and not isinstance(descriptor, _FROZEN_SET_BLOCKLIST):
+        set_method = getattr(descriptor, "__set__", None)
+        if set_method is not None:
+            set_method(self, value)
+            return
+    raise AttributeError(
+        f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
+    )
+
+
+class Inmutable(Record, abstract=True):
+    @staticmethod
+    def __class_build__(bld: Type.Builder):
+        bld.add_slots("__hash_cache__")
+
+        @bld.postbuild
+        def post(cls):
+            cls.__setattr__ = _frozen_setattr
+            register_inmutable(cls)
+
+    @classmethod
+    def __class_check__(cls):
+        inmutability_errors = []
+
+        for nm, attr in attr_info_of(cls).items():
+            try:
+                check_inmutable(attr.type)
+            except TypeError as exc:
+                exc.add_note(
+                    f"Attribute {nm!r} of {cls.__name__!r} is not inmutable"
+                )
+                inmutability_errors.append(exc)
+
+        if inmutability_errors:
+            raise ExceptionGroup(
+                f"Errors in inmutability of {cls.__name__!r}",
+                inmutability_errors,
+            )
+
+    if not TYPE_CHECKING:
+        @derived(impl_hash_method)
+        def __structural_hash__(self): ...
+
+        def __hash__(self):
+            cache = getattr(self, "__hash_cache__", None)
+            if cache is not None:
+                return cache
+            hash_value = self.__structural_hash__()
+            object.__setattr__(self, "__hash_cache__", hash_value)
+            return hash_value
+
+        def __copy__(self):
+            return self
+
+        def __deepcopy__(self, memo):
+            return self
     

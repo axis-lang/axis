@@ -1,7 +1,9 @@
 import copy
 import unittest
 
-from protobase.record import Consed, Inmutable, Record, mutate
+from protobase.consed import Consed
+from protobase.inmutable import Inmutable
+from protobase.record import Record, mutate
 
 
 class RecordTest(unittest.TestCase):

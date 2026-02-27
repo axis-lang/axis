@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextvars import ContextVar, Token
 from functools import partial
+import inspect
 from time import perf_counter
 from typing import (
     Any,
@@ -18,7 +19,8 @@ from typing import (
 import weakref
 
 from protobase.inmutable import register_inmutable
-from protobase.record import Inmutable, Record
+from protobase.inmutable import Inmutable
+from protobase.record import Record
 __all__ = [
     "functions",
     "input",
@@ -302,6 +304,14 @@ class Runtime:
             if obj is None:
                 raise TypeError("flux.input requires an instance")
             return self.input_get(func_id, obj)
+        if inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func):
+            raise TypeError(
+                "flux queries must return concrete values; generators and awaitables are not supported"
+            )
+        if inspect.isgeneratorfunction(func):
+            raise TypeError(
+                "flux queries must return concrete values; generators and awaitables are not supported"
+            )
         if obj is None:
             argkey = self._args_key(func_id, args, kwargs)
             key = Key(func_id, None, argkey[1], argkey[2])
@@ -334,6 +344,20 @@ class Runtime:
             self._exit(key, token_key, token_deps, token_emits)
             raise
         deps, emits = self._exit(key, token_key, token_deps, token_emits)
+        if inspect.isgenerator(value):
+            value.close()
+            raise TypeError(
+                "flux queries must return concrete values; generators and awaitables are not supported"
+            )
+        if inspect.iscoroutine(value):
+            value.close()
+            raise TypeError(
+                "flux queries must return concrete values; generators and awaitables are not supported"
+            )
+        if inspect.isasyncgen(value) or inspect.isawaitable(value):
+            raise TypeError(
+                "flux queries must return concrete values; generators and awaitables are not supported"
+            )
         elapsed = perf_counter() - start
 
         dep_list = self._memo_deps(deps)

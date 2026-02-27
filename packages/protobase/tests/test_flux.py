@@ -209,6 +209,55 @@ class FluxFunctionTest(unittest.TestCase):
         self.assertEqual(calls["add"], 2)
 
 
+class FluxUnsupportedReturnTest(unittest.TestCase):
+    def test_property_generator_function_raises(self):
+        class Box:
+            __slots__ = ("__weakref__",)
+
+            @flux.property
+            def values(self):
+                yield 1
+
+        box = Box()
+        with self.assertRaises(TypeError):
+            _ = box.values
+
+    def test_property_generator_object_raises(self):
+        class Box:
+            __slots__ = ("__weakref__",)
+
+            @flux.property
+            def values(self):
+                return (value for value in range(3))
+
+        box = Box()
+        with self.assertRaises(TypeError):
+            _ = box.values
+
+    def test_property_async_function_raises(self):
+        class Box:
+            __slots__ = ("__weakref__",)
+
+            @flux.property
+            async def value(self) -> int:
+                return 1
+
+        box = Box()
+        with self.assertRaises(TypeError):
+            _ = box.value
+
+    def test_function_coroutine_object_raises(self):
+        @flux.functions
+        def compute() -> object:
+            async def inner() -> int:
+                return 1
+
+            return cast(object, inner())
+
+        with self.assertRaises(TypeError):
+            compute()
+
+
 class FluxWeakrefTest(unittest.TestCase):
     def test_slots_require_weakref(self):
         with self.assertRaises(TypeError):
