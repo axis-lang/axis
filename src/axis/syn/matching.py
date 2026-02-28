@@ -6,25 +6,26 @@ Matching is functional: it produces a result object and never mutates state.
 
 Core concepts
 - MatchExpr: AST nodes used only for matching.
-- MatchCapture: wraps a subpattern and records a captured name.
-- MatchGoal: marks the expected result type and schema.
+- MatchCapture: wraps a subpattern and records captured values per candidate.
+- MatchGoal: leaf node that carries one or more candidates.
+- MatchCandidate: typed or untyped goal for resolution.
 - MatchSwitch: lookup node with priority order (literal -> any -> match_all).
-- MatchResult: immutable bundle of goals and captures.
+- MatchResult: immutable bundle of candidates and captures.
 
 Matcher contract
 - Matcher.match(pattern, value) returns MatchResult or None.
-- MatchResult.unify(a, b) merges goals and captures.
-- MatchGoal is applied at the end to validate and build the output.
+- MatchResult.unify(a, b) merges candidates and captures.
+- MatchCandidate is applied at the end to validate and build the output.
 
 Captures
 - Captures are only produced by MatchCapture nodes.
-- Each capture records a name and the captured value.
+- Each capture records a value and resolves a name per candidate.
 - Variadic captures use MatchCapture(variadic=True).
 
 Goals and schemas
-- MatchGoal can be typed (result_type) or untyped (for the evaluator).
-- If typed, the goal uses the class annotations as a schema.
-- If untyped, the goal returns a frozendict of captures.
+- MatchCandidate can be typed (result_type) or untyped (for the evaluator).
+- If typed, the candidate uses the class annotations as a schema.
+- If untyped, the candidate returns a frozendict of captures.
 
 Projections
 - Projections are defined per AST node through Node.as_(type).
@@ -64,16 +65,9 @@ class MatchExpr(Expr, abstract=True):
     pass
 
 
-class MatchGoal(MatchExpr):
-    subpattern: Expr | None = None
+class MatchCandidate(Inmutable):
     result_type: type["ClassMatcher"] | None = None
     schema: frozendict[str, type] | None = None
-
-    def __eq__(self, other: object) -> bool:
-        if type(self) is not type(other):
-            return NotImplemented
-        assert isinstance(other, MatchGoal)
-        return self.result_type == other.result_type and self.schema == other.schema
 
     def __hash__(self) -> int:
         return hash((self.result_type, self.schema))
@@ -87,8 +81,16 @@ class MatchGoal(MatchExpr):
         return self.result_type(**values)
 
 
+class MatchGoal(MatchExpr):
+    subpattern: Expr | None = None
+    candidates: frozenset[MatchCandidate] = frozenset()
+
+    def __str__(self):
+        return f"{{ {self.subpattern} }}"
+
+
 class MatchCapture(MatchExpr):
-    name: str
+    name_by_candidate: frozendict[MatchCandidate, str]
     subpattern: Expr
     variadic: bool = False
 
@@ -108,7 +110,7 @@ class CaptureEvent(Inmutable):
 
 
 class MatchResult(Inmutable):
-    goals: frozenset[MatchGoal] = frozenset()
+    candidates: frozenset[MatchCandidate] = frozenset()
     captures: tuple[CaptureEvent, ...] = ()
 
     @classmethod
@@ -117,7 +119,7 @@ class MatchResult(Inmutable):
 
     @classmethod
     def from_goal(cls, goal: MatchGoal) -> "MatchResult":
-        return cls(goals=frozenset((goal,)))
+        return cls(candidates=frozenset(goal.candidates))
 
     @classmethod
     def from_capture(cls, capture: MatchCapture, value: Node | tuple[Node, ...]) -> "MatchResult":
@@ -125,20 +127,32 @@ class MatchResult(Inmutable):
 
     @classmethod
     def unify(cls, left: "MatchResult", right: "MatchResult") -> "MatchResult":
-        return cls(
-            goals=left.goals | right.goals,
+        merged = cls(
+            candidates=left.candidates | right.candidates,
             captures=left.captures + right.captures,
         )
+        if not merged.candidates:
+            return merged
+        filtered = frozenset(
+            candidate
+            for candidate in merged.candidates
+            if merged.values_for(candidate) is not None
+        )
+        if filtered == merged.candidates:
+            return merged
+        return cls(candidates=filtered, captures=merged.captures)
 
-    def values_for(self, goal: MatchGoal) -> dict[str, Any] | None:
+    def values_for(self, candidate: MatchCandidate) -> dict[str, Any] | None:
         values: dict[str, Any] = {}
         for event in self.captures:
-            name = event.capture.name
+            name = event.capture.name_by_candidate.get(candidate)
+            if name is None:
+                continue
             value = event.value
-            if goal.schema is not None:
-                if name not in goal.schema:
+            if candidate.schema is not None:
+                if name not in candidate.schema:
                     return None
-                expected = goal.schema[name]
+                expected = candidate.schema[name]
                 value = _project_value(value, expected)
             if name in values and values[name] != value:
                 return None
@@ -198,26 +212,30 @@ def _filters_overlap(a: MatchFilter, b: MatchFilter) -> bool:
     return True
 
 
-def _patterns_from_pairs(pairs: Iterable[tuple[Expr, MatchGoal]]):
-    result: dict[Expr, MatchGoal] = {}
-    for expr, goal in pairs:
-        if expr in result and result[expr] != goal:
-            raise ValueError(f"Ambiguous match: {expr} maps to multiple goals")
-        result[expr] = goal
+def _patterns_from_pairs(
+    pairs: Iterable[tuple[Expr, frozenset[MatchCandidate] | MatchCandidate]]
+):
+    result: dict[Expr, frozenset[MatchCandidate]] = {}
+    for expr, candidates in pairs:
+        candidate_set = (
+            candidates if isinstance(candidates, frozenset) else frozenset((candidates,))
+        )
+        if expr in result:
+            result[expr] = result[expr] | candidate_set
+        else:
+            result[expr] = candidate_set
     return result
 
 
-def merge(patterns: dict[Expr, MatchGoal]) -> Expr:
+def merge(patterns: dict[Expr, frozenset[MatchCandidate]]) -> Expr:
     if not patterns:
         raise ValueError("merge() requires at least one pattern")
 
     match_all_items = [
-        (expr, goal)
-        for expr, goal in patterns.items()
+        (expr, candidates)
+        for expr, candidates in patterns.items()
         if expr.match_spec.match_all
     ]
-    if len(match_all_items) > 1:
-        raise ValueError("Ambiguous match_all patterns in same switch")
 
     match_all_expr: Expr | None = None
     if match_all_items:
@@ -225,15 +243,15 @@ def merge(patterns: dict[Expr, MatchGoal]) -> Expr:
         if len(patterns) == 1:
             return match_all_expr
         patterns = {
-            expr: goal
-            for expr, goal in patterns.items()
+            expr: candidates
+            for expr, candidates in patterns.items()
             if expr is not match_all_items[0][0]
         }
 
-    groups: dict[MatchFilter, dict[Expr, MatchGoal]] = {}
-    for expr, goal in patterns.items():
+    groups: dict[MatchFilter, dict[Expr, frozenset[MatchCandidate]]] = {}
+    for expr, candidates in patterns.items():
         match_filter = _match_filter(expr)
-        groups.setdefault(match_filter, {})[expr] = goal
+        groups.setdefault(match_filter, {})[expr] = candidates
 
     literals: dict[MatchFilter, Expr] = {}
     anys: dict[MatchFilter, Expr] = {}
@@ -266,15 +284,10 @@ def merge(patterns: dict[Expr, MatchGoal]) -> Expr:
     )
 
 
-def _reify_group(group: dict[Expr, MatchGoal]) -> Expr:
+def _reify_group(group: dict[Expr, frozenset[MatchCandidate]]) -> Expr:
     patterns = list(group.keys())
     first = patterns[0]
     target_type = type(first)
-
-    capture_names = {pattern.match_spec.capture_name for pattern in patterns}
-    if len(capture_names) > 1:
-        raise ValueError("Conflicting capture names in group")
-    capture_name = capture_names.pop()
 
     attrs: dict[str, Any] = {}
     has_expr_attrs = False
@@ -284,7 +297,7 @@ def _reify_group(group: dict[Expr, MatchGoal]) -> Expr:
         values = [getattr(pattern, attr) for pattern, _ in pairs]
         if _is_expr_value(value):
             has_expr_attrs = True
-            sub_pairs = [(v, goal) for (pattern, goal), v in zip(pairs, values)]
+            sub_pairs = [(v, goals) for (pattern, goals), v in zip(pairs, values)]
             subpatterns = _patterns_from_pairs(sub_pairs)
             attrs[attr] = merge(subpatterns)
             continue
@@ -308,50 +321,65 @@ def _reify_group(group: dict[Expr, MatchGoal]) -> Expr:
             attrs[attr] = tuple(merged_items)
             continue
 
+        if attr in first.match_spec.filter_any:
+            attrs[attr] = values[0]
+            continue
         if not all(v == values[0] for v in values):
             raise ValueError(
                 f"Ambiguous literal value for {target_type.__name__}.{attr}"
             )
         attrs[attr] = values[0]
 
-    goals = set(group.values())
-    if not has_expr_attrs:
-        if len(goals) != 1:
-            raise ValueError("Ambiguous goal types for leaf match")
-        merged_expr: Expr = target_type(**attrs)
-    else:
-        merged_expr = target_type(**attrs)
+    candidates: set[MatchCandidate] = set()
+    for candidate_set in group.values():
+        candidates.update(candidate_set)
 
-    if capture_name is not None:
-        for goal in group.values():
-            if goal.schema is None:
+    merged_expr: Expr = target_type(**attrs)
+
+    name_by_candidate: dict[MatchCandidate, str] = {}
+    for pattern, candidate_set in pairs:
+        capture_name = pattern.match_spec.capture_name
+        if capture_name is None:
+            continue
+        for candidate in candidate_set:
+            existing = name_by_candidate.get(candidate)
+            if existing is None:
+                name_by_candidate[candidate] = capture_name
+            elif existing != capture_name:
+                raise ValueError(
+                    "Conflicting capture names for candidate "
+                    f"{candidate.result_type}: {existing} vs {capture_name}"
+                )
+
+    if name_by_candidate:
+        for candidate, capture_name in name_by_candidate.items():
+            if candidate.schema is None:
                 continue
-            if capture_name not in goal.schema:
+            if capture_name not in candidate.schema:
                 raise ValueError(
                     f"Capture '{capture_name}' not found in goal schema"
                 )
-            expected = goal.schema[capture_name]
+            expected = candidate.schema[capture_name]
             if _is_expr_expected(expected):
                 continue
             if not first.match_spec.match_all:
-                candidates = _projection_candidates(expected)
-                if candidates and not any(
-                    type(first).can_project(candidate) for candidate in candidates
+                projection_candidates = _projection_candidates(expected)
+                if projection_candidates and not any(
+                    type(first).can_project(candidate_type)
+                    for candidate_type in projection_candidates
                 ):
                     raise ValueError(
                         f"No projection from {type(first).__name__} to {expected}"
                     )
         merged_expr = MatchCapture(
-            name=capture_name,
+            name_by_candidate=frozendict(name_by_candidate),
             subpattern=merged_expr,
         )
 
     if not has_expr_attrs:
-        goal_template = next(iter(goals))
         merged_expr = MatchGoal(
             subpattern=merged_expr,
-            result_type=goal_template.result_type,
-            schema=goal_template.schema,
+            candidates=frozenset(candidates),
         )
 
     return merged_expr
@@ -450,10 +478,8 @@ class Matcher(Record):
 
         def _tree(self) -> Expr:
             if self._match_tree is None:
-                goals = {
-                    pattern: MatchGoal(subpattern=None, result_type=None, schema=None)
-                    for pattern in self.patterns
-                }
+                candidate = MatchCandidate(result_type=None, schema=None)
+                goals = {pattern: frozenset((candidate,)) for pattern in self.patterns}
                 self._match_tree = merge(goals)
             return self._match_tree
 
@@ -462,12 +488,19 @@ class Matcher(Record):
                 expr = Expr.from_str(expr)
             matcher = Matcher()
             result = matcher.match(self._tree(), expr)
-            if result is None or not result.goals:
+            if result is None or not result.candidates:
                 return None
-            if len(result.goals) != 1:
-                raise ValueError("Ambiguous goals in evaluator result")
-            goal = next(iter(result.goals))
-            resolved = goal.apply(result)
+            viable = [
+                candidate
+                for candidate in result.candidates
+                if result.values_for(candidate) is not None
+            ]
+            if not viable:
+                return None
+            if len(viable) != 1:
+                raise ValueError("Ambiguous candidates in evaluator result")
+            candidate = viable[0]
+            resolved = candidate.apply(result)
             if resolved is None:
                 return None
             return cast(frozendict[str, Any], resolved)
@@ -486,20 +519,20 @@ class ClassMatcher(Inmutable, abstract=True):
     __match_tree__: ClassVar[Expr | None] = None
 
     @classmethod
-    def _goal_for(cls, target: type["ClassMatcher"]) -> MatchGoal:
+    def _candidate_for(cls, target: type["ClassMatcher"]) -> MatchCandidate:
         annotations = getattr(target, "__annotations__", {})
         schema = frozendict(annotations) if annotations else None
-        return MatchGoal(subpattern=None, result_type=target, schema=schema)
+        return MatchCandidate(result_type=target, schema=schema)
 
     @classmethod
-    def _collect_patterns(cls) -> dict[Expr, MatchGoal]:
-        patterns: dict[Expr, MatchGoal] = {}
+    def _collect_patterns(cls) -> dict[Expr, frozenset[MatchCandidate]]:
+        patterns: dict[Expr, frozenset[MatchCandidate]] = {}
 
         def collect(target: type[ClassMatcher]):
             if hasattr(target, "match_patterns"):
-                goal = cls._goal_for(target)
+                candidate = cls._candidate_for(target)
                 for pattern in target.match_patterns:
-                    patterns[pattern] = goal
+                    patterns[pattern] = frozenset((candidate,))
             for subclass in target.__subclasses__():
                 if is_abstract(subclass):
                     continue
@@ -520,20 +553,27 @@ class ClassMatcher(Inmutable, abstract=True):
             _expr = Expr.from_str(_expr)
         matcher = Matcher()
         result = matcher.match(cls._match_tree(), _expr)
-        if result is None or not result.goals:
+        if result is None or not result.candidates:
             return None
-        if len(result.goals) != 1:
-            raise ValueError("Ambiguous goals in class matcher result")
-        goal = next(iter(result.goals))
-        values = result.values_for(goal)
+        viable = [
+            candidate
+            for candidate in result.candidates
+            if result.values_for(candidate) is not None
+        ]
+        if not viable:
+            return None
+        if len(viable) != 1:
+            raise ValueError("Ambiguous candidates in class matcher result")
+        candidate = viable[0]
+        values = result.values_for(candidate)
         if values is None:
             return None
-        if goal.result_type is None:
+        if candidate.result_type is None:
             return None
         for key in kwargs:
             if key in values:
                 raise ValueError(f"Duplicate argument: {key}")
-        instance = goal.result_type(*args, **values, **kwargs)
+        instance = candidate.result_type(*args, **values, **kwargs)
         if not isinstance(instance, cls):
             raise ValueError("Resolved goal is not an instance of {cls.__name__}")
         return cast(Self, instance)

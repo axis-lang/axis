@@ -206,6 +206,24 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#castExpr.
+    def enterCastExpr(self, ctx:AxisParser.CastExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#castExpr.
+    def exitCastExpr(self, ctx:AxisParser.CastExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#castOp.
+    def enterCastOp(self, ctx:AxisParser.CastOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#castOp.
+    def exitCastOp(self, ctx:AxisParser.CastOpContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#rangeExpr.
     def enterRangeExpr(self, ctx:AxisParser.RangeExprContext):
         pass

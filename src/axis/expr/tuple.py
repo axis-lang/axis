@@ -1,6 +1,6 @@
 from typing import ClassVar, Literal, Optional, Self
 
-from protobase import cached_property
+from protobase import cached_property, frozendict
 
 from axis import log, syn
 
@@ -200,7 +200,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchRe
             if isinstance(rhs_pattern, syn.MatchCapture):
                 if not rhs_pattern.variadic:
                     rhs_pattern = syn.MatchCapture(
-                        name=rhs_pattern.name,
+                        name_by_candidate=rhs_pattern.name_by_candidate,
                         subpattern=rhs_pattern.subpattern,
                         variadic=True,
                     )
@@ -208,20 +208,24 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchRe
                 subpattern = rhs_pattern.subpattern
                 if isinstance(subpattern, syn.MatchCapture) and not subpattern.variadic:
                     subpattern = syn.MatchCapture(
-                        name=subpattern.name,
+                        name_by_candidate=subpattern.name_by_candidate,
                         subpattern=subpattern.subpattern,
                         variadic=True,
                     )
                 rhs_pattern = syn.MatchGoal(
                     subpattern=subpattern,
-                    result_type=rhs_pattern.result_type,
-                    schema=rhs_pattern.schema,
+                    candidates=rhs_pattern.candidates,
                 )
             elif isinstance(rhs_pattern, Sym) and rhs_pattern.is_wildcard:
-                rhs_pattern = syn.MatchCapture(
-                    name=rhs_pattern.name[1:],
+                candidate = syn.MatchCandidate(result_type=None, schema=None)
+                capture = syn.MatchCapture(
+                    name_by_candidate=frozendict({candidate: rhs_pattern.name[1:]}),
                     subpattern=rhs_pattern,
                     variadic=True,
+                )
+                rhs_pattern = syn.MatchGoal(
+                    subpattern=capture,
+                    candidates=frozenset((candidate,)),
                 )
             else:
                 rhs_pattern = None

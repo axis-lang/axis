@@ -11,6 +11,8 @@ class Infix(syn.Expr, abstract=True):
 
         symbol: "Symbol"  # type: ignore[override]
 
+        def __str__(self):
+            return self.symbol.value
 
         @classmethod
         def build(cls, s: str):
@@ -18,11 +20,17 @@ class Infix(syn.Expr, abstract=True):
                 return cls(symbol=cls.Symbol(s))
             except ValueError:
                 raise ValueError(f"Unknown binary operator: {s}")
+            
+
 
     precedence: ClassVar[int] = 0  # to be overridden in subclasses
     op: Op
     lhs: syn.Expr
     rhs: syn.Expr
+
+    def __str__(self):
+        return f"{self.lhs} {self.op} {self.rhs}"
+        
 
     @classmethod
     def build(cls, lhs: syn.Expr, *ops) -> syn.Expr:
@@ -36,10 +44,6 @@ class Infix(syn.Expr, abstract=True):
 
         return lhs
 
-    def __str__(self):
-        
-        return f"{self.lhs} {self.op.symbol.value} {self.rhs}"
-        
 
 class Productive(Infix):
     class Op(Infix.Op):
@@ -91,6 +95,15 @@ class Range(Infix):
             RANGE_EXCL = "..<"
 
     precedence: ClassVar[int] = 5
+
+
+class Cast(Infix):
+    class Op(Infix.Op):
+        class Symbol(Infix.Op.Symbol):
+            CAST = "=>"
+            COERCE = "->"
+
+    precedence: ClassVar[int] = 6
 
 
 

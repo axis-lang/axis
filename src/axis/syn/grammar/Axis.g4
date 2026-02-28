@@ -56,8 +56,12 @@ expr
 
 // Juxtaposition (right-to-left evaluation)
 compoundExpr
-    : rangeExpr (rangeExpr)*
+    : castExpr (castExpr)*
     ;
+
+
+castExpr: rangeExpr (castOp castExpr)?;
+castOp: '->' | '=>';
 
 
 rangeExpr: logicExpr (rangeOp logicExpr)?;
