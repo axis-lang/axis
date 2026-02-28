@@ -5,7 +5,7 @@ from typing import ClassVar
 from protobase import flux
 
 from axis import dom, syn
-from axis.sem import Database
+from axis.sem import Entity
 
 from .item import Item
 from .ref import name_from_expr, ref_from_expr, scope_ref_from_item
@@ -51,16 +51,16 @@ class Mod(Item):
         return ref_from_expr(self.path, scope_ref)
 
     @flux.property
-    def contributions(self) -> frozenset[Database.Contribution]:
+    def contributions(self) -> frozenset[Entity.Contribution]:
         if self.path is None:
             return frozenset()
         scope_ref = scope_ref_from_item(self)
-        contributions: list[Database.Contribution] = [
-            Database.Namespace(anchor=self.ref, origin=self.path, ctx=self)
+        contributions: list[Entity.Contribution] = [
+            Entity.Namespace(anchor=self.ref, origin=self.path, ctx=self)
         ]
         if scope_ref is not None:
             contributions.append(
-                Database.Member(
+                Entity.Member(
                     anchor=scope_ref,
                     name=name_from_expr(self.path),
                     target=self.ref,

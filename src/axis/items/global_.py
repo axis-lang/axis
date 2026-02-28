@@ -4,7 +4,7 @@ from typing import ClassVar, Literal, Optional
 from protobase import flux
 
 from axis import syn
-from axis.sem import Database
+from axis.sem import Entity
 
 from .item import Item
 from .ref import ref_from_expr, scope_ref_from_item
@@ -52,15 +52,15 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
                 )
 
     @flux.property
-    def contributions(self) -> frozenset[Database.Contribution]:
+    def contributions(self) -> frozenset[Entity.Contribution]:
         if self.key is None:
             return frozenset()
         scope_ref = scope_ref_from_item(self)
         anchor = ref_from_expr(self.key, scope_ref)
-        contributions: list[Database.Contribution] = []
+        contributions: list[Entity.Contribution] = []
         if self.value is not None:
             contributions.append(
-                Database.Fact(
+                Entity.Fact(
                     anchor=anchor,
                     args=(self.value,),
                     origin=self.value,
@@ -69,7 +69,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
             )
         if self.bound is not None:
             contributions.append(
-                Database.Constraint(
+                Entity.Constraint(
                     anchor=anchor,
                     predicate=self.bound,
                     origin=self.bound,

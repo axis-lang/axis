@@ -3,7 +3,7 @@ from typing import ClassVar
 from protobase import flux
 
 from axis import dom
-from axis.sem import Database
+from axis.sem import Entity
 
 from .mod import Mod
 from .ref import ref_from_expr
@@ -18,7 +18,7 @@ class Unit(Mod):
         return ref_from_expr(self.path, None)
 
     @flux.property
-    def contributions(self) -> frozenset[Database.Contribution]:
+    def contributions(self) -> frozenset[Entity.Contribution]:
         if self.path is None:
             return frozenset()
-        return frozenset((Database.Namespace(anchor=self.ref, origin=self.path, ctx=self),))
+        return frozenset((Entity.Namespace(anchor=self.ref, origin=self.path, ctx=self),))

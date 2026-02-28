@@ -5,7 +5,7 @@ from typing import ClassVar, Iterable, Literal, Optional
 from protobase import flux
 
 from axis import dom, syn, expr
-from axis.sem import Database
+from axis.sem import Entity
 from .blocks import TupleBlock
 
 
@@ -76,7 +76,7 @@ class Def(Item, syn.ClassMatcher):
     }
 
     # pkg: items.Package
-    origin: syn.Expr
+    origin: syn.Expr | None = None
     where: Optional[Where] = None
     takes: tuple[Takes, ...] = ()
     returns: tuple[Returns, ...] = ()
@@ -131,17 +131,17 @@ class Def(Item, syn.ClassMatcher):
             return self
 
         return cls(
-            expr=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
+            origin=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
         )
 
     @flux.property
-    def contributions(self) -> frozenset[Database.Contribution]:
+    def contributions(self) -> frozenset[Entity.Contribution]:
         if self.origin is None:
             return frozenset()
 
         scope_ref = scope_ref_from_item(self)
         owner = ref_from_expr(self.origin, scope_ref)
-        contributions: list[Database.Contribution] = []
+        contributions: list[Entity.Contribution] = []
 
         where_expr = self.where
         if self.takes:
@@ -173,7 +173,7 @@ class Def(Item, syn.ClassMatcher):
                 for takes_candidate in takes_shapes:
                     for where_candidate in where_shapes:
                         contributions.append(
-                            Database.Overload(
+                            Entity.Overload(
                                 anchor=owner,
                                 takes_shape=takes_candidate,
                                 where_shape=where_candidate,
@@ -187,7 +187,7 @@ class Def(Item, syn.ClassMatcher):
                                 if ret.expr is None:
                                     continue
                                 contributions.append(
-                                    Database.Returns(
+                                    Entity.Returns(
                                         anchor=owner,
                                         takes_shape=takes_candidate,
                                         where_shape=where_candidate,
@@ -214,7 +214,7 @@ class Def(Item, syn.ClassMatcher):
                     if ret.expr is None:
                         continue
                     contributions.append(
-                        Database.Returns(
+                        Entity.Returns(
                             anchor=owner,
                             takes_shape=None,
                             where_shape=where_candidate,
@@ -227,7 +227,7 @@ class Def(Item, syn.ClassMatcher):
         if self.where is not None:
             for elem in self.where.elements:
                 contributions.append(
-                    Database.Constraint(
+                    Entity.Constraint(
                         anchor=owner,
                         predicate=elem,
                         origin=elem,
@@ -328,10 +328,10 @@ class QualDef(Def):
         syn.Expr.from_str("$sym[..$spec] $target"),
     )
 
-    sym: expr.Sym
+    sym: expr.Sym | None = None
     # target y spec son parametros (takes)
     spec: Optional[expr.Tuple] = None
-    target: syn.Expr
+    target: syn.Expr | None = None
 
 
 class ClassDef(Def):
@@ -347,7 +347,7 @@ class ClassDef(Def):
 
     # spec son 
 
-    sym: expr.Sym
+    sym: expr.Sym | None = None
     spec: Optional[expr.Tuple] = None
     args: Optional[expr.Tuple] = None
 
@@ -369,9 +369,9 @@ class FnDef(Def):
 
     # spec son 
 
-    sym: expr.Sym
-    ret: syn.Expr
-    args: expr.Tuple
+    sym: expr.Sym | None = None
+    ret: syn.Expr | None = None
+    args: expr.Tuple | None = None
     spec: Optional[expr.Tuple] = None
     ctx: Optional[syn.Expr] = None
 
@@ -384,8 +384,8 @@ class CastDef(Def):
         syn.Expr.from_str("$from_ => $to"), # explicit hard coercion
     )
 
-    from_: syn.Expr
-    to: syn.Expr
+    from_: syn.Expr | None = None
+    to: syn.Expr | None = None
 
 
 def _shape_from_tuple(tup: expr.Tuple) -> dom.Tuple[str, syn.Expr]:

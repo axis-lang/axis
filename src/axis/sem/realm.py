@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from protobase import Consed, flux
 
 from .database import Database
+from .entity import Entity
 
 if TYPE_CHECKING:
     from .context import Context
@@ -19,7 +20,7 @@ class Realm(Consed, abstract=True):
 
     @flux.property
     def database(self) -> Database:
-        contributions: list[Database.Contribution] = []
+        contributions: list[Entity.Contribution] = []
         for ctx in self.contexts:
             contributions.extend(ctx.contributions)
         return Database.from_contributions(contributions)

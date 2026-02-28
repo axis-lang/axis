@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from typing import Iterable, TYPE_CHECKING
+from typing import Iterable
 
-from protobase import Inmutable, frozendict
+from protobase import Consed, Inmutable, frozendict
 
 from axis import dom, syn
-
-if TYPE_CHECKING:
-    from .database import Database
-
 
 class ReturnEntry(Inmutable):
     origins: frozenset[syn.Node]
@@ -55,6 +51,33 @@ class OverloadBucket(Inmutable):
 
 
 class Entity(Inmutable):
+    class Contribution(Consed, abstract=True):
+        anchor: dom.Ref
+        origin: syn.Node
+        ctx: syn.Item
+
+    class Namespace(Contribution):
+        ...
+
+    class Member(Contribution):
+        name: str
+        target: dom.Ref
+
+    class Overload(Contribution):
+        takes_shape: dom.Tuple[str, syn.Expr]
+        where_shape: dom.Tuple[str, syn.Expr] | None
+
+    class Returns(Contribution):
+        takes_shape: dom.Tuple[str, syn.Expr] | None
+        where_shape: dom.Tuple[str, syn.Expr] | None
+        returns_shape: dom.Tuple[str, syn.Expr]
+
+    class Constraint(Contribution):
+        predicate: syn.Node
+
+    class Fact(Contribution):
+        args: tuple[syn.Expr, ...]
+
     ref: dom.Ref
     members: frozendict[str, dom.Ref]
     member_origins: frozendict[str, frozenset[syn.Node]]
@@ -86,10 +109,8 @@ class Entity(Inmutable):
 
     @classmethod
     def from_contributions(
-        cls, ref: dom.Ref, contributions: Iterable["Database.Contribution"]
+        cls, ref: dom.Ref, contributions: Iterable["Entity.Contribution"]
     ) -> "Entity":
-        from .database import Database
-
         members: dict[str, dom.Ref] = {}
         member_origins: dict[str, set[syn.Node]] = {}
         member_contexts: dict[str, set[syn.Item]] = {}
@@ -103,7 +124,7 @@ class Entity(Inmutable):
         fact_contexts: dict[tuple[syn.Expr, ...], set[syn.Item]] = {}
 
         for contribution in contributions:
-            if isinstance(contribution, Database.Member):
+            if isinstance(contribution, cls.Member):
                 members[contribution.name] = contribution.target
                 member_origins.setdefault(contribution.name, set()).add(
                     contribution.origin
@@ -111,28 +132,28 @@ class Entity(Inmutable):
                 member_contexts.setdefault(contribution.name, set()).add(
                     contribution.ctx
                 )
-            elif isinstance(contribution, Database.Overload):
+            elif isinstance(contribution, cls.Overload):
                 key = (contribution.takes_shape, contribution.where_shape)
                 bucket = overload_buckets.setdefault(key, OverloadBucket.Builder())
                 bucket.origins.add(contribution.origin)
                 bucket.contexts.add(contribution.ctx)
-            elif isinstance(contribution, Database.Returns):
+            elif isinstance(contribution, cls.Returns):
                 key = (contribution.takes_shape, contribution.where_shape)
                 bucket = overload_buckets.setdefault(key, OverloadBucket.Builder())
                 bucket.add_return(
                     contribution.returns_shape, contribution.origin, contribution.ctx
                 )
-            elif isinstance(contribution, Database.Constraint):
+            elif isinstance(contribution, cls.Constraint):
                 constraints.setdefault(contribution.predicate, set()).add(
                     contribution.origin
                 )
                 constraint_contexts.setdefault(contribution.predicate, set()).add(
                     contribution.ctx
                 )
-            elif isinstance(contribution, Database.Fact):
+            elif isinstance(contribution, cls.Fact):
                 facts.setdefault(contribution.args, set()).add(contribution.origin)
                 fact_contexts.setdefault(contribution.args, set()).add(contribution.ctx)
-            elif isinstance(contribution, Database.Namespace):
+            elif isinstance(contribution, cls.Namespace):
                 continue
 
         overloads = {
