@@ -3,16 +3,13 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Self, Union as TypingUnion, cast
 
-from protobase import Consed, frozendict, inmutable
+from protobase import Consed, frozendict
 
 from axis import syn
 from axis.dom.tuple_ import Tuple
 
 
 class Builtin(Consed, abstract=True): ...
-
-
-inmutable(Builtin)
 
 
 type Atom = TypingUnion[int, float, Decimal, str, bool, None]

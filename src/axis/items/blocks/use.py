@@ -18,7 +18,14 @@ class Use(syn.Block, Inmutable):
     import_expr: syn.Expr
 
     @classmethod
-    def build(cls, kw: Literal['use'], import_expr: syn.Expr, *, children: tuple[syn.Block, ...]) -> Self:
+    def build(
+        cls,
+        kw: Literal["use"],
+        import_expr: syn.Expr,
+        *,
+        children: tuple[syn.Block, ...],
+        **kwargs,
+    ) -> Self:
         return cls(import_expr=import_expr)
 
     @cached_property

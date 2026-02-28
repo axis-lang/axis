@@ -1,11 +1,13 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 from axis import syn, expr
-from protobase import Inmutable
 from .blocks import TupleBlock
 
 
-class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
+from .item import Item
+
+
+class Def(Item, syn.ClassMatcher):
 
     class Where(TupleBlock):
         outline_keyword: ClassVar = "where"
@@ -45,7 +47,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
             children: syn.Block.Children,
             **kwargs,
         ):
-
+            kwargs.pop("realm", None)
             return cls(expr=expr, **kwargs)
 
     # class Expose(TupleBlock):

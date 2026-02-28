@@ -2,11 +2,12 @@ from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
 from axis import syn
-from protobase import Inmutable
+
+from .item import Item
 
 
 
-class Global(syn.SegregatedItem, syn.ClassMatcher, Inmutable, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
+class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal ValueMixin or ElementMixin
     """
     <kw> <name>: <type> = <value>
     where <kw> in ["val", "var", "let", 'dyn', 'mut']
