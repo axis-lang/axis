@@ -91,3 +91,12 @@ class Range(Infix):
             RANGE_EXCL = "..<"
 
     precedence: ClassVar[int] = 5
+
+
+
+# class Cast(Infix): Coherce
+#     class Op(Infix.Op):
+#         class Symbol(Infix.Op.Symbol):
+#             RANGE_INCL = "=>"
+#             RANGE_EXCL = "->"
+#     precedence: ClassVar[int] = 5

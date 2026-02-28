@@ -68,7 +68,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
     }
 
     # pkg: items.Package
-    expr: syn.Expr | None = None
+    origin: syn.Expr
     where: Optional[Where] = None
     takes: tuple[Takes, ...] = ()
     returns: tuple[Returns, ...] = ()
@@ -113,7 +113,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
         # procesa la estructura de la expresion para determinar el tipo de definicion
         self = cls.match(
             expr,
-            expr=expr,
+            origin=expr,
             where=where,
             takes=tuple(takes),
             returns=tuple(returns),
@@ -127,7 +127,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
         )
 
     def contribute(self, collector) -> None:
-        if self.expr is None:
+        if self.origin is None:
             return
 
         where_expr = self.where
@@ -137,7 +137,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
                 if takes_expr is None:
                     continue
                 collector.overload(
-                    self.expr,
+                    self.origin,
                     takes_expr,
                     where_expr,
                     origin=takes_expr,
@@ -149,7 +149,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
                         if ret.expr is None:
                             continue
                         collector.returns(
-                            self.expr,
+                            self.origin,
                             takes_expr,
                             where_expr,
                             ret.expr,
@@ -161,7 +161,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
                 if ret.expr is None:
                     continue
                 collector.returns(
-                    self.expr,
+                    self.origin,
                     None,
                     where_expr,
                     ret.expr,
@@ -171,7 +171,7 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
 
         if self.where is not None:
             for elem in self.where.elements:
-                collector.constraint(self.expr, elem, origin=elem, ctx=self)
+                collector.constraint(self.origin, elem, origin=elem, ctx=self)
 
     # def ingest(self, ingestor: Ingestor):
     #     ...
@@ -257,6 +257,19 @@ class Def(syn.SegregatedItem, syn.ClassMatcher, Inmutable):
     #         raise ValueError(f"Invalid definition expression: {self.expr}")
     #     return kind
 
+
+class QualDef(Def):
+    match_patterns: ClassVar = (
+        syn.Expr.from_str("$sym $target"),
+        syn.Expr.from_str("$sym[..$spec] $target"),
+    )
+
+    sym: expr.Sym
+    # target y spec son parametros (takes)
+    spec: Optional[expr.Tuple] = None
+    target: syn.Expr
+
+
 class ClassDef(Def):
     '''
     Tambien representara funciones,  
@@ -270,7 +283,7 @@ class ClassDef(Def):
 
     # spec son 
 
-    sym: expr.Sym | None = None
+    sym: expr.Sym
     spec: Optional[expr.Tuple] = None
     args: Optional[expr.Tuple] = None
 
@@ -278,20 +291,39 @@ class ClassDef(Def):
         assert len(self.returns) == 0, "ClassDef cannot have returns"
 
 
-class QualDef(Def):
+class FnDef(Def):
+    '''
+    Tambien representara funciones,  
+    '''
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym $target"),
-        syn.Expr.from_str("$sym[..$spec] $target"),
+        syn.Expr.from_str("$sym(..args) -> $ret"),
+        syn.Expr.from_str("$sym[..$spec](..args) -> $ret"),
+        syn.Expr.from_str("$ctx.$sym(..args) -> $ret"),
+        syn.Expr.from_str("$ctx.$sym[..$spec](..args) -> $ret"),
+
     )
 
-    sym: expr.Sym | None = None
-    # target y spec son parametros (takes)
+    # spec son 
+
+    sym: expr.Sym
+    ret: syn.Expr
+    args: expr.Tuple
     spec: Optional[expr.Tuple] = None
-    target: syn.Expr | None = None
+    ctx: Optional[syn.Expr] = None
 
+    # def __invariants__(self):
+    #     assert len(self.returns) == 0, "FnDef cannot have returns"
 
-# class CohertionDef(Def):
-#     match_patterns: ClassVar = (
-#         syn.Expr.from_str("T@Sym -> U@Sym"), # implicit cohertion
-#         syn.Expr.from_str("T@Sym => U@Sym"), # explicit cohertion
-#     )
+class CastDef(Def):
+    match_patterns: ClassVar = (
+        syn.Expr.from_str("$from_ -> $to"), # implicit soft casting
+        syn.Expr.from_str("$from_ => $to"), # explicit hard coercion
+    )
+
+    from_: syn.Expr
+    to: syn.Expr
+
+if __name__ == "__main__":
+    from rich import print
+
+    print(Def._match_tree())

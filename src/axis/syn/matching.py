@@ -535,7 +535,7 @@ class ClassMatcher(Inmutable, abstract=True):
                 raise ValueError(f"Duplicate argument: {key}")
         instance = goal.result_type(*args, **values, **kwargs)
         if not isinstance(instance, cls):
-            raise ValueError("Resolved goal is not an instance of ClassMatcher")
+            raise ValueError("Resolved goal is not an instance of {cls.__name__}")
         return cast(Self, instance)
 
 

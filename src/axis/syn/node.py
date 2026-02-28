@@ -52,19 +52,7 @@ class Node(FromSrcMixin, Inmutable, abstract=True):
         return NotImplemented
 
     def __rich__(self):
-
-        OP_STYLE = "yellow"
-        ATTR_STYLE = "cyan"
-        TYPE_STYLE = "green"
-        VALUE_STYLE = "italic bright_black"
-
-        label = Text(no_wrap=False)
-        label.append(type(self).__qualname__, style=TYPE_STYLE)
-        label.append(" = ", style=OP_STYLE)
-        # label.append(shorten(str(self), 50), style=VALUE_STYLE)
-        label.append(str(self), style=VALUE_STYLE)
-
-        tree = Tree(label, guide_style=TYPE_STYLE)
+        tree = Tree(_rich_root_label(self), guide_style=_TYPE_STYLE)
 
         # primero los valores simples
         # luego los nodos
@@ -74,42 +62,7 @@ class Node(FromSrcMixin, Inmutable, abstract=True):
             if value is None or value == ():
                 continue
 
-            if isinstance(value, Node):
-                child = value.__rich__()
-                child.label = Text()
-                child.label.append(attr, style=ATTR_STYLE)
-                child.label.append(": ", style=OP_STYLE)
-                child.label.append(type(value).__qualname__, style=TYPE_STYLE)
-                child.label.append(" = ", style=OP_STYLE)
-                child.label.append(shorten(str(value), 50), style=VALUE_STYLE)
-                tree.add(child)
-                continue
-
-            if isinstance(value, (tuple, frozenset)):  # CONTAINER TYPES
-                child_label = Text()
-                child_label.append(attr, style=ATTR_STYLE)
-                child_label.append(": ", style=OP_STYLE)
-                child_label.append(type(value).__qualname__, style=TYPE_STYLE)
-                child = Tree(child_label, guide_style=ATTR_STYLE)
-
-                for item in value:
-                    if isinstance(item, Node):
-                        child.add(item)
-                    else:
-                        item_label = Text()
-                        item_label.append(shorten(str(item), 50), style=VALUE_STYLE)
-                        child.add(item_label)
-
-                tree.add(child)
-                continue
-
-            attr_label = Text()
-            attr_label.append(attr, style=ATTR_STYLE)
-            attr_label.append(": ", style=OP_STYLE)
-            attr_label.append(type(value).__qualname__, style=TYPE_STYLE)
-            attr_label.append(" = ", style=OP_STYLE)
-            attr_label.append(Text(shorten(str(value), 50), style=VALUE_STYLE))
-            tree.add(attr_label)
+            tree.add(_rich_value_child(attr, value))
 
         return tree
 
@@ -304,3 +257,90 @@ class MatchSpec(Inmutable):
     capture_name: str | None = None
     match_all: bool = False
     filter_any: frozenset[str] = frozenset()
+
+
+_OP_STYLE = "yellow"
+_ATTR_STYLE = "cyan"
+_TYPE_STYLE = "green"
+_VALUE_STYLE = "italic bright_black"
+
+
+def _rich_root_label(node: Node) -> Text:
+    label = Text(no_wrap=False)
+    label.append(type(node).__qualname__, style=_TYPE_STYLE)
+    label.append(" = ", style=_OP_STYLE)
+    label.append(shorten(str(node), 50), style=_VALUE_STYLE)
+    return label
+
+
+def _rich_attr_type_label(name: str, value: object) -> Text:
+    label = Text()
+    label.append(name, style=_ATTR_STYLE)
+    label.append(": ", style=_OP_STYLE)
+    label.append(type(value).__qualname__, style=_TYPE_STYLE)
+    return label
+
+
+def _rich_scalar_label(name: str, value: object) -> Text:
+    label = Text()
+    label.append(name, style=_ATTR_STYLE)
+    label.append(": ", style=_OP_STYLE)
+    label.append(type(value).__qualname__, style=_TYPE_STYLE)
+    label.append(" = ", style=_OP_STYLE)
+    label.append(shorten(str(value), 50), style=_VALUE_STYLE)
+    return label
+
+
+def _rich_item_label(value: object) -> Text:
+    label = Text()
+    label.append(shorten(str(value), 50), style=_VALUE_STYLE)
+    return label
+
+
+def _rich_named_node(name: str, node: Node) -> Tree:
+    child = node.__rich__()
+    child.label = Text()
+    child.label.append(name, style=_ATTR_STYLE)
+    child.label.append(": ", style=_OP_STYLE)
+    child.label.append(type(node).__qualname__, style=_TYPE_STYLE)
+    child.label.append(" = ", style=_OP_STYLE)
+    child.label.append(shorten(str(node), 50), style=_VALUE_STYLE)
+    return child
+
+
+def _rich_value_child(name: str, value: object) -> Tree | Text:
+    if isinstance(value, Node):
+        return _rich_named_node(name, value)
+    if isinstance(value, (dict, frozendict)):
+        return _rich_mapping_tree(name, value)
+    if isinstance(value, (tuple, frozenset)):
+        return _rich_container_tree(name, value)
+    return _rich_scalar_label(name, value)
+
+
+def _rich_mapping_tree(name: str, mapping: dict | frozendict) -> Tree:
+    child = Tree(_rich_attr_type_label(name, mapping), guide_style=_ATTR_STYLE)
+
+    for index, (item_key, item_value) in enumerate(mapping.items()):
+        #entry_label = Text()
+        #entry_label.append(f"item[{index}]", style=_ATTR_STYLE)
+        entry = Tree(Text(), guide_style=_ATTR_STYLE, hide_root=True)
+
+        entry.add(_rich_value_child("key", item_key))
+        entry.add(_rich_value_child("value", item_value))
+
+        child.add(entry)
+
+    return child
+
+
+def _rich_container_tree(name: str, values: Iterable[object]) -> Tree:
+    child = Tree(_rich_attr_type_label(name, values), guide_style=_ATTR_STYLE)
+
+    for item in values:
+        if isinstance(item, Node):
+            child.add(item)
+        else:
+            child.add(_rich_item_label(item))
+
+    return child
