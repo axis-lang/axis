@@ -120,6 +120,134 @@ class Const(Val):
             raise TypeError(f"Const.data must be primitive, got {type(self.data)}")
 
 
+class Ref(Val):
+    class Type(Type):
+        parent: Ref.Type | None = None
+        spec: Tuple[str, Type] = Tuple.EMPTY
+
+    class Data(Builtin):
+        parent: Ref.Data | None
+        member: str
+        spec: tuple[Data, ...]
+
+    type: "Ref.Type"  # type: ignore[override]
+    data: "Ref.Data"
+
+    @classmethod
+    def from_parts(
+        cls,
+        member: str,
+        *,
+        parent: "Ref | None" = None,
+        spec: Tuple[str, Const] = Tuple.EMPTY,
+    ) -> "Ref":
+        parent_type = cast(Ref.Type | None, parent.type) if parent else None
+        spec_types = Tuple(index=spec.index, values=tuple(p.type for p in spec.values))
+        ref_type = Ref.Type(parent=parent_type, spec=spec_types)
+        ref_data = Ref.Data(
+            parent=None if parent is None else parent.data,
+            member=member,
+            spec=tuple(_const_data(p) for p in spec.values),
+        )
+        return cls(type=ref_type, data=ref_data)
+
+    @classmethod
+    def root(cls, name: str) -> "Ref":
+        ref_type = Ref.Type(parent=None, spec=Tuple.EMPTY)
+        ref_data = Ref.Data(parent=None, member=name, spec=())
+        return cls(type=ref_type, data=ref_data)
+
+    @classmethod
+    def from_str(cls, value: str) -> "Ref":
+        parts = [part.strip() for part in value.split(".")]
+        segments = tuple(part for part in parts if part)
+        if not segments:
+            raise ValueError("Ref.from_str requires at least one segment")
+        ref = cls.root(segments[0])
+        for segment in segments[1:]:
+            ref = ref.child(segment)
+        return ref
+
+    def child(
+        self,
+        name: str,
+        *,
+        spec: Tuple[str, Const] = Tuple.EMPTY,
+    ) -> "Ref":
+        return Ref.from_parts(name, parent=self, spec=spec)
+
+    def with_spec(self, args: Const) -> "Ref":
+        if not isinstance(args.type, StructType):
+            raise TypeError("Ref.with_spec requires a StructType value")
+        if not isinstance(args.data, tuple):
+            raise TypeError("Ref.with_spec requires tuple data")
+        return Ref(
+            type=Ref.Type(
+                parent=self.type.parent,
+                spec=args.type.fields,
+            ),
+            data=Ref.Data(
+                parent=self.data.parent,
+                member=self.data.member,
+                spec=args.data,
+            ),
+        )
+
+    @property
+    def parent(self) -> "Ref | None":
+        parent_data = self.data.parent
+        if parent_data is None:
+            return None
+        parent_type = self.type.parent
+        if parent_type is None:
+            raise TypeError("Ref has parent data but no parent type")
+        return Ref(type=parent_type, data=parent_data)
+
+    @property
+    def spec(self) -> Const:
+        return Const.from_type_data(cast(Type, self.type.spec), self.data.spec)
+
+    def __invariants__(self) -> None:
+        if not isinstance(self.type, Ref.Type):
+            raise TypeError(
+                f"Ref.type must be Ref.Type, got {type(self.type).__name__}"
+            )
+        parent_data = self.data.parent
+        member = self.data.member
+        spec_data = self.data.spec
+        if not isinstance(member, str) or not member:
+            raise TypeError("Ref.member must be a non-empty string")
+        if parent_data is None:
+            if self.type.parent is not None:
+                raise TypeError("Ref.Type parent is set but data has no parent")
+        else:
+            if self.type.parent is None:
+                raise TypeError("Ref.Type parent is None but data has a parent")
+        if not isinstance(spec_data, tuple):
+            raise TypeError("Ref.spec data must be a tuple")
+        if len(spec_data) != len(self.type.spec.values):
+            raise TypeError("Ref spec length does not match Ref.Type spec")
+
+
+class Err(Val):
+    message: str
+    origin: "syn.Node | None" = None
+    type: "Ref.Type | None" = None  # type: ignore[override]
+    data: "Ref.Data | None" = None  # type: ignore[override]
+
+    def __invariants__(self) -> None:
+        if not isinstance(self.message, str) or not self.message:
+            raise TypeError("Err.message must be a non-empty string")
+        if self.type is None:
+            object.__setattr__(self, "type", Ref.Type(parent=None, spec=Tuple.EMPTY))
+        if self.data is None:
+            object.__setattr__(
+                self,
+                "data",
+                Ref.Data(parent=None, member="", spec=()),
+            )
+
+
 class Var(Dom):
     class Type(Type):
         id: str
@@ -141,115 +269,6 @@ class Var(Dom):
             raise TypeError("Var.type id must match Var.data id")
 
 
-class Err(Val):
-    message: str
-    origin: "syn.Node | None" = None
-    type: "Ref.Type | None" = None  # type: ignore[override]
-    data: "Ref.Data | None" = None  # type: ignore[override]
-
-    def __invariants__(self) -> None:
-        if not isinstance(self.message, str) or not self.message:
-            raise TypeError("Err.message must be a non-empty string")
-        if self.type is None:
-            object.__setattr__(self, "type", Ref.Type(parent=None, params=Tuple.EMPTY))
-        if self.data is None:
-            object.__setattr__(
-                self,
-                "data",
-                Ref.Data(parent=None, member="", params=()),
-            )
-
-
-class Ref(Val):
-    class Type(Type):
-        parent: "Ref.Type | None" = None
-        params: Tuple[str, "Type"] = Tuple.EMPTY
-
-    class Data(Builtin):
-        member: str
-        params: tuple[Data, ...]
-        parent: "Ref.Data | None"
-
-    type: "Ref.Type"  # type: ignore[override]
-    data: "Ref.Data"
-
-    @classmethod
-    def from_parts(
-        cls,
-        member: str,
-        *,
-        parent: "Ref | None" = None,
-        params: Tuple[str, Const] = Tuple.EMPTY,
-    ) -> "Ref":
-        parent_type = cast(Ref.Type | None, parent.type) if parent else None
-        param_types = Tuple(index=params.index, values=tuple(p.type for p in params.values))
-        ref_type = Ref.Type(parent=parent_type, params=param_types)
-        ref_data = Ref.Data(
-            parent=None if parent is None else parent.data,
-            member=member,
-            params=tuple(_const_data(p) for p in params.values),
-        )
-        return cls(type=ref_type, data=ref_data)
-
-    @classmethod
-    def root(cls, name: str) -> "Ref":
-        ref_type = Ref.Type(parent=None, params=Tuple.EMPTY)
-        ref_data = Ref.Data(parent=None, member=name, params=())
-        return cls(type=ref_type, data=ref_data)
-
-    @classmethod
-    def from_str(cls, value: str) -> "Ref":
-        parts = [part.strip() for part in value.split(".")]
-        segments = tuple(part for part in parts if part)
-        if not segments:
-            raise ValueError("Ref.from_str requires at least one segment")
-        ref = cls.root(segments[0])
-        for segment in segments[1:]:
-            ref = ref.child(segment)
-        return ref
-
-    def child(
-        self,
-        name: str,
-        *,
-        params: Tuple[str, Const] = Tuple.EMPTY,
-    ) -> "Ref":
-        return Ref.from_parts(name, parent=self, params=params)
-
-    def with_args(self, args: Const) -> "Ref":
-        if not isinstance(args.type, StructType):
-            raise TypeError("Ref.with_args requires a StructType value")
-        if not isinstance(args.data, tuple):
-            raise TypeError("Ref.with_args requires tuple data")
-        ref_type = Ref.Type(
-            parent=self.type.parent,
-            params=cast(Tuple[str, Type], args.type.fields),
-        )
-        ref_data = Ref.Data(parent=self.data.parent, member=self.data.member, params=args.data)
-        return Ref(type=ref_type, data=ref_data)
-
-    def __invariants__(self) -> None:
-        if not isinstance(self.type, Ref.Type):
-            raise TypeError(
-                f"Ref.type must be Ref.Type, got {type(self.type).__name__}"
-            )
-        parent_data = self.data.parent
-        member = self.data.member
-        params_data = self.data.params
-        if not isinstance(member, str) or not member:
-            raise TypeError("Ref.member must be a non-empty string")
-        if parent_data is None:
-            if self.type.parent is not None:
-                raise TypeError("Ref.Type parent is set but data has no parent")
-        else:
-            if self.type.parent is None:
-                raise TypeError("Ref.Type parent is None but data has a parent")
-        if not isinstance(params_data, tuple):
-            raise TypeError("Ref.params data must be a tuple")
-        if len(params_data) != len(self.type.params.values):
-            raise TypeError("Ref params length does not match Ref.Type params")
-
-
 def _const_data(value: Const) -> Data:
     if isinstance(value, Const):
         return value.data
@@ -267,3 +286,12 @@ def ref_segments(ref: Ref) -> tuple[str, ...]:
         segments.append(current.member)
         current = current.parent
     return tuple(reversed(segments))
+
+
+if __name__ == "__main__":
+    from rich import print
+
+    std = Ref.root("std").child("io").child("console").child("print")
+    print(std)
+
+

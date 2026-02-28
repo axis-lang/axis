@@ -67,9 +67,9 @@ class EvalTest(unittest.TestCase):
 
     def test_nominal_params_with_var_encoding(self):
         param = dom.Const.from_literal(3)
-        params = cast(dom.Tuple[str | None, dom.Const], dom.Tuple.new(param))
+        spec = cast(dom.Tuple[str, dom.Const], dom.Tuple.new(size=param))
         base = dom.Ref.root("std")
-        ref = dom.Ref.from_parts("Array", parent=base, params=params)
+        ref = dom.Ref.from_parts("Array", parent=base, spec=spec)
         meta = dom.NominalType.from_ref(ref)
         if isinstance(meta, dom.NominalType):
             self.assertTrue(isinstance(meta.ref, dom.Ref))

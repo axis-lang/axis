@@ -1,6 +1,6 @@
 from typing import Self
 
-from axis import src
+from axis import dom, src
 from protobase import flux
 from typing import cast
 
@@ -63,26 +63,19 @@ def debug_package(path: str = "codebase/sandbox") -> None:
     def print_syn(value: str):
         print(syn.Expr.from_str(value))
 
-    print("database.entities", len(db.entities_by_shape))
+    print("database.entities", len(db.entities_by_ref))
     print("database.namespaces", len(db.members_by_scope))
-    print("database.ref_shapes", tuple(ref.segments for ref in db.entities_by_shape))
+    print("database.refs", tuple(dom.ref_segments(ref) for ref in db.entities_by_ref))
 
     def find_entity(*segments):
         return next(
             (
                 entity
-                for ref, entity in db.entities_by_shape.items()
-                if ref.segments == tuple(segments)
+                for ref, entity in db.entities_by_ref.items()
+                if dom.ref_segments(ref) == tuple(segments)
             ),
             None,
         )
-
-    root_scope = next(
-        (scope for scope in db.members_by_scope if scope.segments == ()),
-        None,
-    )
-    if root_scope is not None:
-        print("root.members", tuple(db.members_by_scope[root_scope].keys()))
 
     sandbox_entity = find_entity("sandbox")
     if sandbox_entity is not None:

@@ -135,7 +135,7 @@ Variants:
 - `FnType(args, ret)`
 - `UnionType(members)`
 - `Var.Type(id)`
-- `Ref.Type(parent, params)`
+- `Ref.Type(parent, spec)`
 - `Qualifier(underlying)`
 - `NominalQualifier(ref, underlying)`
 
@@ -182,7 +182,7 @@ Shape:
 
 Invariants:
 - `ref` is interned and canonical.
-- Hyperparameters are encoded in `ref.params` (value-level) and serialized in
+- Hyperparameters are encoded in `ref.spec` (value-level) and serialized in
   `ref.data`.
 
 Example:
@@ -211,16 +211,16 @@ It is a concrete literal value in the `Val` branch.
 
 ### Shape
 
-`Ref` is a path with explicit structure and optional parameters:
+`Ref` is a path with explicit structure and optional specialization:
 
 - `parent: Ref | None`
 - `member: str`
-- `params: Tuple[str, Const]`
+- `spec: Tuple[str, Const]`
 
 `Ref.Type` describes the structural type of a reference:
 
 - `parent: Ref.Type | None`
-- `params: Tuple[str, Type]`
+- `spec: Tuple[str, Type]`
 
 `segments` can be derived via `dom.ref_segments(ref)`.
 
@@ -263,11 +263,11 @@ mechanisms while preserving expressiveness.
 
 ## Compact Examples
 
-Nominal (no params):
+Nominal (no spec):
 
 - `NominalType(ref=Ref("std.Text"))`
 
-Nominal (with params in Ref):
+Nominal (with spec in Ref):
 
 - `Array[3]` =>
   `NominalType(ref=<Ref("Array") with param 3>)`
@@ -316,7 +316,7 @@ Phase 2: Elaboration and Normalization
 
 - Convert AST into canonical `Dom` forms (`Const` or `Var`).
 - Build `Type` and `Ref` objects.
-- Encode hyperparameters into `Ref.params` when specializing entities.
+- Encode hyperparameters into `Ref.spec` when specializing entities.
 - Validate structural invariants (Index uniqueness, positional before nominal).
 - Example: `Array[3]` becomes `NominalType(ref=<Ref("Array") with param 3>)`.
 - Example: `Person("john", 33)` becomes `Const(type=NominalType(ref=Ref("Person")), data=("john", 33))`.

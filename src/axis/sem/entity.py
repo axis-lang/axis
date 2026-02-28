@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Iterable, TYPE_CHECKING
 
 from protobase import Inmutable, frozendict
 
-from axis import syn
+from axis import dom, syn
 
-from .ref_shape import RefShape
-from axis import dom
+if TYPE_CHECKING:
+    from .database import Database
 
 
 class ReturnEntry(Inmutable):
@@ -27,9 +27,9 @@ class ReturnEntry(Inmutable):
 
 
 class OverloadBucket(Inmutable):
-    origins: frozenset
-    contexts: frozenset
-    returns: frozendict
+    origins: frozenset[syn.Node]
+    contexts: frozenset[syn.Item]
+    returns: frozendict[dom.Tuple[str, syn.Expr], ReturnEntry]
 
     class Builder:
         def __init__(self) -> None:
@@ -55,19 +55,22 @@ class OverloadBucket(Inmutable):
 
 
 class Entity(Inmutable):
-    ref_shape: RefShape
-    members: frozendict
-    member_origins: frozendict
-    member_contexts: frozendict
-    overload_buckets: frozendict
-    constraints: frozendict
-    constraint_contexts: frozendict
-    facts: frozendict
-    fact_contexts: frozendict
+    ref: dom.Ref
+    members: frozendict[str, dom.Ref]
+    member_origins: frozendict[str, frozenset[syn.Node]]
+    member_contexts: frozendict[str, frozenset[syn.Item]]
+    overload_buckets: frozendict[
+        tuple[dom.Tuple[str, syn.Expr] | None, dom.Tuple[str, syn.Expr] | None],
+        OverloadBucket,
+    ]
+    constraints: frozendict[syn.Node, frozenset[syn.Node]]
+    constraint_contexts: frozendict[syn.Node, frozenset[syn.Item]]
+    facts: frozendict[tuple[syn.Expr, ...], frozenset[syn.Node]]
+    fact_contexts: frozendict[tuple[syn.Expr, ...], frozenset[syn.Item]]
 
     class View(Inmutable):
         base: "Entity"
-        ref: RefShape
+        ref: dom.Ref
 
         @property
         def overload_buckets(self):
@@ -81,100 +84,95 @@ class Entity(Inmutable):
         def facts(self):
             return self.base.facts
 
-    class Builder:
-        def __init__(self, ref_shape: RefShape) -> None:
-            self.ref_shape = ref_shape
-            self._members: dict[str, RefShape] = {}
-            self._member_origins: dict[str, set[syn.Node]] = {}
-            self._member_contexts: dict[str, set[syn.Item]] = {}
-            self._overload_buckets: dict[
-                tuple[dom.Tuple[str, syn.Expr] | None, dom.Tuple[str, syn.Expr] | None],
-                OverloadBucket.Builder,
-            ] = {}
-            self._constraints: dict[syn.Node, set[syn.Node]] = {}
-            self._constraint_contexts: dict[syn.Node, set[syn.Item]] = {}
-            self._facts: dict[tuple[syn.Expr, ...], set[syn.Node]] = {}
-            self._fact_contexts: dict[tuple[syn.Expr, ...], set[syn.Item]] = {}
+    @classmethod
+    def from_contributions(
+        cls, ref: dom.Ref, contributions: Iterable["Database.Contribution"]
+    ) -> "Entity":
+        from .database import Database
 
-        def add_member(
-            self,
-            name: str,
-            target: RefShape,
-            origin: syn.Node,
-            ctx: syn.Item,
-        ) -> None:
-            self._members[name] = target
-            self._member_origins.setdefault(name, set()).add(origin)
-            self._member_contexts.setdefault(name, set()).add(ctx)
+        members: dict[str, dom.Ref] = {}
+        member_origins: dict[str, set[syn.Node]] = {}
+        member_contexts: dict[str, set[syn.Item]] = {}
+        overload_buckets: dict[
+            tuple[dom.Tuple[str, syn.Expr] | None, dom.Tuple[str, syn.Expr] | None],
+            OverloadBucket.Builder,
+        ] = {}
+        constraints: dict[syn.Node, set[syn.Node]] = {}
+        constraint_contexts: dict[syn.Node, set[syn.Item]] = {}
+        facts: dict[tuple[syn.Expr, ...], set[syn.Node]] = {}
+        fact_contexts: dict[tuple[syn.Expr, ...], set[syn.Item]] = {}
 
-        def add_overload(
-            self,
-            takes_shape: dom.Tuple[str, syn.Expr],
-            where_shape: dom.Tuple[str, syn.Expr] | None,
-            origin: syn.Node,
-            ctx: syn.Item,
-        ) -> None:
-            key = (takes_shape, where_shape)
-            bucket = self._overload_buckets.setdefault(key, OverloadBucket.Builder())
-            bucket.origins.add(origin)
-            bucket.contexts.add(ctx)
+        for contribution in contributions:
+            if isinstance(contribution, Database.Member):
+                members[contribution.name] = contribution.target
+                member_origins.setdefault(contribution.name, set()).add(
+                    contribution.origin
+                )
+                member_contexts.setdefault(contribution.name, set()).add(
+                    contribution.ctx
+                )
+            elif isinstance(contribution, Database.Overload):
+                key = (contribution.takes_shape, contribution.where_shape)
+                bucket = overload_buckets.setdefault(key, OverloadBucket.Builder())
+                bucket.origins.add(contribution.origin)
+                bucket.contexts.add(contribution.ctx)
+            elif isinstance(contribution, Database.Returns):
+                key = (contribution.takes_shape, contribution.where_shape)
+                bucket = overload_buckets.setdefault(key, OverloadBucket.Builder())
+                bucket.add_return(
+                    contribution.returns_shape, contribution.origin, contribution.ctx
+                )
+            elif isinstance(contribution, Database.Constraint):
+                constraints.setdefault(contribution.predicate, set()).add(
+                    contribution.origin
+                )
+                constraint_contexts.setdefault(contribution.predicate, set()).add(
+                    contribution.ctx
+                )
+            elif isinstance(contribution, Database.Fact):
+                facts.setdefault(contribution.args, set()).add(contribution.origin)
+                fact_contexts.setdefault(contribution.args, set()).add(contribution.ctx)
+            elif isinstance(contribution, Database.Namespace):
+                continue
 
-        def add_return(
-            self,
-            takes_shape: dom.Tuple[str, syn.Expr] | None,
-            where_shape: dom.Tuple[str, syn.Expr] | None,
-            returns_shape: dom.Tuple[str, syn.Expr],
-            origin: syn.Node,
-            ctx: syn.Item,
-        ) -> None:
-            key = (takes_shape, where_shape)
-            bucket = self._overload_buckets.setdefault(key, OverloadBucket.Builder())
-            bucket.add_return(returns_shape, origin, ctx)
-
-        def add_constraint(
-            self, predicate: syn.Node, origin: syn.Node, ctx: syn.Item
-        ) -> None:
-            self._constraints.setdefault(predicate, set()).add(origin)
-            self._constraint_contexts.setdefault(predicate, set()).add(ctx)
-
-        def add_fact(
-            self, args: tuple[syn.Expr, ...], origin: syn.Node, ctx: syn.Item
-        ) -> None:
-            self._facts.setdefault(args, set()).add(origin)
-            self._fact_contexts.setdefault(args, set()).add(ctx)
-
-        def build(self) -> "Entity":
-            overloads = {
-                key: bucket.build() for key, bucket in self._overload_buckets.items()
-            }
-            return Entity(
-                ref_shape=self.ref_shape,
-                members=frozendict(self._members),
-                member_origins=frozendict({
+        overloads = {
+            key: bucket.build() for key, bucket in overload_buckets.items()
+        }
+        return Entity(
+            ref=ref,
+            members=frozendict(members),
+            member_origins=frozendict(
+                {
                     name: frozenset(origins)
-                    for name, origins in self._member_origins.items()
-                }),
-                member_contexts=frozendict({
+                    for name, origins in member_origins.items()
+                }
+            ),
+            member_contexts=frozendict(
+                {
                     name: frozenset(contexts)
-                    for name, contexts in self._member_contexts.items()
-                }),
-                overload_buckets=frozendict(overloads),
-                constraints=frozendict({
-                    predicate: frozenset(origins)
-                    for predicate, origins in self._constraints.items()
-                }),
-                constraint_contexts=frozendict({
+                    for name, contexts in member_contexts.items()
+                }
+            ),
+            overload_buckets=frozendict(overloads),
+            constraints=frozendict(
+                {predicate: frozenset(origins) for predicate, origins in constraints.items()}
+            ),
+            constraint_contexts=frozendict(
+                {
                     predicate: frozenset(contexts)
-                    for predicate, contexts in self._constraint_contexts.items()
-                }),
-                facts=frozendict({
-                    args: frozenset(origins) for args, origins in self._facts.items()
-                }),
-                fact_contexts=frozendict({
+                    for predicate, contexts in constraint_contexts.items()
+                }
+            ),
+            facts=frozendict(
+                {args: frozenset(origins) for args, origins in facts.items()}
+            ),
+            fact_contexts=frozendict(
+                {
                     args: frozenset(contexts)
-                    for args, contexts in self._fact_contexts.items()
-                }),
-            )
+                    for args, contexts in fact_contexts.items()
+                }
+            ),
+        )
 
-    def view(self, ref: RefShape) -> "Entity.View":
+    def view(self, ref: dom.Ref) -> "Entity.View":
         return Entity.View(base=self, ref=ref)

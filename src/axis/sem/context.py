@@ -20,5 +20,6 @@ class Context(syn.SegregatedItem, abstract=True):
     def scope(self) -> ScopeBinding:
         raise NotImplementedError
 
-    def contribute(self, builder: "Database.Builder") -> None:
+    @flux.property
+    def contributions(self) -> frozenset["Database.Contribution"]:
         raise NotImplementedError

@@ -1,9 +1,13 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
+from protobase import flux
+
 from axis import syn
+from axis.sem import Database
 
 from .item import Item
+from .ref import ref_from_expr, scope_ref_from_item
 
 
 
@@ -47,13 +51,32 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
                     f"Invalid syntax for named element: {key} {args}"
                 )
 
-    def contribute(self, collector) -> None:
+    @flux.property
+    def contributions(self) -> frozenset[Database.Contribution]:
         if self.key is None:
-            return
+            return frozenset()
+        scope_ref = scope_ref_from_item(self)
+        anchor = ref_from_expr(self.key, scope_ref)
+        contributions: list[Database.Contribution] = []
         if self.value is not None:
-            collector.fact(self.key, (self.value,), origin=self.value, ctx=self)
+            contributions.append(
+                Database.Fact(
+                    anchor=anchor,
+                    args=(self.value,),
+                    origin=self.value,
+                    ctx=self,
+                )
+            )
         if self.bound is not None:
-            collector.constraint(self.key, self.bound, origin=self.bound, ctx=self)
+            contributions.append(
+                Database.Constraint(
+                    anchor=anchor,
+                    predicate=self.bound,
+                    origin=self.bound,
+                    ctx=self,
+                )
+            )
+        return frozenset(contributions)
 
 class Val(Global):
     outline_keyword: ClassVar = "val"

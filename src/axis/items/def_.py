@@ -1,10 +1,16 @@
 from __future__ import annotations
-from typing import ClassVar, Literal, Optional
-from axis import syn, expr
+from itertools import combinations
+from typing import ClassVar, Iterable, Literal, Optional
+
+from protobase import flux
+
+from axis import dom, syn, expr
+from axis.sem import Database
 from .blocks import TupleBlock
 
 
 from .item import Item
+from .ref import ref_from_expr, scope_ref_from_item, slot_name_from_key
 
 
 class Def(Item, syn.ClassMatcher):
@@ -128,9 +134,14 @@ class Def(Item, syn.ClassMatcher):
             expr=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
         )
 
-    def contribute(self, collector) -> None:
+    @flux.property
+    def contributions(self) -> frozenset[Database.Contribution]:
         if self.origin is None:
-            return
+            return frozenset()
+
+        scope_ref = scope_ref_from_item(self)
+        owner = ref_from_expr(self.origin, scope_ref)
+        contributions: list[Database.Contribution] = []
 
         where_expr = self.where
         if self.takes:
@@ -138,42 +149,93 @@ class Def(Item, syn.ClassMatcher):
                 takes_expr = takes.expr
                 if takes_expr is None:
                     continue
-                collector.overload(
-                    self.origin,
-                    takes_expr,
-                    where_expr,
-                    origin=takes_expr,
-                    ctx=self,
+
+                takes_shape = _shape_from_expr(takes_expr)
+                takes_defaults = (
+                    _defaults_from_tuple(takes_expr)
+                    if isinstance(takes_expr, expr.Tuple)
+                    else ()
+                )
+                where_shape = _shape_from_expr(where_expr) if where_expr else None
+                where_defaults = (
+                    _defaults_from_tuple(where_expr)
+                    if isinstance(where_expr, expr.Tuple)
+                    else ()
                 )
 
-                if self.returns:
-                    for ret in self.returns:
-                        if ret.expr is None:
-                            continue
-                        collector.returns(
-                            self.origin,
-                            takes_expr,
-                            where_expr,
-                            ret.expr,
+                takes_shapes = _expand_default_shapes(takes_shape, takes_defaults)
+                where_shapes = (
+                    _expand_default_shapes(where_shape, where_defaults)
+                    if where_shape
+                    else (None,)
+                )
+
+                for takes_candidate in takes_shapes:
+                    for where_candidate in where_shapes:
+                        contributions.append(
+                            Database.Overload(
+                                anchor=owner,
+                                takes_shape=takes_candidate,
+                                where_shape=where_candidate,
+                                origin=takes_expr,
+                                ctx=self,
+                            )
+                        )
+
+                        if self.returns:
+                            for ret in self.returns:
+                                if ret.expr is None:
+                                    continue
+                                contributions.append(
+                                    Database.Returns(
+                                        anchor=owner,
+                                        takes_shape=takes_candidate,
+                                        where_shape=where_candidate,
+                                        returns_shape=_shape_from_expr(ret.expr),
+                                        origin=ret.expr,
+                                        ctx=self,
+                                    )
+                                )
+        elif self.returns:
+            where_shape = _shape_from_expr(where_expr) if where_expr else None
+            where_defaults = (
+                _defaults_from_tuple(where_expr)
+                if isinstance(where_expr, expr.Tuple)
+                else ()
+            )
+            where_shapes = (
+                _expand_default_shapes(where_shape, where_defaults)
+                if where_shape
+                else (None,)
+            )
+
+            for where_candidate in where_shapes:
+                for ret in self.returns:
+                    if ret.expr is None:
+                        continue
+                    contributions.append(
+                        Database.Returns(
+                            anchor=owner,
+                            takes_shape=None,
+                            where_shape=where_candidate,
+                            returns_shape=_shape_from_expr(ret.expr),
                             origin=ret.expr,
                             ctx=self,
                         )
-        elif self.returns:
-            for ret in self.returns:
-                if ret.expr is None:
-                    continue
-                collector.returns(
-                    self.origin,
-                    None,
-                    where_expr,
-                    ret.expr,
-                    origin=ret.expr,
-                    ctx=self,
-                )
+                    )
 
         if self.where is not None:
             for elem in self.where.elements:
-                collector.constraint(self.origin, elem, origin=elem, ctx=self)
+                contributions.append(
+                    Database.Constraint(
+                        anchor=owner,
+                        predicate=elem,
+                        origin=elem,
+                        ctx=self,
+                    )
+                )
+
+        return frozenset(contributions)
 
     # def ingest(self, ingestor: Ingestor):
     #     ...
@@ -324,6 +386,80 @@ class CastDef(Def):
 
     from_: syn.Expr
     to: syn.Expr
+
+
+def _shape_from_tuple(tup: expr.Tuple) -> dom.Tuple[str, syn.Expr]:
+    keys: list[str | None] = []
+    values: list[syn.Expr] = []
+    for element in tup.elements:
+        match element:
+            case expr.Tuple.Positional(value=value):
+                if value is None:
+                    raise ValueError("Tuple positional element requires a value")
+                keys.append(None)
+                values.append(value)
+            case expr.Tuple.Nominal(key=key, bound=bound, value=_):
+                if bound is None:
+                    raise ValueError("Tuple nominal element requires a bound")
+                keys.append(slot_name_from_key(key))
+                values.append(bound)
+            case _:
+                raise ValueError(f"Unsupported tuple element: {element}")
+
+    return dom.Tuple.from_keys(tuple(keys), tuple(values))
+
+
+def _shape_from_expr(node: syn.Expr) -> dom.Tuple[str, syn.Expr]:
+    if isinstance(node, expr.Tuple):
+        return _shape_from_tuple(node)
+    return dom.Tuple.from_keys((None,), (node,))
+
+
+def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
+    defaults: list[int | str] = []
+    for pos, element in enumerate(tup.elements):
+        match element:
+            case expr.Tuple.Nominal(key=key, value=value) if value is not None:
+                defaults.append(slot_name_from_key(key))
+    return tuple(defaults)
+
+
+def _normalize_default_positions(
+    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
+) -> tuple[int, ...]:
+    positions: list[int] = []
+    for default in defaults:
+        if isinstance(default, int):
+            positions.append(default)
+        else:
+            pos = shape.index.get(default, default=None)
+            if pos is None:
+                continue
+            positions.append(pos)
+    return tuple(dict.fromkeys(positions))
+
+
+def _shape_without_positions(
+    shape: dom.Tuple[str, syn.Expr], positions: set[int]
+) -> dom.Tuple[str, syn.Expr]:
+    keys = tuple(k for i, k in enumerate(shape.index.keys) if i not in positions)
+    values = tuple(v for i, v in enumerate(shape.values) if i not in positions)
+    return dom.Tuple.from_keys(keys, values)
+
+
+def _expand_default_shapes(
+    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
+) -> tuple[dom.Tuple[str, syn.Expr], ...]:
+    positions = _normalize_default_positions(shape, defaults)
+    if not positions:
+        return (shape,)
+
+    expanded: list[dom.Tuple[str, syn.Expr]] = []
+    positions_list = list(positions)
+    for r in range(len(positions_list) + 1):
+        for combo in combinations(positions_list, r):
+            expanded.append(_shape_without_positions(shape, set(combo)))
+    return tuple(expanded)
 
 if __name__ == "__main__":
     from rich import print

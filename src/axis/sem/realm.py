@@ -19,7 +19,7 @@ class Realm(Consed, abstract=True):
 
     @flux.property
     def database(self) -> Database:
-        collector = Database.Builder()
+        contributions: list[Database.Contribution] = []
         for ctx in self.contexts:
-            ctx.contribute(collector)
-        return collector.build()
+            contributions.extend(ctx.contributions)
+        return Database.from_contributions(contributions)
