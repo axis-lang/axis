@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Optional, Self
+from typing import Any, Dict, List, NoReturn, Optional, Self, cast
 
 from protobase import Inmutable, mutate
 from rich import print
@@ -43,20 +43,20 @@ _LABEL_STYLE = {
 
 
 class Label(Inmutable):
-    span: src.Span
+    span: src.Source.Span
     message: Optional[str] = None
     style: LabelStyle = LabelStyle.PRIMARY
 
     @property
-    def file(self):
-        return self.span.file
+    def source(self):
+        return self.span.source
 
 class Diagnostic(Inmutable):
     severity: Severity
     message: str
     code: Optional[str] = None
-    labels: tuple[Label] = ()
-    notes: tuple[str] = ()
+    labels: tuple[Label, ...] = ()
+    notes: tuple[str, ...] = ()
     suggestion: Optional[str] = None
 
     def __enter__(self):
@@ -72,13 +72,13 @@ class Diagnostic(Inmutable):
 
     # def with_label(
     #     self,
-    #     span: src.Span | Any,
+    #     span: src.Source.Span | Any,
     #     message: str = "",
     #     style: LabelStyle = LabelStyle.PRIMARY,
     # ) -> Self:
 
-    #     if not isinstance(span, src.Span):
-    #         span = src.Span.of(span)
+    #     if not isinstance(span, src.Source.Span):
+    #         span = src.Source.Span.of(span)
 
     #     if span is None:
     #         return self
@@ -108,29 +108,29 @@ class Diagnostic(Inmutable):
 
         labels_by_file: Dict[Path, List[Label]] = {}
         for lbl in self.labels:
-            labels_by_file.setdefault(lbl.file.path, []).append(lbl)
+            labels_by_file.setdefault(lbl.source.path, []).append(lbl)
 
         for file_path, lbls in labels_by_file.items():
-            file = lbls[0].file
+            source = lbls[0].source
             file_header = Text(f"{file_path}", style="bold")
             yield file_header
             spans = lbls
             # compute context lines
             line_ranges: Dict[int, List[Label]] = {}
             for lbl in spans:
-                start_pos = file.position_at_offset(lbl.span.start)
-                end_pos = file.position_at_offset(lbl.span.end)
-                start_line = start_pos.line.line_no
-                end_line = end_pos.line.line_no
+                start_pos = source.position_at_offset(lbl.span.start)
+                end_pos = source.position_at_offset(lbl.span.end)
+                start_line = cast(src.Source.Line, start_pos.line).line_no
+                end_line = cast(src.Source.Line, end_pos.line).line_no
                 for ln in range(start_line, end_line + 1):
                     line_ranges.setdefault(ln, []).append(lbl)
             all_lines = sorted(line_ranges.keys())
             start_ctx = max(all_lines[0] - 1, 1)
-            end_ctx = min(all_lines[-1] + 1, len(file))
+            end_ctx = min(all_lines[-1] + 1, len(source))
 
             for ln in range(start_ctx, end_ctx + 1):
-                line = file[ln-1]
-                source = line.content
+                line = source[ln-1]
+                line_content = line.content
                 gutter = f" {'>' if ln in all_lines else ' '} {ln} | "
                 text = Text(gutter)
                 if ln in line_ranges:
@@ -138,10 +138,10 @@ class Diagnostic(Inmutable):
                     idx = 0
                     segments: List[tuple[int,int,Label]] = []
                     for lbl in line_ranges[ln]:
-                        start_pos = file.position_at_offset(lbl.span.start)
-                        end_pos = file.position_at_offset(lbl.span.end)
-                        s_ln = start_pos.line.line_no
-                        e_ln = end_pos.line.line_no
+                        start_pos = source.position_at_offset(lbl.span.start)
+                        end_pos = source.position_at_offset(lbl.span.end)
+                        s_ln = cast(src.Source.Line, start_pos.line).line_no
+                        e_ln = cast(src.Source.Line, end_pos.line).line_no
                         if s_ln == ln:
                             start = start_pos.col_no - 1
                         else:
@@ -149,30 +149,30 @@ class Diagnostic(Inmutable):
                         if e_ln == ln:
                             end = end_pos.col_no - 1
                         else:
-                            end = len(source)
+                            end = len(line_content)
                         segments.append((start, end, lbl))
                     segments.sort(key=lambda x: x[0])
                     last = 0
                     for start, end, lbl in segments:
                         # append plain
                         if start > last:
-                            text.append(source[last:start])
+                            text.append(line_content[last:start])
                         # append highlighted
-                        text.append(source[start:end], _LABEL_STYLE[lbl.style])
+                        text.append(line_content[start:end], _LABEL_STYLE[lbl.style])
                         last = end
                     # remainder
-                    if last < len(source):
-                        text.append(source[last:])
+                    if last < len(line_content):
+                        text.append(line_content[last:])
                 else:
-                    text.append(source)
+                    text.append(line_content)
                 yield text
 
             # annotations below multiline spans for messages
             for lbl in spans:
-                start_pos = file.position_at_offset(lbl.span.start)
-                end_pos = file.position_at_offset(lbl.span.end)
-                start_line = start_pos.line.line_no
-                end_line = end_pos.line.line_no
+                start_pos = source.position_at_offset(lbl.span.start)
+                end_pos = source.position_at_offset(lbl.span.end)
+                start_line = cast(src.Source.Line, start_pos.line).line_no
+                end_line = cast(src.Source.Line, end_pos.line).line_no
                 
                 # Display message for the label
                 if lbl.message:
@@ -226,17 +226,17 @@ if __name__ == "__main__":
         "    }\n"
         "}\n"
     )
-    f2 = src.File(Path("example2.rs"), content)
+    f2 = src.SourceBuffer(Path("example2.rs"), content)
     start_fold = content.find(".map(|v| v * sum)\n")
     end_fold = start_fold + 10
-    span = src.Span(file=f2, start=start_fold, end=end_fold)
+    span = src.Source.Span(source=f2, start=start_fold, end=end_fold)
     lbl_fold = Label(span, "use checked_mul here", LabelStyle.PRIMARY)
     diag2 = Diagnostic(
         severity=Severity.WARNING,
         code="W200",
         message="Potential overflow",
-        labels=[lbl_fold],
-        notes=["Operations on large data slices may overflow."],
+        labels=(lbl_fold,),
+        notes=("Operations on large data slices may overflow.",),
         suggestion="Switch to checked operations as needed."
     )
     console.print(diag2)

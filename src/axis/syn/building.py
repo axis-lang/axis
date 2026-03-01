@@ -33,7 +33,7 @@ IGNORED_TOKENS = {
 
 class Builder(Inmutable):
 
-    source: src.Span
+    source: src.Source.Span
 
     def __call__(self, ctx: ParserRuleContext | TerminalNode, kwargs={}):
         if not isinstance(ctx, (ParserRuleContext | TerminalNode)):
@@ -52,10 +52,10 @@ class Builder(Inmutable):
                 span = self.source[start:stop]
             except Exception:
                 span = self.source
-            if isinstance(span, src.File.Position):
+            if isinstance(span, src.Position):
                 span = span.line
 
-            if isinstance(span, src.File.Position):
+            if isinstance(span, src.Position):
                 span = span.line
             log.error("Syntax error").with_label(log.Label(span, message)).throw()
 
@@ -85,7 +85,7 @@ class Builder(Inmutable):
 
         if isinstance(result, syn.Node):
             span = self.source[start:stop]
-            if isinstance(span, src.File.Position):
+            if isinstance(span, src.Source.Position):
                 span = span.line
             span.tag(result)
 
@@ -185,9 +185,9 @@ class FromSrcMixin(Inmutable, abstract=True):
         raise NotImplementedError(f'No build() method for {cls.__qualname__}')
 
     @classmethod
-    def from_str(cls, src_span: src.Span | str, **kwargs) -> Self:
+    def from_str(cls, src_span: src.Source.Span | str, **kwargs) -> Self:
         if isinstance(src_span, str):
-            src_span = src.Span.from_str(src_span)
+            src_span = src.Source.Span.from_str(src_span)
 
         lexer = AxisLexer(InputStream(src_span.content))
         parser = AxisParser(CommonTokenStream(lexer))
@@ -215,8 +215,8 @@ class FromSrcMixin(Inmutable, abstract=True):
         return result
 
     @property
-    def span(self) -> src.Span | None:
-        return src.span_of(self)
+    def span(self) -> src.Source.Span | None:
+        return src.Source.Span_of(self)
 
     #@property
     def as_label(self, *args, **kwargs):

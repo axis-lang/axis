@@ -9,33 +9,35 @@ from .item import Item
 #from .index import GlobalIndex
 
 class Package(Realm):
-    dir: src.Dir
+    dir: src.SourceDir
 
     @classmethod
     def from_path(cls, path: str | src.Path) -> Self:
-        return cls(dir=src.Dir.from_path(path))
+        return cls(dir=src.SourceDir.from_path(path))
 
     @property
-    def source_paths(self) -> frozenset[src.Path]:  # path -> file
+    def source_files(self) -> frozenset[src.SourceFile]:
         return frozenset(self.dir.glob("**/*.ax"))
 
     @flux.method
-    def file_items(self, path: src.Path) -> frozenset[Item]:
+    def file_items(self, file: src.SourceFile) -> frozenset[Item]:
         from axis import items
-        file = src.File.from_path(self.dir.path / path)
-        return frozenset(items.Unit.from_file(file, realm=self))
+        return frozenset(
+            item for item in items.Unit.from_file(file, realm=self)
+            if isinstance(item, Item)
+        )
 
     @flux.property
     def items(self) -> frozenset[Item]:
         return frozenset(
             item
-            for path in self.source_paths
-            for item in self.file_items(path)
+            for file in self.source_files
+            for item in self.file_items(file)
         )
 
     @property
     def contexts(self):
-        return self.items
+        return tuple(self.items)
 
 
 if __name__ == "__main__":

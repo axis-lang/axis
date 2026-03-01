@@ -134,7 +134,7 @@ class OutlineNode(Node, abstract=True):
         return OutlineSpec(cls, frozendict(rules))
 
     @classmethod
-    def parse_outline_tree(cls, file: src.File) -> OutlineTree[type[OutlineNode]]:
+    def parse_outline_tree(cls, file: src.Source) -> OutlineTree[type[OutlineNode]]:
         return cls.outline_spec.parse_tree(file)
 
     @classmethod
@@ -216,7 +216,7 @@ class SegregatedOutlineNode(OutlineNode, abstract=True):
 
     @classmethod
     def from_file(
-        cls, src_file: src.File, **kwargs
+        cls, src_file: src.Source, **kwargs
     ) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
         tree = cls.parse_outline_tree(src_file)
         #from rich import print

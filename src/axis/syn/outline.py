@@ -14,7 +14,7 @@ EMPTY_LINE = re.compile(r"^\s*$", re.MULTILINE)
 
 class OutlineTree[T](Inmutable):
     tag: T
-    content: src.Span
+    content: src.Source.Span
     children: tuple[OutlineTree, ...]
 
     def __rich__(self):
@@ -89,7 +89,7 @@ class OutlineRule[T](Inmutable):
     def child_tags(self) -> tuple[T, ...]:
         return tuple(child.tag for child in self.children.values())
 
-    def match_child(self, line: src.Line, pos: int = 0) -> Optional[T]:
+    def match_child(self, line: src.Source.Line, pos: int = 0) -> Optional[T]:
         if len(self.children) == 0:
             return None
 
@@ -120,22 +120,22 @@ class OutlineSpec[T](Inmutable):
     class StackEntry(Record):
         rule: OutlineRule
         identation: str = ""
-        content: list[src.Line] = []
+        content: list[src.Source.Line] = []
         children: list[OutlineTree] = []
         next: Optional[OutlineSpec.StackEntry] = None
 
         def as_tree(self):
             return OutlineTree(
                 tag=self.rule.tag,
-                content=src.Span(
-                    file=self.content[0].file,
+                content=src.Source.Span(
+                    source=self.content[0].source,
                     start=self.content[0].start,
                     end=self.content[-1].end,
                 ),
                 children=tuple(self.children),
             )
 
-    def parse_tree(self, file: src.File) -> OutlineTree[T]:
+    def parse_tree(self, file: src.Source) -> OutlineTree[T]:
 
         top_level_entry = self.StackEntry(rule=self.rules[self.start])
         current_entry = top_level_entry

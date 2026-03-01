@@ -1,5 +1,6 @@
+from typing import Self
+
 from axis import syn
-from axis.src import Self
 
 class Index(syn.Expr):
     origin: syn.Expr

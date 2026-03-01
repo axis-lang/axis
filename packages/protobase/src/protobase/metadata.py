@@ -33,7 +33,7 @@ class Metadata[T](Object, abstract=True):
                 cls.__storage__ = WeakKeyDictionary()
 
     @classmethod
-    def of(cls, obj: T):
+    def of(cls, obj: T) -> Self | None:
         try: 
             return cls.__storage__.get(obj)
         except KeyError:
