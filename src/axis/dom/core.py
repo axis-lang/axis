@@ -71,7 +71,17 @@ class NominalType(Type):
 
 
 class StructType(Type):
+    """
+    def Struct[...]:
+    extends Type
+    takes:
+        fields: Tuple[I] Type
+    where:
+        val I: Tuple.Index
+    """
     fields: Tuple[str, "Type"]
+
+
 
 
 class FnType(Type):
@@ -83,15 +93,15 @@ class UnionType(Type):
     members: tuple["Type", ...]
 
 
-class Dom(Consed, abstract=True):
+
+class Val(Consed, abstract=True):
+    pass
+
+class Pure(Val, abstract=True):
     type: Type
-
-
-class Val(Dom, abstract=True): ...
-
-
-class Const(Val):
     data: Data
+
+class Const(Pure):
 
     @classmethod
     def from_type_data(cls, type_: Type, data: Data) -> Self:
@@ -120,7 +130,7 @@ class Const(Val):
             raise TypeError(f"Const.data must be primitive, got {type(self.data)}")
 
 
-class Ref(Val):
+class Ref(Pure):
     class Type(Type):
         parent: Ref.Type | None = None
         spec: Tuple[str, Type] = Tuple.EMPTY
@@ -248,7 +258,7 @@ class Err(Val):
             )
 
 
-class Var(Dom):
+class Var(Val):
     class Type(Type):
         id: str
 
@@ -293,5 +303,4 @@ if __name__ == "__main__":
 
     std = Ref.root("std").child("io").child("console").child("print")
     print(std)
-
 

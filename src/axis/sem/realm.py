@@ -12,11 +12,23 @@ if TYPE_CHECKING:
 
 
 class Realm(Consed, abstract=True):
-    __slots__ = ("__weakref__",)
-
     @property
     def contexts(self) -> tuple["Context", ...]:
         raise NotImplementedError
+
+    @flux.property
+    def contributions(self) -> frozenset[Entity.Contribution]:
+        return frozenset(
+            contribution for ctx in self.contexts for contribution in ctx.contributions
+        )
+
+    # @flux.property
+    # def contributions_by_ref(self) -> frozendict[dom.Ref, frozensetEntity.Contribution]:
+    #     return frozenset(
+    #         contribution for ctx in self.contexts for contribution in ctx.contributions
+    #     )
+    
+
 
     @flux.property
     def database(self) -> Database:

@@ -3,22 +3,34 @@ from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
 from protobase import Inmutable, frozendict, mutate
 from axis import log, syn, expr, dom
+from axis.sem import Scope
 from functools import singledispatchmethod
 
 
 class Evaluator(Inmutable):
     # type Bound = type
     type EvalResult = tuple[dom.Type, dom.Data]
-    type EnvValue = dom.Dom | EvalResult
+    type EnvValue = dom.Pure | dom.Var | dom.Err | EvalResult
 
     env: frozendict = frozendict()
+    scope: Scope | None = None
 
     @classmethod
-    def from_env(cls, env: Mapping[str, "Evaluator.EnvValue"]):
-        return cls(env=_coerce_env(env))
+    def from_env(
+        cls, env: Mapping[str, "Evaluator.EnvValue"], scope: Scope | None = None
+    ):
+        return cls(env=_coerce_env(env), scope=scope)
+
+    @classmethod
+    def from_scope(cls, scope: Scope, env: Mapping[str, "Evaluator.EnvValue"] | None = None):
+        base_env = _coerce_env(env or {})
+        return cls(env=base_env, scope=scope)
 
     def with_env(self, env: Mapping[str, "Evaluator.EnvValue"]):
         return mutate(self, env=_coerce_env(env))
+
+    def with_scope(self, scope: Scope | None):
+        return mutate(self, scope=scope)
 
     def __call__(self, node: syn.Node) -> dom.Const:
         type_, data = self.eval(node)
@@ -61,14 +73,13 @@ class Evaluator(Inmutable):
 
     def _resolve_env(self, sym: expr.Sym) -> EvalResult:
         key = str(sym)
-        if key not in self.env:
+        if key in self.env:
+            value = self.env[key]
+            return _coerce_env_value(sym, value)
+        if self.scope is None:
             self._error(sym, f"Unbound symbol: {key}")
-        value = self.env[key]
-        if isinstance(value, dom.Dom):
-            return value.type, _env_data(value)
-        if isinstance(value, tuple) and len(value) == 2:
-            return value  # type: ignore[return-value]
-        raise TypeError(f"Invalid env value for {key}: {type(value)}")
+        value = self.scope.lookup(sym)
+        return _coerce_scope_value(sym, value)
 
     def _numeric_result(self, value: int | Decimal) -> EvalResult:
         if isinstance(value, Decimal):
@@ -238,7 +249,38 @@ def _builtin_nominal(name: str) -> dom.Type:
     return dom.NominalType.from_str(f"std.{name}")
 
 
-def _env_data(value: dom.Dom) -> dom.Data:
+def _env_data(value: dom.Pure | dom.Var | dom.Err) -> dom.Data:
     if hasattr(value, "data"):
         return cast(dom.Data, getattr(value, "data"))
     raise TypeError("Env values must carry data")
+
+
+def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.EvalResult:
+    if isinstance(value, dom.Pure):
+        pure = cast(dom.Pure, value)
+        return pure.type, pure.data
+    if isinstance(value, (dom.Var, dom.Err)):
+        type_ = value.type
+        if type_ is None:
+            raise TypeError("Env value missing type")
+        return cast(dom.Type, type_), _env_data(value)
+    if isinstance(value, tuple) and len(value) == 2:
+        return value  # type: ignore[return-value]
+    raise TypeError(f"Invalid env value for {sym}: {type(value)}")
+
+
+def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> Evaluator.EvalResult:
+    if isinstance(value, dom.Err):
+        message = value.message or f"Unbound symbol: {sym}"
+        diag = log.error(message)
+        if sym.span is not None:
+            diag = diag.with_label(sym.as_label(message))
+        diag.throw()
+    if isinstance(value, dom.Pure):
+        return value.type, value.data
+    if isinstance(value, dom.Var):
+        type_ = value.type
+        if type_ is None:
+            raise TypeError("Scope value missing type")
+        return cast(dom.Type, type_), _env_data(value)
+    raise TypeError(f"Invalid scope value for {sym}: {type(value)}")

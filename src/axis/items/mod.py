@@ -4,11 +4,13 @@ from typing import ClassVar
 
 from protobase import flux
 
-from axis import dom, syn
-from axis.sem import Entity
+from axis import dom, expr, syn
+from axis.sem import Entity, Scope
 
+from .blocks import Use
 from .item import Item
 from .ref import name_from_expr, ref_from_expr, scope_ref_from_item
+from .scopes import parent_scope
 
 
 class Mod(Item):
@@ -28,6 +30,7 @@ class Mod(Item):
     #pkg: items.Package
 
     path: syn.Expr | None = None
+    uses: tuple[Use, ...] = ()
 
     @classmethod
     def build(
@@ -40,8 +43,8 @@ class Mod(Item):
         #parent: syn.SegregatedOutlineNode,
         **kwargs
     ):
-        # procesa imports desde children
-        return cls(path=path, **kwargs)
+        uses = tuple(child for child in children if isinstance(child, Use))
+        return cls(path=path, uses=uses, **kwargs)
 
     @flux.property
     def ref(self) -> dom.Ref:
@@ -70,9 +73,83 @@ class Mod(Item):
             )
         return frozenset(contributions)
 
+    @flux.property
+    def scope(self) -> Scope:
+        scope_name = name_from_expr(self.path) if self.path is not None else None
+        builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
+        realm = self.realm
+        if realm is None:
+            return builder.build()
+
+        db = realm.database
+        for use in self.uses:
+            entries, spreads = _collect_use_entries(use.import_expr, None)
+            for name, ref in entries:
+                builder.define(name, ref)
+            for scope_ref in spreads:
+                for name, ref in _namespace_members(db, scope_ref).items():
+                    builder.define(name, ref)
+
+        if self.path is not None:
+            for name, ref in _namespace_members(db, self.ref).items():
+                builder.define(name, ref)
+
+        return builder.build()
+
     # class Binding(sem.Binding):
     #     item: Mod
 
     #     @cached_property
     #     def ref(self):
     #         return val.Ref.from_expr(self.item.path, base_ref=self.parent.ref)
+
+
+def _namespace_members(db, scope_ref: dom.Ref) -> dict[str, dom.Ref]:
+    members: dict[str, dom.Ref] = dict(db.members_by_scope.get(scope_ref, {}))
+    for ref in db.entities_by_ref:
+        parent = ref.parent
+        if parent is not None and parent == scope_ref:
+            name = ref.data.member
+            members.setdefault(name, ref)
+    return members
+
+
+def _collect_use_entries(
+    node: syn.Expr, prefix: dom.Ref | None
+) -> tuple[list[tuple[str, dom.Ref]], list[dom.Ref]]:
+    entries: list[tuple[str, dom.Ref]] = []
+    spreads: list[dom.Ref] = []
+
+    def walk(value: object, current_prefix: dom.Ref | None) -> None:
+        match value:
+            case expr.Apply(function=function_expr, argument=argument_expr):
+                next_prefix = ref_from_expr(function_expr, current_prefix)
+                walk(argument_expr, next_prefix)
+            case expr.Tuple(elements=elements):
+                for element in elements:
+                    walk(element, current_prefix)
+            case expr.Tuple.Positional(value=elem_value):
+                if elem_value is None:
+                    return
+                if isinstance(elem_value, str) and elem_value == "...":
+                    if current_prefix is not None:
+                        spreads.append(current_prefix)
+                    return
+                walk(elem_value, current_prefix)
+            case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
+                alias_expr = elem_value or bound or key
+                alias = name_from_expr(alias_expr)
+                target_ref = ref_from_expr(key, current_prefix)
+                entries.append((alias, target_ref))
+            case str() as literal if literal == "...":
+                if current_prefix is not None:
+                    spreads.append(current_prefix)
+            case syn.Expr() as expr_node:
+                target_ref = ref_from_expr(expr_node, current_prefix)
+                alias = name_from_expr(expr_node)
+                entries.append((alias, target_ref))
+            case _:
+                return
+
+    walk(node, prefix)
+    return entries, spreads

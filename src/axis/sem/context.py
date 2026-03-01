@@ -6,14 +6,14 @@ from axis import syn
 
 from .entity import Entity
 from .realm import Realm
-from .scope_binding import ScopeBinding
+from .scope import Scope
 
 
 class Context(syn.SegregatedItem, abstract=True):
     realm: Realm | None = None
 
     @flux.property
-    def scope(self) -> ScopeBinding:
+    def scope(self) -> Scope:
         raise NotImplementedError
 
     @flux.property

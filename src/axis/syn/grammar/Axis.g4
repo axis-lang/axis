@@ -220,7 +220,7 @@ TEXT: '\'' ( ~'\'' | '\\' . )* '\'';
 // ASSIGN: '=';
 // ARROW: '->';
 
-// ELLIPSIS: '..';
+//ELLIPSIS: '...';
 // WILDCARD: '_';
 
 WS: [ \t\r\n]+ -> skip;

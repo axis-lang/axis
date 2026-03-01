@@ -1,34 +1,26 @@
 unit std
 
-def Number
-    ------
-    Number es un trait
-
-
 def Boolean
 def Natural
 def Whole
 def Integer
 def Real
 def Text
+def Sym
 
 
-def Set V
-    -----
+def Struct[I] T
 where: 
-    val V: Bound    
+    val I: Struct.Index[N] Sym
+    val N: Whole
+    val T: Type
 
-
-def Map[K] V
-    --------
+def Struct.Index[N] K
 where: 
-    val K: Bound
-    val V: Bound
-
-
-def Index[arity] key
-    ----------------
+    val N: Whole
+    val K: Type = Sym
 takes: 
-    val arity: Whole
-    val key: Bound
+    val keymap: Array[N] Optional K
+
+
 

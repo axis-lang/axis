@@ -138,7 +138,8 @@ class DatabaseSmokeTest(unittest.TestCase):
     def test_database_build(self):
         pkg = items.Package.from_path("codebase/std-core")
         db = pkg.database
-        self.assertGreater(len(db.entities_by_shape), 0)
+        print(db.members_by_scope)
+        self.assertGreater(len(db.entities_by_ref), 0)
         self.assertGreater(len(db.members_by_scope), 0)
 
     def test_database_is_cached(self):

@@ -5,12 +5,13 @@ from typing import ClassVar, Iterable, Literal, Optional
 from protobase import flux
 
 from axis import dom, syn, expr
-from axis.sem import Entity
+from axis.sem import Entity, Scope
 from .blocks import TupleBlock
 
 
 from .item import Item
-from .ref import ref_from_expr, scope_ref_from_item, slot_name_from_key
+from .ref import name_from_expr, ref_from_expr, scope_ref_from_item, slot_name_from_key
+from .scopes import parent_scope
 
 
 class Def(Item, syn.ClassMatcher):
@@ -143,6 +144,17 @@ class Def(Item, syn.ClassMatcher):
         owner = ref_from_expr(self.origin, scope_ref)
         contributions: list[Entity.Contribution] = []
 
+        if scope_ref is not None:
+            contributions.append(
+                Entity.Member(
+                    anchor=scope_ref,
+                    name=name_from_expr(self.origin),
+                    target=owner,
+                    origin=self.origin,
+                    ctx=self,
+                )
+            )
+
         where_expr = self.where
         if self.takes:
             for takes in self.takes:
@@ -236,6 +248,16 @@ class Def(Item, syn.ClassMatcher):
                 )
 
         return frozenset(contributions)
+
+    @flux.property
+    def scope(self) -> Scope:
+        scope_name = name_from_expr(self.origin) if self.origin is not None else None
+        builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
+        for takes in self.takes:
+            _define_tuple_bindings(builder, takes)
+        if self.where is not None:
+            _define_tuple_bindings(builder, self.where)
+        return builder.build()
 
     # def ingest(self, ingestor: Ingestor):
     #     ...
@@ -413,6 +435,20 @@ def _shape_from_expr(node: syn.Expr) -> dom.Tuple[str, syn.Expr]:
     if isinstance(node, expr.Tuple):
         return _shape_from_tuple(node)
     return dom.Tuple.from_keys((None,), (node,))
+
+
+def _define_tuple_bindings(builder: Scope.Builder, tup: expr.Tuple) -> None:
+    for element in tup.elements:
+        match element:
+            case expr.Tuple.Nominal(key=key):
+                name = slot_name_from_key(key)
+            case expr.Tuple.Positional(value=value):
+                if value is None:
+                    continue
+                name = name_from_expr(value)
+            case _:
+                continue
+        builder.define(name, dom.Var.from_id(name))
 
 
 def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:

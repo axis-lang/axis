@@ -13,6 +13,8 @@ def slot_name_from_key(key: syn.Expr) -> str:
 
 def name_from_expr(node: syn.Expr) -> str:
     match node:
+        case expr.Compound(components=components) if components:
+            return name_from_expr(components[0])
         case expr.Sym(name=name):
             return name
         case expr.Member(name=name):

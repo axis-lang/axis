@@ -9,20 +9,21 @@ The core idea is a strict separation between:
 - the descriptor of a datum (`Type`), and
 - the datum itself (`Data`).
 
-All values in the language flow as `Dom`, even in partial and lazy phases.
+All values in the language flow as `Val`, even in partial and lazy phases.
 
 
 ## Core Concepts
 
 ### Value
 
-`Dom` represents a value in the language. It is immutable and hash-consed.
+`Val` represents a value in the language. It is immutable and hash-consed.
 
 - `type`: a descriptor that defines the shape/meaning of the value.
 - `data`: the underlying datum (only present on concrete values).
 
-`Dom` is the only container used across evaluation phases. `Val` is the literal
-value branch, and `Const` is the general-purpose concrete value type.
+`Val` is the only container used across evaluation phases. `Pure` is the literal
+value branch (it carries `type` and `data`), and `Const` is the general-purpose
+concrete data value type.
 
 Serialization principle:
 
@@ -30,19 +31,22 @@ Serialization principle:
 - `type` is the deserialized, structural form.
 
 Concrete variants:
-- `Val`: abstract base for literal values.
+- `Val`: abstract base for values.
+- `Pure`: abstract base for literal values (with `type` and `data`).
 - `Const`: concrete literal value with `data`.
 - `Ref`: concrete literal nominal value.
 - `Var`: a placeholder value with stable identity.
+- `Err`: an error value that can carry origin and type.
 
 
-### Val and Var
+### Val, Pure, and Var
 
-`Val` and `Var` are forms of `Dom` (with `Val` as an
-abstract base and `Const`/`Ref` as concrete implementations).
+`Val` is the abstract base. `Pure` is the literal base (with `type` and `data`)
+and `Const`/`Ref` are its concrete implementations.
 
 `Const` always contains concrete, immutable data.
 `Var` represents an unknown value that is still well-typed.
+`Err` represents a semantic error while still flowing through the value layer.
 
 `Var` is used for generics and placeholders. It does not carry AST or runtime
 environments.
@@ -62,7 +66,7 @@ Type-level vs value-level placeholders:
 
 Var and context:
 
-- `Var` remains pure and canonical; it does not embed AST or env.
+- `Var` remains canonical and context-free; it does not embed AST or env.
 - If a phase needs origin context, it should be stored in a side table
   keyed by the variable id (e.g. `var_origin[id] = (ast, env, constraints)`).
 
@@ -114,9 +118,10 @@ qualified values while keeping the type system explicit.
 
 #### Type and Values
 
-- `Dom` carries one `type`.
-- `Val` is an abstract literal base; concrete literal values (`Const`, `Ref`) carry `data`.
+- `Pure` carries one `type` and `data`.
+- `Const` and `Ref` are concrete `Pure` values.
 - `Var` is a non-literal value used in patterns and bounds.
+- `Err` is a non-literal value used for diagnostics.
 - `type` is created once; many values share it.
 - `data` is shaped by `type` but does not carry meaning by itself.
 
@@ -239,7 +244,7 @@ propagates constants. Unresolved values are represented as `Var`.
 
 Key properties:
 - No new AST node types are introduced.
- - The same `Dom` container is used in all phases.
+- The same `Val` container is used in all phases.
 - `type` must always be valid even when the value is a `Var`.
 
 
@@ -314,7 +319,7 @@ Phase 1: Parse
 
 Phase 2: Elaboration and Normalization
 
-- Convert AST into canonical `Dom` forms (`Const` or `Var`).
+- Convert AST into canonical `Val` forms (`Const`, `Ref`, or `Var`).
 - Build `Type` and `Ref` objects.
 - Encode hyperparameters into `Ref.spec` when specializing entities.
 - Validate structural invariants (Index uniqueness, positional before nominal).

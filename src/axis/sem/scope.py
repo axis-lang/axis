@@ -7,13 +7,13 @@ from protobase import Consed, frozendict
 from axis import dom, expr, syn
 
 
-class ScopeBinding(Consed):
+class Scope(Consed):
     name: str | None
-    parent: Optional["ScopeBinding"] = None
+    parent: Optional["Scope"] = None
     bindings: frozendict[str, dom.Val] = frozendict()
 
     class Builder:
-        def __init__(self, name: str | None = None, parent: Optional["ScopeBinding"] = None):
+        def __init__(self, name: str | None = None, parent: Optional["Scope"] = None):
             self.name = name
             self.parent = parent
             self.bindings: dict[str, dom.Val] = {}
@@ -21,11 +21,11 @@ class ScopeBinding(Consed):
         def define(self, name: str, value: dom.Val) -> None:
             self.bindings[name] = value
 
-        def extend(self, parent: Optional["ScopeBinding"]) -> None:
+        def extend(self, parent: Optional["Scope"]) -> None:
             self.parent = parent
 
-        def build(self) -> "ScopeBinding":
-            return ScopeBinding(
+        def build(self) -> "Scope":
+            return Scope(
                 name=self.name,
                 parent=self.parent,
                 bindings=frozendict(self.bindings),
@@ -46,8 +46,8 @@ class ScopeBinding(Consed):
             return self.parent._lookup_name(name, origin=origin)
         return dom.Err(message=f"Unbound symbol: {name}", origin=origin)
 
-    def _find_scope(self, name: str) -> Optional["ScopeBinding"]:
-        current: Optional[ScopeBinding] = self
+    def _find_scope(self, name: str) -> Optional["Scope"]:
+        current: Optional[Scope] = self
         while current is not None:
             if current.name == name:
                 return current
