@@ -118,18 +118,11 @@ postfixExpr
 
 // Primary exprs
 primaryExpr
-    : wildcardExpr
-    | ellipsisExpr
-    //| etcExpr // unary operator
-    | symExpr
+    : symExpr
     | litExpr
     | tupleExpr
     | lambda
     ;
-
-ellipsisExpr: '...';
-
-wildcardExpr: '_'; // placePattern
 
 //etcExpr: '..' expr?; // etcPattern
 
@@ -137,6 +130,9 @@ symExpr: ID ('@' ID)?;
 
 litExpr : DECIMAL
     | TEXT
+    | ELLIPSIS
+    | WILDCARD
+    | NONE
     ;
 
 // wildcard: '_';
@@ -200,6 +196,10 @@ lambdaParam
 
 
 // Lexer Rules
+ELLIPSIS: '...';
+WILDCARD: '_';
+NONE: '(/)';
+
 ID: [$]?[a-zA-Z_][a-zA-Z0-9_]*;
 DECIMAL: [0-9]+ ('.' [0-9]+)?;
 TEXT: '\'' ( ~'\'' | '\\' . )* '\'';
@@ -219,9 +219,6 @@ TEXT: '\'' ( ~'\'' | '\\' . )* '\'';
 // COLON: ':';
 // ASSIGN: '=';
 // ARROW: '->';
-
-//ELLIPSIS: '...';
-// WILDCARD: '_';
 
 WS: [ \t\r\n]+ -> skip;
 COMMENT: '#' ~[\r\n]* -> skip;

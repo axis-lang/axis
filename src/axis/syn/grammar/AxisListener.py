@@ -431,24 +431,6 @@ class AxisListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by AxisParser#ellipsisExpr.
-    def enterEllipsisExpr(self, ctx:AxisParser.EllipsisExprContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#ellipsisExpr.
-    def exitEllipsisExpr(self, ctx:AxisParser.EllipsisExprContext):
-        pass
-
-
-    # Enter a parse tree produced by AxisParser#wildcardExpr.
-    def enterWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
-        pass
-
-    # Exit a parse tree produced by AxisParser#wildcardExpr.
-    def exitWildcardExpr(self, ctx:AxisParser.WildcardExprContext):
-        pass
-
-
     # Enter a parse tree produced by AxisParser#symExpr.
     def enterSymExpr(self, ctx:AxisParser.SymExprContext):
         pass

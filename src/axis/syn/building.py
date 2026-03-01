@@ -12,6 +12,7 @@ from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl
 from protobase import Inmutable, mutate, is_abstract
 
 from axis import log, src, syn
+from ..literals import WILDCARD
 
 from .grammar import AxisLexer, AxisParser
 
@@ -111,11 +112,13 @@ class Builder(Inmutable):
             case AxisLexer.ID:
                 return intern(token.text)
             case AxisLexer.TEXT:
-                return token.text
-            # case AxisLexer.ELLIPSIS:
-            #     return ...
-            # case AxisLexer.WILDCARD:
-            #     return None
+                return intern(token.text)
+            case AxisLexer.ELLIPSIS:
+                return ...
+            case AxisLexer.WILDCARD:
+                return WILDCARD
+            case AxisLexer.NONE:
+                return None
             # case (
             #     AxisLexer.ADD
             #     | AxisLexer.SUB

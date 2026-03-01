@@ -13,7 +13,7 @@ def Struct[I] T
 where: 
     val I: Struct.Index[N] Sym
     val N: Whole
-    val T: Type
+    val T: Type = Sym
 
 def Struct.Index[N] K
 where: 

@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
 from protobase import Inmutable, frozendict, mutate
 from axis import log, syn, expr, dom
+from axis.literals import WILDCARD
 from axis.sem import Scope
 from functools import singledispatchmethod
 
@@ -107,9 +108,16 @@ class Evaluator(Inmutable):
 @Evaluator.impl(expr.Lit)
 def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
     value = node.value
+    if value is Ellipsis:
+        evaluator._error(node, "Ellipsis is not a value")
+    elif value is None:
+        evaluator._error(node, "None literal is not a value")
+    elif value is WILDCARD:
+        evaluator._error(node, "Wildcard literal is not a value")
+    assert value is not Ellipsis and value is not None and value is not WILDCARD
     if isinstance(value, float):
         value = Decimal(value)
-    literal = dom.Const.from_literal(value)
+    literal = dom.Const.from_literal(cast(dom.Data, value))
     return literal.type, literal.data
 
 
