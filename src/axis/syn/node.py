@@ -52,19 +52,9 @@ class Node(FromSrcMixin, Inmutable, abstract=True):
         return NotImplemented
 
     def __rich__(self):
-        tree = Tree(_rich_root_label(self), guide_style=_TYPE_STYLE)
+        from axis.tui.ast_render import NodeRenderer
 
-        # primero los valores simples
-        # luego los nodos
-        # finalmente contenedores
-
-        for attr, value in attrs_of(self).items():
-            if value is None or value == ():
-                continue
-
-            tree.add(_rich_value_child(attr, value))
-
-        return tree
+        return NodeRenderer().render(self)
 
 
 class OutlineNode(Node, abstract=True):

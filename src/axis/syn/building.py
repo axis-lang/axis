@@ -8,7 +8,7 @@ from warnings import warn
 
 from antlr4 import (CommonTokenStream, InputStream, ParserRuleContext,
                     TerminalNode, Token)
-from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl
+from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl, ParseTree
 from protobase import Inmutable, mutate, is_abstract
 
 from axis import log, src, syn
@@ -35,7 +35,7 @@ class Builder(Inmutable):
 
     source: src.Source.Span
 
-    def __call__(self, ctx: ParserRuleContext | TerminalNode, kwargs={}):
+    def __call__(self, ctx: ParseTree | TerminalNode, kwargs={}):
         if not isinstance(ctx, (ParserRuleContext | TerminalNode)):
             raise ValueError(
                 f"Expected ParserRuleContext or TerminalNode, got {type(ctx)}"
@@ -52,10 +52,10 @@ class Builder(Inmutable):
                 span = self.source[start:stop]
             except Exception:
                 span = self.source
-            if isinstance(span, src.Position):
+            if isinstance(span, src.Source.Position):
                 span = span.line
 
-            if isinstance(span, src.Position):
+            if isinstance(span, src.Source.Position):
                 span = span.line
             log.error("Syntax error").with_label(log.Label(span, message)).throw()
 
@@ -69,6 +69,7 @@ class Builder(Inmutable):
             result = self.build(ctx, **kwargs)
 
         else:
+            assert ctx.start is not None and ctx.stop is not None, f"Context {ctx} has no start or stop token"
             start, stop = ctx.start.start, ctx.stop.stop + 1
 
             params = [
@@ -216,7 +217,7 @@ class FromSrcMixin(Inmutable, abstract=True):
 
     @property
     def span(self) -> src.Source.Span | None:
-        return src.Source.Span_of(self)
+        return src.span_of(self)
 
     #@property
     def as_label(self, *args, **kwargs):

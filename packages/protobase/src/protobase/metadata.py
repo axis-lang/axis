@@ -1,5 +1,5 @@
 #%%
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Self, cast
 from weakref import WeakKeyDictionary
 from protobase.object import Object
 from protobase.type import Type
@@ -35,7 +35,7 @@ class Metadata[T](Object, abstract=True):
     @classmethod
     def of(cls, obj: T) -> Self | None:
         try: 
-            return cls.__storage__.get(obj)
+            return cls.__storage__.get(obj) # type: ignore
         except KeyError:
             pass
         return cls.__on_fault__(obj)

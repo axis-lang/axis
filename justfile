@@ -2,8 +2,8 @@ ANTLR4_TOOLS_ANTLR_VERSION:="4.13.2"
 help: 
     @just --list
 
-launch: 
-    @poetry run python -m axis
+launch *ARGS: 
+    @poetry run python -m axis {{ARGS}}
 
 test:
     @clear && printf '\e[3J'

@@ -25,6 +25,10 @@ ipykernel = "^6.28.0"
 rich = {extras = ["jupyter"], version = "^13.9.4"}
 watchdog = "^6.0.0"
 pyright = "^1.1.408"
+textual = "^0.83.0"
+
+[tool.pyright]
+exclude = ["src/axis/syn/grammar/*.py"]
 
 [tool.poetry-monoranger-plugin]
 enabled = true

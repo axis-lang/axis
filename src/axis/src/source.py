@@ -13,7 +13,7 @@ __all__ = ["Source", "SourceBuffer"]
 class Source(Inmutable, abstract=True):
     path: Path
 
-    @property
+    @flux.property
     def content(self) -> str:
         raise NotImplementedError
 
@@ -23,7 +23,9 @@ class Source(Inmutable, abstract=True):
         starts = [0] + [i for i, ch in enumerate(src, 1) if ch == "\n"]
 
         return tuple(
-            Source.Line(source=self, start=starts[i], end=starts[i + 1] - 1, line_no=i + 1)
+            Source.Line(
+                source=self, start=starts[i], end=starts[i + 1] - 1, line_no=i + 1
+            )
             for i in range(len(starts) - 1)
         )
 
@@ -108,7 +110,10 @@ class Source(Inmutable, abstract=True):
             if isinstance(index, int):
                 if index < 0 or index >= len(self):
                     raise IndexError(f"Index {index} out of range (0-{len(self)})")
-                return Source.Position(self, index)
+
+                return Source.Position(
+                    self.source.line_at_offset(self.start + index), self.start + index
+                )
             raise TypeError(f"Invalid index type: {type(index)}")
 
         @cached_property
@@ -121,11 +126,11 @@ class Source(Inmutable, abstract=True):
 
         @property
         def start_line(self) -> "Source.Line":
-            return cast(Source.Line, self.start_position.line)
+            return self.start_position.line
 
         @property
         def end_line(self) -> "Source.Line":
-            return cast(Source.Line, self.start_position.line)
+            return self.end_position.line
 
         @property
         def is_multi_line(self) -> bool:
@@ -137,14 +142,18 @@ class Source(Inmutable, abstract=True):
 
         def match(self, pattern: re.Pattern | str, offset: int = 0, full: bool = False):
             if offset < 0 or offset > len(self):
-                raise IndexError(f"Offset {offset} out of range (0-{len(self.content)})")
+                raise IndexError(
+                    f"Offset {offset} out of range (0-{len(self.content)})"
+                )
 
             if isinstance(pattern, str):
                 pattern = re.compile(pattern)
             regex: re.Pattern = pattern
 
             if full:
-                return regex.fullmatch(self.source.content, self.start + offset, self.end)
+                return regex.fullmatch(
+                    self.source.content, self.start + offset, self.end
+                )
             return regex.match(self.source.content, self.start + offset, self.end)
 
         def fullmatch(self, pattern: re.Pattern | str, offset: int = 0):
@@ -168,7 +177,7 @@ class Source(Inmutable, abstract=True):
             return self.source.content.startswith(prefix, self.start, self.end)
 
     class Position(Inmutable):
-        line: "Source.Span"
+        line: Source.Line
         col_no: int
 
         @property
@@ -196,6 +205,6 @@ class SourceBuffer(Source):
     def _content(self) -> str:
         return self.buffer
 
-    @property  # type: ignore[override]
+    @flux.property  # type: ignore[override]
     def content(self) -> str:
         return self._content

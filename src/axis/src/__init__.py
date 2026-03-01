@@ -7,7 +7,11 @@ Esto es para facilitar la integración con herramientas que ya implementan esta 
 from pathlib import Path
 
 from .source import Source, SourceBuffer
-from .fs import SourceDir, SourceFile, SourceWatch
+from .fs import FSWatcher, SourceDir, SourceFile
+
+Span = Source.Span  # type: ignore[misc]
+Line = Source.Line  # type: ignore[misc]
+Position = Source.Position  # type: ignore[misc]
 
 __all__ = [
     "Line",
@@ -17,7 +21,7 @@ __all__ = [
     "SourceBuffer",
     "SourceDir",
     "SourceFile",
-    "SourceWatch",
+    "FSWatcher",
     "Span",
     "span_of",
     "tag_span_from",

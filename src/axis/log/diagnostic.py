@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, NoReturn, Optional, Self, cast
+from typing import NoReturn, Optional, cast
 
-from protobase import Inmutable, mutate
+from protobase import Inmutable, flux, mutate
 from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.style import Style
@@ -97,104 +97,24 @@ class Diagnostic(Inmutable):
         raise DiagnosticException(self).with_traceback(None)
 
     def emit(self) -> None:
+        if flux.in_query():
+            flux.emit(self)
+            return
         print(self)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        header = Text(f"{self.severity.name.lower()}[{self.code}]: {self.message}\n")
-        header.stylize(_SEVERITY_STYLE[self.severity])
-        yield header
+        from axis.tui.diagnostics import DiagnosticRenderer
 
-        labels_by_file: Dict[Path, List[Label]] = {}
-        for lbl in self.labels:
-            labels_by_file.setdefault(lbl.source.path, []).append(lbl)
-
-        for file_path, lbls in labels_by_file.items():
-            source = lbls[0].source
-            file_header = Text(f"{file_path}", style="bold")
-            yield file_header
-            spans = lbls
-            # compute context lines
-            line_ranges: Dict[int, List[Label]] = {}
-            for lbl in spans:
-                start_pos = source.position_at_offset(lbl.span.start)
-                end_pos = source.position_at_offset(lbl.span.end)
-                start_line = cast(src.Source.Line, start_pos.line).line_no
-                end_line = cast(src.Source.Line, end_pos.line).line_no
-                for ln in range(start_line, end_line + 1):
-                    line_ranges.setdefault(ln, []).append(lbl)
-            all_lines = sorted(line_ranges.keys())
-            start_ctx = max(all_lines[0] - 1, 1)
-            end_ctx = min(all_lines[-1] + 1, len(source))
-
-            for ln in range(start_ctx, end_ctx + 1):
-                line = source[ln-1]
-                line_content = line.content
-                gutter = f" {'>' if ln in all_lines else ' '} {ln} | "
-                text = Text(gutter)
-                if ln in line_ranges:
-                    # highlight background for each label segment
-                    idx = 0
-                    segments: List[tuple[int,int,Label]] = []
-                    for lbl in line_ranges[ln]:
-                        start_pos = source.position_at_offset(lbl.span.start)
-                        end_pos = source.position_at_offset(lbl.span.end)
-                        s_ln = cast(src.Source.Line, start_pos.line).line_no
-                        e_ln = cast(src.Source.Line, end_pos.line).line_no
-                        if s_ln == ln:
-                            start = start_pos.col_no - 1
-                        else:
-                            start = 0
-                        if e_ln == ln:
-                            end = end_pos.col_no - 1
-                        else:
-                            end = len(line_content)
-                        segments.append((start, end, lbl))
-                    segments.sort(key=lambda x: x[0])
-                    last = 0
-                    for start, end, lbl in segments:
-                        # append plain
-                        if start > last:
-                            text.append(line_content[last:start])
-                        # append highlighted
-                        text.append(line_content[start:end], _LABEL_STYLE[lbl.style])
-                        last = end
-                    # remainder
-                    if last < len(line_content):
-                        text.append(line_content[last:])
-                else:
-                    text.append(line_content)
-                yield text
-
-            # annotations below multiline spans for messages
-            for lbl in spans:
-                start_pos = source.position_at_offset(lbl.span.start)
-                end_pos = source.position_at_offset(lbl.span.end)
-                start_line = cast(src.Source.Line, start_pos.line).line_no
-                end_line = cast(src.Source.Line, end_pos.line).line_no
-                
-                # Display message for the label
-                if lbl.message:
-                    if start_line == end_line:
-                        # For single-line spans, show the message below the line
-                        s_col = start_pos.col_no - 1
-                        e_col = end_pos.col_no - 1
-                        gutter = " " * len(f"   {start_line} | ")
-                        pointer = " " * s_col + "^" * (e_col - s_col)
-                        msg = Text(f"{gutter}{pointer} {lbl.message}\n", style=_LABEL_STYLE[lbl.style])
-                        yield msg
-                    else:
-                        # For multiline spans, show the message after the span
-                        msg = Text(f"   → {lbl.message}\n", style=_LABEL_STYLE[lbl.style])
-                        yield msg
-
-        for note in self.notes:
-            nt = Text(f"note: {note}\n", style="italic")
-            yield nt
-        if self.suggestion:
-            sg = Text(f"suggestion: {self.suggestion}\n", style="underline")
-            yield sg
+        renderer = DiagnosticRenderer()
+        for renderable in renderer.render(self):
+            if isinstance(renderable, Text):
+                line = cast(Text, renderable).copy()
+                line.append("\n")
+                yield line
+            else:
+                yield renderable
 
 
 

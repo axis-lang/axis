@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Self
 
 from protobase import Consed, Object, flux
 
-__all__ = ["SourceFile", "SourceDir", "SourceWatch"]
+__all__ = ["SourceFile", "SourceDir", "FSWatcher"]
 
 from .source import Source
 
@@ -24,13 +25,9 @@ class SourceFile(Consed, Source):
     def __repr__(self) -> str:
         return str(self)
 
-    # @flux.property
-    # def _content(self) -> str:
-
     @flux.property  # type: ignore[override]
     def content(self) -> str:
         return (self.source_dir.path / self.path).read_text(encoding="utf-8")
-        # return self._content
 
 
 class SourceDir(Consed):
@@ -63,8 +60,8 @@ class SourceDir(Consed):
         return frozenset(matches)
 
 
-class SourceWatch(Object):
-    __slots__ = ("__weakref__", "root", "_observer", "_handler")
+class FSWatcher(Object):
+    __slots__ = ("__weakref__", "root", "_observer", "_handler", "_callbacks")
 
     root: SourceDir
 
@@ -72,6 +69,11 @@ class SourceWatch(Object):
         self.root = root
         self._observer = None
         self._handler = None
+        self._callbacks: list[Callable[[], None]] = []
+
+    def on_change(self, func: Callable[[], None]) -> Callable[[], None]:
+        self._callbacks.append(func)
+        return func
 
     def start(self) -> None:
         try:
@@ -126,6 +128,8 @@ class SourceWatch(Object):
     ) -> None:
         if is_dir:
             SourceDir.glob.invalidate_for(self.root)
+            for callback in tuple(self._callbacks):
+                callback()
             return
 
         self._invalidate_file(path)
@@ -135,11 +139,16 @@ class SourceWatch(Object):
         if event in {"created", "deleted", "moved"}:
             SourceDir.glob.invalidate_for(self.root)
 
+        for callback in tuple(self._callbacks):
+            callback()
+
     def _invalidate_file(self, path: Path | str | bytes) -> None:
+        if isinstance(path, bytes):
+            path = path.decode()
         target = Path(path).resolve()
         try:
             rel = target.relative_to(self.root.path)
         except ValueError:
             return
         file = SourceFile(path=rel, source_dir=self.root)
-        SourceFile._content.invalidate(file)
+        SourceFile.content.invalidate(file)
