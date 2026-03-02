@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from axis.sem import Context
+from axis.sem import Entity
 
 
-class Item(Context, abstract=True):
+class Item(Entity.Context, abstract=True):
     ...

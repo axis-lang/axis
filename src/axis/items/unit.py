@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from protobase import flux
 
@@ -12,13 +12,14 @@ class Unit(Mod):
     outline_keyword: ClassVar[str] = "unit"
 
     @flux.property
-    def ref(self) -> dom.Ref:
+    def ref(self) -> dom.Anchor:
         if self.path is None:
             raise ValueError("Unit requires a path to build its ref")
-        return ref_from_expr(self.path, None)
+        ref = ref_from_expr(self.path, None)
+        if isinstance(ref, dom.Spec):
+            raise ValueError("Unit ref cannot be specialized")
+        return cast(dom.Anchor, ref)
 
     @flux.property
     def contributions(self) -> frozenset[Entity.Contribution]:
-        if self.path is None:
-            return frozenset()
-        return frozenset((Entity.Namespace(anchor=self.ref, origin=self.path, ctx=self),))
+        return frozenset()

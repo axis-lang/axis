@@ -38,7 +38,8 @@ class Use(syn.Block, Inmutable):
         def walk(value: object, current_prefix: dom.Ref | None) -> None:
             match value:
                 case expr.Apply(function=function_expr, argument=argument_expr):
-                    next_prefix = ref_from_expr(function_expr, current_prefix)
+                    scope = current_prefix.anchor if current_prefix is not None else None
+                    next_prefix = ref_from_expr(function_expr, scope)
                     walk(argument_expr, next_prefix)
                 case expr.Tuple(elements=elements):
                     for element in elements:
@@ -54,13 +55,15 @@ class Use(syn.Block, Inmutable):
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
                     alias = sym_from_expr(alias_expr)
-                    target_ref = ref_from_expr(key, current_prefix)
+                    scope = current_prefix.anchor if current_prefix is not None else None
+                    target_ref = ref_from_expr(key, scope)
                     entries.append((alias, target_ref))
                 case expr.Lit() as lit if lit.value is Ellipsis:
                     if current_prefix is not None:
                         entries.append((lit, current_prefix))
                 case syn.Expr() as expr_node:
-                    target_ref = ref_from_expr(expr_node, current_prefix)
+                    scope = current_prefix.anchor if current_prefix is not None else None
+                    target_ref = ref_from_expr(expr_node, scope)
                     alias = sym_from_expr(expr_node)
                     entries.append((alias, target_ref))
                 case _:

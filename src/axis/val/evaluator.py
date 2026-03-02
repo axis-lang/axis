@@ -2,7 +2,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
 from protobase import Inmutable, frozendict, mutate
-from axis import log, syn, expr, dom
+from axis import src, syn, expr, dom
 from axis.literals import WILDCARD
 from axis.sem import Scope
 from functools import singledispatchmethod
@@ -61,13 +61,15 @@ class Evaluator(Inmutable):
         bounds: Iterable[dom.Type],
         values: Iterable[dom.Data],
     ):
-        index = dom.Index(tuple(k for k in keys))
-        fields = cast(dom.Tuple[str, dom.Type], dom.Tuple(index=index, values=tuple(bounds)))
-        struct = dom.StructType(fields=cast(dom.Tuple[str, dom.Type], fields))
+        index = dom.Struct.Index(tuple(k for k in keys))
+        fields = cast(
+            dom.Struct[str, dom.Type], dom.Struct(index=index, values=tuple(bounds))
+        )
+        struct = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
         return struct, tuple(values)
 
     def _error(self, node: syn.Node, message: str):
-        diag = log.error(message)
+        diag = src.error(message)
         if node.span is not None:
             diag = diag.with_label(node.as_label(message))
         diag.throw()
@@ -270,7 +272,7 @@ def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.Eva
     if isinstance(value, dom.Err):
         if value.diagnostic is not None:
             value.diagnostic.throw()
-        diag = log.error(f"Invalid env value for {sym}")
+        diag = src.error(f"Invalid env value for {sym}")
         if sym.span is not None:
             diag = diag.with_label(sym.as_label("invalid env value"))
         diag.throw()
@@ -287,7 +289,7 @@ def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> Evaluator.EvalResult:
         if value.diagnostic is not None:
             value.diagnostic.throw()
         message = f"Unbound symbol: {sym}"
-        diag = log.error(message)
+        diag = src.error(message)
         if sym.span is not None:
             diag = diag.with_label(sym.as_label(message))
         diag.throw()

@@ -2,7 +2,7 @@ from typing import ClassVar, Literal, Optional, Self
 
 from protobase import cached_property, frozendict
 
-from axis import log, syn
+from axis import src, syn
 
 from .prefix import Etc
 from .sym import Sym
@@ -124,7 +124,7 @@ class Tuple(syn.Expr):
             return len(self.elements), 0
 
         if len(spread_positions) > 1:
-            with log.error(
+            with src.error(
                 f"Tuple has {len(spread_positions)} spread positions, only one expected"
             ) as err:
                 for pos in spread_positions:

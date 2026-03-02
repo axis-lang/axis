@@ -11,7 +11,7 @@ from antlr4 import (CommonTokenStream, InputStream, ParserRuleContext,
 from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl, ParseTree
 from protobase import Inmutable, mutate, is_abstract
 
-from axis import log, src, syn
+from axis import src, syn
 from ..literals import WILDCARD
 
 from .grammar import AxisLexer, AxisParser
@@ -57,7 +57,7 @@ class Builder(Inmutable):
 
             if isinstance(span, src.Source.Position):
                 span = span.line
-            log.error("Syntax error").with_label(log.Label(span, message)).throw()
+            src.error("Syntax error").with_label(src.Label(span, message)).throw()
 
             raise ValueError(
                 f"Unexpected error node '{token}' {token.source}"
@@ -222,4 +222,4 @@ class FromSrcMixin(Inmutable, abstract=True):
     #@property
     def as_label(self, *args, **kwargs):
         assert self.span is not None, f'Node {self!r} has no span'
-        return log.Label(self.span, *args, **kwargs)
+        return src.Label(self.span, *args, **kwargs)

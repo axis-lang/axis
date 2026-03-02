@@ -47,27 +47,28 @@ class Mod(Item):
         return cls(path=path, uses=uses, **kwargs)
 
     @flux.property
-    def ref(self) -> dom.Ref:
+    def ref(self) -> dom.Anchor:
         if self.path is None:
             raise ValueError("Mod requires a path to build its ref")
         scope_ref = scope_ref_from_item(self)
-        return ref_from_expr(self.path, scope_ref)
+        ref = ref_from_expr(self.path, scope_ref)
+        if isinstance(ref, dom.Spec):
+            raise ValueError("Module ref cannot be specialized")
+        return cast(dom.Anchor, ref)
 
     @flux.property
     def contributions(self) -> frozenset[Entity.Contribution]:
         if self.path is None:
             return frozenset()
         scope_ref = scope_ref_from_item(self)
-        contributions: list[Entity.Contribution] = [
-            Entity.Namespace(anchor=self.ref, origin=self.path, ctx=self)
-        ]
+        contributions: list[Entity.Contribution] = []
         if scope_ref is not None:
             contributions.append(
                 Entity.Member(
                     anchor=scope_ref,
                     name=name_from_expr(self.path),
                     target=self.ref,
-                    origin=self,
+                    origin=self.path,
                     ctx=self,
                 )
             )
@@ -85,7 +86,9 @@ class Mod(Item):
         for use in self.uses:
             for name, ref in use.entries:
                 if isinstance(name, expr.Lit) and name.value is Ellipsis:
-                    for member_name, member_ref in _namespace_members(db, ref).items():
+                    for member_name, member_ref in _namespace_members(
+                        db, ref.anchor
+                    ).items():
                         sym = expr.Sym(name=member_name).with_span_of(name)
                         builder.define(sym, member_ref)
                     continue
@@ -105,11 +108,12 @@ class Mod(Item):
     #         return val.Ref.from_expr(self.item.path, base_ref=self.parent.ref)
 
 
-def _namespace_members(db, scope_ref: dom.Ref) -> dict[str, dom.Ref]:
+def _namespace_members(db, scope_ref: dom.Anchor) -> dict[str, dom.Ref]:
     members: dict[str, dom.Ref] = dict(db.members_by_scope.get(scope_ref, {}))
     for ref in db.entities_by_ref:
         parent = ref.parent
         if parent is not None and parent == scope_ref:
-            name = ref.data.member
+            data = cast(dom.Anchor.Data, ref.data)
+            name = data.member
             members.setdefault(name, ref)
     return members

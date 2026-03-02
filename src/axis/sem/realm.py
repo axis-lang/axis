@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from protobase import Consed, flux
 
 from .database import Database
 from .entity import Entity
 
-if TYPE_CHECKING:
-    from .context import Context
-
 
 class Realm(Consed, abstract=True):
     @property
-    def contexts(self) -> tuple["Context", ...]:
+    def contexts(self) -> tuple[Entity.Context, ...]:
         raise NotImplementedError
 
     @flux.property

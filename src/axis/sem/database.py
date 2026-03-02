@@ -10,16 +10,17 @@ from .entity import Entity
 
 
 class Database(Inmutable):
-    type EntitiesByRef = frozendict[dom.Ref, Entity]
-    type MembersByScope = frozendict[dom.Ref, frozendict[str, dom.Ref]]
+    type EntitiesByRef = frozendict[dom.Anchor, Entity]
+    type MembersByScope = frozendict[dom.Anchor, frozendict[str, dom.Ref]]
 
     entities_by_ref: EntitiesByRef
     members_by_scope: MembersByScope
 
     def specialize(self, ref: dom.Ref) -> Entity.View | None:
-        base = self.entities_by_ref.get(ref)
+        anchor = ref.anchor
+        base = self.entities_by_ref.get(anchor)
         if base is None:
-            ref_segments = dom.ref_segments(ref)
+            ref_segments = dom.ref_segments(anchor)
             base = next(
                 (
                     entity
@@ -36,8 +37,8 @@ class Database(Inmutable):
     def from_contributions(
         cls, contributions: Iterable["Entity.Contribution"]
     ) -> "Database":
-        entities: dict[dom.Ref, list[Entity.Contribution]] = {}
-        members_by_scope: dict[dom.Ref, dict[str, dom.Ref]] = {}
+        entities: dict[dom.Anchor, list[Entity.Contribution]] = {}
+        members_by_scope: dict[dom.Anchor, dict[str, dom.Ref]] = {}
 
         for contribution in contributions:
             anchor = contribution.anchor

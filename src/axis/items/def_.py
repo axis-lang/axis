@@ -10,7 +10,14 @@ from .blocks import TupleBlock
 
 
 from .item import Item
-from .ref import name_from_expr, ref_from_expr, scope_ref_from_item, slot_name_from_key, sym_from_expr
+from .ref import (
+    bound_from_expr,
+    name_from_expr,
+    ref_from_expr,
+    scope_ref_from_item,
+    slot_name_from_key,
+    sym_from_expr,
+)
 from .scopes import parent_scope
 
 
@@ -143,6 +150,7 @@ class Def(Item, syn.ClassMatcher):
 
         scope_ref = scope_ref_from_item(self)
         owner = ref_from_expr(self.origin, scope_ref)
+        anchor = owner.anchor
         contributions: list[Entity.Contribution] = []
 
         if scope_ref is not None:
@@ -156,94 +164,84 @@ class Def(Item, syn.ClassMatcher):
                 )
             )
 
-        where_expr = self.where
-        if self.takes:
+        spec_struct = (
+            _bounds_from_expr(self.where, scope_ref)
+            if self.where is not None
+            else _empty_bound_struct()
+        )
+
+        has_takes = bool(self.takes)
+        has_returns = bool(self.returns)
+
+        if not has_takes and not has_returns:
+            if self.where is not None:
+                contributions.append(
+                    Entity.SpecContribution(
+                        anchor=anchor,
+                        spec=spec_struct,
+                        origin=self.where,
+                        ctx=self,
+                    )
+                )
+            return frozenset(contributions)
+
+        if has_takes:
             for takes in self.takes:
                 takes_expr = takes.expr
                 if takes_expr is None:
                     continue
-
-                takes_shape = _shape_from_expr(takes_expr)
-                takes_defaults = (
+                params_struct = _bounds_from_expr(takes_expr, scope_ref)
+                defaults = (
                     _defaults_from_tuple(takes_expr)
                     if isinstance(takes_expr, expr.Tuple)
                     else ()
                 )
-                where_shape = _shape_from_expr(where_expr) if where_expr else None
-                where_defaults = (
-                    _defaults_from_tuple(where_expr)
-                    if isinstance(where_expr, expr.Tuple)
-                    else ()
-                )
+                params_structs = _expand_default_shapes(params_struct, defaults)
 
-                takes_shapes = _expand_default_shapes(takes_shape, takes_defaults)
-                where_shapes = (
-                    _expand_default_shapes(where_shape, where_defaults)
-                    if where_shape
-                    else (None,)
-                )
-
-                for takes_candidate in takes_shapes:
-                    for where_candidate in where_shapes:
-                        contributions.append(
-                            Entity.Overload(
-                                anchor=owner,
-                                takes_shape=takes_candidate,
-                                where_shape=where_candidate,
-                                origin=takes_expr,
-                                ctx=self,
-                            )
-                        )
-
-                        if self.returns:
-                            for ret in self.returns:
-                                if ret.expr is None:
-                                    continue
-                                contributions.append(
-                                    Entity.Returns(
-                                        anchor=owner,
-                                        takes_shape=takes_candidate,
-                                        where_shape=where_candidate,
-                                        returns_shape=_shape_from_expr(ret.expr),
-                                        origin=ret.expr,
-                                        ctx=self,
-                                    )
-                                )
-        elif self.returns:
-            where_shape = _shape_from_expr(where_expr) if where_expr else None
-            where_defaults = (
-                _defaults_from_tuple(where_expr)
-                if isinstance(where_expr, expr.Tuple)
-                else ()
-            )
-            where_shapes = (
-                _expand_default_shapes(where_shape, where_defaults)
-                if where_shape
-                else (None,)
-            )
-
-            for where_candidate in where_shapes:
-                for ret in self.returns:
-                    if ret.expr is None:
-                        continue
+                for params in params_structs:
                     contributions.append(
-                        Entity.Returns(
-                            anchor=owner,
-                            takes_shape=None,
-                            where_shape=where_candidate,
-                            returns_shape=_shape_from_expr(ret.expr),
-                            origin=ret.expr,
+                        Entity.OverloadContribution(
+                            anchor=anchor,
+                            spec=spec_struct,
+                            params=params,
+                            origin=takes_expr,
                             ctx=self,
                         )
                     )
-
-        if self.where is not None:
-            for elem in self.where.elements:
+                    for ret in self.returns:
+                        if ret.expr is None:
+                            continue
+                        contributions.append(
+                            Entity.ImplContribution(
+                                anchor=anchor,
+                                spec=spec_struct,
+                                params=params,
+                                returns=bound_from_expr(ret.expr, scope_ref),
+                                origin=ret.expr,
+                                ctx=self,
+                            )
+                        )
+        else:
+            params = _empty_bound_struct()
+            contributions.append(
+                Entity.OverloadContribution(
+                    anchor=anchor,
+                    spec=spec_struct,
+                    params=params,
+                    origin=self.origin,
+                    ctx=self,
+                )
+            )
+            for ret in self.returns:
+                if ret.expr is None:
+                    continue
                 contributions.append(
-                    Entity.Constraint(
-                        anchor=owner,
-                        predicate=elem,
-                        origin=elem,
+                    Entity.ImplContribution(
+                        anchor=anchor,
+                        spec=spec_struct,
+                        params=params,
+                        returns=bound_from_expr(ret.expr, scope_ref),
+                        origin=ret.expr,
                         ctx=self,
                     )
                 )
@@ -326,31 +324,39 @@ class CastDef(Def):
     to: syn.Expr | None = None
 
 
-def _shape_from_tuple(tup: expr.Tuple) -> dom.Tuple[str, syn.Expr]:
+def _bounds_from_tuple(
+    tup: expr.Tuple, scope: dom.Anchor | None
+) -> dom.Struct[str, dom.Bound]:
     keys: list[str | None] = []
-    values: list[syn.Expr] = []
+    values: list[dom.Bound] = []
     for element in tup.elements:
         match element:
             case expr.Tuple.Positional(value=value):
                 if value is None:
                     raise ValueError("Tuple positional element requires a value")
                 keys.append(None)
-                values.append(value)
+                values.append(bound_from_expr(value, scope))
             case expr.Tuple.Nominal(key=key, bound=bound, value=_):
                 if bound is None:
                     raise ValueError("Tuple nominal element requires a bound")
                 keys.append(slot_name_from_key(key))
-                values.append(bound)
+                values.append(bound_from_expr(bound, scope))
             case _:
                 raise ValueError(f"Unsupported tuple element: {element}")
 
-    return dom.Tuple.from_keys(tuple(keys), tuple(values))
+    return dom.Struct.from_keys(tuple(keys), tuple(values))
 
 
-def _shape_from_expr(node: syn.Expr) -> dom.Tuple[str, syn.Expr]:
+def _bounds_from_expr(
+    node: syn.Expr, scope: dom.Anchor | None
+) -> dom.Struct[str, dom.Bound]:
     if isinstance(node, expr.Tuple):
-        return _shape_from_tuple(node)
-    return dom.Tuple.from_keys((None,), (node,))
+        return _bounds_from_tuple(node, scope)
+    return dom.Struct.from_keys((None,), (bound_from_expr(node, scope),))
+
+
+def _empty_bound_struct() -> dom.Struct[str, dom.Bound]:
+    return dom.Struct.from_keys((), ())
 
 
 def _define_tuple_bindings(builder: Scope.Builder, tup: expr.Tuple) -> None:
@@ -377,7 +383,7 @@ def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
 
 
 def _normalize_default_positions(
-    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
+    shape: dom.Struct[str, dom.Bound], defaults: Iterable[int | str]
 ) -> tuple[int, ...]:
     positions: list[int] = []
     for default in defaults:
@@ -392,21 +398,21 @@ def _normalize_default_positions(
 
 
 def _shape_without_positions(
-    shape: dom.Tuple[str, syn.Expr], positions: set[int]
-) -> dom.Tuple[str, syn.Expr]:
+    shape: dom.Struct[str, dom.Bound], positions: set[int]
+) -> dom.Struct[str, dom.Bound]:
     keys = tuple(k for i, k in enumerate(shape.index.keys) if i not in positions)
     values = tuple(v for i, v in enumerate(shape.values) if i not in positions)
-    return dom.Tuple.from_keys(keys, values)
+    return dom.Struct.from_keys(keys, values)
 
 
 def _expand_default_shapes(
-    shape: dom.Tuple[str, syn.Expr], defaults: Iterable[int | str]
-) -> tuple[dom.Tuple[str, syn.Expr], ...]:
+    shape: dom.Struct[str, dom.Bound], defaults: Iterable[int | str]
+) -> tuple[dom.Struct[str, dom.Bound], ...]:
     positions = _normalize_default_positions(shape, defaults)
     if not positions:
         return (shape,)
 
-    expanded: list[dom.Tuple[str, syn.Expr]] = []
+    expanded: list[dom.Struct[str, dom.Bound]] = []
     positions_list = list(positions)
     for r in range(len(positions_list) + 1):
         for combo in combinations(positions_list, r):

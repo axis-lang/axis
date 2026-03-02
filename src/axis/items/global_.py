@@ -57,33 +57,15 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
         if self.key is None:
             return frozenset()
         scope_ref = scope_ref_from_item(self)
-        anchor = ref_from_expr(self.key, scope_ref)
+        target = ref_from_expr(self.key, scope_ref)
         contributions: list[Entity.Contribution] = []
         if scope_ref is not None:
             contributions.append(
                 Entity.Member(
                     anchor=scope_ref,
                     name=name_from_expr(self.key),
-                    target=anchor,
+                    target=target,
                     origin=self.key,
-                    ctx=self,
-                )
-            )
-        if self.value is not None:
-            contributions.append(
-                Entity.Fact(
-                    anchor=anchor,
-                    args=(self.value,),
-                    origin=self.value,
-                    ctx=self,
-                )
-            )
-        if self.bound is not None:
-            contributions.append(
-                Entity.Constraint(
-                    anchor=anchor,
-                    predicate=self.bound,
-                    origin=self.bound,
                     ctx=self,
                 )
             )

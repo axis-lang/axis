@@ -1,42 +1,55 @@
 #%%
 import argparse
-import time
 from rich import print
 from protobase import flux
-from axis import log, syn, val, items, src
-
+from axis import src, syn, val, items
+from IPython import embed
 
 parser = argparse.ArgumentParser(description="Axis package debug runner")
 parser.add_argument(
     "--package",
-    required=True,
-    # default="codebase/sandbox",
+    #required=True,
+    default="codebase/std.core",
     help="Path to the package root",
 )
 parser.add_argument(
-    "--watch",
+    "--repl",
     action="store_true",
-    help="Watch the source directory for changes",
+    help="Run the REPL",
 )
-parser.add_argument(
-    "--tui",
-    action="store_true",
-    help="Run the Textual TUI (implies --watch)",
-)
-args = parser.parse_args(["--package", "codebase/sandbox"])
+
+# parser.add_argument(
+#     "--watch",
+#     action="store_true",
+#     help="Watch the source directory for changes",
+# )
+# parser.add_argument(
+#     "--tui",
+#     action="store_true",
+#     help="Run the Textual TUI (implies --watch)",
+# )
+args = parser.parse_args()
 
 pkg = items.Package.from_path(args.package)
 
-
-def collect_diagnostics() -> tuple[log.Diagnostic, ...]:
+def collect_diagnostics() -> tuple[src.Diagnostic, ...]:
     try:
         _ = pkg.database
     except Exception:
         pass
-    diagnostics = flux.collect_all(cls=log.Diagnostic)
-    return tuple(diag for diag in diagnostics if isinstance(diag, log.Diagnostic))
+    diagnostics = flux.collect_all(cls=src.Diagnostic)
+    return tuple(diag for diag in diagnostics if isinstance(diag, src.Diagnostic))
 
 
+pkg.database
+for diag in collect_diagnostics():
+    diag.emit()
+
+
+if args.repl:
+    embed()
+
+"""
 if args.tui:
     from axis.tui.main import MainView
 
@@ -75,3 +88,4 @@ else:
     diagnostics = collect_diagnostics()
     for diag in diagnostics:
         diag.emit()
+"""

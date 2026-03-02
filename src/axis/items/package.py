@@ -4,7 +4,7 @@ from axis import dom, src
 from protobase import flux
 from typing import cast
 
-from axis.sem import Context, Realm
+from axis.sem import Realm
 from .item import Item
 #from .index import GlobalIndex
 
@@ -74,61 +74,18 @@ if __name__ == "__main__":
 
         sandbox_entity = find_entity("sandbox")
         if sandbox_entity is not None:
-            print("sandbox.members", tuple(sandbox_entity.members.keys()))
-            print("sandbox.overloads", len(sandbox_entity.overload_buckets))
-            print("sandbox.facts", len(sandbox_entity.facts))
-            print("sandbox.constraints", len(sandbox_entity.constraints))
+            print("sandbox.spec_buckets", len(sandbox_entity.spec_buckets))
+            print("sandbox.overloads", len(sandbox_entity.overloads))
 
         basic_entity = find_entity("sandbox", "basic")
         if basic_entity is not None:
-            print("sandbox.basic.members", tuple(basic_entity.members.keys()))
-            print("sandbox.basic.overloads", len(basic_entity.overload_buckets))
+            print("sandbox.basic.spec_buckets", len(basic_entity.spec_buckets))
+            print("sandbox.basic.overloads", len(basic_entity.overloads))
 
         demo_entity = find_entity("sandbox", "demo")
         if demo_entity is not None:
-            print("sandbox.demo.members", tuple(demo_entity.members.keys()))
-            print("sandbox.demo.overloads", len(demo_entity.overload_buckets))
-
-        point_entity = find_entity("sandbox", "demo", "Point")
-        if point_entity is not None:
-            print("sandbox.demo.Point.overloads", len(point_entity.overload_buckets))
-            print(
-                "sandbox.demo.Point.returns",
-                sum(len(b.returns) for b in point_entity.overload_buckets.values()),
-            )
-
-        add_entity = find_entity("sandbox", "demo", "Add")
-        if add_entity is not None:
-            print("sandbox.demo.Add.overloads", len(add_entity.overload_buckets))
-            print(
-                "sandbox.demo.Add.returns",
-                sum(len(b.returns) for b in add_entity.overload_buckets.values()),
-            )
-
-        default_entity = find_entity("sandbox", "demo", "Default")
-        if default_entity is not None:
-            print("sandbox.demo.Default.injectors", len(default_entity.overload_buckets))
-            print("sandbox.demo.Default.constraints", len(default_entity.constraints))
-
-        id_entity = find_entity("sandbox", "demo", "Id")
-        if id_entity is not None:
-            print("sandbox.demo.Id.overloads", len(id_entity.overload_buckets))
-            print(
-                "sandbox.demo.Id.returns",
-                sum(len(b.returns) for b in id_entity.overload_buckets.values()),
-            )
-
-        clamp_entity = find_entity("sandbox", "demo", "Clamp")
-        if clamp_entity is not None:
-            print("sandbox.demo.Clamp.overloads", len(clamp_entity.overload_buckets))
-            print(
-                "sandbox.demo.Clamp.returns",
-                sum(len(b.returns) for b in clamp_entity.overload_buckets.values()),
-            )
-
-        origin_entity = find_entity("sandbox", "demo", "origin")
-        if origin_entity is not None:
-            print("sandbox.demo.origin.facts", len(origin_entity.facts))
+            print("sandbox.demo.spec_buckets", len(demo_entity.spec_buckets))
+            print("sandbox.demo.overloads", len(demo_entity.overloads))
 
         print_eval(
             """

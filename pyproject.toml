@@ -19,6 +19,7 @@ interegular = "^0.3.3"
 #egglog = "^7.1.0"
 pyyaml = "^6.0.2"
 semver = "^3.0.4"
+ipython = "^9.10.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.28.0"
