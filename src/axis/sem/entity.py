@@ -123,6 +123,8 @@ class Entity(Inmutable):
         facts: dict[tuple[syn.Expr, ...], set[syn.Node]] = {}
         fact_contexts: dict[tuple[syn.Expr, ...], set[syn.Item]] = {}
 
+        # TODO: Check for conflicting contributions (e.g. multiple members with the same name but different targets)
+
         for contribution in contributions:
             if isinstance(contribution, cls.Member):
                 members[contribution.name] = contribution.target

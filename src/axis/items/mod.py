@@ -4,7 +4,7 @@ from typing import ClassVar, cast
 
 from protobase import flux
 
-from axis import dom, syn
+from axis import dom, expr, syn
 from axis.sem import Entity, Scope
 
 from .blocks import Use
@@ -84,15 +84,16 @@ class Mod(Item):
         db = realm.database
         for use in self.uses:
             for name, ref in use.entries:
-                if name is Ellipsis:
+                if isinstance(name, expr.Lit) and name.value is Ellipsis:
                     for member_name, member_ref in _namespace_members(db, ref).items():
-                        builder.define(member_name, member_ref)
+                        sym = expr.Sym(name=member_name).with_span_of(name)
+                        builder.define(sym, member_ref)
                     continue
-                builder.define(cast(str, name), ref)
+                builder.define(cast(expr.Sym, name), ref)
 
         if self.path is not None:
             for name, ref in _namespace_members(db, self.ref).items():
-                builder.define(name, ref)
+                builder.define(expr.Sym(name=name), ref)
 
         return builder.build()
 

@@ -6,6 +6,16 @@ Esto es para facilitar la integración con herramientas que ya implementan esta 
 
 from pathlib import Path
 
+from .diagnostic import (  # noqa: F401
+    Diagnostic,
+    DiagnosticException,
+    Label,
+    LabelStyle,
+    Severity,
+    error,
+    info,
+    warning,
+)
 from .source import Source, SourceBuffer
 from .fs import FSWatcher, SourceDir, SourceFile
 
@@ -23,6 +33,14 @@ __all__ = [
     "SourceFile",
     "FSWatcher",
     "Span",
+    "Diagnostic",
+    "DiagnosticException",
+    "Label",
+    "LabelStyle",
+    "Severity",
+    "error",
+    "info",
+    "warning",
     "span_of",
     "tag_span_from",
 ]

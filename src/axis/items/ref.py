@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, cast
 
 from axis import dom, expr, syn
+from axis.literals import WILDCARD
 
 
 def slot_name_from_key(key: syn.Expr) -> str:
@@ -27,6 +28,22 @@ def name_from_expr(node: syn.Expr) -> str:
             return str(node)
 
 
+def sym_from_expr(node: syn.Expr) -> expr.Sym:
+    match node:
+        case expr.Sym() as sym:
+            return sym
+        case expr.Member() as member:
+            return member.as_sym()
+        case expr.Compound(components=components) if components:
+            return sym_from_expr(components[0]).with_span_of(node)
+        case expr.Index(origin=origin_expr):
+            return sym_from_expr(origin_expr).with_span_of(node)
+        case expr.Apply(function=function_expr):
+            return sym_from_expr(function_expr).with_span_of(node)
+        case _:
+            return expr.Sym(name=name_from_expr(node)).with_span_of(node)
+
+
 def scope_ref_from_item(item: syn.Item) -> dom.Ref | None:
     parent = getattr(item, "parent", None)
     while isinstance(parent, syn.Item):
@@ -39,7 +56,9 @@ def scope_ref_from_item(item: syn.Item) -> dom.Ref | None:
 def _const_from_expr(node: syn.Expr, scope: dom.Ref | None) -> dom.Const:
     match node:
         case expr.Lit(value=value):
-            return dom.Const.from_literal(value)
+            if value is Ellipsis or value is WILDCARD:
+                return dom.Const.from_literal(str(value))
+            return dom.Const.from_literal(cast(dom.Data, value))
         case expr.Sym(name=name):
             return dom.Const.from_type_data(dom.Type.var(name), ("var", name))
         case expr.Member() | expr.Index() | expr.Compound() | expr.Apply():

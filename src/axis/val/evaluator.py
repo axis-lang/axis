@@ -257,7 +257,7 @@ def _builtin_nominal(name: str) -> dom.Type:
     return dom.NominalType.from_str(f"std.{name}")
 
 
-def _env_data(value: dom.Pure | dom.Var | dom.Err) -> dom.Data:
+def _env_data(value: dom.Pure | dom.Var) -> dom.Data:
     if hasattr(value, "data"):
         return cast(dom.Data, getattr(value, "data"))
     raise TypeError("Env values must carry data")
@@ -267,10 +267,15 @@ def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.Eva
     if isinstance(value, dom.Pure):
         pure = cast(dom.Pure, value)
         return pure.type, pure.data
-    if isinstance(value, (dom.Var, dom.Err)):
+    if isinstance(value, dom.Err):
+        if value.diagnostic is not None:
+            value.diagnostic.throw()
+        diag = log.error(f"Invalid env value for {sym}")
+        if sym.span is not None:
+            diag = diag.with_label(sym.as_label("invalid env value"))
+        diag.throw()
+    if isinstance(value, dom.Var):
         type_ = value.type
-        if type_ is None:
-            raise TypeError("Env value missing type")
         return cast(dom.Type, type_), _env_data(value)
     if isinstance(value, tuple) and len(value) == 2:
         return value  # type: ignore[return-value]
@@ -279,7 +284,9 @@ def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.Eva
 
 def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> Evaluator.EvalResult:
     if isinstance(value, dom.Err):
-        message = value.message or f"Unbound symbol: {sym}"
+        if value.diagnostic is not None:
+            value.diagnostic.throw()
+        message = f"Unbound symbol: {sym}"
         diag = log.error(message)
         if sym.span is not None:
             diag = diag.with_label(sym.as_label(message))

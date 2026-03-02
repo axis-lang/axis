@@ -8,7 +8,7 @@ from rich.style import Style
 from rich.text import Text
 
 from axis import src
-from axis.log.diagnostic import Diagnostic, Label, LabelStyle, Severity
+from axis.src.diagnostic import Diagnostic, Label, LabelStyle, Severity
 
 
 @dataclass(frozen=True)

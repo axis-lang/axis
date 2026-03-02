@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import RichLog, Static, TabbedContent, TabPane
 
-from axis.log.diagnostic import Diagnostic
+from axis.src.diagnostic import Diagnostic
 from axis.tui.diagnostics import DiagnosticRenderer
 
 

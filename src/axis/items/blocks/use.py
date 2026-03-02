@@ -1,11 +1,10 @@
-from types import EllipsisType
 from typing import ClassVar, Literal, Self
 
 from protobase import Inmutable
 
 from axis import dom, expr, syn
 
-from ..ref import name_from_expr, ref_from_expr
+from ..ref import ref_from_expr, sym_from_expr
 
 
 class Use(syn.Block, Inmutable):
@@ -19,7 +18,7 @@ class Use(syn.Block, Inmutable):
 
     import_expr: syn.Expr
 
-    type Entry = tuple[str | EllipsisType, dom.Ref]
+    type Entry = tuple[expr.Sym | expr.Lit, dom.Ref]
 
     @classmethod
     def build(
@@ -49,20 +48,20 @@ class Use(syn.Block, Inmutable):
                         return
                     if isinstance(elem_value, expr.Lit) and elem_value.value is Ellipsis:
                         if current_prefix is not None:
-                            entries.append((Ellipsis, current_prefix))
+                            entries.append((elem_value, current_prefix))
                         return
                     walk(elem_value, current_prefix)
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
-                    alias = name_from_expr(alias_expr)
+                    alias = sym_from_expr(alias_expr)
                     target_ref = ref_from_expr(key, current_prefix)
                     entries.append((alias, target_ref))
-                case expr.Lit(value=value) if value is Ellipsis:
+                case expr.Lit() as lit if lit.value is Ellipsis:
                     if current_prefix is not None:
-                        entries.append((Ellipsis, current_prefix))
+                        entries.append((lit, current_prefix))
                 case syn.Expr() as expr_node:
                     target_ref = ref_from_expr(expr_node, current_prefix)
-                    alias = name_from_expr(expr_node)
+                    alias = sym_from_expr(expr_node)
                     entries.append((alias, target_ref))
                 case _:
                     return

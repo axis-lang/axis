@@ -10,8 +10,9 @@ from .blocks import TupleBlock
 
 
 from .item import Item
-from .ref import name_from_expr, ref_from_expr, scope_ref_from_item, slot_name_from_key
+from .ref import name_from_expr, ref_from_expr, scope_ref_from_item, slot_name_from_key, sym_from_expr
 from .scopes import parent_scope
+
 
 
 class Def(Item, syn.ClassMatcher):
@@ -259,91 +260,6 @@ class Def(Item, syn.ClassMatcher):
             _define_tuple_bindings(builder, self.where)
         return builder.build()
 
-    # def ingest(self, ingestor: Ingestor):
-    #     ...
-
-    # class Kind(syn.ClassMatcher, abstract=True): ...
-
-    # class InfixKind(Kind):
-    #     """
-    #     def a + b
-    #     takes:
-    #         val a: T
-    #         val b: T
-    #     where:
-    #         val T: Numeric
-    #     """
-
-    #     op: expr.Infix.Op
-    #     lhs: expr.Sym
-    #     rhs: expr.Sym
-
-    # class PrefixKind(Kind):
-    #     """
-    #     def -a
-    #     takes:
-    #         val a: T
-    #     where:
-    #         val T: Numeric
-    #     """
-
-    #     op: expr.Prefix.Op
-    #     rhs: expr.Sym
-
-    # class QualKind(Kind):
-    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-    #         syn.Expr.from_str("$sym@Sym $qualified@Sym"),
-    #         syn.Expr.from_str("$sym@Sym[..$generics] $qualified@Sym"),
-    #     )
-
-    #     qualified: expr.Sym
-    #     generics: Optional[expr.Tuple] = None
-
-    # class ClassKind(Kind):
-    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-    #         syn.Expr.from_str("$sym@Sym"),
-    #         syn.Expr.from_str("$sym@Sym[..$generics]"),
-    #     )
-
-    #     generics: Optional[expr.Tuple] = None
-
-    # class FunctionKind(Kind):
-    #     match_patterns: ClassVar[tuple[syn.Expr, ...]] = (
-    #         syn.Expr.from_str("$sym@Sym(..$params)"),
-    #         syn.Expr.from_str("$sym@Sym[..$generics](..$params)"),
-    #         syn.Expr.from_str("$context.$sym(..$params)"),
-    #         syn.Expr.from_str("$context.$sym[..$generics](..$params)"),
-    #     )
-
-    #     params: Optional[expr.Tuple] = None
-    #     context: Optional[syn.Expr] = None
-
-    # @cached_property
-    # def kind(self):
-    #     match self.expr:
-    #         case expr.Sym(at=at) as sym:
-    #             return self.ClassKind(sym=sym)
-    #         case expr.Index(origin=expr.Sym() as sym, index=expr.Tuple() as generics):
-    #             return self.ClassKind(sym=sym, generics=generics)
-    #         case expr.Infix(op=op) as infix:
-    #             ...
-    #         case expr.Prefix(op=op) as prefix:
-    #             ...
-    #         case expr.Apply(function=function, argument=arguments):
-    #             ...
-
-    #     kind = self.Kind.match(self.expr)
-    #     if kind is None:
-
-    #         with log.error(
-    #             f"Definition expression does not match any known kind: {self.expr}"
-    #         ) as err:
-    #             err.with_label(self.as_label("Unknown def kind"))
-
-    #         raise ValueError(f"Invalid definition expression: {self.expr}")
-    #     return kind
-
-
 class QualDef(Def):
     match_patterns: ClassVar = (
         syn.Expr.from_str("$sym $target"),
@@ -441,14 +357,14 @@ def _define_tuple_bindings(builder: Scope.Builder, tup: expr.Tuple) -> None:
     for element in tup.elements:
         match element:
             case expr.Tuple.Nominal(key=key):
-                name = slot_name_from_key(key)
+                sym = sym_from_expr(key)
             case expr.Tuple.Positional(value=value):
                 if value is None:
                     continue
-                name = name_from_expr(value)
+                sym = sym_from_expr(value)
             case _:
                 continue
-        builder.define(name, dom.Var.from_id(name))
+        builder.define(sym, dom.Var.from_id(sym.name))
 
 
 def _defaults_from_tuple(tup: expr.Tuple) -> tuple[int | str, ...]:
