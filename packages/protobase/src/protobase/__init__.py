@@ -1,3 +1,4 @@
+from .missing import *
 from .type import *
 from .object import *
 from .derived import *
@@ -9,4 +10,4 @@ from .metadata import *
 from .frozendict import *
 from .consed import *
 from . import flux
-from dataclasses import MISSING as Missing, _MISSING_TYPE as MissingType
+

@@ -1,6 +1,5 @@
 # %%
 from copy import deepcopy
-from dataclasses import MISSING as _MISSING
 from functools import cached_property
 from itertools import chain, filterfalse
 from types import GenericAlias, MappingProxyType, UnionType
@@ -28,6 +27,7 @@ from weakref import WeakKeyDictionary
 
 from .utils import compile_function, dict_split
 from .derived import derived
+from .missing import Missing as _MISSING
 from .type import Type
 
 

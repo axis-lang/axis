@@ -1,10 +1,12 @@
 # %%
 from abc import ABC, abstractmethod
-from dataclasses import MISSING as _MISSING, dataclass, field
-from typing import Any, Callable, Optional, Self, Sequence
+from dataclasses import dataclass, field
 from functools import cache
 from sys import modules
+from typing import Any, Callable, Optional, Self, Sequence
 from warnings import warn
+
+from .missing import Missing as _MISSING, MissingType as _MISSING_TYPE
 
 class Type(type):
 
@@ -62,6 +64,13 @@ class Type(type):
             return self.namespace.get("__annotations__", {})
 
         def data(self, *args, **kwargs):
+            if "attrs" in kwargs:
+                attrs = kwargs["attrs"]
+                if isinstance(attrs, dict):
+                    kwargs["attrs"] = {
+                        name: (_MISSING if isinstance(value, _MISSING_TYPE) else value)
+                        for name, value in attrs.items()
+                    }
             self._metadata.update(kwargs)
             result = tuple(self._metadata.get(arg) for arg in args)
             return result[0] if len(result) == 1 else result

@@ -61,3 +61,28 @@ class Database(Inmutable):
                 }
             ),
         )
+
+    def __rich__(self):
+        from rich.table import Table
+
+        table = Table(title="Database")
+        table.add_column("Anchor")
+        table.add_column("Specs", justify="right")
+        table.add_column("Overloads", justify="right")
+        table.add_column("Impls", justify="right")
+        table.add_column("Members", justify="right")
+
+        items = sorted(
+            self.entities_by_ref.items(),
+            key=lambda item: dom.ref_segments(item[0]),
+        )
+        for anchor, entity in items:
+            members = self.members_by_scope.get(anchor)
+            table.add_row(
+                str(anchor),
+                str(len(entity.spec_buckets)),
+                str(len(entity.overloads)),
+                str(len(entity.implementations)),
+                "0" if members is None else str(len(members)),
+            )
+        return table

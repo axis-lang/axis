@@ -41,6 +41,26 @@ assert second.items == []
 
 If you want to reuse a shared instance, pass it explicitly during construction.
 
+### Missing sentinel for LSP ordering
+
+Static checkers such as Pyright enforce dataclass-style ordering: fields without
+defaults cannot appear after fields with defaults. Protobase allows that order at
+runtime, so you can use a sentinel to keep the field required while satisfying
+the checker:
+
+```python
+from protobase import Object, _
+
+
+class Config(Object):
+    x: int = 5
+    y: int = _
+```
+
+`_` is an alias of `Missing` typed as `Any`. During class construction, values
+equal to `Missing` are treated as "no default", so `y` remains required in the
+derived `__init__`.
+
 ## Mutation helper
 
 `mutate(record, **attrs)` creates a new record by copying the current state and

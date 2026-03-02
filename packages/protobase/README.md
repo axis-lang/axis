@@ -247,6 +247,24 @@ Implications:
 - Defaults that are already immutable (numbers, strings, tuples, records) are
   safe; deepcopy is still applied but cheap.
 
+## LSP-friendly required fields
+
+Pyright enforces that non-default fields cannot follow default fields. If you
+want to keep a field required while placing it after defaults, use the `Missing`
+sentinel via the `_` alias:
+
+```python
+from protobase import Object, _
+
+
+class Config(Object):
+    x: int = 5
+    y: int = _
+```
+
+`_` is typed as `Any`, and is normalized to "no default" during class build, so
+the derived `__init__` still requires `y`.
+
 ## Documentation
 
 Extended documentation lives in `docs/README.md` and includes guides for the

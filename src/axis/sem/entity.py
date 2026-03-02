@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import Iterable
 
-from protobase import Consed, Inmutable, flux, frozendict
+from protobase import Consed, Inmutable, flux, frozendict, _
 
 from axis import dom, src, syn, sem
-
-from typing import Any
-from dataclasses import MISSING as Missing
-
-_: Any = Missing
 
 class Entity(Inmutable):
     class Context(syn.SegregatedItem, abstract=True):
@@ -26,7 +21,7 @@ class Entity(Inmutable):
     class Contribution(Consed, abstract=True):
         anchor: dom.Anchor
         origin: syn.Node
-        ctx: "Entity.Context"
+        ctx: Entity.Context
 
     class Member(Contribution):
         name: str
@@ -96,6 +91,14 @@ class Entity(Inmutable):
 
     def view(self, ref: dom.Ref) -> "Entity.View":
         return Entity.View(base=self, ref=ref)
+
+    def __rich__(self):
+        from rich.text import Text
+
+        return Text(
+            f"Entity({self.ref}) specs={len(self.spec_buckets)} "
+            f"overloads={len(self.overloads)} impls={len(self.implementations)}"
+        )
 
 
 def _is_full(struct: dom.Struct[str, dom.Bound]) -> bool:

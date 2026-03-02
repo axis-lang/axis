@@ -51,6 +51,15 @@ Input helpers (descriptor methods):
 - `register_inmutable(*types)`
 - `is_inmutable(cls)`
 
+## Sentinels
+
+- `Missing` (`src/protobase/missing.py`)
+  - Reexport of `dataclasses.MISSING`.
+- `MissingType`
+  - Type of `Missing`.
+- `_`
+  - Alias of `Missing` typed as `Any` for LSP-friendly defaults.
+
 ## Notes
 
 - Defaults are deep-copied on initialization.
