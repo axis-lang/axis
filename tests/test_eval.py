@@ -1,6 +1,5 @@
 import unittest
 from decimal import Decimal
-from typing import cast
 
 from axis import dom, syn, val
 
@@ -51,11 +50,11 @@ class EvalTest(unittest.TestCase):
             self.eval("beta")
 
     def test_ref_from_str(self):
-        ref = dom.Ref.from_str("std.Array")
+        ref = dom.Anchor.from_str("std.Array")
         self.assertEqual(dom.ref_segments(ref), ("std", "Array"))
 
     def test_type_var_helper(self):
-        meta = dom.Type.var("T")
+        meta = dom.Var.Type(id="T")
         self.assertTrue(isinstance(meta, dom.Var.Type))
         if isinstance(meta, dom.Var.Type):
             self.assertEqual(meta.id, "T")
@@ -67,9 +66,10 @@ class EvalTest(unittest.TestCase):
 
     def test_nominal_params_with_var_encoding(self):
         param = dom.Const.from_literal(3)
-        spec = cast(dom.Tuple[str, dom.Const], dom.Tuple.new(size=param))
-        base = dom.Ref.root("std")
-        ref = dom.Ref.from_parts("Array", parent=base, spec=spec)
+        fields = dom.Struct.new(size=param.type)
+        spec = dom.Const(type=dom.StructType(fields=fields), data=(param.data,))
+        base = dom.Anchor.from_str("std.Array")
+        ref = base.specialize(spec)
         meta = dom.NominalType.from_ref(ref)
         if isinstance(meta, dom.NominalType):
             self.assertTrue(isinstance(meta.ref, dom.Ref))

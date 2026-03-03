@@ -2,7 +2,7 @@
 import argparse
 from rich import print
 from protobase import flux
-from axis import src, syn, val, items
+from axis import src, dom, sem, syn, val, items, expr
 from IPython import embed
 
 parser = argparse.ArgumentParser(description="Axis package debug runner")

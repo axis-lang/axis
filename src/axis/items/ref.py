@@ -61,12 +61,12 @@ def _const_from_expr(node: syn.Expr, scope: dom.Anchor | None) -> dom.Const:
         case expr.Lit(value=value):
             if value is Ellipsis or value is WILDCARD:
                 return dom.Const.from_literal(str(value))
-            return dom.Const.from_literal(cast(dom.Data, value))
+            return dom.Const.from_literal(cast(dom.Literal, value))
         case expr.Sym(name=name):
-            return dom.Const.from_type_data(dom.Type.var(name), name)
+            return dom.Const(type=dom.Var.Type(id=name), data=name)
         case expr.Member() | expr.Index() | expr.Compound() | expr.Apply():
             ref = ref_from_expr(node, scope)
-            return dom.Const.from_type_data(ref.type, ref.data)
+            return dom.Const(type=ref.type, data=ref.data)
         case _:
             return dom.Const.from_literal(str(node))
 
@@ -77,7 +77,7 @@ def _struct_const_from_values(
     index = dom.Struct.Index(keys)
     fields = dom.Struct(index=index, values=tuple(value.type for value in values))
     struct_type = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
-    return dom.Const.from_type_data(struct_type, tuple(value.data for value in values))
+    return dom.Const(type=struct_type, data=tuple(value.data for value in values))
 
 
 def spec_from_expr(node: syn.Expr, scope: dom.Anchor | None) -> dom.Const | None:
@@ -108,7 +108,7 @@ def bound_from_expr(node: syn.Expr, scope: dom.Anchor | None) -> dom.Bound:
         case expr.Lit(value=value):
             if value is Ellipsis or value is WILDCARD:
                 return dom.Bound.from_literal(str(value))
-            return dom.Bound.from_literal(cast(dom.Data, value))
+            return dom.Bound.from_literal(cast(dom.Literal, value))
         case expr.Sym(name=name):
             return dom.Bound.var(name)
         case expr.Member() | expr.Index() | expr.Compound() | expr.Apply():
@@ -149,7 +149,7 @@ def ref_from_expr(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Ref:
             return ref_with_spec(cast(dom.Anchor, base), spec)
         case expr.Sym(name=name):
             if scope is None:
-                return dom.Anchor.root(name)
+                return dom.Anchor.from_str(name)
             return scope.child(name)
         case expr.Member(of=of_expr, name=name):
             base = ref_from_expr(of_expr, scope)

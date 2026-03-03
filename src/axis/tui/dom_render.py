@@ -1,28 +1,94 @@
 from __future__ import annotations
 
-from typing import cast
+from functools import singledispatch
 
+from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
 from rich.text import Text
 
-from axis.dom.core import Anchor, Ref, Spec
+from axis import dom
 
 
-def format_ref(ref: Ref) -> str:
+def format_ref(ref: dom.Ref) -> str:
     anchor = ref.anchor
-    parts: list[str] = []
-    current = cast(Anchor.Data | None, anchor.data)
-    stack: list[Anchor.Data] = []
-    while current is not None:
-        stack.append(current)
-        current = current.parent
-    for data in reversed(stack):
-        parts.append(data.member)
-    if isinstance(ref, Spec):
-        suffix = "[]" if ref.spec is None else "[...]"
+    parts = list(anchor.data)
+    if isinstance(ref, dom.Spec):
+        suffix = "[]" if ref.specialization is None else "[...]"
         if parts:
             parts[-1] = f"{parts[-1]}{suffix}"
     return ".".join(parts)
 
 
-def render_ref(ref: Ref) -> Text:
+def render_ref(ref: dom.Ref) -> Text:
     return Text(format_ref(ref))
+
+
+def format_const(value: dom.Const) -> str:
+    return f"Const(type={value.type}, data={value.data!r})"
+
+
+def render_const(value: dom.Const) -> Text:
+    return Text(format_const(value))
+
+
+def format_err(value: dom.Err) -> str:
+    if value.diagnostic is not None:
+        return f"Err({value.diagnostic.message})"
+    return "Err"
+
+
+def render_err(value: dom.Err) -> RenderableType:
+    if value.diagnostic is not None:
+        return value.diagnostic
+    return Text(format_err(value))
+
+
+@singledispatch
+def format_dom(value: object) -> str:
+    return f"<{type(value).__name__}>"
+
+
+@format_dom.register
+def _(value: dom.Pure) -> str:
+    return f"<{type(value).__name__}>"
+
+
+@format_dom.register
+def _(value: dom.Ref) -> str:
+    return format_ref(value)
+
+
+@format_dom.register
+def _(value: dom.Const) -> str:
+    return format_const(value)
+
+
+@format_dom.register
+def _(value: dom.Err) -> str:
+    return format_err(value)
+
+
+@singledispatch
+def render_dom(value: object) -> RenderableType:
+    return Text(format_dom(value))
+
+
+@render_dom.register
+def _(value: dom.Ref) -> RenderableType:
+    return render_ref(value)
+
+
+@render_dom.register
+def _(value: dom.Const) -> RenderableType:
+    return render_const(value)
+
+
+@render_dom.register
+def _(value: dom.Err) -> RenderableType:
+    return render_err(value)
+
+
+@singledispatch
+def rich_console_dom(
+    value: object, console: Console, options: ConsoleOptions
+) -> RenderResult:
+    yield render_dom(value)

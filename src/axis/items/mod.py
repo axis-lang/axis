@@ -111,9 +111,8 @@ class Mod(Item):
 def _namespace_members(db, scope_ref: dom.Anchor) -> dict[str, dom.Ref]:
     members: dict[str, dom.Ref] = dict(db.members_by_scope.get(scope_ref, {}))
     for ref in db.entities_by_ref:
-        parent = ref.parent
+        parent = ref.anchor.parent
         if parent is not None and parent == scope_ref:
-            data = cast(dom.Anchor.Data, ref.data)
-            name = data.member
+            name = ref.anchor.data[-1]
             members.setdefault(name, ref)
     return members

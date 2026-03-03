@@ -145,8 +145,8 @@ class Struct[K, V](Consed):
             + ")"
         )
 
-    @classmethod
-    def new(cls, *positional: V, **nominal: V) -> "Struct[str, V]":
+    @staticmethod
+    def new[T](*positional: T, **nominal: T) -> Struct[str, T]:
         index = Struct.Index((None,) * len(positional) + tuple(nominal.keys()))
         values = positional + tuple(nominal.values())
         return Struct(index, values)
@@ -189,7 +189,7 @@ class Struct[K, V](Consed):
             raise KeyError(f"Key not found: {key}")
         return self.values[offset]
 
-    def apply[R](self, func: Callable[[V], R]) -> "Struct[K, R]":
+    def map[R](self, func: Callable[[V], R]) -> "Struct[K, R]":
         return Struct(
             index=self.index,
             values=tuple(func(v) for v in self.values),
