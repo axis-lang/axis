@@ -1,3 +1,5 @@
+from types import NoneType
+
 from .map import *
 from .struct import *
 
@@ -9,58 +11,45 @@ from .var import *
 from .err import *
 
 
-# NATIVE_TYPE_MAP = {
-#     int: NominalType.from_str("std.Integer"),
-#     float: NominalType.from_str("std.Decimal"),
-#     Decimal: NominalType.from_str("std.Decimal"),
-#     str: NominalType.from_str("std.Text"),
-#     bool: NominalType.from_str("std.Boolean"),
-#     type(None): NominalType.from_str("std.Null"),
-# }
+def _new_nominal_type(name: str):
+    return NominalType(
+        ref=Spec(
+            type=SpecType(spec=None),
+            data=(tuple(name.split(".")), None),
+        ),
+    )
 
 
-# def type_of_native(tp: type) -> Type:
-#     if tp in NATIVE_TYPE_MAP:
-#         return NATIVE_TYPE_MAP[tp]
-#     else:
-#         raise TypeError(f"Unsupported native type: {tp}")
+NOMINAL_TYPE = _new_nominal_type("std.Nominal")
+EMPTY_TYPE = _new_nominal_type("std.Empty")
+BOOLEAN_TYPE = _new_nominal_type("std.Boolean")
+NATURAL_TYPE = _new_nominal_type("std.Natural")
+WHOLE_TYPE = _new_nominal_type("std.Whole")
+INTEGER_TYPE = _new_nominal_type("std.Integer")
+DECIMAL_TYPE = _new_nominal_type("std.Decimal")
+TEXT_TYPE = _new_nominal_type("std.Text")
+
+TYPE_BY_NATIVE = {
+    bool: BOOLEAN_TYPE,
+    int: INTEGER_TYPE,
+    float: DECIMAL_TYPE,
+    Decimal: DECIMAL_TYPE,
+    str: TEXT_TYPE,
+    type(None): EMPTY_TYPE,
+}
 
 
-def type_of_literal(value: Literal) -> Type:
-    if isinstance(value, bool):
-        return STD_BOOLEAN
-    elif isinstance(value, int):
-        if value > 0:
-            return STD_NATURAL
-        elif value == 0:
-            return STD_WHOLE
-        else:
-            return STD_INTEGER
-    elif isinstance(value, float):
-        return STD_DECIMAL
-    elif isinstance(value, Decimal):
-        if value == value.to_integral_value():
-            return STD_INTEGER
-        else:
-            return STD_DECIMAL
-    elif isinstance(value, str):
-        return STD_TEXT
-    elif value is None:
-        return STD_NULL
-    else:
-        raise TypeError(f"Unsupported literal type: {type(value)}")
+def type_of(val: Val) -> Const:
+    if not isinstance(val, Pure):
+        raise TypeError(f"Cannot determine type of non-Pure value: {val}")
+    return val.type.as_val
 
 
-NOMINAL_TYPE = NominalType.new("std.NominalType")
-META_NOMINAL_TYPE = Const(type=NOMINAL_TYPE, data=NOMINAL_TYPE)
-
-STD_BOOLEAN = NominalType.new("std.Boolean")
-STD_NATURAL = NominalType.new("std.Natural")
-STD_WHOLE = NominalType.new("std.Whole")
-STD_INTEGER = NominalType.new("std.Integer")
-STD_DECIMAL = NominalType.new("std.Decimal")
-STD_TEXT = NominalType.new("std.Text")
-STD_NULL = NominalType.new("std.Optional") # Permite (/) como valor literal Optional X
+def type_of_native(native: type[Literal] | None) -> Type:
+    if (result := TYPE_BY_NATIVE.get(native)) is not None:
+        return result
+    raise TypeError(f"Unsupported native type: {native}")
 
 
-
+def type_of_literal(literal: Literal) -> Type:
+    return type_of_native(type(literal))

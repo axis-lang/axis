@@ -65,7 +65,7 @@ class EvalTest(unittest.TestCase):
             self.assertTrue(isinstance(meta.ref, dom.Ref))
 
     def test_nominal_params_with_var_encoding(self):
-        param = dom.Const.new_literal(3)
+        param = dom.Const.of_literal(3)
         fields = dom.Struct.new(size=param.type)
         spec = dom.Const(type=dom.StructType(fields=fields), data=(param.data,))
         base = dom.Anchor.from_str("std.Array")

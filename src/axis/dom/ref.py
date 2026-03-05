@@ -5,7 +5,10 @@ from typing import Self
 from protobase import _
 
 from axis import dom
+from .type_ import Type
 
+
+class RefType(Type, abstract=True): ...
 
 class Ref(dom.Pure, abstract=True):
     @property
@@ -21,7 +24,7 @@ class Ref(dom.Pure, abstract=True):
         )
 
 
-class AnchorType(dom.Type):
+class AnchorType(RefType):
     pass
 
 
@@ -70,7 +73,7 @@ class Anchor(Ref):
         return Spec.from_anchor_spec(self, spec)
 
 
-class SpecType(dom.Type):
+class SpecType(RefType):
     spec: dom.StructType | None = None
 
 
@@ -85,7 +88,7 @@ class Spec(Ref):
     def new(cls, ref: dom.Ref | str, **spec) -> "Spec":
         if isinstance(ref, str):
             ref = Anchor.from_str(ref)
-        return cls.from_anchor_spec(ref.anchor, dom.Const.new_struct(**spec))
+        return cls.from_anchor_spec(ref.anchor, dom.Const.of_struct(**spec))
 
     @classmethod
     def from_anchor_spec(cls, anchor: Anchor, spec: dom.Const | None) -> Self:

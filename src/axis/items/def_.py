@@ -2,7 +2,7 @@ from __future__ import annotations
 from itertools import combinations
 from typing import ClassVar, Iterable, Literal, Optional
 
-from protobase import flux
+from protobase import flux, Missing
 
 from axis import dom, syn, expr
 from axis.sem import Entity, Scope
@@ -136,12 +136,17 @@ class Def(Item, syn.ClassMatcher):
             returns=tuple(returns),
             **kwargs,
         )
-        if self is not None:
-            return self
 
-        return cls(
-            origin=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
-        )
+        if self is None: # esto debe ser un src.error y debe retornar Missing que sera ignorado.
+            raise ValueError(f"Expression {expr} does not match any pattern for {cls.__name__}")
+
+        return self
+        # if self is not None:
+        #     return self
+
+        # return cls(
+        #     origin=expr, **kwargs, where=where, takes=tuple(takes), returns=tuple(returns)
+        # )
 
     @flux.property
     def contributions(self) -> frozenset[Entity.Contribution]:
@@ -300,7 +305,6 @@ class FnDef(Def):
         syn.Expr.from_str("$sym[..$spec](..args) -> $ret"),
         syn.Expr.from_str("$ctx.$sym(..args) -> $ret"),
         syn.Expr.from_str("$ctx.$sym[..$spec](..args) -> $ret"),
-
     )
 
     # spec son 

@@ -29,7 +29,7 @@ class Bound(dom.Pure):
 
     @classmethod
     def from_literal(cls, value: dom.Literal) -> "Bound":
-        literal = dom.Const.new_literal(value)
+        literal = dom.Const.of_literal(value)
         return cls(type=literal.type, data=literal.data)
 
     @classmethod

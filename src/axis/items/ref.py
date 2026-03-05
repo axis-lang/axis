@@ -60,15 +60,15 @@ def _const_from_expr(node: syn.Expr, scope: dom.Anchor | None) -> dom.Const:
     match node:
         case expr.Lit(value=value):
             if value is Ellipsis or value is WILDCARD:
-                return dom.Const.new_literal(str(value))
-            return dom.Const.new_literal(cast(dom.Literal, value))
+                return dom.Const.of_literal(str(value))
+            return dom.Const.of_literal(cast(dom.Literal, value))
         case expr.Sym(name=name):
             return dom.Const(type=dom.Var.Type(id=name), data=name)
         case expr.Member() | expr.Index() | expr.Compound() | expr.Apply():
             ref = ref_from_expr(node, scope)
             return dom.Const(type=ref.type, data=ref.data)
         case _:
-            return dom.Const.new_literal(str(node))
+            return dom.Const.of_literal(str(node))
 
 
 def _struct_const_from_values(
