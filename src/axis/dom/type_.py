@@ -7,9 +7,9 @@ from .core import Builtin, Literal, Decimal
 
 
 class Type(Builtin, abstract=True):
-    @staticmethod
-    def of_native(t: type) -> Type:
-        return dom.type_of_native(t)
+    # @staticmethod
+    # def of_native(t: type) -> Type:
+    #     return dom.type_of_native(t)
 
     @staticmethod
     def of_literal(value: Literal):
@@ -34,6 +34,14 @@ class NominalQualifier(Qualifier):
 
 class NominalType(Type):
     ref: dom.Spec
+
+    @classmethod
+    def new(cls, ref: dom.Ref|str, **spec) -> Self:
+        return cls(ref=dom.Spec.new(ref, **spec))
+
+    # @classmethod
+    # def from_anchor_spec(cls, anchor: str, **spec) -> Self:
+    #     return cls(ref=dom.Spec.from_anchor_spec)
 
     @classmethod
     def from_ref(cls, ref: dom.Ref) -> Self:

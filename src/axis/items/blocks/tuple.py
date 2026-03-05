@@ -27,12 +27,12 @@ class TupleBlock(syn.Block, expr.Tuple, abstract=True):
             kw: Literal["val", "var", "let", "dyn", "mut"],
             *args,
             children: syn.OutlineNode.Children,
+            realm,
             **kwargs,
         ):
             assert (
                 kw == cls.outline_keyword
             ), f"Expected keyword {cls.outline_keyword}, got {kw}"
-            kwargs.pop("realm", None)
             return super().build(*args, **kwargs)
 
     class Val(Element):

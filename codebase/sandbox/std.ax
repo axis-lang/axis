@@ -1,0 +1,13 @@
+unit std
+
+def Boolean
+def Natural
+def Whole
+def Integer
+def Decimal
+
+def Set V
+def Map[K] V
+
+def Struct[I] V
+

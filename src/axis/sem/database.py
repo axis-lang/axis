@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from protobase import Inmutable, frozendict
+from protobase import Inmutable, flux, frozendict
 
 from axis import dom
 
@@ -16,22 +16,13 @@ class Database(Inmutable):
     entities_by_ref: EntitiesByRef
     members_by_scope: MembersByScope
 
-    def specialize(self, ref: dom.Ref) -> Entity.View | None:
-        anchor = ref.anchor
-        base = self.entities_by_ref.get(anchor)
-        if base is None:
-            ref_segments = dom.ref_segments(anchor)
-            base = next(
-                (
-                    entity
-                    for candidate, entity in self.entities_by_ref.items()
-                    if dom.ref_segments(candidate) == ref_segments
-                ),
-                None,
-            )
-        if base is None:
-            return None
-        return base.view(ref)
+    @flux.method
+    def entity(self, anchor: dom.Anchor) -> Entity | None:
+        return self.entities_by_ref.get(anchor)
+
+    def __getitem__(self, item: str | dom.Anchor) -> Entity | None:
+        anchor = dom.Anchor.from_str(item) if isinstance(item, str) else item
+        return self.entity(anchor)
 
     @classmethod
     def from_contributions(
@@ -67,9 +58,9 @@ class Database(Inmutable):
 
         table = Table(title="Database")
         table.add_column("Anchor")
-        table.add_column("Specs", justify="right")
-        table.add_column("Overloads", justify="right")
-        table.add_column("Impls", justify="right")
+        table.add_column("Spec Buckets", justify="right")
+        table.add_column("Overload Buckets", justify="right")
+        table.add_column("Deref", justify="right")
         table.add_column("Members", justify="right")
 
         items = sorted(
@@ -80,9 +71,9 @@ class Database(Inmutable):
             members = self.members_by_scope.get(anchor)
             table.add_row(
                 str(anchor),
-                str(len(entity.spec_buckets)),
-                str(len(entity.overloads)),
-                str(len(entity.implementations)),
+                str(len(entity.spec_by_shape)),
+                str(len(entity.overload_by_shape)),
+                str(len(entity.impl_by_result)),
                 "0" if members is None else str(len(members)),
             )
         return table

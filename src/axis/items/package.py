@@ -74,18 +74,24 @@ if __name__ == "__main__":
 
         sandbox_entity = find_entity("sandbox")
         if sandbox_entity is not None:
-            print("sandbox.spec_buckets", len(sandbox_entity.spec_buckets))
-            print("sandbox.overloads", len(sandbox_entity.overloads))
+            print("sandbox.spec_buckets", len(sandbox_entity.spec_by_shape))
+            print("sandbox.overload_buckets", len(sandbox_entity.overload_by_shape))
+            print("sandbox.deref_bucket", len(sandbox_entity.impl_by_result))
 
         basic_entity = find_entity("sandbox", "basic")
         if basic_entity is not None:
-            print("sandbox.basic.spec_buckets", len(basic_entity.spec_buckets))
-            print("sandbox.basic.overloads", len(basic_entity.overloads))
+            print("sandbox.basic.spec_buckets", len(basic_entity.spec_by_shape))
+            print(
+                "sandbox.basic.overload_buckets",
+                len(basic_entity.overload_by_shape),
+            )
+            print("sandbox.basic.deref_bucket", len(basic_entity.impl_by_result))
 
         demo_entity = find_entity("sandbox", "demo")
         if demo_entity is not None:
-            print("sandbox.demo.spec_buckets", len(demo_entity.spec_buckets))
-            print("sandbox.demo.overloads", len(demo_entity.overloads))
+            print("sandbox.demo.spec_buckets", len(demo_entity.spec_by_shape))
+            print("sandbox.demo.overload_buckets", len(demo_entity.overload_by_shape))
+            print("sandbox.demo.deref_bucket", len(demo_entity.impl_by_result))
 
         print_eval(
             """

@@ -7,6 +7,7 @@ from protobase import Consed, cached_property
 
 from axis.dom.map import Map
 
+__all__ = ["Struct"]
 
 class Struct[K, V](Consed):
     class Shape[SK](Consed):

@@ -59,6 +59,10 @@ class Anchor(Ref):
         return self
 
     @property
+    def segments(self) -> AnchorSegments:
+        return self.data
+
+    @property
     def spec(self) -> "Spec":
         return Spec.from_anchor_spec(self, None)
 
@@ -78,8 +82,10 @@ class Spec(Ref):
     data: SpecData = _
 
     @classmethod
-    def from_str(cls, value: str, spec: dom.Const | None = None) -> "Spec":
-        return cls.from_anchor_spec(Anchor.from_str(value), spec)
+    def new(cls, ref: dom.Ref | str, **spec) -> "Spec":
+        if isinstance(ref, str):
+            ref = Anchor.from_str(ref)
+        return cls.from_anchor_spec(ref.anchor, dom.Const.new_struct(**spec))
 
     @classmethod
     def from_anchor_spec(cls, anchor: Anchor, spec: dom.Const | None) -> Self:

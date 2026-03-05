@@ -119,7 +119,7 @@ def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
     assert value is not Ellipsis and value is not None and value is not WILDCARD
     if isinstance(value, float):
         value = Decimal(value)
-    literal = dom.Const.from_literal(cast(dom.Data, value))
+    literal = dom.Const.new_literal(cast(dom.Data, value))
     return literal.type, literal.data
 
 

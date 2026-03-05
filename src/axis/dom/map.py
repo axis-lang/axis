@@ -6,6 +6,8 @@ from typing import Callable, Iterable, Iterator, Optional, Self, overload
 from protobase import Consed, frozendict
 
 
+__all__ = ["Map"]
+
 class Map[K, V](Consed):
     "def Map[K] V"
 

@@ -1,5 +1,6 @@
 #%%
 import argparse
+from time import sleep
 from rich import print
 from protobase import flux
 from axis import src, dom, sem, syn, val, items, expr
@@ -17,12 +18,12 @@ parser.add_argument(
     action="store_true",
     help="Run the REPL",
 )
-
-# parser.add_argument(
-#     "--watch",
-#     action="store_true",
-#     help="Watch the source directory for changes",
-# )
+parser.add_argument(
+    "--watch",
+    action="store_true",
+    help="Watch the source directory for changes",
+    default=True,
+)
 # parser.add_argument(
 #     "--tui",
 #     action="store_true",
@@ -47,7 +48,25 @@ for diag in collect_diagnostics():
 
 
 if args.repl:
-    embed()
+
+    watch = src.FSWatcher(pkg.dir)
+
+    @watch.on_change
+    def collect_and_show_diagnostics() -> None:
+        sleep(0.5)
+        for diag in collect_diagnostics():
+            diag.emit()
+
+        #diagnostics = collect_diagnostics()
+        #app.call_from_thread(app.show_diagnostics, diagnostics)
+
+    watch.start()
+    try:
+        embed()
+    finally:
+        watch.stop()
+
+
 
 """
 if args.tui:

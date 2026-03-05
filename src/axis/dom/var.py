@@ -29,7 +29,7 @@ class Bound(dom.Pure):
 
     @classmethod
     def from_literal(cls, value: dom.Literal) -> "Bound":
-        literal = dom.Const.from_literal(value)
+        literal = dom.Const.new_literal(value)
         return cls(type=literal.type, data=literal.data)
 
     @classmethod
@@ -40,6 +40,3 @@ class Bound(dom.Pure):
     def var(cls, ident: str) -> "Bound":
         return cls(type=Var.Type(id=ident), data=ident)
 
-    def __invariants__(self) -> None:
-        if not dom._is_data(self.data):
-            raise TypeError(f"Bound.data must be primitive, got {type(self.data)}")

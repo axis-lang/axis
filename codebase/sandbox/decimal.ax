@@ -1,0 +1,6 @@
+unit sandbox
+
+def Decimal[...]
+where:
+    val precission: Whole
+

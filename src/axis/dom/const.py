@@ -8,13 +8,16 @@ from axis import dom
 class Const[T: dom.Type = Any, D: dom.Data = Any](dom.Pure[T, D]):
 
     @staticmethod
-    def from_literal(value: dom.Literal) -> "Const[dom.NominalType]":
+    def new_literal(value: dom.Literal) -> dom.Const:
         return Const(type=dom.Type.of_literal(value), data=value)
 
     @staticmethod
-    def from_struct(
-        *positional: dom.Literal, **nominal: dom.Literal
-    ) -> Const[dom.StructType]:
+    def new_struct(
+        *positional: dom.Literal,
+        **nominal: dom.Literal,
+    ) -> dom.Const[dom.StructType]:
         fields = dom.Struct.new(*positional, **nominal)
-        field_types = fields.map(dom.Type.of_literal)
-        return Const(type=dom.StructType(fields=field_types), data=fields.values)
+        return dom.Const(
+            type=dom.StructType(fields=fields.map(dom.Type.of_literal)),
+            data=fields.values,
+        )

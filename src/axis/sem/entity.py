@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from protobase import Consed, Inmutable, flux, frozendict, _
+from protobase import Consed, flux, frozendict, _
 
-from axis import dom, src, syn, sem
+from axis import dom, syn, sem
 
-class Entity(Inmutable):
+
+class Entity(Consed):
     class Context(syn.SegregatedItem, abstract=True):
         realm: sem.Realm = _
 
@@ -17,6 +18,8 @@ class Entity(Inmutable):
         @flux.property
         def contributions(self) -> frozenset["Entity.Contribution"]:
             raise NotImplementedError
+        
+        # eval
 
     class Contribution(Consed, abstract=True):
         anchor: dom.Anchor
@@ -27,190 +30,110 @@ class Entity(Inmutable):
         name: str
         target: dom.Ref
 
+    ref: dom.Anchor
+    contributions: frozenset[Entity.Contribution]
+
+    @classmethod
+    def from_contributions(
+        cls, ref: dom.Anchor, contributions: Iterable[Entity.Contribution]
+    ) -> "Entity":
+        return cls(ref=ref, contributions=frozenset(contributions))
+
+    # Specialization
+
     class SpecContribution(Contribution):
         spec: dom.Struct[str, dom.Bound]
+
+    class SpecBucket(Consed):
+        specs: frozenset[Entity.SpecContribution]
+
+        @flux.property
+        def overload_by_shape(
+            self,
+        ) -> frozendict[dom.Struct.Shape, Entity.OverloadBucket]:
+            return _overload_by_shape_bucket(self.specs)
+
+        # direct impl by result
+
+    @flux.property
+    def spec_by_shape(self) -> frozendict[dom.Struct.Shape, SpecBucket]:
+        return _spec_by_shape_bucket(self.contributions)
+
+    # Parametrization
 
     class OverloadContribution(SpecContribution):
         params: dom.Struct[str, dom.Bound]
 
+    class OverloadBucket(Consed):
+        overloads: frozenset[Entity.OverloadContribution]
+
+        @flux.property
+        def impl_by_result(self):
+            return _impl_by_result_bucket(self.overloads)
+
+    @flux.property
+    def overload_by_shape(self) -> frozendict[dom.Struct.Shape, OverloadBucket]:
+        return _overload_by_shape_bucket(self.contributions)
+
+    # Implementation
+
     class ImplContribution(OverloadContribution):
         returns: dom.Bound
 
-    class Constraint(Inmutable):
-        struct: dom.Struct[str, dom.Bound]
+    class ImplBucket(Consed):
+        impls: frozenset[Entity.ImplContribution]
 
-    class Overload(Inmutable):
-        spec: "Entity.Constraint"
-        params: dom.Struct[str, dom.Bound]
+    @flux.property
+    def impl_by_result(self) -> frozendict[dom.Bound, ImplBucket]:
+        return _impl_by_result_bucket(self.contributions)
 
-    ref: dom.Anchor
-    spec_buckets: frozendict[dom.Struct.Shape, Constraint] = frozendict()
-    overloads: frozendict[dom.Struct.Shape, Overload] = frozendict()
-    implementations: frozendict[
-        dom.Struct.Shape, tuple["Entity.ImplContribution", ...]
-    ] = frozendict()
 
-    class View(Inmutable):
-        base: "Entity"
-        ref: dom.Ref
+def _spec_by_shape_bucket(
+    contributions: frozenset[Entity.Contribution],
+) -> frozendict[dom.Struct.Shape, Entity.SpecBucket]:
+    specs: dict[dom.Struct.Shape, list[Entity.SpecContribution]] = {}
+    for contrib in contributions:
+        if isinstance(contrib, Entity.SpecContribution):
+            # for shape in contrib.spec_shapes:
+            specs.setdefault(contrib.spec.shape, []).append(contrib)
 
-        @property
-        def spec_buckets(self):
-            return self.base.spec_buckets
-
-        @property
-        def overloads(self):
-            return self.base.overloads
-
-        @property
-        def implementations(self):
-            return self.base.implementations
-
-    @classmethod
-    def empty(cls, ref: dom.Anchor) -> "Entity":
-        return cls(
-            ref=ref,
-            spec_buckets=frozendict(),
-            overloads=frozendict(),
-            implementations=frozendict(),
+    return frozendict(
+        (
+            (shape, Entity.SpecBucket(specs=frozenset(spec)))
+            for shape, spec in specs.items()
         )
+    )
 
-    @classmethod
-    def from_contributions(
-        cls, ref: dom.Anchor, contributions: Iterable["Entity.Contribution"]
-    ) -> "Entity":
-        spec_buckets = _build_spec_buckets(contributions)
-        overloads = _build_overloads(contributions)
-        implementations = _build_implementations(contributions)
-        return cls(
-            ref=ref,
-            spec_buckets=frozendict(spec_buckets),
-            overloads=frozendict(overloads),
-            implementations=frozendict(implementations),
+
+def _overload_by_shape_bucket(
+    contributions: frozenset[Entity.Contribution],
+) -> frozendict[dom.Struct.Shape, Entity.OverloadBucket]:
+    overloads: dict[dom.Struct.Shape, list[Entity.OverloadContribution]] = {}
+    for contrib in contributions:
+        if isinstance(contrib, Entity.OverloadContribution):
+            # for shape in contrib.params_shapes:
+            overloads.setdefault(contrib.params.shape, []).append(contrib)
+
+    return frozendict(
+        (
+            (shape, Entity.OverloadBucket(overloads=frozenset(overload)))
+            for shape, overload in overloads.items()
         )
+    )
 
-    def view(self, ref: dom.Ref) -> "Entity.View":
-        return Entity.View(base=self, ref=ref)
 
-    def __rich__(self):
-        from rich.text import Text
+def _impl_by_result_bucket(
+    contributions: frozenset[Entity.Contribution],
+) -> frozendict[dom.Bound, Entity.ImplBucket]:
+    impls: dict[dom.Bound, list[Entity.ImplContribution]] = {}
+    for contrib in contributions:
+        if isinstance(contrib, Entity.ImplContribution):
+            if contrib.params.index.is_empty:
+                impls.setdefault(contrib.returns, []).append(contrib)
 
-        return Text(
-            f"Entity({self.ref}) specs={len(self.spec_buckets)} "
-            f"overloads={len(self.overloads)} impls={len(self.implementations)}"
+    return frozendict(
+        (
+            (returns, Entity.ImplBucket(impls=frozenset(impl)))
+            for returns, impl in impls.items()
         )
-
-
-def _is_full(struct: dom.Struct[str, dom.Bound]) -> bool:
-    return struct.index.is_full
-
-
-def _emit_invalid(contribution: Entity.Contribution, kind: str) -> None:
-    diag = src.error(f"{kind} struct must be full")
-    span = src.span_of(contribution.origin)
-    if span is not None:
-        diag = diag.with_label(
-            src.Label(
-                span=span,
-                message="invalid shape",
-                style=src.LabelStyle.PRIMARY,
-            )
-        )
-    diag.emit()
-
-
-def _emit_collision(contribution: Entity.Contribution, kind: str, shape: dom.Struct.Shape) -> None:
-    diag = src.error(f"{kind} shape collision: {shape!r}")
-    span = src.span_of(contribution.origin)
-    if span is not None:
-        diag = diag.with_label(
-            src.Label(
-                span=span,
-                message="colliding contribution",
-                style=src.LabelStyle.PRIMARY,
-            )
-        )
-    diag.emit()
-
-
-def _build_spec_buckets(
-    contributions: Iterable[Entity.Contribution],
-) -> dict[dom.Struct.Shape, Entity.Constraint]:
-    specs: list[Entity.SpecContribution] = [
-        c for c in contributions if type(c) is Entity.SpecContribution
-    ]
-    valid: list[Entity.SpecContribution] = []
-    for contrib in specs:
-        if not _is_full(contrib.spec):
-            _emit_invalid(contrib, "spec")
-            continue
-        valid.append(contrib)
-
-    buckets: dict[dom.Struct.Shape, list[Entity.SpecContribution]] = {}
-    for contrib in valid:
-        buckets.setdefault(contrib.spec.shape, []).append(contrib)
-
-    result: dict[dom.Struct.Shape, Entity.Constraint] = {}
-    for shape, items in buckets.items():
-        if len(items) > 1:
-            for contrib in items:
-                _emit_collision(contrib, "spec", shape)
-            continue
-        result[shape] = Entity.Constraint(struct=items[0].spec)
-
-    return result
-
-
-def _build_overloads(
-    contributions: Iterable[Entity.Contribution],
-) -> dict[dom.Struct.Shape, Entity.Overload]:
-    overloads: list[Entity.OverloadContribution] = [
-        c for c in contributions if type(c) is Entity.OverloadContribution
-    ]
-    valid: list[Entity.OverloadContribution] = []
-    for contrib in overloads:
-        if not _is_full(contrib.spec):
-            _emit_invalid(contrib, "spec")
-            continue
-        if not _is_full(contrib.params):
-            _emit_invalid(contrib, "params")
-            continue
-        valid.append(contrib)
-
-    buckets: dict[dom.Struct.Shape, list[Entity.OverloadContribution]] = {}
-    for contrib in valid:
-        buckets.setdefault(contrib.params.shape, []).append(contrib)
-
-    result: dict[dom.Struct.Shape, Entity.Overload] = {}
-    for shape, items in buckets.items():
-        if len(items) > 1:
-            for contrib in items:
-                _emit_collision(contrib, "params", shape)
-            continue
-        constraint = Entity.Constraint(struct=items[0].spec)
-        result[shape] = Entity.Overload(spec=constraint, params=items[0].params)
-
-    return result
-
-
-def _build_implementations(
-    contributions: Iterable[Entity.Contribution],
-) -> dict[dom.Struct.Shape, tuple[Entity.ImplContribution, ...]]:
-    impls: list[Entity.ImplContribution] = [
-        c for c in contributions if isinstance(c, Entity.ImplContribution)
-    ]
-    valid: list[Entity.ImplContribution] = []
-    for contrib in impls:
-        if not _is_full(contrib.spec):
-            _emit_invalid(contrib, "spec")
-            continue
-        if not _is_full(contrib.params):
-            _emit_invalid(contrib, "params")
-            continue
-        valid.append(contrib)
-
-    buckets: dict[dom.Struct.Shape, list[Entity.ImplContribution]] = {}
-    for contrib in valid:
-        buckets.setdefault(contrib.params.shape, []).append(contrib)
-
-    return {shape: tuple(items) for shape, items in buckets.items()}
+    )

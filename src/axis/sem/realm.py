@@ -10,6 +10,11 @@ class Realm(Consed, abstract=True):
     @property
     def contexts(self) -> tuple[Entity.Context, ...]:
         raise NotImplementedError
+    
+    """
+    pipeline de construccion:
+    
+    """
 
     @flux.property
     def contributions(self) -> frozenset[Entity.Contribution]:
@@ -22,8 +27,6 @@ class Realm(Consed, abstract=True):
     #     return frozenset(
     #         contribution for ctx in self.contexts for contribution in ctx.contributions
     #     )
-    
-
 
     @flux.property
     def database(self) -> Database:
@@ -31,3 +34,8 @@ class Realm(Consed, abstract=True):
         for ctx in self.contexts:
             contributions.extend(ctx.contributions)
         return Database.from_contributions(contributions)
+
+
+    # protocolo de evaluacion de expresiones, con el database como contexto de evaluacion
+    # 1. introspeccion de tipos.
+
