@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from enum import Enum
+from types import EllipsisType
 
 
-class Wildcard(Enum):
+__all__ = ["WildcardType", "Wildcard", "EllipsisType"]
+
+
+class WildcardType(Enum):
     VALUE = "_"
 
 
-WILDCARD = Wildcard.VALUE
+Wildcard = WildcardType.VALUE

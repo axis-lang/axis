@@ -2,14 +2,14 @@ from decimal import Decimal
 from types import EllipsisType
 from typing import ClassVar, Self
 
-from axis.literals import Wildcard, WILDCARD
-from axis import syn
+from axis.literals import WildcardType, Wildcard
+from axis import syn, dom
 
 class Lit(syn.Expr):
-    type Value = Decimal | int | str | bool | EllipsisType | None | Wildcard
+    type Value = dom.Literal | EllipsisType | WildcardType
     value: Value
 
-    _: ClassVar[Wildcard] = WILDCARD
+    _: ClassVar[WildcardType] = Wildcard
 
     @classmethod
     def build(cls, value: Value) -> Self:

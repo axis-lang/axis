@@ -2,7 +2,8 @@ from typing import ClassVar, Literal, Optional, Self
 
 from protobase import cached_property, frozendict
 
-from axis import src, syn
+from axis import syn
+from axis.log import report as log
 
 from .prefix import Etc
 from .sym import Sym
@@ -124,13 +125,15 @@ class Tuple(syn.Expr):
             return len(self.elements), 0
 
         if len(spread_positions) > 1:
-            with src.error(
+            report = log.error(
                 f"Tuple has {len(spread_positions)} spread positions, only one expected"
-            ) as err:
-                for pos in spread_positions:
-                    err.with_label(
-                        self.elements[pos].as_label(f"Spread element at position {pos}")
-                    )
+            )
+            for pos in spread_positions:
+                report = report.label(
+                    self.elements[pos],
+                    f"Spread element at position {pos}",
+                )
+            report.emit()
             raise ValueError("Tuple has multiple spread positions")
 
         head_count = spread_positions[0]

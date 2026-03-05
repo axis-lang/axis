@@ -2,11 +2,10 @@ from typing import ClassVar, cast
 
 from protobase import flux
 
-from axis import dom
+from axis import dom, expr
 from axis.sem import Entity
 
 from .mod import Mod
-from .ref import ref_from_expr
 
 class Unit(Mod):
     outline_keyword: ClassVar[str] = "unit"
@@ -15,7 +14,9 @@ class Unit(Mod):
     def ref(self) -> dom.Anchor:
         if self.path is None:
             raise ValueError("Unit requires a path to build its ref")
-        ref = ref_from_expr(self.path, None)
+        ref = expr.to_spec_ref(self.path, None)
+        if ref is None:
+            raise ValueError("Unit requires a path to build its ref")
         if isinstance(ref, dom.Spec):
             raise ValueError("Unit ref cannot be specialized")
         return cast(dom.Anchor, ref)

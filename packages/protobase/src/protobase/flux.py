@@ -854,8 +854,9 @@ def iter(
                 stack.append(child)
 
 
-def emit(item: object) -> None:
+def emit[T](item: T) -> T:
     _runtime.emit(item)
+    return item
 
 
 def _query_key(

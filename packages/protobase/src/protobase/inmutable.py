@@ -26,7 +26,7 @@ _INMUTABLE_TYPES: set[type] = {
     type,
     type(None),
     type(...),
-    #type(attrs_of),  # function type is accepted as inmutable
+    #type(lambda: None), # function es inmutable, 
     bool,
     int,
     float,

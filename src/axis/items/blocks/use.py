@@ -4,8 +4,6 @@ from protobase import Inmutable
 
 from axis import dom, expr, syn
 
-from ..ref import ref_from_expr, sym_from_expr
-
 
 class Use(syn.Block, Inmutable):
     """
@@ -39,7 +37,9 @@ class Use(syn.Block, Inmutable):
             match value:
                 case expr.Apply(function=function_expr, argument=argument_expr):
                     scope = current_prefix.anchor if current_prefix is not None else None
-                    next_prefix = ref_from_expr(function_expr, scope)
+                    next_prefix = expr.to_spec_ref(function_expr, scope)
+                    if next_prefix is None:
+                        return
                     walk(argument_expr, next_prefix)
                 case expr.Tuple(elements=elements):
                     for element in elements:
@@ -54,17 +54,21 @@ class Use(syn.Block, Inmutable):
                     walk(elem_value, current_prefix)
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
-                    alias = sym_from_expr(alias_expr)
+                    alias = expr.to_sym(alias_expr)
                     scope = current_prefix.anchor if current_prefix is not None else None
-                    target_ref = ref_from_expr(key, scope)
+                    target_ref = expr.to_spec_ref(key, scope)
+                    if target_ref is None:
+                        return
                     entries.append((alias, target_ref))
                 case expr.Lit() as lit if lit.value is Ellipsis:
                     if current_prefix is not None:
                         entries.append((lit, current_prefix))
                 case syn.Expr() as expr_node:
                     scope = current_prefix.anchor if current_prefix is not None else None
-                    target_ref = ref_from_expr(expr_node, scope)
-                    alias = sym_from_expr(expr_node)
+                    target_ref = expr.to_spec_ref(expr_node, scope)
+                    if target_ref is None:
+                        return
+                    alias = expr.to_sym(expr_node)
                     entries.append((alias, target_ref))
                 case _:
                     return

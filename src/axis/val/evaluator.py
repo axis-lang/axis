@@ -2,8 +2,10 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
 from protobase import Inmutable, frozendict, mutate
-from axis import src, syn, expr, dom
-from axis.literals import WILDCARD
+from axis import syn, expr, dom
+from axis.log import report as log
+from axis.log.report import Report
+from axis.literals import Wildcard, WildcardType, EllipsisType
 from axis.sem import Scope
 from functools import singledispatchmethod
 
@@ -69,10 +71,7 @@ class Evaluator(Inmutable):
         return struct, tuple(values)
 
     def _error(self, node: syn.Node, message: str):
-        diag = src.error(message)
-        if node.span is not None:
-            diag = diag.with_label(node.as_label(message))
-        diag.throw()
+        log.error(message).label(node, message).throw()
 
     def _resolve_env(self, sym: expr.Sym) -> EvalResult:
         key = str(sym)
@@ -110,16 +109,15 @@ class Evaluator(Inmutable):
 @Evaluator.impl(expr.Lit)
 def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
     value = node.value
+
     if value is Ellipsis:
         evaluator._error(node, "Ellipsis is not a value")
-    elif value is None:
-        evaluator._error(node, "None literal is not a value")
-    elif value is WILDCARD:
-        evaluator._error(node, "Wildcard literal is not a value")
-    assert value is not Ellipsis and value is not None and value is not WILDCARD
-    if isinstance(value, float):
-        value = Decimal(value)
-    literal = dom.Const.of_literal(cast(dom.Data, value))
+    elif value is Wildcard:
+        evaluator._error(node, "Wildcard is not a value")
+
+    assert not isinstance(value, (EllipsisType, WildcardType))
+
+    literal = dom.Const.of_literal(value)
     return literal.type, literal.data
 
 
@@ -265,17 +263,24 @@ def _env_data(value: dom.Pure | dom.Var) -> dom.Data:
     raise TypeError("Env values must carry data")
 
 
+def _throw_diagnostic(diagnostic: object) -> None:
+    if isinstance(diagnostic, Report):
+        raise Report.Exception(diagnostic).with_traceback(None)
+    if hasattr(diagnostic, "throw"):
+        diagnostic.throw()
+    raise Report.Exception(log.error("Unknown diagnostic").build()).with_traceback(None)
+
+
 def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.EvalResult:
     if isinstance(value, dom.Pure):
         pure = cast(dom.Pure, value)
         return pure.type, pure.data
     if isinstance(value, dom.Err):
         if value.diagnostic is not None:
-            value.diagnostic.throw()
-        diag = src.error(f"Invalid env value for {sym}")
-        if sym.span is not None:
-            diag = diag.with_label(sym.as_label("invalid env value"))
-        diag.throw()
+            _throw_diagnostic(value.diagnostic)
+        log.error(f"Invalid env value for {sym}").label(
+            sym, "invalid env value"
+        ).throw()
     if isinstance(value, dom.Var):
         type_ = value.type
         return cast(dom.Type, type_), _env_data(value)
@@ -287,12 +292,9 @@ def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.Eva
 def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> Evaluator.EvalResult:
     if isinstance(value, dom.Err):
         if value.diagnostic is not None:
-            value.diagnostic.throw()
+            _throw_diagnostic(value.diagnostic)
         message = f"Unbound symbol: {sym}"
-        diag = src.error(message)
-        if sym.span is not None:
-            diag = diag.with_label(sym.as_label(message))
-        diag.throw()
+        log.error(message).label(sym, message).throw()
     if isinstance(value, dom.Pure):
         return value.type, value.data
     if isinstance(value, dom.Var):

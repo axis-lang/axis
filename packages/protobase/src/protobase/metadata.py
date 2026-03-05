@@ -4,7 +4,7 @@ from weakref import WeakKeyDictionary
 from protobase.object import Object
 from protobase.type import Type
 
-class Metadata[T](Object, abstract=True):
+class Metadata[T=Any](Object, abstract=True):
     __slots__ = "__weakref__",
     __storage__: ClassVar[WeakKeyDictionary[object, object]]
     
@@ -44,8 +44,12 @@ class Metadata[T](Object, abstract=True):
     def __on_fault__(cls, obj: T) -> Self | None:
         return None
 
-    def tag(self, *objs: T) -> None:
-        storage = type(self).__storage__
-        for obj in objs:
-            storage[obj] = self
-        
+    def tag[V](self, obj: V) -> V:
+        type(self).__storage__[obj] = self
+        return obj
+
+    # def tag(self, *objs: T) -> None:
+    #     storage = type(self).__storage__
+    #     for obj in objs:
+    #         storage[obj] = self
+

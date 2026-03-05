@@ -9,7 +9,6 @@ from axis.sem import Entity, Scope
 
 from .blocks import Use
 from .item import Item
-from .ref import name_from_expr, ref_from_expr, scope_ref_from_item
 from .scopes import parent_scope
 
 
@@ -50,8 +49,10 @@ class Mod(Item):
     def ref(self) -> dom.Anchor:
         if self.path is None:
             raise ValueError("Mod requires a path to build its ref")
-        scope_ref = scope_ref_from_item(self)
-        ref = ref_from_expr(self.path, scope_ref)
+        scope_ref = self.anchor
+        ref = expr.to_spec_ref(self.path, scope_ref)
+        if ref is None:
+            raise ValueError("Mod requires a path to build its ref")
         if isinstance(ref, dom.Spec):
             raise ValueError("Module ref cannot be specialized")
         return cast(dom.Anchor, ref)
@@ -60,13 +61,13 @@ class Mod(Item):
     def contributions(self) -> frozenset[Entity.Contribution]:
         if self.path is None:
             return frozenset()
-        scope_ref = scope_ref_from_item(self)
+        scope_ref = self.anchor
         contributions: list[Entity.Contribution] = []
         if scope_ref is not None:
             contributions.append(
                 Entity.Member(
                     anchor=scope_ref,
-                    name=name_from_expr(self.path),
+                    name=expr.to_name(self.path),
                     target=self.ref,
                     origin=self.path,
                     ctx=self,
@@ -76,7 +77,7 @@ class Mod(Item):
 
     @flux.property
     def scope(self) -> Scope:
-        scope_name = name_from_expr(self.path) if self.path is not None else None
+        scope_name = expr.to_name(self.path) if self.path is not None else None
         builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
         realm = self.realm
         if realm is None:

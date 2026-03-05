@@ -3,11 +3,10 @@ from typing import ClassVar, Literal, Optional
 
 from protobase import flux
 
-from axis import syn
+from axis import expr, syn
 from axis.sem import Entity, Scope
 
 from .item import Item
-from .ref import name_from_expr, ref_from_expr, scope_ref_from_item
 from .scopes import parent_scope
 
 
@@ -56,14 +55,16 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
     def contributions(self) -> frozenset[Entity.Contribution]:
         if self.key is None:
             return frozenset()
-        scope_ref = scope_ref_from_item(self)
-        target = ref_from_expr(self.key, scope_ref)
+        scope_ref = self.anchor
+        target = expr.to_spec_ref(self.key, scope_ref)
+        if target is None:
+            return frozenset()
         contributions: list[Entity.Contribution] = []
         if scope_ref is not None:
             contributions.append(
                 Entity.Member(
                     anchor=scope_ref,
-                    name=name_from_expr(self.key),
+                    name=expr.to_name(self.key),
                     target=target,
                     origin=self.key,
                     ctx=self,
@@ -73,7 +74,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
 
     @flux.property
     def scope(self) -> Scope:
-        scope_name = name_from_expr(self.key) if self.key is not None else None
+        scope_name = expr.to_name(self.key) if self.key is not None else None
         builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
         return builder.build()
 

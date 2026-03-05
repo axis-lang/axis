@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, cast
 
 from protobase import Consed, flux, frozendict, _
 
 from axis import dom, syn, sem
+from axis.sem.var import Var
 
 
 class Entity(Consed):
@@ -42,7 +43,7 @@ class Entity(Consed):
     # Specialization
 
     class SpecContribution(Contribution):
-        spec: dom.Struct[str, dom.Bound]
+        spec: dom.Struct[str, Var]
 
     class SpecBucket(Consed):
         specs: frozenset[Entity.SpecContribution]
@@ -62,7 +63,7 @@ class Entity(Consed):
     # Parametrization
 
     class OverloadContribution(SpecContribution):
-        params: dom.Struct[str, dom.Bound]
+        params: dom.Struct[str, Var]
 
     class OverloadBucket(Consed):
         overloads: frozenset[Entity.OverloadContribution]
@@ -78,13 +79,13 @@ class Entity(Consed):
     # Implementation
 
     class ImplContribution(OverloadContribution):
-        returns: dom.Bound
+        returns: syn.Expr
 
     class ImplBucket(Consed):
         impls: frozenset[Entity.ImplContribution]
 
     @flux.property
-    def impl_by_result(self) -> frozendict[dom.Bound, ImplBucket]:
+    def impl_by_result(self) -> frozendict[syn.Expr, ImplBucket]:
         return _impl_by_result_bucket(self.contributions)
 
 
@@ -124,12 +125,13 @@ def _overload_by_shape_bucket(
 
 def _impl_by_result_bucket(
     contributions: frozenset[Entity.Contribution],
-) -> frozendict[dom.Bound, Entity.ImplBucket]:
-    impls: dict[dom.Bound, list[Entity.ImplContribution]] = {}
+) -> frozendict[syn.Expr, Entity.ImplBucket]:
+    impls: dict[syn.Expr, list[Entity.ImplContribution]] = {}
     for contrib in contributions:
         if isinstance(contrib, Entity.ImplContribution):
             if contrib.params.index.is_empty:
-                impls.setdefault(contrib.returns, []).append(contrib)
+                returns = cast(syn.Expr, contrib.returns)
+                impls.setdefault(returns, []).append(contrib)
 
     return frozendict(
         (

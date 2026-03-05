@@ -334,3 +334,6 @@ def _rich_container_tree(name: str, values: Iterable[object]) -> Tree:
             child.add(_rich_item_label(item))
 
     return child
+
+class SyntaxError(Node):
+    ...

@@ -14,7 +14,7 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(result.data, 12)
         self.assertTrue(isinstance(result.type, dom.NominalType))
         if isinstance(result.type, dom.NominalType):
-            self.assertEqual(dom.ref_segments(result.type.ref), ("std", "Integer"))
+            self.assertEqual(dom.ref_segments(result.type.ref), ("std", "Decimal"))
 
     def test_eval_additive(self):
         result = self.eval("1 + 2")
