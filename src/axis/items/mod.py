@@ -1,49 +1,40 @@
 from __future__ import annotations
 
-from typing import ClassVar, cast
+from typing import ClassVar, cast, Literal, Self
 
-from protobase import flux
+from protobase import flux, _, slot_cached_property
 
-from axis import dom, expr, syn
-from axis.sem import Entity, Scope
+from axis import dom, expr, syn, sem, log
+#from axis.sem import Entity, Scope
 
 from .blocks import Use
 from .item import Item
 from .scopes import parent_scope
 
 
+
 class Mod(Item):
-    """
-    Cometido: agrupar semanticamente un conjunto de sub-items.
-
-    el modulo representa un espacio de nombres
-
-    Example:
-        mod axis.items:
-            ...
-    """
-
     outline_keyword: ClassVar[str] = "mod"
-    # grammar: ClassVar[str] = "mod: 'mod' expression ':' EOF;"
-
-    #pkg: items.Package
-
-    path: syn.Expr | None = None
+    path: syn.Expr = _
     uses: tuple[Use, ...] = ()
 
     @classmethod
     def build(
-        cls,
-        kw,
+        cls: type[Self],
+        kw: Literal['mod', 'unit'],
         path: syn.Expr,
         *,
-        #pkg: items.Package,
         children: syn.OutlineNode.Children,
-        #parent: syn.SegregatedOutlineNode,
         **kwargs
     ):
         uses = tuple(child for child in children if isinstance(child, Use))
         return cls(path=path, uses=uses, **kwargs)
+
+    @slot_cached_property
+    def anchor(self):
+        anchor = self.parent.anchor if self.parent is not None else None
+        return expr.as_anchor(self.path, anchor)
+    
 
     @flux.property
     def ref(self) -> dom.Anchor:
@@ -58,27 +49,23 @@ class Mod(Item):
         return cast(dom.Anchor, ref)
 
     @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
-        if self.path is None:
-            return frozenset()
-        scope_ref = self.anchor
-        contributions: list[Entity.Contribution] = []
-        if scope_ref is not None:
-            contributions.append(
-                Entity.Member(
-                    anchor=scope_ref,
-                    name=expr.to_name(self.path),
-                    target=self.ref,
-                    origin=self.path,
-                    ctx=self,
-                )
-            )
-        return frozenset(contributions)
+    def contributions(self) -> frozenset[sem.Entity.Contribution]:
+        # contributions: list[sem.Entity.Contribution] = []
+        # contributions.append(
+        #     sem.Entity.Member(
+        #         anchor=self.anchor,
+        #         name=expr.to_name(self.path),
+        #         target=self.ref,
+        #         origin=self.path,
+        #         ctx=self,
+        #     )
+        # )
+        return frozenset()
 
     @flux.property
-    def scope(self) -> Scope:
-        scope_name = expr.to_name(self.path) if self.path is not None else None
-        builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
+    def scope(self) -> sem.Scope:
+        scope_name = expr.name_of(self.path) if self.path is not None else None
+        builder = sem.Scope.Builder(name=scope_name, parent=parent_scope(self))
         realm = self.realm
         if realm is None:
             return builder.build()

@@ -2,24 +2,25 @@ from __future__ import annotations
 
 from typing import Iterable, cast
 
-from protobase import Consed, flux, frozendict, _
+from protobase import Inmutable, Consed, flux, frozendict, _
 
 from axis import dom, syn, sem
 from axis.sem.var import Var
 
 
 class Entity(Consed):
-    class Context(syn.SegregatedItem, abstract=True):
+    class Context[P: syn.OutlineNode](syn.SegregatedItem[P], abstract=True):
         realm: sem.Realm = _
 
-        @flux.property
-        def scope(self) -> sem.Scope:
-            raise NotImplementedError
+        # @flux.property
+        # def scope(self) -> sem.Scope:
+        #     raise NotImplementedError
+        # el scope deberia ir en la contribucion?!
 
         @flux.property
         def contributions(self) -> frozenset["Entity.Contribution"]:
-            raise NotImplementedError
-        
+            return frozenset()
+
         # eval
 
     class Contribution(Consed, abstract=True):

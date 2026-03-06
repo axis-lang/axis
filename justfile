@@ -6,9 +6,9 @@ help:
 launch *ARGS: 
     @poetry run python -m axis {{ARGS}}
 
-test:
+test *ARGS:
     @clear && printf '\e[3J'
-    @poetry run python -m unittest discover -s tests
+    @poetry run python -m unittest discover -s tests {{ARGS}}
 
 test-all:
     @for d in packages/*; do \

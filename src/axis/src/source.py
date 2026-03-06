@@ -21,6 +21,7 @@ class Source(Inmutable, abstract=True):
     def lines(self) -> tuple["Source.Line", ...]:
         src = self.content
         starts = [0] + [i for i, ch in enumerate(src, 1) if ch == "\n"]
+        starts.append(len(src) + 1)
 
         return tuple(
             Source.Line(
@@ -97,23 +98,26 @@ class Source(Inmutable, abstract=True):
 
         def __getitem__(self, index: slice | int) -> "Source.Span | Source.Position":
             if isinstance(index, slice):
-                if index.start < 0 or index.stop > len(self):
+                if index.step not in (None, 1):
+                    raise TypeError("Slice step is not supported")
+
+                start = 0 if index.start is None else index.start
+                stop = len(self) if index.stop is None else index.stop
+
+                if start < 0 or stop < 0 or stop > len(self):
                     raise IndexError(f"Slice {index} out of range (0-{len(self)})")
-                if index.start > index.stop:
+                if start > stop:
                     raise IndexError(f"Slice {index} invalid (start > stop)")
 
                 return Source.Span(
                     source=self.source,
-                    start=self.start + index.start,
-                    end=self.start + index.stop,
+                    start=self.start + start,
+                    end=self.start + stop,
                 )
             if isinstance(index, int):
                 if index < 0 or index >= len(self):
                     raise IndexError(f"Index {index} out of range (0-{len(self)})")
-
-                return Source.Position(
-                    self.source.line_at_offset(self.start + index), self.start + index
-                )
+                return self.source.position_at_offset(self.start + index)
             raise TypeError(f"Invalid index type: {type(index)}")
 
         @cached_property
@@ -131,6 +135,12 @@ class Source(Inmutable, abstract=True):
         @property
         def end_line(self) -> "Source.Line":
             return self.end_position.line
+
+        @property
+        def line(self) -> "Source.Line":
+            if self.is_multi_line:
+                raise ValueError("Span covers multiple lines")
+            return self.start_line
 
         @property
         def is_multi_line(self) -> bool:

@@ -1,16 +1,11 @@
 from __future__ import annotations
 from functools import cache
-from typing import Any, Callable, ClassVar, Iterable, Literal, Optional, Self
+from typing import Any, Callable, ClassVar, Optional, Self
 from axis import src
-from protobase import Inmutable, attrs_of, classproperty, frozendict, is_abstract
-from rich.tree import Tree
-from rich.text import Text
-from textwrap import shorten
+from protobase import Inmutable, classproperty, frozendict, is_abstract
+
 from .building import FromSrcMixin
 from .outline import OutlineTree, OutlineRule, OutlineSpec
-
-
-# alpha -> {}
 
 
 class Node(FromSrcMixin, Inmutable, abstract=True):
@@ -28,6 +23,7 @@ class Node(FromSrcMixin, Inmutable, abstract=True):
             registry[target_type] = func
             cls._as_registry = registry
             return func
+
         return decorator
 
     @classmethod
@@ -191,14 +187,14 @@ class EmbeddedOutlineNode(OutlineNode, abstract=True):
         return super().build(*args, children=children, **kwargs)
 
 
-class SegregatedOutlineNode(OutlineNode, abstract=True):
-    parent: Optional[OutlineNode] = None
+class SegregatedOutlineNode[P: OutlineNode](OutlineNode, abstract=True):
+    parent: Optional[P] = None
 
     @classmethod
     def build(
         cls,
         *args,
-        parent: Optional[OutlineNode],
+        parent: Optional[P],
         children: OutlineNode.Children,
         **kwargs,
     ) -> Self:
@@ -206,11 +202,13 @@ class SegregatedOutlineNode(OutlineNode, abstract=True):
 
     @classmethod
     def from_file(
-        cls, src_file: src.Source, **kwargs
+        cls,
+        src_file: src.Source,
+        **kwargs,
     ) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
         tree = cls.parse_outline_tree(src_file)
-        #from rich import print
-        #print(tree)
+        # from rich import print
+        # print(tree)
         self, more = cls.from_outline(tree, **kwargs)
         return (self, *more)
 
@@ -233,14 +231,12 @@ class Item(OutlineNode, Node, abstract=True):
     grammar_context_infix: ClassVar[str] = "Item"
 
 
-class SegregatedItem(Item, SegregatedOutlineNode, abstract=True):
-    """"""
-
-    # pkg:
+class SegregatedItem[P: OutlineNode](Item, SegregatedOutlineNode[P], abstract=True):
+    pass
 
 
 class EmbeddedItem(Item, EmbeddedOutlineNode, abstract=True):
-    """"""
+    pass
 
 
 class MatchSpec(Inmutable):
@@ -249,91 +245,91 @@ class MatchSpec(Inmutable):
     filter_any: frozenset[str] = frozenset()
 
 
-_OP_STYLE = "yellow"
-_ATTR_STYLE = "cyan"
-_TYPE_STYLE = "green"
-_VALUE_STYLE = "italic bright_black"
+# _OP_STYLE = "yellow"
+# _ATTR_STYLE = "cyan"
+# _TYPE_STYLE = "green"
+# _VALUE_STYLE = "italic bright_black"
 
 
-def _rich_root_label(node: Node) -> Text:
-    label = Text(no_wrap=False)
-    label.append(type(node).__qualname__, style=_TYPE_STYLE)
-    label.append(" = ", style=_OP_STYLE)
-    label.append(shorten(str(node), 50), style=_VALUE_STYLE)
-    return label
+# def _rich_root_label(node: Node) -> Text:
+#     label = Text(no_wrap=False)
+#     label.append(type(node).__qualname__, style=_TYPE_STYLE)
+#     label.append(" = ", style=_OP_STYLE)
+#     label.append(shorten(str(node), 50), style=_VALUE_STYLE)
+#     return label
 
 
-def _rich_attr_type_label(name: str, value: object) -> Text:
-    label = Text()
-    label.append(name, style=_ATTR_STYLE)
-    label.append(": ", style=_OP_STYLE)
-    label.append(type(value).__qualname__, style=_TYPE_STYLE)
-    return label
+# def _rich_attr_type_label(name: str, value: object) -> Text:
+#     label = Text()
+#     label.append(name, style=_ATTR_STYLE)
+#     label.append(": ", style=_OP_STYLE)
+#     label.append(type(value).__qualname__, style=_TYPE_STYLE)
+#     return label
 
 
-def _rich_scalar_label(name: str, value: object) -> Text:
-    label = Text()
-    label.append(name, style=_ATTR_STYLE)
-    label.append(": ", style=_OP_STYLE)
-    label.append(type(value).__qualname__, style=_TYPE_STYLE)
-    label.append(" = ", style=_OP_STYLE)
-    label.append(shorten(str(value), 50), style=_VALUE_STYLE)
-    return label
+# def _rich_scalar_label(name: str, value: object) -> Text:
+#     label = Text()
+#     label.append(name, style=_ATTR_STYLE)
+#     label.append(": ", style=_OP_STYLE)
+#     label.append(type(value).__qualname__, style=_TYPE_STYLE)
+#     label.append(" = ", style=_OP_STYLE)
+#     label.append(shorten(str(value), 50), style=_VALUE_STYLE)
+#     return label
 
 
-def _rich_item_label(value: object) -> Text:
-    label = Text()
-    label.append(shorten(str(value), 50), style=_VALUE_STYLE)
-    return label
+# def _rich_item_label(value: object) -> Text:
+#     label = Text()
+#     label.append(shorten(str(value), 50), style=_VALUE_STYLE)
+#     return label
 
 
-def _rich_named_node(name: str, node: Node) -> Tree:
-    child = node.__rich__()
-    child.label = Text()
-    child.label.append(name, style=_ATTR_STYLE)
-    child.label.append(": ", style=_OP_STYLE)
-    child.label.append(type(node).__qualname__, style=_TYPE_STYLE)
-    child.label.append(" = ", style=_OP_STYLE)
-    child.label.append(shorten(str(node), 50), style=_VALUE_STYLE)
-    return child
+# def _rich_named_node(name: str, node: Node) -> Tree:
+#     child = node.__rich__()
+#     child.label = Text()
+#     child.label.append(name, style=_ATTR_STYLE)
+#     child.label.append(": ", style=_OP_STYLE)
+#     child.label.append(type(node).__qualname__, style=_TYPE_STYLE)
+#     child.label.append(" = ", style=_OP_STYLE)
+#     child.label.append(shorten(str(node), 50), style=_VALUE_STYLE)
+#     return child
 
 
-def _rich_value_child(name: str, value: object) -> Tree | Text:
-    if isinstance(value, Node):
-        return _rich_named_node(name, value)
-    if isinstance(value, (dict, frozendict)):
-        return _rich_mapping_tree(name, value)
-    if isinstance(value, (tuple, frozenset)):
-        return _rich_container_tree(name, value)
-    return _rich_scalar_label(name, value)
+# def _rich_value_child(name: str, value: object) -> Tree | Text:
+#     if isinstance(value, Node):
+#         return _rich_named_node(name, value)
+#     if isinstance(value, (dict, frozendict)):
+#         return _rich_mapping_tree(name, value)
+#     if isinstance(value, (tuple, frozenset)):
+#         return _rich_container_tree(name, value)
+#     return _rich_scalar_label(name, value)
 
 
-def _rich_mapping_tree(name: str, mapping: dict | frozendict) -> Tree:
-    child = Tree(_rich_attr_type_label(name, mapping), guide_style=_ATTR_STYLE)
+# def _rich_mapping_tree(name: str, mapping: dict | frozendict) -> Tree:
+#     child = Tree(_rich_attr_type_label(name, mapping), guide_style=_ATTR_STYLE)
 
-    for index, (item_key, item_value) in enumerate(mapping.items()):
-        #entry_label = Text()
-        #entry_label.append(f"item[{index}]", style=_ATTR_STYLE)
-        entry = Tree(Text(), guide_style=_ATTR_STYLE, hide_root=True)
+#     for index, (item_key, item_value) in enumerate(mapping.items()):
+#         #entry_label = Text()
+#         #entry_label.append(f"item[{index}]", style=_ATTR_STYLE)
+#         entry = Tree(Text(), guide_style=_ATTR_STYLE, hide_root=True)
 
-        entry.add(_rich_value_child("key", item_key))
-        entry.add(_rich_value_child("value", item_value))
+#         entry.add(_rich_value_child("key", item_key))
+#         entry.add(_rich_value_child("value", item_value))
 
-        child.add(entry)
+#         child.add(entry)
 
-    return child
+#     return child
 
 
-def _rich_container_tree(name: str, values: Iterable[object]) -> Tree:
-    child = Tree(_rich_attr_type_label(name, values), guide_style=_ATTR_STYLE)
+# def _rich_container_tree(name: str, values: Iterable[object]) -> Tree:
+#     child = Tree(_rich_attr_type_label(name, values), guide_style=_ATTR_STYLE)
 
-    for item in values:
-        if isinstance(item, Node):
-            child.add(item)
-        else:
-            child.add(_rich_item_label(item))
+#     for item in values:
+#         if isinstance(item, Node):
+#             child.add(item)
+#         else:
+#             child.add(_rich_item_label(item))
 
-    return child
+#     return child
 
-class SyntaxError(Node):
-    ...
+
+class SyntaxError(Node): ...

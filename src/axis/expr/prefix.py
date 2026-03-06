@@ -1,14 +1,13 @@
 from enum import Enum
 from typing import ClassVar
-from axis import conf, syn
+from axis import syn
 
 
 class Prefix(syn.Expr, abstract=True):
     class Op(syn.Node, abstract=True):
         grammar_context_infix: ClassVar[str] = ""
 
-        class Symbol(str, Enum):
-            ...
+        class Symbol(str, Enum): ...
 
         symbol: "Symbol"  # type: ignore[override]
 
@@ -33,6 +32,7 @@ class Etc(Prefix):
             ETC = ".."
 
         symbol: "Symbol"  # type: ignore[override]
+
 
 class Sign(Prefix):
     class Op(Prefix.Op):

@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
-from protobase import flux
+from protobase import flux, slot_cached_property
 
-from axis import expr, syn
+from axis import dom, expr, syn
 from axis.sem import Entity, Scope
 
 from .item import Item
@@ -21,6 +21,13 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
     key: syn.Expr | None = None
     bound: Optional[syn.Expr] = None
     value: Optional[syn.Expr] = None
+
+    @slot_cached_property
+    def anchor(self) -> dom.Anchor:
+        parent = self.parent
+        if parent is None:
+            raise ValueError("Global requires a parent to build its anchor")
+        return parent.anchor
 
     @classmethod
     def build(
@@ -64,7 +71,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
             contributions.append(
                 Entity.Member(
                     anchor=scope_ref,
-                    name=expr.to_name(self.key),
+                    name=expr.name_of(self.key),
                     target=target,
                     origin=self.key,
                     ctx=self,
@@ -74,7 +81,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
 
     @flux.property
     def scope(self) -> Scope:
-        scope_name = expr.to_name(self.key) if self.key is not None else None
+        scope_name = expr.name_of(self.key) if self.key is not None else None
         builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
         return builder.build()
 

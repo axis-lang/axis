@@ -29,7 +29,7 @@ class Tuple(syn.Expr):
     class Positional(Element):  # PositionalElement
         "value"
 
-        value: Optional[syn.Expr]
+        value: syn.Expr
 
         def __str__(self) -> str:
             return str(self.value)

@@ -46,6 +46,10 @@ class Anchor(Ref):
             raise ValueError("Anchor.data must have at least one segment")
 
     @classmethod
+    def root(cls, value: str) -> "Anchor":
+        return cls(data=tuple(value, ))
+
+    @classmethod
     def from_str(cls, value: str) -> "Anchor":
         return cls(data=tuple(p for part in value.split(".") if (p := part.strip())))
 

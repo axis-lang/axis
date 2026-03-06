@@ -62,6 +62,6 @@ class Val(Inmutable, abstract=True):
         yield from dom_render.rich_console_dom(self, console, options)
 
 
-class Pure[T: "dom.Type" = Any, D: Data = Any](Consed, abstract=True):
+class Pure[T: "dom.Type" = Any, D: Data = Any](Val, Consed, abstract=True):
     type: T
     data: D

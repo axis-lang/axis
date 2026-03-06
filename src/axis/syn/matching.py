@@ -46,9 +46,19 @@ from __future__ import annotations
 
 from functools import singledispatchmethod
 from types import UnionType
-from typing import Any, ClassVar, Iterable, Self, Union, cast, get_args, get_origin
+from typing import (
+    Any,
+    ClassVar,
+    Iterable,
+    Self,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from protobase import Inmutable, Record, attrs_of, frozendict, is_abstract
+from protobase.object import attr_info_of
 
 from .node import Expr, Node
 
@@ -520,8 +530,12 @@ class ClassMatcher(Inmutable, abstract=True):
 
     @classmethod
     def _candidate_for(cls, target: type["ClassMatcher"]) -> MatchCandidate:
-        annotations = getattr(target, "__annotations__", {})
-        schema = frozendict(annotations) if annotations else None
+        attrs = attr_info_of(target)
+        schema = (
+            frozendict({name: info.type for name, info in attrs.items()})
+            if attrs
+            else None
+        )
         return MatchCandidate(result_type=target, schema=schema)
 
     @classmethod
@@ -529,13 +543,11 @@ class ClassMatcher(Inmutable, abstract=True):
         patterns: dict[Expr, frozenset[MatchCandidate]] = {}
 
         def collect(target: type[ClassMatcher]):
-            if hasattr(target, "match_patterns"):
+            if hasattr(target, "match_patterns") and not is_abstract(target):
                 candidate = cls._candidate_for(target)
                 for pattern in target.match_patterns:
                     patterns[pattern] = frozenset((candidate,))
             for subclass in target.__subclasses__():
-                if is_abstract(subclass):
-                    continue
                 collect(subclass)
 
         collect(cls)

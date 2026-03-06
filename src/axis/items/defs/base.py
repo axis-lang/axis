@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import ClassVar, Literal, Optional
 
-from protobase import flux
+from protobase import flux, _, slot_cached_property
+
 
 from axis import dom, expr, syn
 from axis.log import report as log
@@ -10,8 +11,6 @@ from axis.sem import Entity, ParamVar, Scope, SpecVar, Var
 
 from ..blocks import TupleBlock
 from ..item import Item
-from ..scopes import parent_scope
-
 
 def _emit_diag(message: str, node: syn.Node | None) -> None:
     log.error(message).label(node).emit()
@@ -19,6 +18,7 @@ def _emit_diag(message: str, node: syn.Node | None) -> None:
 
 def _throw_diag(message: str, node: syn.Node | None) -> None:
     log.error(message).label(node).throw()
+
 
 def _element_name(element: expr.Tuple.Element) -> str:
     match element:
@@ -28,13 +28,15 @@ def _element_name(element: expr.Tuple.Element) -> str:
             if value is None:
                 _throw_diag("Positional element requires a value", element)
             assert value is not None
-            return expr.to_name(value)
+            return expr.name_of(value)
         case _:
             _throw_diag("Unsupported tuple element", element)
     raise ValueError("Unreachable")
 
 
-def _inline_prefix(inline_expr: expr.Tuple) -> tuple[tuple[expr.Tuple.Element, ...], bool]:
+def _inline_prefix(
+    inline_expr: expr.Tuple,
+) -> tuple[tuple[expr.Tuple.Element, ...], bool]:
     elements = inline_expr.elements
     spread_index: int | None = None
     for index, element in enumerate(elements):
@@ -78,7 +80,7 @@ def merge_inline_block_tuple(
                 if bound is None:
                     _throw_diag("Tuple element requires a bound", element)
                 assert bound is not None
-                sym = expr.to_sym(key)
+                sym = expr.as_sym(key)
                 var = var_cls(sym=sym, bound=bound, default=value)
                 keys.append(expr.to_slot_name(key))
                 values.append(var)
@@ -150,10 +152,11 @@ class Def(Item, syn.ClassMatcher):
         Returns: False,
     }
 
-    origin: syn.Expr | None = None
-    where: Optional[Where] = None
-    takes: tuple[Takes, ...] = ()
-    returns: tuple[Returns, ...] = ()
+    origin: syn.Expr = _
+    where: tuple[Where, ...] = _
+    takes: tuple[Takes, ...] = _
+    returns: tuple[Returns, ...] = _
+    other_blocks: tuple[syn.Block, ...] = _
 
     @classmethod
     def build(
@@ -168,61 +171,80 @@ class Def(Item, syn.ClassMatcher):
             kw == cls.outline_keyword
         ), f"Expected keyword {cls.outline_keyword}, got {kw}"
 
-        where: Optional[Def.Where] = None
+        where: list[Def.Where] = []
         takes: list[Def.Takes] = []
         returns: list[Def.Returns] = []
+        others: list[syn.Block] = []
+
         for child in children:
             match child:
                 case cls.Where() as w:
-                    where = w
+                    where.append(w)
                 case cls.Takes() as t:
                     takes.append(t)
                 case cls.Returns() as r:
                     returns.append(r)
+                case _:
+                    others.append(child)
 
         self = cls.match(
             expr_node,
             origin=expr_node,
-            where=where,
+            where=tuple(where),
             takes=tuple(takes),
             returns=tuple(returns),
+            other_blocks=tuple(others),
             **kwargs,
         )
+
         if self is None:
-            _throw_diag(
-                f"Expression does not match any pattern for {cls.__name__}",
-                expr_node,
+            (
+                log.error(f"Expression does not match any pattern for {cls.__name__}")
+                .label(expr_node)
+                .throw()
             )
-            raise AssertionError("Unreachable")
+
         return self
 
     @flux.property
     def contributions(self) -> frozenset[Entity.Contribution]:
         raise NotImplementedError("Def.contributions must be implemented per subclass")
 
-    @flux.property
-    def scope(self) -> Scope:
-        scope_name = expr.to_name(self.origin) if self.origin is not None else None
-        builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
-        for takes in self.takes:
-            _define_tuple_bindings(builder, takes)
-        if self.where is not None:
-            _define_tuple_bindings(builder, self.where)
-        return builder.build()
+    # @flux.property
+    # def scope(self) -> Scope:
+    #     scope_name = expr.to_name(self.origin) if self.origin is not None else None
+    #     builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
+    #     for takes in self.takes:
+    #         _define_tuple_bindings(builder, takes)
+    #     if self.where is not None:
+    #         _define_tuple_bindings(builder, self.where)
+    #     return builder.build()
 
 
-def _define_tuple_bindings(builder: Scope.Builder, tup: expr.Tuple) -> None:
-    for element in tup.elements:
-        match element:
-            case expr.Tuple.Nominal(key=key):
-                sym = expr.to_sym(key)
-            case expr.Tuple.Positional(value=value):
-                if value is None:
-                    continue
-                sym = expr.to_sym(value)
-            case _:
-                continue
-        builder.define(sym, dom.Var.from_id(sym.name))
+# def _define_tuple_bindings(builder: Scope.Builder, tup: expr.Tuple) -> None:
+#     for element in tup.elements:
+#         match element:
+#             case expr.Tuple.Nominal(key=key):
+#                 sym = expr.as_sym(key)
+#             case expr.Tuple.Positional(value=value):
+#                 if value is None:
+#                     continue
+#                 sym = expr.as_sym(value)
+#             case _:
+#                 continue
+#         builder.define(sym, dom.Var.from_id(sym.name))
+
+
+class SymDef(Def, abstract=True):
+
+    sym: expr.Sym = _
+
+    @slot_cached_property
+    def anchor(self) -> dom.Anchor:
+        anchor = expr.as_anchor(self.sym, self.parent.anchor if self.parent else None)
+        if anchor is None:
+            raise ValueError("ClassDef requires a valid sym to build its anchor")
+        return anchor
 
 
 class CastDef(Def):

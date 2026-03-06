@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import ClassVar, Union
-from axis import conf, syn
-from rich.text import Text
+from typing import ClassVar
+from axis import syn
+
 
 class Infix(syn.Expr, abstract=True):
     class Op(syn.Node, abstract=True):
@@ -20,8 +20,6 @@ class Infix(syn.Expr, abstract=True):
                 return cls(symbol=cls.Symbol(s))
             except ValueError:
                 raise ValueError(f"Unknown binary operator: {s}")
-            
-
 
     precedence: ClassVar[int] = 0  # to be overridden in subclasses
     op: Op
@@ -30,7 +28,6 @@ class Infix(syn.Expr, abstract=True):
 
     def __str__(self):
         return f"{self.lhs} {self.op} {self.rhs}"
-        
 
     @classmethod
     def build(cls, lhs: syn.Expr, *ops) -> syn.Expr:
@@ -54,8 +51,8 @@ class Productive(Infix):
             MOD = "%"
             POW = "**"
 
-
     precedence: ClassVar[int] = 1
+
 
 class Additive(Infix):
     class Op(Infix.Op):
@@ -63,8 +60,8 @@ class Additive(Infix):
             ADD = "+"
             SUB = "-"
 
-
     precedence: ClassVar[int] = 2
+
 
 class Comparison(Infix):
     class Op(Infix.Op):
@@ -76,8 +73,8 @@ class Comparison(Infix):
             GT = ">"
             GTE = ">="
 
-
     precedence: ClassVar[int] = 3
+
 
 class Logic(Infix):
     class Op(Infix.Op):
@@ -85,8 +82,8 @@ class Logic(Infix):
             AND = "&&"
             OR = "||"
 
-
     precedence: ClassVar[int] = 4
+
 
 class Range(Infix):
     class Op(Infix.Op):
@@ -104,7 +101,6 @@ class Cast(Infix):
             COERCE = "->"
 
     precedence: ClassVar[int] = 6
-
 
 
 # class Cast(Infix): Coherce

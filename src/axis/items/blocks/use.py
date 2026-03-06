@@ -16,7 +16,7 @@ class Use(syn.Block, Inmutable):
 
     import_expr: syn.Expr
 
-    type Entry = tuple[expr.Sym | expr.Lit, dom.Ref]
+    type Entry = tuple[expr.Sym | expr.Lit, dom.Ref | None] 
 
     @classmethod
     def build(
@@ -30,48 +30,41 @@ class Use(syn.Block, Inmutable):
         return cls(import_expr=import_expr)
 
     @property
-    def entries(self) -> tuple[Entry, ...]:
+    def entries(self) -> frozenset[Entry]:
         entries: list[Use.Entry] = []
 
-        def walk(value: object, current_prefix: dom.Ref | None) -> None:
+        def walk(value: syn.Node, current_anchor: dom.Anchor | None) -> None:
             match value:
                 case expr.Apply(function=function_expr, argument=argument_expr):
-                    scope = current_prefix.anchor if current_prefix is not None else None
-                    next_prefix = expr.to_spec_ref(function_expr, scope)
-                    if next_prefix is None:
-                        return
-                    walk(argument_expr, next_prefix)
+                    anchor = expr.as_anchor(function_expr, current_anchor)
+                    walk(argument_expr, anchor)
                 case expr.Tuple(elements=elements):
                     for element in elements:
-                        walk(element, current_prefix)
+                        walk(element, current_anchor)
                 case expr.Tuple.Positional(value=elem_value):
-                    if elem_value is None:
-                        return
+                    #if elem_value is None: return
                     if isinstance(elem_value, expr.Lit) and elem_value.value is Ellipsis:
-                        if current_prefix is not None:
-                            entries.append((elem_value, current_prefix))
+                        #if current_anchor is not None:
+                        entries.append((elem_value, current_anchor))
                         return
-                    walk(elem_value, current_prefix)
+                    walk(elem_value, current_anchor)
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
-                    alias = expr.to_sym(alias_expr)
-                    scope = current_prefix.anchor if current_prefix is not None else None
-                    target_ref = expr.to_spec_ref(key, scope)
-                    if target_ref is None:
+                    alias = expr.as_sym(alias_expr)
+                    scope = current_anchor.anchor if current_anchor is not None else None
+                    target_anchor = expr.as_anchor(key, scope)
+                    if target_anchor is None:
                         return
-                    entries.append((alias, target_ref))
+                    entries.append((alias, target_anchor))
                 case expr.Lit() as lit if lit.value is Ellipsis:
-                    if current_prefix is not None:
-                        entries.append((lit, current_prefix))
+                    entries.append((lit, current_anchor))
                 case syn.Expr() as expr_node:
-                    scope = current_prefix.anchor if current_prefix is not None else None
-                    target_ref = expr.to_spec_ref(expr_node, scope)
-                    if target_ref is None:
-                        return
-                    alias = expr.to_sym(expr_node)
-                    entries.append((alias, target_ref))
+                    scope = current_anchor.anchor if current_anchor is not None else None
+                    target_anchor = expr.as_anchor(expr_node, scope)
+                    alias = expr.as_sym(expr_node)
+                    entries.append((alias, target_anchor))
                 case _:
                     return
 
         walk(self.import_expr, None)
-        return tuple(entries)
+        return frozenset(entries)

@@ -19,6 +19,20 @@ from .compound import *
 from .trail import *
 
 
+def as_anchor(ast: syn.Expr, scope_ref: dom.Anchor | None) -> dom.Anchor:
+    match ast:
+        case Sym(name=name, at=at):
+            if at is not None:
+                log.warn("Anchor cannot @-qualify a symbol").label(ast).emit()
+            return dom.Anchor.root(name) if scope_ref is None else scope_ref.child(name)
+        case Member(of=of, name=name):
+            return as_anchor(of, scope_ref).child(name)
+        case _:
+            log.error(f"Unsupported anchor expression type ({type(ast)})").label(
+                ast
+            ).throw()
+
+
 def _emit_diag(message: str, node: syn.Node | None) -> None:
     report = log.error(message)
     span = getattr(node, "span", None) if node is not None else None
@@ -44,43 +58,43 @@ def _throw_diag(message: str, node: syn.Node | None) -> None:
 
 
 def to_slot_name(key: syn.Expr) -> str:
-    if isinstance(key, Sym):
-        return key.name
-    return str(key)
-
-
-def to_name(node: syn.Expr) -> str:
-    match node:
-        case Compound(components=components) if components:
-            return to_name(components[0])
+    match key:
         case Sym(name=name):
             return name
+        case _:
+            log.error("Unsupported tuple key expression").label(key).throw()
+
+
+def name_of(node: syn.Expr) -> str:
+    match node:
         case Member(name=name):
             return name
+        case Sym(name=name):
+            return name
+        case Compound(components=components) if components:
+            return name_of(components[0])
         case Index(origin=origin_expr):
-            return to_name(origin_expr)
+            return name_of(origin_expr)
         case Apply(function=function_expr):
-            return to_name(function_expr)
+            return name_of(function_expr)
         case _:
-            _emit_diag("Cannot derive name from expression", node)
-            return str(node)
+            log.error("Cannot derive name from expression").label(node).throw()
 
 
-def to_sym(node: syn.Expr) -> Sym:
+def as_sym(node: syn.Expr) -> Sym:
     match node:
         case Sym() as sym:
             return sym
-        case Member() as member:
-            return member.as_sym()
-        case Compound(components=components) if components:
-            return to_sym(components[0]).with_span_of(node)
-        case Index(origin=origin_expr):
-            return to_sym(origin_expr).with_span_of(node)
-        case Apply(function=function_expr):
-            return to_sym(function_expr).with_span_of(node)
+        # case Member() as member:
+        #     return Sym(name=member.name).with_span_of(node)
+        # case Compound(components=components) if components:
+        #     return as_sym(components[0]).with_span_of(node)
+        # case Index(origin=origin_expr):
+        #     return as_sym(origin_expr).with_span_of(node)
+        # case Apply(function=function_expr):
+        #     return as_sym(function_expr).with_span_of(node)
         case _:
-            name = to_name(node)
-            return Sym(name=name).with_span_of(node)
+            return Sym(name=name_of(node)).with_span_of(node)
 
 
 def to_anchor_ref(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Anchor | None:
@@ -170,9 +184,13 @@ def _struct_const_from_values(
     keys: TypingTuple[str | None, ...], values: TypingTuple[dom.Const, ...]
 ) -> dom.Const:
     index = dom.Struct.Index(builtins.tuple(keys))
-    fields = dom.Struct(index=index, values=builtins.tuple(value.type for value in values))
+    fields = dom.Struct(
+        index=index, values=builtins.tuple(value.type for value in values)
+    )
     struct_type = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
-    return dom.Const(type=struct_type, data=builtins.tuple(value.data for value in values))
+    return dom.Const(
+        type=struct_type, data=builtins.tuple(value.data for value in values)
+    )
 
 
 def to_const(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Const:

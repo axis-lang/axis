@@ -11,51 +11,47 @@ from functools import singledispatchmethod
 
 
 class Evaluator(Inmutable):
-    # type Bound = type
-    type EvalResult = tuple[dom.Type, dom.Data]
-    type EnvValue = dom.Pure | dom.Var | dom.Err | EvalResult
-
-    env: frozendict = frozendict()
+    env: frozendict[str, dom.Val] = frozendict()
     scope: Scope | None = None
 
     @classmethod
     def from_env(
-        cls, env: Mapping[str, "Evaluator.EnvValue"], scope: Scope | None = None
+        cls, env: Mapping[str, dom.Val], scope: Scope | None = None
     ):
         return cls(env=_coerce_env(env), scope=scope)
 
     @classmethod
-    def from_scope(cls, scope: Scope, env: Mapping[str, "Evaluator.EnvValue"] | None = None):
+    def from_scope(cls, scope: Scope, env: Mapping[str, dom.Val] | None = None):
         base_env = _coerce_env(env or {})
         return cls(env=base_env, scope=scope)
 
-    def with_env(self, env: Mapping[str, "Evaluator.EnvValue"]):
+    def with_env(self, env: Mapping[str, dom.Val]):
         return mutate(self, env=_coerce_env(env))
 
     def with_scope(self, scope: Scope | None):
         return mutate(self, scope=scope)
 
     def __call__(self, node: syn.Node) -> dom.Const:
-        type_, data = self.eval(node)
-        return dom.Const(type=type_, data=cast(dom.Data, data))
+        value = self.eval(node)
+        return _as_const(node, value)
 
-    def boolean(self, value: bool) -> EvalResult:
-        return _builtin_nominal("Boolean"), value
+    def boolean(self, value: bool) -> dom.Val:
+        return _value_const(value)
 
-    def natural(self, value: int) -> EvalResult:
-        return _builtin_nominal("Natural"), value
+    def natural(self, value: int) -> dom.Val:
+        return _value_const(value)
 
-    def whole(self, value: int) -> EvalResult:
-        return _builtin_nominal("Whole"), value
+    def whole(self, value: int) -> dom.Val:
+        return _value_const(value)
 
-    def integer(self, value: int) -> EvalResult:
-        return _builtin_nominal("Integer"), value
+    def integer(self, value: int) -> dom.Val:
+        return _value_const(value)
     
-    def decimal(self, value: Decimal) -> EvalResult:
-        return _builtin_nominal("Decimal"), value
+    def decimal(self, value: Decimal) -> dom.Val:
+        return _value_const(value)
     
-    def text(self, value: str) -> EvalResult:
-        return _builtin_nominal("Text"), value
+    def text(self, value: str) -> dom.Val:
+        return _value_const(value)
 
     def struct(
         self,
@@ -68,12 +64,12 @@ class Evaluator(Inmutable):
             dom.Struct[str, dom.Type], dom.Struct(index=index, values=tuple(bounds))
         )
         struct = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
-        return struct, tuple(values)
+        return dom.Const(type=struct, data=tuple(values))
 
     def _error(self, node: syn.Node, message: str):
         log.error(message).label(node, message).throw()
 
-    def _resolve_env(self, sym: expr.Sym) -> EvalResult:
+    def _resolve_env(self, sym: expr.Sym) -> dom.Val:
         key = str(sym)
         if key in self.env:
             value = self.env[key]
@@ -83,7 +79,7 @@ class Evaluator(Inmutable):
         value = self.scope.lookup(sym)
         return _coerce_scope_value(sym, value)
 
-    def _numeric_result(self, value: int | Decimal) -> EvalResult:
+    def _numeric_result(self, value: int | Decimal) -> dom.Val:
         if isinstance(value, Decimal):
             return self.decimal(value)
         if isinstance(value, bool):
@@ -92,7 +88,7 @@ class Evaluator(Inmutable):
 
 
     @singledispatchmethod
-    def eval(cls, node: syn.Node) -> EvalResult:
+    def eval(cls, node: syn.Node) -> dom.Val:
         raise NotImplementedError(f"Cannot evaluate node of type {type(node)}")
 
     @classmethod
@@ -107,7 +103,7 @@ class Evaluator(Inmutable):
 
 
 @Evaluator.impl(expr.Lit)
-def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
+def eval_lit(evaluator: Evaluator, node: expr.Lit) -> dom.Val:
     value = node.value
 
     if value is Ellipsis:
@@ -117,12 +113,11 @@ def eval_lit(evaluator: Evaluator, node: expr.Lit) -> Evaluator.EvalResult:
 
     assert not isinstance(value, (EllipsisType, WildcardType))
 
-    literal = dom.Const.of_literal(value)
-    return literal.type, literal.data
+    return dom.Const.of_literal(value)
 
 
 @Evaluator.impl(expr.Tuple)
-def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.EvalResult:
+def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> dom.Val:
     keys: list[str | None] = []
     bounds: list[dom.Type] = []
     values: list[dom.Data] = []
@@ -130,35 +125,32 @@ def eval_tuple(evaluator: Evaluator, node: expr.Tuple) -> Evaluator.EvalResult:
     for element in node.elements:
         match element:
             case expr.Tuple.Positional(value=value):
-                bound, value = evaluator.eval(value)
+                result = evaluator.eval(value)
+                pure = _as_pure(value, result)
                 keys.append(None)
-                bounds.append(bound)
-                values.append(value)
+                bounds.append(pure.type)
+                values.append(pure.data)
 
             case expr.Tuple.Nominal(key=key, bound=bound, value=value):
-                # key: {'literal'}
-                bound, value = evaluator.eval(value)
-                # if bound.. debe cohercionar value
-                assert isinstance(key, expr.Sym)
-                keys.append(key.name)
-                bounds.append(bound)
-                values.append(value)
+                value_expr = value if value is not None else key
+                result = evaluator.eval(value_expr)
+                pure = _as_pure(value_expr, result)
+                keys.append(expr.to_slot_name(key))
+                bounds.append(pure.type)
+                values.append(pure.data)
 
     return evaluator.struct(keys, bounds, values)
 
 
 @Evaluator.impl(expr.Sym)
-def eval_sym(evaluator: Evaluator, node: expr.Sym) -> Evaluator.EvalResult:
+def eval_sym(evaluator: Evaluator, node: expr.Sym) -> dom.Val:
     return evaluator._resolve_env(node)
 
 
 @Evaluator.impl(expr.Additive)
-def eval_additive(evaluator: Evaluator, node: expr.Additive) -> Evaluator.EvalResult:
-    lhs_meta, lhs = evaluator.eval(node.lhs)
-    rhs_meta, rhs = evaluator.eval(node.rhs)
-
-    if not isinstance(lhs, (int, Decimal)) or not isinstance(rhs, (int, Decimal)):
-        evaluator._error(node, "Additive operator requires numeric operands")
+def eval_additive(evaluator: Evaluator, node: expr.Additive) -> dom.Val:
+    lhs = _numeric_operand(node.lhs, evaluator.eval(node.lhs))
+    rhs = _numeric_operand(node.rhs, evaluator.eval(node.rhs))
 
     op = node.op.symbol.value
     if isinstance(lhs, Decimal) or isinstance(rhs, Decimal):
@@ -174,12 +166,9 @@ def eval_additive(evaluator: Evaluator, node: expr.Additive) -> Evaluator.EvalRe
 
 
 @Evaluator.impl(expr.Productive)
-def eval_productive(evaluator: Evaluator, node: expr.Productive) -> Evaluator.EvalResult:
-    lhs_meta, lhs = evaluator.eval(node.lhs)
-    rhs_meta, rhs = evaluator.eval(node.rhs)
-
-    if not isinstance(lhs, (int, Decimal)) or not isinstance(rhs, (int, Decimal)):
-        evaluator._error(node, "Productive operator requires numeric operands")
+def eval_productive(evaluator: Evaluator, node: expr.Productive) -> dom.Val:
+    lhs = _numeric_operand(node.lhs, evaluator.eval(node.lhs))
+    rhs = _numeric_operand(node.rhs, evaluator.eval(node.rhs))
 
     op = node.op.symbol.value
     if isinstance(lhs, Decimal) or isinstance(rhs, Decimal) or op == "/":
@@ -197,34 +186,34 @@ def eval_productive(evaluator: Evaluator, node: expr.Productive) -> Evaluator.Ev
 
 
 @Evaluator.impl(expr.Sign)
-def eval_sign(evaluator: Evaluator, node: expr.Sign) -> Evaluator.EvalResult:
-    type_, value = evaluator.eval(node.rhs)
+def eval_sign(evaluator: Evaluator, node: expr.Sign) -> dom.Val:
+    value = evaluator.eval(node.rhs)
     op = node.op.symbol.value
 
     match op:
         case "+":
-            if not isinstance(value, (int, Decimal)):
-                evaluator._error(node, "Unary + requires a numeric operand")
-            return evaluator._numeric_result(value)
+            operand = _numeric_operand(node.rhs, value, "Unary + requires a numeric operand")
+            return evaluator._numeric_result(operand)
         case "-":
-            if not isinstance(value, (int, Decimal)):
-                evaluator._error(node, "Unary - requires a numeric operand")
-            return evaluator._numeric_result(-value)
+            operand = _numeric_operand(node.rhs, value, "Unary - requires a numeric operand")
+            return evaluator._numeric_result(-operand)
         case "!":
-            if not isinstance(value, bool):
+            pure = _as_pure(node.rhs, value)
+            if not isinstance(pure.data, bool):
                 evaluator._error(node, "Unary ! requires a boolean operand")
-            return evaluator.boolean(not value)
+            return evaluator.boolean(not pure.data)
         case "~":
-            if not isinstance(value, int):
+            pure = _as_pure(node.rhs, value)
+            if not isinstance(pure.data, int) or isinstance(pure.data, bool):
                 evaluator._error(node, "Unary ~ requires an integer operand")
-            return evaluator.integer(~value)
+            return evaluator.integer(~pure.data)
 
     evaluator._error(node, f"Unsupported unary operator: {op}")
 
 
 @Evaluator.impl(expr.Compound)
-def eval_compound(evaluator: Evaluator, node: expr.Compound) -> Evaluator.EvalResult:
-    last_result: Evaluator.EvalResult | None = None
+def eval_compound(evaluator: Evaluator, node: expr.Compound) -> dom.Val:
+    last_result: dom.Val | None = None
     for component in node.components:
         last_result = evaluator.eval(component)
     if last_result is None:
@@ -233,73 +222,83 @@ def eval_compound(evaluator: Evaluator, node: expr.Compound) -> Evaluator.EvalRe
 
 
 @Evaluator.impl(expr.Apply)
-def eval_apply(evaluator: Evaluator, node: expr.Apply) -> Evaluator.EvalResult:
+def eval_apply(evaluator: Evaluator, node: expr.Apply) -> dom.Val:
     evaluator._error(node, "Apply expressions are not implemented yet")
 
 
 @Evaluator.impl(expr.Index)
-def eval_index(evaluator: Evaluator, node: expr.Index) -> Evaluator.EvalResult:
+def eval_index(evaluator: Evaluator, node: expr.Index) -> dom.Val:
     evaluator._error(node, "Index expressions are not implemented yet")
 
 
 @Evaluator.impl(expr.Member)
-def eval_member(evaluator: Evaluator, node: expr.Member) -> Evaluator.EvalResult:
+def eval_member(evaluator: Evaluator, node: expr.Member) -> dom.Val:
     evaluator._error(node, "Member expressions are not implemented yet")
 
 
-def _coerce_env(env: Mapping[str, "Evaluator.EnvValue"]) -> frozendict:
+def _coerce_env(env: Mapping[str, dom.Val]) -> frozendict[str, dom.Val]:
     if isinstance(env, frozendict):
         return env
     return frozendict(env)
 
 
-def _builtin_nominal(name: str) -> dom.Type:
-    return dom.NominalType.from_str(f"std.{name}")
+def _value_const(value: dom.Literal) -> dom.Const:
+    return dom.Const.of_literal(value)
 
 
-def _env_data(value: dom.Pure | dom.Var) -> dom.Data:
-    if hasattr(value, "data"):
-        return cast(dom.Data, getattr(value, "data"))
-    raise TypeError("Env values must carry data")
-
-
-def _throw_diagnostic(diagnostic: object) -> None:
-    if isinstance(diagnostic, Report):
-        raise Report.Exception(diagnostic).with_traceback(None)
-    if hasattr(diagnostic, "throw"):
-        diagnostic.throw()
-    raise Report.Exception(log.error("Unknown diagnostic").build()).with_traceback(None)
-
-
-def _coerce_env_value(sym: expr.Sym, value: Evaluator.EnvValue) -> Evaluator.EvalResult:
+def _as_const(node: syn.Node, value: dom.Val) -> dom.Const:
+    if isinstance(value, dom.Const):
+        return value
     if isinstance(value, dom.Pure):
-        pure = cast(dom.Pure, value)
-        return pure.type, pure.data
+        return dom.Const(type=value.type, data=value.data)
     if isinstance(value, dom.Err):
-        if value.diagnostic is not None:
-            _throw_diagnostic(value.diagnostic)
-        log.error(f"Invalid env value for {sym}").label(
-            sym, "invalid env value"
-        ).throw()
-    if isinstance(value, dom.Var):
-        type_ = value.type
-        return cast(dom.Type, type_), _env_data(value)
-    if isinstance(value, tuple) and len(value) == 2:
-        return value  # type: ignore[return-value]
+        _raise_err(value, node=node)
+    raise TypeError(f"Expected Pure value, got {type(value)}")
+
+
+def _as_pure(node: syn.Node, value: dom.Val) -> dom.Pure:
+    if isinstance(value, dom.Pure):
+        return value
+    if isinstance(value, dom.Err):
+        _raise_err(value, node=node)
+    log.error("Expected pure value").label(node, "expected pure value").throw()
+    raise TypeError("Unreachable")
+
+
+def _numeric_operand(
+    node: syn.Node,
+    value: dom.Val,
+    message: str = "Numeric operand required",
+) -> int | Decimal:
+    pure = _as_pure(node, value)
+    data = pure.data
+    if not isinstance(data, (int, Decimal)):
+        log.error(message).label(node, message).throw()
+    return data
+
+
+def _raise_err(err: dom.Err, node: syn.Node | None = None) -> None:
+    report = Report.of(err)
+    if report is not None:
+        raise Report.Exception(report).with_traceback(None)
+    message = "Invalid error value"
+    builder = log.error(message)
+    if node is not None:
+        builder = builder.label(node, message)
+    builder.throw()
+
+
+def _coerce_env_value(sym: expr.Sym, value: dom.Val) -> dom.Val:
+    if isinstance(value, dom.Err):
+        _raise_err(value, node=sym)
+    if isinstance(value, (dom.Val, dom.Pure)):
+        return value
     raise TypeError(f"Invalid env value for {sym}: {type(value)}")
 
 
-def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> Evaluator.EvalResult:
+def _coerce_scope_value(sym: expr.Sym, value: dom.Val) -> dom.Val:
     if isinstance(value, dom.Err):
-        if value.diagnostic is not None:
-            _throw_diagnostic(value.diagnostic)
-        message = f"Unbound symbol: {sym}"
-        log.error(message).label(sym, message).throw()
-    if isinstance(value, dom.Pure):
-        return value.type, value.data
-    if isinstance(value, dom.Var):
-        type_ = value.type
-        if type_ is None:
-            raise TypeError("Scope value missing type")
-        return cast(dom.Type, type_), _env_data(value)
+        _raise_err(value, node=sym)
+    if isinstance(value, dom.Val):
+        return value
     raise TypeError(f"Invalid scope value for {sym}: {type(value)}")
