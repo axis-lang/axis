@@ -60,15 +60,20 @@ class TupleBlock(syn.Block, expr.Tuple, abstract=True):
     }
 
     @classmethod
-    def build(cls, elements, *args, **kwargs):
-        children = kwargs.pop("children", ())
-        kwargs.pop("realm", None)
+    def build(
+        cls, *args, realm, children: syn.OutlineNode.Children, **kwargs
+    ):
         match args:
             case (kw, sep):
-                assert kw == cls.outline_keyword, f"Expected keyword {cls.outline_keyword}, got {kw}"
-            case (sep,):
-                pass
+                assert (
+                    kw == cls.outline_keyword
+                ), f"Expected keyword {cls.outline_keyword}, got {kw}"
             case _:
                 raise ValueError(f"Invalid args for {cls.__name__}: {args}")
-        elements = tuple(child for child in children if isinstance(child, cls.Element))
-        return cls(elements=elements, **kwargs)
+
+        return cls(
+            elements=tuple(
+                child for child in children if isinstance(child, cls.Element)
+            ),
+            **kwargs,
+        )

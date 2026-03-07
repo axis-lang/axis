@@ -10,6 +10,7 @@ from .type_ import Type
 
 class RefType(Type, abstract=True): ...
 
+
 class Ref(dom.Pure, abstract=True):
     @property
     def anchor(self) -> "Anchor":
@@ -49,8 +50,8 @@ class Anchor(Ref):
             raise ValueError("Anchor.data must have at least one segment")
 
     @classmethod
-    def root(cls, value: str) -> "Anchor":
-        return cls(data=(value, ))
+    def from_root(cls, value: str) -> "Anchor":
+        return cls(data=(value,))
 
     @classmethod
     def from_str(cls, value: str) -> "Anchor":
@@ -58,6 +59,14 @@ class Anchor(Ref):
 
     def child(self, name: str) -> "Anchor":
         return self.__class__(data=(*self.data, name))
+
+    @property
+    def root(self) -> str:
+        return self.data[0]
+
+    @property
+    def name(self) -> str:
+        return self.data[-1]
 
     @property
     def parent(self) -> Anchor | None:

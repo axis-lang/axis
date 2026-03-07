@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Optional, Self, Sequence
 
 from protobase import Inmutable, Record, cached_property, frozendict
@@ -75,7 +74,9 @@ class OutlineRule[T](Inmutable):
     @classmethod
     def from_children(cls, tag: T, children: Sequence[OutlineRule.Child[T]]) -> Self:
         # TODO: verify keyword uniqueness
-        return cls(tag=tag, children=frozendict((child.keyword, child) for child in children))
+        return cls(
+            tag=tag, children=frozendict((child.keyword, child) for child in children)
+        )
 
     @cached_property
     def child_pattern(self) -> re.Pattern:
@@ -94,7 +95,9 @@ class OutlineRule[T](Inmutable):
             return None
 
         if m := line.match(self.child_pattern, pos):
-            assert m.lastindex is not None, f"Pattern must have at least one group {self.child_pattern}"
+            assert (
+                m.lastindex is not None
+            ), f"Pattern must have at least one group {self.child_pattern}"
             return self.child_tags[m.lastindex - 1]
         return None
 
@@ -165,7 +168,7 @@ class OutlineSpec[T](Inmutable):
             line_matched = False
 
             for entry in reversed_stack():
-                #print("TRY", line, entry.rule.tag, repr(entry.identation), repr(line.content))
+                # print("TRY", line, entry.rule.tag, repr(entry.identation), repr(line.content))
 
                 if not line.startswith(entry.identation):
                     continue
@@ -197,7 +200,7 @@ class OutlineSpec[T](Inmutable):
 # if __name__ == "__main__":
 #     from rich import print
 
-    #     class Elem(Inmutable):
+#     class Elem(Inmutable):
 #         keyword: str
 #         keyword_sep: str = " \t"
 
@@ -247,13 +250,13 @@ class OutlineSpec[T](Inmutable):
 #             alpha documentation
 
 #         def foo
-#             --- 
+#             ---
 #             foo documentation
 #         where:
 #             val alpha: Natural = 42
 
 #         def bar
-#             --- 
+#             ---
 #             bar documentation
 #         where:
 #             val beta: Natural = 42

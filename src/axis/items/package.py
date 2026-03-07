@@ -59,7 +59,7 @@ if __name__ == "__main__":
             print(syn.Expr.from_str(value))
 
         print("realm.entities", len(entities))
-        print("realm.members", len(realm.members_by_anchor))
+        print("realm.members", len(realm.namespaces_by_anchor))
         print("realm.anchors", tuple(dom.ref_segments(ref) for ref in entities))
 
         def find_entity(*segments):

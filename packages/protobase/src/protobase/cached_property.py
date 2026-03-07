@@ -2,8 +2,8 @@
 
 from types import GenericAlias
 from typing import Any, Callable, Generic, Literal, Self, TypeVar, overload
-from weakref import WeakKeyDictionary
 
+from .weak import WeakKeyIdDictionary
 from .object import slots_of
 from .type import Type
 
@@ -72,7 +72,7 @@ class cached_property(Generic[T]):
         self.func = func
         self.__doc__ = func.__doc__
         self.__module__ = func.__module__
-        self._cache: WeakKeyDictionary[object, T] = WeakKeyDictionary()
+        self._cache: WeakKeyIdDictionary[object, T] = WeakKeyIdDictionary()
 
     def __set_name__(self, owner, name):
         if not _has_weakref_slot(owner):

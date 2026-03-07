@@ -1,0 +1,12 @@
+unit test
+
+use std.io(
+    a: String,
+    b: String
+)
+
+
+
+def Person
+takes:
+    val name: String

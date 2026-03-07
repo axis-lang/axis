@@ -21,13 +21,17 @@ class Entity(Consed):
     # ) -> "Entity":
     #     return cls(anchor=anchor, contributions=frozenset(contributions))
 
+    class Bucket(Consed):
+        def check(self):
+            pass
+
     class SpecContribution(Context.Contribution):
         class SpecBinding(Context.Binding):
             pass
 
         spec: dom.Struct[str, SpecBinding] = _
 
-    class SpecBucket(Consed):
+    class SpecBucket(Bucket):
         specs: frozenset[Entity.SpecContribution]
 
         @flux.property
@@ -46,12 +50,12 @@ class Entity(Consed):
 
         params: dom.Struct[str, ParamBinding] = _
 
-    class OverloadBucket(Consed):
+    class OverloadBucket(Bucket):
         overloads: frozenset[Entity.OverloadContribution]
 
-        @flux.property
-        def impl_by_result(self) -> frozendict[syn.Expr | None, Entity.ImplBucket]:
-            return _impl_by_result_bucket(self.overloads)
+        # @flux.property
+        # def impl_by_result(self) -> frozendict[syn.Expr | None, Entity.ImplBucket]:
+        #     return _impl_by_result_bucket(self.overloads)
 
     @flux.property
     def overload_by_shape(self) -> frozendict[dom.Struct.Shape, OverloadBucket]:
@@ -64,13 +68,19 @@ class Entity(Consed):
             if self.returns is None:
                 log.warn("ImplContribution without returns").label(self.origin).emit()
 
-    class ImplBucket(Consed):
-        impls: frozenset[Entity.ImplContribution]
+    # class ImplBucket(Bucket):
+    #     impls: frozenset[Entity.ImplContribution]
 
-    @flux.property
-    def impl_by_result(self) -> frozendict[syn.Expr | None, ImplBucket]:
-        return _impl_by_result_bucket(self.contributions)
+    # @flux.property
+    # def impl_by_result(self) -> frozendict[syn.Expr | None, ImplBucket]:
+    #     return _impl_by_result_bucket(self.contributions)
 
+
+    @flux.method
+    def check(self):
+        pass
+
+        
 
 def _spec_by_shape_bucket(
     contributions: frozenset[Context.Contribution],

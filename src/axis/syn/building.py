@@ -14,7 +14,7 @@ from antlr4 import (
     Token,
 )
 from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl, ParseTree
-from protobase import Inmutable, mutate, is_abstract
+from protobase import Inmutable, mutate, is_abstract, _
 
 from axis import src, syn
 from ..literals import Wildcard
@@ -158,11 +158,11 @@ class Builder(Inmutable):
 
 
 class FromSrcMixin(Inmutable, abstract=True):
-    __slots__ = ("__weakref__",)
-
     grammar_context_infix: ClassVar[str] = ""
     grammar_context_name: ClassVar[str]
     grammar_parser_name: ClassVar[str]
+
+    #span: src.Source.Span | None = None
 
     @classmethod
     def __class_post_build__(cls):

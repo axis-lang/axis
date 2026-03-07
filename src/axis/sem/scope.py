@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from protobase import Consed, frozendict
+from protobase import Consed, frozendict, Record
 
 from axis import dom, expr, syn
 from axis.log import report as log
@@ -13,58 +13,42 @@ class Scope(Consed):
     parent: Optional["Scope"] = None
     bindings: frozendict[str, dom.Val] = frozendict()
 
-    class Builder:
-        def __init__(self, name: str | None = None, parent: Optional["Scope"] = None):
-            self.name = name
-            self.parent = parent
-            self.bindings: dict[str, dom.Val] = {}
-            self.origins: dict[str, syn.Node] = {}
+    class Builder(Record):
+        name: str | None = None
+        parent: Scope | None = None
+        bindings: dict[str, dict[dom.Val, set[syn.Node]]] = {}
 
         def define(
             self,
-            sym: expr.Sym,
+            name: str,
             value: dom.Val,
             *,
-            origin: syn.Node | None = None,
+            origin: syn.Node,
         ) -> None:
-            name = sym.name
-            if name in self.bindings:
-                report = log.error(f"Name collision: {name}")
-                primary_origin = sym if sym.span is not None else (origin or sym)
-                report = report.label(
-                    primary_origin,
-                    "conflicting definition",
-                    style=log.Report.LabelStyle.PRIMARY,
-                )
-                previous_origin = self.origins.get(name)
-                if previous_origin is not None:
-                    report = report.label(
-                        previous_origin,
-                        "previous definition",
-                        style=log.Report.LabelStyle.SECONDARY,
-                    )
-                report.emit()
-                self.bindings[name] = dom.Err(diagnostic=report.build())
-                return
-
-            self.bindings[name] = value
-            if origin is None:
-                origin = sym
-            self.origins.setdefault(name, origin)
-
-        def extend(self, parent: Optional["Scope"]) -> None:
-            self.parent = parent
+            self.bindings.setdefault(name, {}).setdefault(value, set()).add(origin)
 
         def build(self) -> "Scope":
+
+            bindings: dict[str, dom.Val] = {}
+            for name, val_by_origin in self.bindings.items():
+                first, *more = val_by_origin.keys()
+                if more:
+                    report = log.error(f"Name conflict: {name}")
+                    for val, origins in val_by_origin.items():
+                        report.labels(origins, f"conflicting definition: {val}")
+                    bindings[name] = report.show().emit().tag(dom.Err())
+                else:
+                    bindings[name] = first
+
             return Scope(
                 name=self.name,
                 parent=self.parent,
-                bindings=frozendict(self.bindings),
+                bindings=frozendict(bindings),
             )
 
     def lookup(self, sym: expr.Sym) -> dom.Val:
         if sym.at:
-            scope = self._find_scope(sym.at)
+            scope = _find_scope(self, sym.at)
             if scope is None:
                 return (
                     log.error(f"Scope not found: {sym.at}")
@@ -85,10 +69,10 @@ class Scope(Consed):
             .tag(dom.Err())
         )
 
-    def _find_scope(self, name: str) -> Optional["Scope"]:
-        current: Optional[Scope] = self
-        while current is not None:
-            if current.name == name:
-                return current
-            current = current.parent
-        return None
+def _find_scope(current: Scope | None, name: str) -> Optional["Scope"]:
+    #current: Optional[Scope] = self
+    while current is not None:
+        if current.name == name:
+            return current
+        current = current.parent
+    return None

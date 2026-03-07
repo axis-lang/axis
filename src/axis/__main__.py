@@ -2,7 +2,7 @@
 from time import sleep
 from cyclopts import App
 from protobase import flux
-from axis import items, log, src
+from axis import items, log, src, dom, expr, syn, sem
 from IPython import embed
 from rich import print
 
@@ -10,10 +10,7 @@ app = App()
 
 
 def collect_reports(pkg: items.Package) -> tuple[log.Report, ...]:
-    try:
-        _ = pkg.entities_by_anchor
-    except Exception as e:
-        print(e)
+    pkg.check()
     diagnostics = flux.collect_all(cls=log.Report)
     return tuple(diag for diag in diagnostics if isinstance(diag, log.Report))
 

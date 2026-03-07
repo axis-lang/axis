@@ -1,12 +1,13 @@
 #%%
 from typing import Any, ClassVar, Self, cast
-from weakref import WeakKeyDictionary
+
 from protobase.object import Object
 from protobase.type import Type
+from protobase.weak import WeakKeyIdDictionary
 
 class Metadata[T=Any](Object, abstract=True):
     __slots__ = "__weakref__",
-    __storage__: ClassVar[WeakKeyDictionary[object, object]]
+    __storage__: ClassVar[WeakKeyIdDictionary[object, object]]
     
     @staticmethod
     def __class_build__(bld: Type.Builder):  # Type.Proto
@@ -30,7 +31,7 @@ class Metadata[T=Any](Object, abstract=True):
         def post(cls):
             if hub:
                 cls.__hub_class__ = cls
-                cls.__storage__ = WeakKeyDictionary()
+                cls.__storage__ = WeakKeyIdDictionary()
 
     @classmethod
     def of(cls, obj: T) -> Self | None:
@@ -52,4 +53,3 @@ class Metadata[T=Any](Object, abstract=True):
     #     storage = type(self).__storage__
     #     for obj in objs:
     #         storage[obj] = self
-

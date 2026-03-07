@@ -1,22 +1,19 @@
 from typing import ClassVar, Literal, Self
 
-from protobase import Inmutable
+from protobase import Inmutable, frozendict
+from protobase.cached_property import slot_cached_property
 
-from axis import dom, expr, syn
+from axis import dom, expr, sem, syn
 
 
 class Use(syn.Block, Inmutable):
-    """
-    Represents a 'use' entity:
-    use x
-    """
 
     outline_keyword: ClassVar[str] = "use"
-    #grammar: ClassVar[str] = "use: 'use' expression EOF;"
+    # grammar: ClassVar[str] = "use: 'use' expression EOF;"
 
     import_expr: syn.Expr
 
-    type Entry = tuple[expr.Sym | expr.Lit, dom.Ref | None] 
+    type Entry = tuple[expr.Sym | expr.Lit, dom.Anchor | None]
 
     @classmethod
     def build(
@@ -29,7 +26,7 @@ class Use(syn.Block, Inmutable):
     ) -> Self:
         return cls(import_expr=import_expr)
 
-    @property
+    @slot_cached_property
     def entries(self) -> frozenset[Entry]:
         entries: list[Use.Entry] = []
 
@@ -42,16 +39,21 @@ class Use(syn.Block, Inmutable):
                     for element in elements:
                         walk(element, current_anchor)
                 case expr.Tuple.Positional(value=elem_value):
-                    #if elem_value is None: return
-                    if isinstance(elem_value, expr.Lit) and elem_value.value is Ellipsis:
-                        #if current_anchor is not None:
+                    # if elem_value is None: return
+                    if (
+                        isinstance(elem_value, expr.Lit)
+                        and elem_value.value is Ellipsis
+                    ):
+                        # if current_anchor is not None:
                         entries.append((elem_value, current_anchor))
                         return
                     walk(elem_value, current_anchor)
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
-                    alias = expr.as_sym(alias_expr)
-                    scope = current_anchor.anchor if current_anchor is not None else None
+                    alias = expr.to_sym(alias_expr)
+                    scope = (
+                        current_anchor.anchor if current_anchor is not None else None
+                    )
                     target_anchor = expr.as_anchor(key, scope)
                     if target_anchor is None:
                         return
@@ -59,12 +61,32 @@ class Use(syn.Block, Inmutable):
                 case expr.Lit() as lit if lit.value is Ellipsis:
                     entries.append((lit, current_anchor))
                 case syn.Expr() as expr_node:
-                    scope = current_anchor.anchor if current_anchor is not None else None
+                    scope = (
+                        current_anchor.anchor if current_anchor is not None else None
+                    )
                     target_anchor = expr.as_anchor(expr_node, scope)
-                    alias = expr.as_sym(expr_node)
+                    alias = expr.to_sym(expr_node)
                     entries.append((alias, target_anchor))
                 case _:
                     return
 
         walk(self.import_expr, None)
         return frozenset(entries)
+
+    def _contribute_to_scope(
+        self,
+        scope_builder: sem.Scope.Builder,
+        namespaces: sem.Namespaces,
+    ):
+        for alias, target in self.entries:
+            if target is None:
+                # ocurre cuando "use ..."
+                continue
+            match alias:
+                case expr.Lit() as lit if lit.is_ellipsis:
+                    # wildcard import
+                    for resolved_target in namespaces.get(target, ()):
+                        scope_builder.define(resolved_target.name, resolved_target, origin=lit)
+                    pass
+                case expr.Sym(name=name) as sym:
+                    scope_builder.define(name, target, origin=sym)

@@ -43,11 +43,12 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
     for element in block_expr.elements:
         match element:
             case expr.Tuple.Nominal(key=key, bound=bound, value=value):
-                if bound is None:
-                    log.error("Tuple element requires a bound").label(element).throw()
-                assert bound is not None
-                sym = expr.as_sym(key)
-                var = binding_cls(sym=sym, bound=bound, default=value)
+                # if bound is None:
+                #     log.error("Tuple element requires a bound").label(element).throw()
+                # assert bound is not None
+                sym = expr.to_sym(key)
+
+                var = binding_cls(sym=key, bound=bound, default=value)
                 entries.append((expr.to_slot_name(key), var))
             case _:
                 log.error("Unsupported tuple element in block").label(element).throw()
@@ -222,10 +223,11 @@ class SymDef(Def, abstract=True):
 
     @slot_cached_property
     def anchor(self) -> dom.Anchor:
-        anchor = expr.as_anchor(self.sym, self.parent.anchor if self.parent else None)
-        if anchor is None:
-            raise ValueError("ClassDef requires a valid sym to build its anchor")
-        return anchor
+        return expr.as_anchor(self.sym, self.parent.anchor if self.parent else None)
+
+    @slot_cached_property
+    def name(self) -> str | None:
+        return self.anchor.name
 
 
 # class CastDef(Def):

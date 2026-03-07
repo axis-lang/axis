@@ -20,10 +20,7 @@ class SourceFile(Consed, Source):
         return self.path.name
 
     def __str__(self) -> str:
-        return f"[{self.source_dir.name}]{self.path}"
-
-    def __repr__(self) -> str:
-        return str(self)
+        return str(self.path)
 
     @flux.property  # type: ignore[override]
     def content(self) -> str:

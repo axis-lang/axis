@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from typing import Iterable
 from protobase import Consed, flux, frozendict
 
 from axis import dom
@@ -7,6 +7,7 @@ from axis import dom
 from .context import Context
 from .entity import Entity
 
+type Namespaces = frozendict[dom.Anchor, frozenset[dom.Anchor]]
 
 class Realm(Consed, abstract=True):
 
@@ -38,13 +39,13 @@ class Realm(Consed, abstract=True):
         return frozenset(self.contributions_by_anchor.keys())
 
     @flux.property
-    def members_by_anchor(self) -> frozendict[dom.Anchor, frozenset[dom.Anchor]]:
-        members: dict[dom.Anchor, set[dom.Anchor]] = {}
+    def namespaces_by_anchor(self) -> Namespaces:
+        namespaces: dict[dom.Anchor, set[dom.Anchor]] = {}
         for anchor in self.all_anchors:
             if (parent := anchor.parent) is not None:
-                members.setdefault(parent, set()).add(anchor)
+                namespaces.setdefault(parent, set()).add(anchor)
         return frozendict(
-            (parent, frozenset(children)) for parent, children in members.items()
+            (parent, frozenset(children)) for parent, children in namespaces.items()
         )
 
     @flux.property
@@ -54,6 +55,10 @@ class Realm(Consed, abstract=True):
             for anchor, contributions in self.contributions_by_anchor.items()
         )
 
+    @property
+    def all_entities(self) -> Iterable[Entity]:
+        return self.entities_by_anchor.values()
+
     def __getitem__(self, anchor: dom.Anchor|str) -> Entity:
         if isinstance(anchor, str):
             anchor = dom.Anchor.from_str(anchor)
@@ -62,3 +67,14 @@ class Realm(Consed, abstract=True):
             raise KeyError(f"Anchor {anchor} not found in realm")
         
         return self.entities_by_anchor[anchor]
+    
+
+
+    @flux.method
+    def check(self):
+        for contribution in self.all_contexts:
+            contribution.check()
+        for contribution in self.all_contributions:
+            contribution.check()
+        for entity in self.all_entities:
+            entity.check()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 
-from typing import NoReturn, Optional, Self, Sequence
+from typing import NoReturn, Optional, Self, Iterable
 
 from protobase import Inmutable, Metadata, Record, flux, mutate
 from rich import print
@@ -69,7 +69,7 @@ class Report(Inmutable, Metadata[dom.Val]):
 
         def labels(
             self,
-            nodes: Sequence[syn.Node],
+            nodes: Iterable[syn.Node],
             message: Optional[str] = None,
             style: Optional["Report.LabelStyle"] = None,
         ) -> "Report.Builder":
@@ -115,8 +115,8 @@ class Report(Inmutable, Metadata[dom.Val]):
                 suggestion=self._suggestion,
             )
 
-        def tag[N: syn.Node](self, ast: N, *args, **kwargs) -> N:
-            return self.build().tag(ast, *args, **kwargs)
+        def tag[V: dom.Val](self, val: V, *args, **kwargs) -> V:
+            return self.build().tag(val, *args, **kwargs)
 
         def show(self, *args, **kwargs):
             return self.build().show(*args, **kwargs)
@@ -143,7 +143,10 @@ class Report(Inmutable, Metadata[dom.Val]):
             return flux.emit(self)
         if or_show:
             return self.show()
-        raise RuntimeError("Report emitted without being in a query context. ")
+        try:
+            self.throw(and_show=False)
+        except Report.Exception as e:
+            raise RuntimeError("Report emitted without being in a query context. ") # from e
 
     def throw(self, and_show=True) -> NoReturn:
         if and_show:
