@@ -5,103 +5,79 @@ from typing import ClassVar, Literal, Optional
 from protobase import flux, _, slot_cached_property
 
 
-from axis import dom, expr, syn
-from axis.log import report as log
-from axis.sem import Entity, ParamVar, Scope, SpecVar, Var
+from axis import dom, expr, syn, sem, log
 
 from ..blocks import TupleBlock
 from ..item import Item
 
-def _emit_diag(message: str, node: syn.Node | None) -> None:
-    log.error(message).label(node).emit()
 
-
-def _throw_diag(message: str, node: syn.Node | None) -> None:
-    log.error(message).label(node).throw()
-
-
-def _element_name(element: expr.Tuple.Element) -> str:
-    match element:
-        case expr.Tuple.Nominal(key=key):
-            return expr.to_slot_name(key)
-        case expr.Tuple.Positional(value=value):
-            if value is None:
-                _throw_diag("Positional element requires a value", element)
-            assert value is not None
-            return expr.name_of(value)
-        case _:
-            _throw_diag("Unsupported tuple element", element)
-    raise ValueError("Unreachable")
-
-
-def _inline_prefix(
-    inline_expr: expr.Tuple,
-) -> tuple[tuple[expr.Tuple.Element, ...], bool]:
-    elements = inline_expr.elements
-    spread_index: int | None = None
-    for index, element in enumerate(elements):
-        if element.is_spread:
-            if index != len(elements) - 1:
-                _throw_diag("Variadic marker must be final element", element)
-            spread_index = index
-            break
-    if spread_index is None:
-        return elements, False
-    return elements[:spread_index], True
-
-
-def merge_inline_block_tuple(
+def merge_inline_block_tuple[B: sem.Context.Binding](
     inline_expr: expr.Tuple | None,
     block_expr: expr.Tuple | None,
     *,
-    var_cls: type[Var],
-) -> dom.Struct[str, Var]:
+    binding_cls: type[B],
+) -> dom.Struct[str, B]:
+    """Merge inline and block tuples into binding structs, enforcing prefix rules."""
     if block_expr is None:
         if inline_expr is not None:
-            _emit_diag("Inline tuple ignored; block required", inline_expr)
+            log.error("Inline tuple ignored; block required").label(inline_expr).emit()
         return dom.Struct.from_keys((), ())
 
     if inline_expr is not None:
-        prefix, variadic = _inline_prefix(inline_expr)
+        prefix, variadic = inline_expr.inline_prefix
         if not variadic and len(block_expr.elements) != len(prefix):
-            _throw_diag("Block must match inline prefix exactly", block_expr)
+            log.error("Block must match inline prefix exactly").label(
+                block_expr
+            ).throw()
         if variadic and len(block_expr.elements) < len(prefix):
-            _throw_diag("Block shorter than inline prefix", block_expr)
+            log.error("Block shorter than inline prefix").label(block_expr).throw()
         for index, prefix_elem in enumerate(prefix):
             block_elem = block_expr.elements[index]
-            if _element_name(prefix_elem) != _element_name(block_elem):
-                _throw_diag("Inline prefix does not match block", block_elem)
+            if prefix_elem.name != block_elem.name:
+                log.error("Inline prefix does not match block").label(
+                    block_elem
+                ).throw()
 
     keys: list[str | None] = []
-    values: list[Var] = []
+    values: list[B] = []
     for element in block_expr.elements:
         match element:
             case expr.Tuple.Nominal(key=key, bound=bound, value=value):
                 if bound is None:
-                    _throw_diag("Tuple element requires a bound", element)
+                    log.error("Tuple element requires a bound").label(element).throw()
                 assert bound is not None
                 sym = expr.as_sym(key)
-                var = var_cls(sym=sym, bound=bound, default=value)
+                var = binding_cls(sym=sym, bound=bound, default=value)
                 keys.append(expr.to_slot_name(key))
                 values.append(var)
             case _:
-                _throw_diag("Unsupported tuple element in block", element)
+                log.error("Unsupported tuple element in block").label(element).throw()
 
     return dom.Struct.from_keys(tuple(keys), tuple(values))
 
 
 def unify_spec_where(
     inline_expr: expr.Tuple | None, block_expr: Def.Where | None
-) -> dom.Struct[str, Var]:
+) -> dom.Struct[str, sem.Entity.SpecContribution.SpecBinding]:
+    """Resolve where blocks into a spec struct, combining inline+block forms."""
     block_tuple = block_expr if block_expr is not None else None
-    return merge_inline_block_tuple(inline_expr, block_tuple, var_cls=SpecVar)
+    return merge_inline_block_tuple(
+        inline_expr,
+        block_tuple,
+        binding_cls=sem.Entity.SpecContribution.SpecBinding,
+    )
 
 
 def unify_args_takes(
     inline_expr: expr.Tuple | None, block_expr: Def.Takes | None
-) -> dom.Struct[str, Var]:
+) -> dom.Struct[str, sem.Entity.OverloadContribution.ParamBinding]:
+    """Resolve takes blocks into a params struct, combining inline+block forms."""
     block_tuple = block_expr if block_expr is not None else None
-    return merge_inline_block_tuple(inline_expr, block_tuple, var_cls=ParamVar)
+    return merge_inline_block_tuple(
+        inline_expr,
+        block_tuple,
+        binding_cls=sem.Entity.OverloadContribution.ParamBinding,
+    )
 
 
 class Def(Item, syn.ClassMatcher):
@@ -206,9 +182,9 @@ class Def(Item, syn.ClassMatcher):
 
         return self
 
-    @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
-        raise NotImplementedError("Def.contributions must be implemented per subclass")
+    # @flux.property
+    # def contributions(self) -> frozenset[sem.Context.Contribution]:
+    #     raise NotImplementedError("Def.contributions must be implemented per subclass")
 
     # @flux.property
     # def scope(self) -> Scope:
@@ -236,6 +212,7 @@ class Def(Item, syn.ClassMatcher):
 
 
 class SymDef(Def, abstract=True):
+    "definicion simbolica con un sym como ancla, como class o func"
 
     sym: expr.Sym = _
 
@@ -247,15 +224,15 @@ class SymDef(Def, abstract=True):
         return anchor
 
 
-class CastDef(Def):
-    match_patterns: ClassVar = (
-        syn.Expr.from_str("$from_ -> $to"),
-        syn.Expr.from_str("$from_ => $to"),
-    )
+# class CastDef(Def):
+#     match_patterns: ClassVar = (
+#         syn.Expr.from_str("$from_ -> $to"),
+#         syn.Expr.from_str("$from_ => $to"),
+#     )
 
-    from_: syn.Expr | None = None
-    to: syn.Expr | None = None
+#     from_: syn.Expr | None = None
+#     to: syn.Expr | None = None
 
-    @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
-        return frozenset()
+#     @flux.property
+#     def contributions(self) -> frozenset[Entity.Contribution]:
+#         return frozenset()

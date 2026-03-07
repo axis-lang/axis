@@ -3,7 +3,7 @@ import argparse
 from time import sleep
 from rich import print
 from protobase import flux
-from axis import src, dom, sem, syn, val, items, expr
+from axis import src, dom, sem, syn, val, items, expr, log
 from IPython import embed
 
 parser = argparse.ArgumentParser(description="Axis package debug runner")
@@ -33,18 +33,18 @@ args = parser.parse_args()
 
 pkg = items.Package.from_path(args.package)
 
-def collect_diagnostics() -> tuple[src.Diagnostic, ...]:
+def collec_reports() -> tuple[log.Report, ...]:
     try:
-        _ = pkg.database
+        _ = pkg.entities_by_anchor
     except Exception:
         pass
-    diagnostics = flux.collect_all(cls=src.Diagnostic)
-    return tuple(diag for diag in diagnostics if isinstance(diag, src.Diagnostic))
+    diagnostics = flux.collect_all(cls=log.Report)
+    return tuple(diag for diag in diagnostics if isinstance(diag, log.Report))
 
 
-pkg.database
-for diag in collect_diagnostics():
-    diag.emit()
+pkg.entities_by_anchor
+for report in collec_reports():
+    report.show()
 
 
 if args.repl:
@@ -54,7 +54,7 @@ if args.repl:
     @watch.on_change
     def collect_and_show_diagnostics() -> None:
         sleep(0.5)
-        for diag in collect_diagnostics():
+        for diag in collec_reports():
             diag.emit()
 
         #diagnostics = collect_diagnostics()

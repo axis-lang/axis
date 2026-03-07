@@ -5,7 +5,7 @@ from protobase import slot_cached_property, cached_property
 
 
 
-class Item(sem.Entity.Context['Item'], abstract=True):
+class Item(sem.Context['Item'], abstract=True):
 
     @slot_cached_property 
     def anchor(self) -> dom.Anchor:

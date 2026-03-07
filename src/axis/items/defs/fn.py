@@ -7,7 +7,7 @@ from protobase import flux, _
 
 from axis import dom, expr, syn
 from axis.log import report as log
-from axis.sem import Entity
+from axis.sem import Context
 
 from .base import SymDef, unify_args_takes, unify_spec_where
 
@@ -31,9 +31,9 @@ class FnDef(SymDef):
     ctx: syn.Expr | None = None
 
     @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
+    def contributions(self) -> frozenset[Context.Contribution]:
         return frozenset(
-            Entity.ImplContribution(
+            Context.ImplContribution(
                 anchor=self.anchor,
                 spec=unify_spec_where(self.spec, where),
                 params=unify_args_takes(self.args, takes),
@@ -47,13 +47,14 @@ class FnDef(SymDef):
                 self.returns or (None,),
             )
         )
+    
 
 
 def merge_returns(
     inline_expr: syn.Expr | None,
     block: FnDef.Returns | None,
     def_: FnDef,
-) -> syn.Expr:
+) -> syn.Expr | None:
     if block is not None and block.expr is not None:
         if inline_expr is None:
             return block.expr
@@ -72,80 +73,3 @@ def merge_returns(
         .label(def_.origin, "missing return")
         .emit()
     )
-    return syn.Expr.from_str("None")
-
-    # @flux.property
-    # def contributions(self) -> frozenset[Entity.Contribution]:
-    #     if self.origin is None:
-    #         return frozenset()
-
-    #     anchor: dom.Anchor | None
-    #     if self.ctx is not None:
-    #         base = expr.to_anchor_ref(self.ctx, self.anchor)
-    #         if base is None or self.sym is None:
-    #             return frozenset()
-    #         anchor = base.child(self.sym.name)
-    #     else:
-    #         base_expr = self.sym if self.sym is not None else self.origin
-    #         anchor = expr.to_anchor_ref(base_expr, self.anchor)
-
-    #     if anchor is None:
-    #         return frozenset()
-
-    #     contributions: list[Entity.Contribution] = []
-    #     if self.anchor is not None:
-    #         contributions.append(
-    #             Entity.Member(
-    #                 anchor=self.anchor,
-    #                 name=expr.name_of(self.origin),
-    #                 target=anchor,
-    #                 origin=self.origin,
-    #                 ctx=self,
-    #             )
-    #         )
-
-    #     spec_struct = unify_spec_where(self.spec, self.where)
-
-    #     returns: list[syn.Expr] = []
-    #     if self.ret is not None:
-    #         returns.append(self.ret)
-    #     for ret in self.returns:
-    #         if ret.expr is not None:
-    #             returns.append(ret.expr)
-
-    #     if not returns:
-    #         report = log.error("FnDef requires a return expression").label(
-    #             self.origin, "missing return"
-    #         )
-    #         report.emit()
-    #         return frozenset()
-
-    #     if self.takes:
-    #         for takes in self.takes:
-    #             params_struct = unify_args_takes(self.args, takes)
-    #             for ret in returns:
-    #                 contributions.append(
-    #                     Entity.ImplContribution(
-    #                         anchor=anchor,
-    #                         spec=spec_struct,
-    #                         params=params_struct,
-    #                         returns=ret,
-    #                         origin=ret,
-    #                         ctx=self,
-    #                     )
-    #                 )
-    #     else:
-    #         params_struct = unify_args_takes(self.args, None)
-    #         for ret in returns:
-    #             contributions.append(
-    #                 Entity.ImplContribution(
-    #                     anchor=anchor,
-    #                     spec=spec_struct,
-    #                     params=params_struct,
-    #                     returns=ret,
-    #                     origin=ret,
-    #                     ctx=self,
-    #                 )
-    #             )
-
-    #     return frozenset(contributions)

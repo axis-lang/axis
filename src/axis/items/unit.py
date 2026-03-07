@@ -3,8 +3,6 @@ from typing import ClassVar, cast
 from protobase import flux
 
 from axis import dom, expr
-from axis.sem import Entity
-
 from .mod import Mod
 
 class Unit(Mod):

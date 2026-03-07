@@ -1,7 +1,6 @@
 from typing import Self
 from axis import syn
-from .sym import Sym
-from .tuple import Tuple
+from .tuple_ import Tuple
 
 class Apply(syn.Expr):
     function: syn.Expr

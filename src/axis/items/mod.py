@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar, cast, Literal, Self
 
-from protobase import flux, _, slot_cached_property
+from protobase import flux, _, slot_cached_property, frozendict
 
 from axis import dom, expr, syn, sem, log
 #from axis.sem import Entity, Scope
@@ -49,7 +49,7 @@ class Mod(Item):
         return cast(dom.Anchor, ref)
 
     @flux.property
-    def contributions(self) -> frozenset[sem.Entity.Contribution]:
+    def contributions(self) -> frozenset[sem.Context.Contribution]:
         # contributions: list[sem.Entity.Contribution] = []
         # contributions.append(
         #     sem.Entity.Member(
@@ -70,21 +70,27 @@ class Mod(Item):
         if realm is None:
             return builder.build()
 
-        db = realm.database
+        members_by_anchor = realm.members_by_anchor
         for use in self.uses:
             for name, ref in use.entries:
                 if isinstance(name, expr.Lit) and name.value is Ellipsis:
+                    if ref is None:
+                        continue
                     for member_name, member_ref in _namespace_members(
-                        db, ref.anchor
+                        members_by_anchor, ref.anchor
                     ).items():
                         sym = expr.Sym(name=member_name).with_span_of(name)
-                        builder.define(sym, member_ref)
+                        builder.define(sym, cast(dom.Val, member_ref))
                     continue
-                builder.define(cast(expr.Sym, name), ref)
+                if ref is None:
+                    continue
+                builder.define(cast(expr.Sym, name), cast(dom.Val, ref))
 
         if self.path is not None:
-            for name, ref in _namespace_members(db, self.ref).items():
-                builder.define(expr.Sym(name=name), ref)
+            for name, ref in _namespace_members(
+                members_by_anchor, self.ref
+            ).items():
+                builder.define(expr.Sym(name=name), cast(dom.Val, ref))
 
         return builder.build()
 
@@ -96,11 +102,12 @@ class Mod(Item):
     #         return val.Ref.from_expr(self.item.path, base_ref=self.parent.ref)
 
 
-def _namespace_members(db, scope_ref: dom.Anchor) -> dict[str, dom.Ref]:
-    members: dict[str, dom.Ref] = dict(db.members_by_scope.get(scope_ref, {}))
-    for ref in db.entities_by_ref:
-        parent = ref.anchor.parent
-        if parent is not None and parent == scope_ref:
-            name = ref.anchor.data[-1]
-            members.setdefault(name, ref)
+def _namespace_members(
+    members_by_anchor: frozendict[dom.Anchor, frozenset[dom.Anchor]],
+    scope_ref: dom.Anchor,
+) -> dict[str, dom.Ref]:
+    members: dict[str, dom.Ref] = {}
+    for anchor in members_by_anchor.get(scope_ref, frozenset()):
+        name = anchor.data[-1]
+        members.setdefault(name, anchor)
     return members

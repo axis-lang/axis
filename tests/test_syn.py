@@ -137,15 +137,16 @@ class ProjectionMatchTest(unittest.TestCase):
 class DatabaseSmokeTest(unittest.TestCase):
     def test_database_build(self):
         pkg = items.Package.from_path("codebase/std.core")
-        db = pkg.database
-        self.assertGreater(len(db.entities_by_ref), 0)
-        self.assertGreater(len(db.members_by_scope), 0)
+        entities = pkg.entities_by_anchor
+        members = pkg.members_by_anchor
+        self.assertGreater(len(entities), 0)
+        self.assertGreater(len(members), 0)
 
     def test_database_is_cached(self):
         pkg = items.Package.from_path("codebase/std.core")
-        db1 = pkg.database
-        db2 = pkg.database
-        self.assertIs(db1, db2)
+        entities_1 = pkg.entities_by_anchor
+        entities_2 = pkg.entities_by_anchor
+        self.assertIs(entities_1, entities_2)
 
 
 # def test_parser(self):

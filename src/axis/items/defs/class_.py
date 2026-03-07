@@ -5,8 +5,7 @@ from typing import ClassVar, Optional, cast
 from itertools import product
 from protobase import flux, slot_cached_property, _
 
-from axis import dom, expr, syn
-from axis.sem import Entity
+from axis import dom, expr, log, syn, sem
 
 from .base import SymDef, unify_args_takes, unify_spec_where
 
@@ -28,9 +27,9 @@ class ClassDef(SymDef):
     args: expr.Tuple | None = None
 
     @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
+    def contributions(self) -> frozenset[sem.Context.Contribution]:
         return frozenset(
-            Entity.OverloadContribution(
+            sem.Entity.OverloadContribution(
                 anchor=self.anchor,
                 spec=unify_spec_where(self.spec, where),
                 params=unify_args_takes(self.args, takes),
@@ -43,3 +42,7 @@ class ClassDef(SymDef):
                 #self.returns or (None,),
             )
         )
+    
+    def __invariant__(self):
+        if len(self.returns) > 0:
+            log.warn("ClassDef should not have returns").label(self.origin).emit()

@@ -15,6 +15,37 @@ modelo de datos canónico. El flujo general separa estrictamente:
 
 ## Arquitectura (src/axis)
 
+```mermaid
+flowchart TD
+	subgraph core
+	DOM
+	FS
+	SEM
+	LOG
+	SYN
+
+	SYN --> SEM
+	SYN --> LOG
+
+	end
+
+	subgraph impl
+	EXPR
+	ITEM
+	end
+
+	LOG --> EXPR
+	LOG --> ITEM
+
+
+	SYN --> EXPR
+	SYN --> ITEM
+	SEM --> ITEM
+
+        FS --> ITEM
+
+```
+
 - `src/axis/syn/`: AST, builder, outline y gramática ANTLR
 - `src/axis/expr/`: nodos de expresión + matcher/reifier
 - `src/axis/items/`: items, bloques y parsing de unidades

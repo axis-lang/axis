@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 
-from typing import NoReturn, Optional, Self
+from typing import NoReturn, Optional, Self, Sequence
 
 from protobase import Inmutable, Metadata, Record, flux, mutate
 from rich import print
@@ -56,15 +56,25 @@ class Report(Inmutable, Metadata[dom.Val]):
             return span.source
 
     class Builder(Record):
-        severity: "Report.Severity"
-        message: str
-        code_value: Optional[str] = None
-        labels: list["Report.Label"] | None = None
-        notes: list[str] | None = None
-        suggestion: Optional[str] = None
+        _severity: "Report.Severity"
+        _message: str
+        _code_value: Optional[str] = None
+        _labels: list["Report.Label"] | None = None
+        _notes: list[str] | None = None
+        _suggestion: Optional[str] = None
 
         def code(self, value: str) -> "Report.Builder":
-            self.code_value = value
+            self._code_value = value
+            return self
+
+        def labels(
+            self,
+            nodes: Sequence[syn.Node],
+            message: Optional[str] = None,
+            style: Optional["Report.LabelStyle"] = None,
+        ) -> "Report.Builder":
+            for node in nodes:
+                self.label(node, message=message, style=style)
             return self
 
         def label(
@@ -76,33 +86,33 @@ class Report(Inmutable, Metadata[dom.Val]):
             if ast is None:
                 return self
             label_style = style if style is not None else Report.LabelStyle.PRIMARY
-            if self.labels is None:
-                self.labels = []
-            self.labels.append(
+            if self._labels is None:
+                self._labels = []
+            self._labels.append(
                 Report.Label(ast=ast, message=message, style=label_style)
             )
             return self
 
         def note(self, message: str) -> "Report.Builder":
-            if self.notes is None:
-                self.notes = []
-            self.notes.append(message)
+            if self._notes is None:
+                self._notes = []
+            self._notes.append(message)
             return self
 
         def suggest(self, message: str) -> "Report.Builder":
-            self.suggestion = message
+            self._suggestion = message
             return self
 
         def build(self) -> Report:
-            labels = tuple(self.labels) if self.labels is not None else ()
-            notes = tuple(self.notes) if self.notes is not None else ()
+            labels = tuple(self._labels) if self._labels is not None else ()
+            notes = tuple(self._notes) if self._notes is not None else ()
             return Report(
-                severity=self.severity,
-                message=self.message,
-                code=self.code_value,
+                severity=self._severity,
+                message=self._message,
+                code=self._code_value,
                 labels=labels,
                 notes=notes,
-                suggestion=self.suggestion,
+                suggestion=self._suggestion,
             )
 
         def tag[N: syn.Node](self, ast: N, *args, **kwargs) -> N:
@@ -149,12 +159,12 @@ class Report(Inmutable, Metadata[dom.Val]):
 
 
 def error(message: str) -> Report.Builder:
-    return Report.Builder(severity=Report.Severity.ERROR, message=message)
+    return Report.Builder(_severity=Report.Severity.ERROR, _message=message)
 
 
 def warn(message: str) -> Report.Builder:
-    return Report.Builder(severity=Report.Severity.WARNING, message=message)
+    return Report.Builder(_severity=Report.Severity.WARNING, _message=message)
 
 
 def info(message: str) -> Report.Builder:
-    return Report.Builder(severity=Report.Severity.INFO, message=message)
+    return Report.Builder(_severity=Report.Severity.INFO, _message=message)

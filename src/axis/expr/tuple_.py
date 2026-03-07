@@ -1,6 +1,6 @@
 from typing import ClassVar, Literal, Optional, Self
 
-from protobase import cached_property, frozendict
+from protobase import slot_cached_property, frozendict
 
 from axis import syn
 from axis.log import report as log
@@ -26,6 +26,10 @@ class Tuple(syn.Expr):
         def is_spread(self) -> bool:
             raise NotImplementedError
 
+        @property
+        def name(self) -> str:
+            log.error("Unsupported tuple element").label(self).throw()
+
     class Positional(Element):  # PositionalElement
         "value"
 
@@ -41,6 +45,15 @@ class Tuple(syn.Expr):
         @property
         def is_spread(self) -> bool:
             return isinstance(self.value, Etc)
+
+        @property
+        def name(self) -> str:
+            value = self.value
+            if value is None:
+                log.error("Positional element requires a value").label(self).throw()
+            from axis import expr as expr_module
+
+            return expr_module.name_of(value)
 
     class Nominal(Element): # es un elemento que implementa value mixin
         "name: bound = value"
@@ -77,6 +90,12 @@ class Tuple(syn.Expr):
         def is_spread(self) -> bool:
             return isinstance(self.key, Etc)
 
+        @property
+        def name(self) -> str:
+            from axis import expr as expr_module
+
+            return expr_module.to_slot_name(self.key)
+
         # @property
         # def is_wildcard(self) -> bool:
         #     return self.key[0] == "$"
@@ -108,11 +127,25 @@ class Tuple(syn.Expr):
     def __iter__(self):
         return iter(self.elements)
 
-    @cached_property
+    @slot_cached_property
     def spread_positions(self) -> tuple[int, ...]:
         return tuple(i for i, e in enumerate(self.elements) if e.is_spread)
 
-    @cached_property  # TODO: cached property can retain the raised error and rethrow it on subsequent calls
+    @slot_cached_property
+    def inline_prefix(self) -> tuple[tuple[Element, ...], bool]:
+        elements = self.elements
+        spread_index: int | None = None
+        for index, element in enumerate(elements):
+            if element.is_spread:
+                if index != len(elements) - 1:
+                    log.error("Variadic marker must be final element").label(element).throw()
+                spread_index = index
+                break
+        if spread_index is None:
+            return elements, False
+        return elements[:spread_index], True
+
+    @slot_cached_property  # TODO: cached property can retain the raised error and rethrow it on subsequent calls
     def head_and_tail_count(self) -> tuple[int, int]:
         """
         Returns a tuple of (head_count, spread_count, tail_count).

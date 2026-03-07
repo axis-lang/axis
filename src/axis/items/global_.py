@@ -4,7 +4,7 @@ from typing import ClassVar, Literal, Optional
 from protobase import flux, slot_cached_property
 
 from axis import dom, expr, syn
-from axis.sem import Entity, Scope
+from axis.sem import Context, Scope
 
 from .item import Item
 from .scopes import parent_scope
@@ -59,25 +59,8 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
                 )
 
     @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
-        if self.key is None:
-            return frozenset()
-        scope_ref = self.anchor
-        target = expr.to_spec_ref(self.key, scope_ref)
-        if target is None:
-            return frozenset()
-        contributions: list[Entity.Contribution] = []
-        if scope_ref is not None:
-            contributions.append(
-                Entity.Member(
-                    anchor=scope_ref,
-                    name=expr.name_of(self.key),
-                    target=target,
-                    origin=self.key,
-                    ctx=self,
-                )
-            )
-        return frozenset(contributions)
+    def contributions(self) -> frozenset[Context.Contribution]:
+        return frozenset()
 
     @flux.property
     def scope(self) -> Scope:

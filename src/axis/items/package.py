@@ -36,7 +36,7 @@ class Package(Realm):
         )
 
     @property
-    def contexts(self):
+    def all_contexts(self):
         return tuple(self.items)
 
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         from axis import syn, val
 
         realm = Package.from_path(path)
-        db = realm.database
+        entities = realm.entities_by_anchor
 
         eval = val.Evaluator()
 
@@ -58,15 +58,15 @@ if __name__ == "__main__":
         def print_syn(value: str):
             print(syn.Expr.from_str(value))
 
-        print("database.entities", len(db.entities_by_ref))
-        print("database.namespaces", len(db.members_by_scope))
-        print("database.refs", tuple(dom.ref_segments(ref) for ref in db.entities_by_ref))
+        print("realm.entities", len(entities))
+        print("realm.members", len(realm.members_by_anchor))
+        print("realm.anchors", tuple(dom.ref_segments(ref) for ref in entities))
 
         def find_entity(*segments):
             return next(
                 (
                     entity
-                    for ref, entity in db.entities_by_ref.items()
+                for ref, entity in entities.items()
                     if dom.ref_segments(ref) == tuple(segments)
                 ),
                 None,

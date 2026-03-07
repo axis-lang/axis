@@ -1,10 +1,10 @@
 import unittest
 from typing import cast
 
-from axis import expr, syn
+from axis import expr, syn, sem
 from axis.log.report import Report
 from axis.items.defs.base import merge_inline_block_tuple
-from axis.sem import ParamVar
+from axis.sem import Context
 
 
 class DefMergeInlineBlockTupleTest(unittest.TestCase):
@@ -13,7 +13,7 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
         struct = merge_inline_block_tuple(
             inline_expr=inline_expr,
             block_expr=None,
-            var_cls=ParamVar,
+            binding_cls=sem.Entity.OverloadContribution.ParamBinding,
         )
         self.assertEqual(struct.index.keys, ())
         self.assertEqual(struct.values, ())
@@ -25,7 +25,7 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
             merge_inline_block_tuple(
                 inline_expr=inline_expr,
                 block_expr=block_expr,
-                var_cls=ParamVar,
+                binding_cls=sem.Entity.OverloadContribution.ParamBinding,
             )
 
     def test_prefix_match_with_spread(self):
@@ -34,7 +34,7 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
         struct = merge_inline_block_tuple(
             inline_expr=inline_expr,
             block_expr=block_expr,
-            var_cls=ParamVar,
+            binding_cls=sem.Entity.OverloadContribution.ParamBinding,
         )
         self.assertEqual(struct.index.keys, ("a", "b"))
         self.assertEqual(len(struct.values), 2)
@@ -46,5 +46,5 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
             merge_inline_block_tuple(
                 inline_expr=inline_expr,
                 block_expr=block_expr,
-                var_cls=ParamVar,
+                binding_cls=sem.Entity.OverloadContribution.ParamBinding,
             )

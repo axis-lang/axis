@@ -5,7 +5,7 @@ from typing import ClassVar, Optional
 from protobase import flux
 
 from axis import expr, syn
-from axis.sem import Entity
+from axis.sem import Context
 
 from .base import Def
 
@@ -21,5 +21,5 @@ class QualDef(Def):
     target: syn.Expr | None = None
 
     @flux.property
-    def contributions(self) -> frozenset[Entity.Contribution]:
+    def contributions(self) -> frozenset[Context.Contribution]:
         return frozenset()
