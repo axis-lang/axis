@@ -35,6 +35,9 @@ class Anchor(Ref):
     type: AnchorType = AnchorType()
     data: AnchorSegments = _
 
+    def __str__(self) -> str:
+        return ".".join(self.data)
+
     def __invariants__(self) -> None:
         if not isinstance(self.data, tuple) or not all(
             isinstance(seg, str) for seg in self.data
@@ -47,7 +50,7 @@ class Anchor(Ref):
 
     @classmethod
     def root(cls, value: str) -> "Anchor":
-        return cls(data=tuple(value, ))
+        return cls(data=(value, ))
 
     @classmethod
     def from_str(cls, value: str) -> "Anchor":

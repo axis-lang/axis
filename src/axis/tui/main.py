@@ -1,64 +1,110 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import RichLog, Static, TabbedContent, TabPane
+from textual.widgets import RichLog, Static, TabbedContent, TabPane, Tree
 
-from axis.src.diagnostic import Diagnostic
-from axis.tui.diagnostics import DiagnosticRenderer
+from axis import items, src
+from protobase import flux
+from axis.log.report import Report
 
 
 class MainView(App[None]):
     CSS = """
-    #repl-tabs {
+    #left-view {
         width: 1fr;
     }
 
-    #diagnostics-tabs {
+    #right-view {
         width: 1fr;
     }
     """
 
     def __init__(
         self,
-        collect_diagnostics: Callable[[], Iterable[Diagnostic]] | None = None,
+        pkg: items.Package,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self._collect_diagnostics = collect_diagnostics
+        self._pkg = pkg
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with TabbedContent(id="repl-tabs"):
-                with TabPane("REPL"):
-                    yield Static("REPL (todo)", id="repl-placeholder")
-            with TabbedContent(id="diagnostics-tabs"):
-                with TabPane("Diagnostics"):
+            with TabbedContent(id="left-view"):
+                with TabPane("Entities"):
+                    yield Tree("Entities", id="entities-tree")
+            with TabbedContent(id="right-view"):
+                with TabPane("Reports"):
                     yield RichLog(
-                        id="diagnostics-log",
+                        id="reports-log",
                         highlight=False,
                         markup=False,
                         wrap=True,
                     )
+                with TabPane("Details"):
+                    yield Static("Select an entity to inspect", id="details-view")
 
     def on_mount(self) -> None:
-        if self._collect_diagnostics is None:
-            return
-        try:
-            diagnostics = self._collect_diagnostics()
-        except Exception:
-            return
-        self.show_diagnostics(diagnostics)
+        self.refresh_views()
 
-    def show_diagnostics(self, diagnostics: Iterable[object]) -> None:
-        log = self.query_one("#diagnostics-log", RichLog)
+    def main(self) -> None:
+        watch = src.FSWatcher(self._pkg.dir)
+
+        @watch.on_change
+        def collect_and_show_reports() -> None:
+            self.call_from_thread(self.refresh_views)
+
+        watch.start()
+        try:
+            self.run()
+        finally:
+            watch.stop()
+
+    def collect_reports(self) -> tuple[Report, ...]:
+        try:
+            _ = self._pkg.entities_by_anchor
+        except Exception:
+            pass
+        diagnostics = flux.collect_all(cls=Report)
+        return tuple(diag for diag in diagnostics if isinstance(diag, Report))
+
+    def refresh_views(self) -> None:
+        self.refresh_tree()
+        self.show_reports(self.collect_reports())
+
+    def refresh_tree(self) -> None:
+        tree = self.query_one("#entities-tree", Tree)
+        root = tree.root
+        for child in list(root.children):
+            child.remove()
+        entities = self._pkg.entities_by_anchor
+        for anchor in sorted(entities.keys(), key=lambda a: a.data):
+            anchor_node = root.add(str(anchor), data=anchor)
+            #anchor_node.add("Entity", data=("entity", anchor))
+            anchor_node.add("Specs", data=("specs", anchor))
+            anchor_node.add("Overloads", data=("overloads", anchor))
+            anchor_node.add("Implementations", data=("impls", anchor))
+        root.expand()
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        detail = self.query_one("#details-view", Static)
+        payload = event.node.data
+        if payload is None:
+            detail.update("Select an entity to inspect")
+            return
+        match payload:
+            case (kind, anchor):
+                detail.update(f"{kind}: {anchor}")
+            case anchor:
+                detail.update(f"entity: {anchor}")
+
+    def show_reports(self, reports: Iterable[object]) -> None:
+        log = self.query_one("#reports-log", RichLog)
         log.clear()
-        renderer = DiagnosticRenderer()
-        for diag in diagnostics:
-            if not isinstance(diag, Diagnostic):
+        for report in reports:
+            if not isinstance(report, Report):
                 continue
-            for renderable in renderer.render(diag):
-                log.write(renderable)
+            log.write(report)
             log.write("")

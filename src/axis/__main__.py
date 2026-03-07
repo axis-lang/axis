@@ -1,110 +1,72 @@
 #%%
-import argparse
 from time import sleep
-from rich import print
+from cyclopts import App
 from protobase import flux
-from axis import src, dom, sem, syn, val, items, expr, log
+from axis import items, log, src
 from IPython import embed
+from rich import print
 
-parser = argparse.ArgumentParser(description="Axis package debug runner")
-parser.add_argument(
-    "--package",
-    #required=True,
-    default="codebase/std.core",
-    help="Path to the package root",
-)
-parser.add_argument(
-    "--repl",
-    action="store_true",
-    help="Run the REPL",
-)
-parser.add_argument(
-    "--watch",
-    action="store_true",
-    help="Watch the source directory for changes",
-    default=True,
-)
-# parser.add_argument(
-#     "--tui",
-#     action="store_true",
-#     help="Run the Textual TUI (implies --watch)",
-# )
-args = parser.parse_args()
+app = App()
 
-pkg = items.Package.from_path(args.package)
 
-def collec_reports() -> tuple[log.Report, ...]:
+def collect_reports(pkg: items.Package) -> tuple[log.Report, ...]:
     try:
         _ = pkg.entities_by_anchor
-    except Exception:
-        pass
+    except Exception as e:
+        print(e)
     diagnostics = flux.collect_all(cls=log.Report)
     return tuple(diag for diag in diagnostics if isinstance(diag, log.Report))
 
 
-pkg.entities_by_anchor
-for report in collec_reports():
-    report.show()
+@app.default
+def main(
+    package: str = "codebase/sandbox",
+    repl: bool = False,
+    watch: bool = False,
+    tui: bool = False,
+) -> None:
+    """Axis package debug runner."""
+    pkg = items.Package.from_path(package)
+
+    if tui:
+        from axis.tui.main import MainView
+        return MainView(pkg).main()
+
+    if repl:
+        watcher = src.FSWatcher(pkg.dir)
+
+        @watcher.on_change
+        def collect_and_show_reports() -> None:
+            sleep(0.5)
+            for report in collect_reports(pkg):
+                report.emit()
+
+        watcher.start()
+        try:
+            embed()
+        finally:
+            watcher.stop()
+        return
+
+    if watch:
+        watcher = src.FSWatcher(pkg.dir)
+
+        @watcher.on_change
+        def collect_and_show_reports() -> None:
+            for report in collect_reports(pkg):
+                report.emit()
+
+        watcher.start()
+        try:
+            while True:
+                sleep(0.5)
+        except KeyboardInterrupt:
+            watcher.stop()
+        return
+
+    for report in collect_reports(pkg):
+        report.show()
 
 
-if args.repl:
-
-    watch = src.FSWatcher(pkg.dir)
-
-    @watch.on_change
-    def collect_and_show_diagnostics() -> None:
-        sleep(0.5)
-        for diag in collec_reports():
-            diag.emit()
-
-        #diagnostics = collect_diagnostics()
-        #app.call_from_thread(app.show_diagnostics, diagnostics)
-
-    watch.start()
-    try:
-        embed()
-    finally:
-        watch.stop()
-
-
-
-"""
-if args.tui:
-    from axis.tui.main import MainView
-
-    watch = src.FSWatcher(pkg.dir)
-    app = MainView(collect_diagnostics=collect_diagnostics)
-
-    @watch.on_change
-    def collect_and_show_diagnostics() -> None:
-        time.sleep(0.5)
-        diagnostics = collect_diagnostics()
-        app.call_from_thread(app.show_diagnostics, diagnostics)
-
-    watch.start()
-    try:
-        app.run()
-    finally:
-        watch.stop()
-
-elif args.watch:
-    watch = src.FSWatcher(pkg.dir)
-
-    @watch.on_change
-    def collect_and_show_diagnostics() -> None:
-        diagnostics = collect_diagnostics()
-        for diag in diagnostics:
-            diag.emit()
-
-    watch.start()
-    try:
-        # starts a embedded repl here!!
-        while True:
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        watch.stop()
-else:
-    diagnostics = collect_diagnostics()
-    for diag in diagnostics:
-        diag.emit()
-"""
+if __name__ == "__main__":
+    app()

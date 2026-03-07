@@ -1,13 +1,14 @@
 # %%
 from __future__ import annotations
 
-from typing import Any, Callable, ClassVar, Iterator, overload
+from typing import Any, Callable, ClassVar, Iterable, Iterator, overload
 
 from protobase import Consed, cached_property
 
 from axis.dom.map import Map
 
 __all__ = ["Struct"]
+
 
 class Struct[K, V](Consed):
     class Shape[SK](Consed):
@@ -93,7 +94,7 @@ class Struct[K, V](Consed):
             return Struct.Shape(arity=self.arity, keys=frozenset(self._indexed_keys))
 
         def __repr__(self) -> str:
-            keys = ('_' if k is None else repr(k) for k in self.keys)
+            keys = ("_" if k is None else repr(k) for k in self.keys)
             return f"Index[{self.arity}] _ = ({', '.join(keys)})"
 
         def __len__(self) -> int:
@@ -157,6 +158,11 @@ class Struct[K, V](Consed):
         cls, index: "Struct.Index[K]", values: tuple[V, ...]
     ) -> "Struct[K, V]":
         return Struct(index=index, values=values)
+
+    @classmethod
+    def from_iter(cls, entries: Iterable[tuple[K | None, V]]) -> "Struct[K, V]":
+        keys, values = zip(*entries) if entries else ((), ())
+        return Struct.from_index(Struct.Index(keys), values)
 
     @classmethod
     def from_keys(

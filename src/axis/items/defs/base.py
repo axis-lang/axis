@@ -7,13 +7,13 @@ from protobase import flux, _, slot_cached_property
 
 from axis import dom, expr, syn, sem, log
 
-from ..blocks import TupleBlock
+from .. import blocks
 from ..item import Item
 
 
 def merge_inline_block_tuple[B: sem.Context.Binding](
     inline_expr: expr.Tuple | None,
-    block_expr: expr.Tuple | None,
+    block_expr: blocks.TupleBlock | None,
     *,
     binding_cls: type[B],
 ) -> dom.Struct[str, B]:
@@ -21,25 +21,25 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
     if block_expr is None:
         if inline_expr is not None:
             log.error("Inline tuple ignored; block required").label(inline_expr).emit()
-        return dom.Struct.from_keys((), ())
+        return dom.Struct.EMPTY
 
-    if inline_expr is not None:
-        prefix, variadic = inline_expr.inline_prefix
-        if not variadic and len(block_expr.elements) != len(prefix):
-            log.error("Block must match inline prefix exactly").label(
-                block_expr
-            ).throw()
-        if variadic and len(block_expr.elements) < len(prefix):
-            log.error("Block shorter than inline prefix").label(block_expr).throw()
-        for index, prefix_elem in enumerate(prefix):
-            block_elem = block_expr.elements[index]
-            if prefix_elem.name != block_elem.name:
-                log.error("Inline prefix does not match block").label(
-                    block_elem
-                ).throw()
+    # if inline_expr is not None:
+    #     prefix, variadic = inline_expr.inline_prefix
+    #     if not variadic and len(block_expr.elements) != len(prefix):
+    #         log.error("Block must match inline prefix exactly").label(
+    #             block_expr
+    #         ).throw()
+    #     if variadic and len(block_expr.elements) < len(prefix):
+    #         log.error("Block shorter than inline prefix").label(block_expr).throw()
+    #     for index, prefix_elem in enumerate(prefix):
+    #         block_elem = block_expr.elements[index]
+    #         if prefix_elem.name != block_elem.name:
+    #             log.error("Inline prefix does not match block").label(
+    #                 block_elem
+    #             ).throw()
 
-    keys: list[str | None] = []
-    values: list[B] = []
+    entries: list[tuple[str | None, B]] = []
+
     for element in block_expr.elements:
         match element:
             case expr.Tuple.Nominal(key=key, bound=bound, value=value):
@@ -48,12 +48,11 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
                 assert bound is not None
                 sym = expr.as_sym(key)
                 var = binding_cls(sym=sym, bound=bound, default=value)
-                keys.append(expr.to_slot_name(key))
-                values.append(var)
+                entries.append((expr.to_slot_name(key), var))
             case _:
                 log.error("Unsupported tuple element in block").label(element).throw()
 
-    return dom.Struct.from_keys(tuple(keys), tuple(values))
+    return dom.Struct.from_iter(entries)
 
 
 def unify_spec_where(
@@ -81,10 +80,15 @@ def unify_args_takes(
 
 
 class Def(Item, syn.ClassMatcher):
-    class Where(TupleBlock):
+
+    class Members(syn.Block):
+        outline_keyword: ClassVar = "members"
+
+
+    class Where(blocks.TupleBlock):
         outline_keyword: ClassVar = "where"
 
-    class Takes(TupleBlock):
+    class Takes(blocks.TupleBlock):
         outline_keyword: ClassVar = "takes"
         expr: Optional[syn.Expr] = None
 

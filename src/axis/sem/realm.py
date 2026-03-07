@@ -38,24 +38,27 @@ class Realm(Consed, abstract=True):
         return frozenset(self.contributions_by_anchor.keys())
 
     @flux.property
+    def members_by_anchor(self) -> frozendict[dom.Anchor, frozenset[dom.Anchor]]:
+        members: dict[dom.Anchor, set[dom.Anchor]] = {}
+        for anchor in self.all_anchors:
+            if (parent := anchor.parent) is not None:
+                members.setdefault(parent, set()).add(anchor)
+        return frozendict(
+            (parent, frozenset(children)) for parent, children in members.items()
+        )
+
+    @flux.property
     def entities_by_anchor(self) -> frozendict[dom.Anchor, Entity]:
         return frozendict(
             (anchor, Entity(anchor=anchor, contributions=contributions))
             for anchor, contributions in self.contributions_by_anchor.items()
         )
 
-    @flux.method
-    def entity_by_anchor(self, anchor: dom.Anchor) -> Entity | None:
-        return self.entities_by_anchor.get(anchor)
+    def __getitem__(self, anchor: dom.Anchor|str) -> Entity:
+        if isinstance(anchor, str):
+            anchor = dom.Anchor.from_str(anchor)
 
-    @flux.property
-    def members_by_anchor(self) -> frozendict[dom.Anchor, frozenset[dom.Anchor]]:
-        members: dict[dom.Anchor, set[dom.Anchor]] = {}
-        for anchor in self.all_anchors:
-            parent = anchor.parent
-            if parent is None:
-                continue
-            members.setdefault(parent, set()).add(anchor)
-        return frozendict(
-            (parent, frozenset(children)) for parent, children in members.items()
-        )
+        if anchor not in self.entities_by_anchor:
+            raise KeyError(f"Anchor {anchor} not found in realm")
+        
+        return self.entities_by_anchor[anchor]

@@ -2,28 +2,24 @@ from typing import ClassVar, Literal, Optional, Self
 
 from protobase import slot_cached_property, frozendict
 
-from axis import syn
-from axis.log import report as log
-
-from .prefix import Etc
-from .sym import Sym
+from axis import syn, expr, log
 
 
 class Tuple(syn.Expr):
-    """
-    Represents a tuple expression in the AST.
-    It can contain elements that are:
-    - Values (e.g. `1`, `2`, `3`)
-    - Named elements (e.g. `a: b`, `c = d`, `e: f = g`)
-    - Spread elements (e.g. `..alpha..`, `..`)
-
-    """
 
     class Element(syn.Node, abstract=True):
         grammar_context_infix: ClassVar[str] = "Element"
 
         @property
+        def is_variadic(self) -> bool:
+            return self.is_spread or self.is_ellipsis
+
+        @property
         def is_spread(self) -> bool:
+            raise NotImplementedError
+
+        @property
+        def is_ellipsis(self) -> bool:
             raise NotImplementedError
 
         @property
@@ -31,8 +27,6 @@ class Tuple(syn.Expr):
             log.error("Unsupported tuple element").label(self).throw()
 
     class Positional(Element):  # PositionalElement
-        "value"
-
         value: syn.Expr
 
         def __str__(self) -> str:
@@ -44,7 +38,11 @@ class Tuple(syn.Expr):
 
         @property
         def is_spread(self) -> bool:
-            return isinstance(self.value, Etc)
+            return isinstance(self.value, expr.Etc)
+
+        @property
+        def is_ellipsis(self) -> bool:
+            return isinstance(self.value, expr.Lit) and self.value.is_ellipsis
 
         @property
         def name(self) -> str:
@@ -55,7 +53,7 @@ class Tuple(syn.Expr):
 
             return expr_module.name_of(value)
 
-    class Nominal(Element): # es un elemento que implementa value mixin
+    class Nominal(Element):  # es un elemento que implementa value mixin
         "name: bound = value"
 
         key: syn.Expr
@@ -70,7 +68,7 @@ class Tuple(syn.Expr):
             e1: Optional[syn.Expr] = None,
             op2: Optional[str] = None,
             e2: Optional[syn.Expr] = None,
-            **kwargs
+            **kwargs,
         ):
             match (op1, e1, op2, e2):
                 case (":", bound, "=", value):
@@ -88,7 +86,11 @@ class Tuple(syn.Expr):
 
         @property
         def is_spread(self) -> bool:
-            return isinstance(self.key, Etc)
+            return isinstance(self.key, expr.Etc)
+
+        @property
+        def is_ellipsis(self) -> bool:
+            return isinstance(self.key, expr.Lit) and self.key.is_ellipsis
 
         @property
         def name(self) -> str:
@@ -109,6 +111,8 @@ class Tuple(syn.Expr):
                 return f"{self.key} = {self.value}"
             return str(self.key)
 
+    ##
+
     elements: tuple[Element, ...]
 
     @classmethod
@@ -128,7 +132,52 @@ class Tuple(syn.Expr):
         return iter(self.elements)
 
     @slot_cached_property
+    def variadic_offsets(self) -> tuple[int, ...]:
+        return tuple(i for i, e in enumerate(self.elements) if e.is_variadic)
+
+    @property
+    def is_variadic(self) -> bool:
+        return len(self.variadic_offsets) > 0
+
+    @property
+    def positional_count(self) -> tuple[int, int]:
+        variadic_offsets = self.variadic_offsets
+        if len(variadic_offsets) == 0:
+            return len(self.elements), 0
+
+        if len(variadic_offsets) > 1:
+            report = log.error(
+                f"Tuple has {len(variadic_offsets)} variadic positions, only one expected"
+            )
+            for pos in variadic_offsets:
+                report = report.label(
+                    self.elements[pos],
+                    f"Variadic element at position {pos}",
+                )
+            report.throw()
+
+        head_count = variadic_offsets[0]
+        tail_count = len(self.elements) - variadic_offsets[-1]  # - 1
+        return head_count, tail_count
+
+    @property
+    def split_positional_elements(
+        self,
+    ) -> tuple[tuple[Element, ...], tuple[Element, ...], tuple[Element, ...]]:
+        head_count, tail_count = self.positional_count
+        return (
+            self.elements[:head_count],
+            (
+                self.elements[head_count : len(self.elements) - tail_count]
+                if tail_count > 0
+                else self.elements[head_count:]
+            ),
+            self.elements[-tail_count:] if tail_count > 0 else (),
+        )
+
+    @slot_cached_property
     def spread_positions(self) -> tuple[int, ...]:
+        "Returns the positions of spread elements in the tuple."
         return tuple(i for i, e in enumerate(self.elements) if e.is_spread)
 
     @slot_cached_property
@@ -138,7 +187,11 @@ class Tuple(syn.Expr):
         for index, element in enumerate(elements):
             if element.is_spread:
                 if index != len(elements) - 1:
-                    log.error("Variadic marker must be final element").label(element).throw()
+                    (
+                        log.error("Variadic marker must be final element")
+                        .label(element)
+                        .throw()
+                    )
                 spread_index = index
                 break
         if spread_index is None:
@@ -203,7 +256,9 @@ class Shape(Tuple): ...
 
 
 @syn.Matcher.impl_rule(Tuple)
-def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchResult | None:
+def match_tuple(
+    self: syn.Matcher, tuple: Tuple, value: syn.Expr
+) -> syn.MatchResult | None:
 
     if not isinstance(value, Tuple):
         return None
@@ -230,9 +285,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchRe
         result = syn.MatchResult.unify(result, head_result)
 
     match target_rest:
-        case (
-            Tuple.Positional(value=Etc(rhs=rhs_pattern)),
-        ):
+        case (Tuple.Positional(value=expr.Etc(rhs=rhs_pattern)),):
             if isinstance(rhs_pattern, syn.MatchCapture):
                 if not rhs_pattern.variadic:
                     rhs_pattern = syn.MatchCapture(
@@ -252,7 +305,7 @@ def match_tuple(self: syn.Matcher, tuple: Tuple, value: syn.Expr) -> syn.MatchRe
                     subpattern=subpattern,
                     candidates=rhs_pattern.candidates,
                 )
-            elif isinstance(rhs_pattern, Sym) and rhs_pattern.is_wildcard:
+            elif isinstance(rhs_pattern, expr.Sym) and rhs_pattern.is_wildcard:
                 candidate = syn.MatchCandidate(result_type=None, schema=None)
                 capture = syn.MatchCapture(
                     name_by_candidate=frozendict({candidate: rhs_pattern.name[1:]}),
@@ -291,7 +344,7 @@ def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
     for elem in tup.elements:
         match elem:
             case Tuple.Positional(
-                value=Etc(rhs=Sym(name=wildcard_name) as sym)
+                value=expr.Etc(rhs=expr.Sym(name=wildcard_name) as sym)
             ) if sym.is_wildcard:
                 target = self.value(wildcard_name, Tuple)
                 elements.extend(target.elements)
