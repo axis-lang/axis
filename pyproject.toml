@@ -24,9 +24,12 @@ ipython = "^9.10.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.28.0"
+myst-parser = "^2.0.0"
+pydata-sphinx-theme = "^0.15.4"
 rich = {extras = ["jupyter"], version = "^13.9.4"}
 watchdog = "^6.0.0"
 pyright = "^1.1.408"
+sphinx = "^7.4.7"
 textual = "^0.83.0"
 
 [tool.pyright]

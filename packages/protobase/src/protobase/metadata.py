@@ -1,9 +1,9 @@
 #%%
 from typing import Any, ClassVar, Self, cast
 
-from protobase.object import Object
-from protobase.type import Type
-from protobase.weak import WeakKeyIdDictionary
+from .object import Object
+from .type import Type
+from .weak import WeakKeyIdDictionary
 
 class Metadata[T=Any](Object, abstract=True):
     __slots__ = "__weakref__",

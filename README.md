@@ -1,68 +1,108 @@
-# AXIS
+# Axis
 
-Axis es un lenguaje en diseño cuyo núcleo unifica AST, sistema semántico y un
-modelo de datos canónico. El flujo general separa estrictamente:
+Axis es un lenguaje/DSL experimental con pipeline incremental de parsing, AST,
+semantica y evaluacion. El modelo se apoya en Protobase/Flux para mantener un
+grafo inmutable y recomputar solo lo necesario ante cambios de entrada.
 
-- `Meta` (descriptores estructurales) y `Data` (datos primitivos serializables),
-- `Val` como único contenedor de valores (`Const` y `Var`) en todas las fases,
-- entidades lógicas como base para tipos, sobrecargas y consultas.
+## Estado actual
 
-## Documentación principal
+- Parser, AST y semantica base implementados.
+- Resolucion de nombres y entidades por anchor.
+- Evaluador parcial con literales y operadores aritmeticos basicos.
+- TUI opcional para inspeccion (Textual).
+- Pendiente: `Apply`, `Index`, `Member` en evaluacion.
 
-- `docs/data-model.md`: modelo de datos (`Val`, `Type`, `Ref`) y codificación canónica
-- `docs/entity.md`: sistema de entidades y resolución de sobrecargas
-- `docs/logic-design.md`: capa lógica (facts, rules, queries)
-
-## Arquitectura (src/axis)
-
-```mermaid
-flowchart TD
-	subgraph core
-	DOM
-	FS
-	SEM
-	LOG
-	SYN
-
-	SYN --> SEM
-	SYN --> LOG
-
-	end
-
-	subgraph impl
-	EXPR
-	ITEM
-	end
-
-	LOG --> EXPR
-	LOG --> ITEM
-
-
-	SYN --> EXPR
-	SYN --> ITEM
-	SEM --> ITEM
-
-        FS --> ITEM
+## Pipeline incremental (vista general)
 
 ```
+Package -> Items -> Contexts -> Realm -> Entity
+```
 
-- `src/axis/syn/`: AST, builder, outline y gramática ANTLR
-- `src/axis/expr/`: nodos de expresión + matcher/reifier
-- `src/axis/items/`: items, bloques y parsing de unidades
-- `src/axis/sem/`: base de datos semántica y shapes
-- `src/axis/dom/`: DOM canónico (Tuple/Index/Shape, Type, Ref, Val)
-- `src/axis/src/`: utilidades de archivo/span
-- `src/axis/log/`: diagnósticos
+- `Package` agrega archivos `.ax` y construye items por archivo.
+- Cada `Item` es un `Context` y emite contribuciones semanticas.
+- `Realm` agrega contribuciones de todos los contextos y crea entidades por
+  `anchor`.
+- `Entity` agrupa contribuciones por forma (spec/overload) para resolucion.
 
-## Flujo conceptual
+## Requisitos
 
-1. Parseo a AST (`syn`, `expr`, `items`).
-2. Normalización a DOM canónico (`dom`), con `Val` y `Type`.
-3. Construcción semántica (`sem`) a partir de contribuciones de items.
-4. Resolución: overloads, constraints y consultas lógicas.
+- Python 3.13+
+- Poetry
+- Antlr4 tools (via `antlr4-tools`)
 
-## Notas de build
+Opcional (dev): `watchdog` para `--watch` y `textual` para `--tui`.
 
-- La gramática y los generados viven en `src/axis/syn/grammar/`.
-- Para regenerar el parser: `just gen-parser`.
-- `protobase` es interno y vive en `packages/protobase/src/protobase`.
+## Instalacion
+
+```bash
+poetry install
+```
+
+## Uso rapido
+
+Comandos con `just`:
+
+```bash
+just help
+just launch -- --help
+just test
+just gen-parser
+```
+
+Comandos directos:
+
+```bash
+poetry run python -m axis --help
+poetry run python -m axis --repl
+poetry run python -m axis --watch
+poetry run python -m axis --tui
+poetry run python -m unittest discover -s tests
+```
+
+## Ejemplos de lenguaje
+
+Archivos de ejemplo en `codebase/` (por ejemplo `codebase/sandbox` y
+`codebase/std.core`).
+
+## Estructura del repo
+
+- `src/axis/`: codigo principal
+  - `syn/`: gramatica ANTLR, parsing y AST
+  - `items/`: items/defs que emiten contribuciones
+  - `sem/`: realm/entity/scope
+  - `dom/`: valores, tipos y estructuras
+  - `val/`: evaluador
+  - `src/`: fuentes, IO y watchers
+  - `tui/`: interfaz textual
+- `packages/protobase/`: runtime de records inmutables, consing y flux
+- `tests/`: suite unittest
+
+Dependencias entre capas (A -> B significa "A depende de B"):
+
+```mermaid
+flowchart LR
+    src_layer["src/axis/src\nFuentes e IO"] --> protobase["packages/protobase\nRecords/Flux"]
+    syn_layer["src/axis/syn\nParsing/AST"] --> src_layer
+    syn_layer --> protobase
+    items_layer["src/axis/items\nItems/Defs"] --> syn_layer
+    items_layer --> sem_layer["src/axis/sem\nRealm/Entity/Scope"]
+    items_layer --> dom_layer["src/axis/dom\nTipos/Valores"]
+    items_layer --> protobase
+    sem_layer --> dom_layer
+    sem_layer --> protobase
+    val_layer["src/axis/val\nEvaluador"] --> syn_layer
+    val_layer --> sem_layer
+    val_layer --> dom_layer
+    val_layer --> protobase
+    tui_layer["src/axis/tui\nTUI"] --> sem_layer
+    tui_layer --> protobase
+```
+
+## Documentacion interna
+
+- Guia de estilo y patrones de protobase/flux: `docs/style_guide.md`
+
+## Notas
+
+- El generador de parser usa `just gen-parser` con `Axis.g4`.
+- `just docs` genera la documentacion Sphinx en `dist/docs`.
