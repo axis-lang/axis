@@ -30,6 +30,8 @@ class MainView(App[None]):
         super().__init__(**kwargs)
         self._pkg = pkg
 
+        self._reports = pkg.all_reports
+
     def compose(self) -> ComposeResult:
         with Horizontal():
             with TabbedContent(id="left-view"):
@@ -54,6 +56,7 @@ class MainView(App[None]):
 
         @watch.on_change
         def collect_and_show_reports() -> None:
+            self._reports = self._pkg.all_reports
             self.call_from_thread(self.refresh_views)
 
         watch.start()
@@ -62,17 +65,10 @@ class MainView(App[None]):
         finally:
             watch.stop()
 
-    def collect_reports(self) -> tuple[Report, ...]:
-        try:
-            _ = self._pkg.entities_by_anchor
-        except Exception:
-            pass
-        diagnostics = flux.collect_all(cls=Report)
-        return tuple(diag for diag in diagnostics if isinstance(diag, Report))
 
     def refresh_views(self) -> None:
         self.refresh_tree()
-        self.show_reports(self.collect_reports())
+        self.show_reports(self._reports)
 
     def refresh_tree(self) -> None:
         tree = self.query_one("#entities-tree", Tree)

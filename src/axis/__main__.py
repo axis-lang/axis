@@ -1,4 +1,4 @@
-#%%
+# %%
 from time import sleep
 from cyclopts import App
 from protobase import flux
@@ -7,12 +7,6 @@ from IPython import embed
 from rich import print
 
 app = App()
-
-
-def collect_reports(pkg: items.Package) -> tuple[log.Report, ...]:
-    pkg.check()
-    diagnostics = flux.collect_all(cls=log.Report)
-    return tuple(diag for diag in diagnostics if isinstance(diag, log.Report))
 
 
 @app.default
@@ -27,42 +21,33 @@ def main(
 
     if tui:
         from axis.tui.main import MainView
+
         return MainView(pkg).main()
 
-    if repl:
+    for report in pkg.all_reports:
+        report.show()
+
+    if repl or watch:
         watcher = src.FSWatcher(pkg.dir)
 
         @watcher.on_change
         def collect_and_show_reports() -> None:
-            sleep(0.5)
-            for report in collect_reports(pkg):
+            for report in pkg.all_reports:
                 report.emit()
+            # print(f"Watching {pkg.dir} for changes. Press Ctrl+C to stop.")
 
         watcher.start()
+
         try:
-            embed()
+            if repl:
+                embed()
+            else:
+                print(f"Watching {pkg.dir} for changes. Press Ctrl+C to stop.")
+                while True:
+                    sleep(1)
         finally:
             watcher.stop()
         return
-
-    if watch:
-        watcher = src.FSWatcher(pkg.dir)
-
-        @watcher.on_change
-        def collect_and_show_reports() -> None:
-            for report in collect_reports(pkg):
-                report.emit()
-
-        watcher.start()
-        try:
-            while True:
-                sleep(0.5)
-        except KeyboardInterrupt:
-            watcher.stop()
-        return
-
-    for report in collect_reports(pkg):
-        report.show()
 
 
 if __name__ == "__main__":

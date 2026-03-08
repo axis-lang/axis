@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from threading import Lock, Timer
 from typing import Self
 
 from protobase import Consed, Object, flux
@@ -58,15 +59,27 @@ class SourceDir(Consed):
 
 
 class FSWatcher(Object):
-    __slots__ = ("__weakref__", "root", "_observer", "_handler", "_callbacks")
+    __slots__ = (
+        "__weakref__",
+        "root",
+        "_observer",
+        "_handler",
+        "_callbacks",
+        "_debounce_seconds",
+        "_debounce_timer",
+        "_debounce_lock",
+    )
 
     root: SourceDir
 
-    def __init__(self, root: SourceDir) -> None:
+    def __init__(self, root: SourceDir, debounce_seconds: float = 0.1) -> None:
         self.root = root
         self._observer = None
         self._handler = None
         self._callbacks: list[Callable[[], None]] = []
+        self._debounce_seconds = debounce_seconds
+        self._debounce_timer: Timer | None = None
+        self._debounce_lock = Lock()
 
     def on_change(self, func: Callable[[], None]) -> Callable[[], None]:
         self._callbacks.append(func)
@@ -115,6 +128,30 @@ class FSWatcher(Object):
         self._observer.join()
         self._observer = None
         self._handler = None
+        self._cancel_debounce()
+
+    def _schedule_callbacks(self) -> None:
+        if not self._callbacks:
+            return
+        with self._debounce_lock:
+            if self._debounce_timer is not None:
+                self._debounce_timer.cancel()
+            self._debounce_timer = Timer(self._debounce_seconds, self._flush_callbacks)
+            self._debounce_timer.daemon = True
+            self._debounce_timer.start()
+
+    def _cancel_debounce(self) -> None:
+        with self._debounce_lock:
+            if self._debounce_timer is None:
+                return
+            self._debounce_timer.cancel()
+            self._debounce_timer = None
+
+    def _flush_callbacks(self) -> None:
+        with self._debounce_lock:
+            self._debounce_timer = None
+        for callback in tuple(self._callbacks):
+            callback()
 
     def _notify_event(
         self,
@@ -125,8 +162,7 @@ class FSWatcher(Object):
     ) -> None:
         if is_dir:
             SourceDir.glob.invalidate_for(self.root)
-            for callback in tuple(self._callbacks):
-                callback()
+            self._schedule_callbacks()
             return
 
         self._invalidate_file(path)
@@ -136,8 +172,7 @@ class FSWatcher(Object):
         if event in {"created", "deleted", "moved"}:
             SourceDir.glob.invalidate_for(self.root)
 
-        for callback in tuple(self._callbacks):
-            callback()
+        self._schedule_callbacks()
 
     def _invalidate_file(self, path: Path | str | bytes) -> None:
         if isinstance(path, bytes):

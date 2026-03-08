@@ -28,7 +28,6 @@ class Scope(Consed):
             self.bindings.setdefault(name, {}).setdefault(value, set()).add(origin)
 
         def build(self) -> "Scope":
-
             bindings: dict[str, dom.Val] = {}
             for name, val_by_origin in self.bindings.items():
                 first, *more = val_by_origin.keys()
@@ -36,7 +35,7 @@ class Scope(Consed):
                     report = log.error(f"Name conflict: {name}")
                     for val, origins in val_by_origin.items():
                         report.labels(origins, f"conflicting definition: {val}")
-                    bindings[name] = report.show().emit().tag(dom.Err())
+                    bindings[name] = report.emit().tag(dom.Err())
                 else:
                     bindings[name] = first
 

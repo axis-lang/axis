@@ -2,9 +2,8 @@ unit test
 
 use std.io(
     a: String,
-    b: String
+    b: String,
 )
-
 
 
 def Person

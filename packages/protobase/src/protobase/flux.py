@@ -874,29 +874,29 @@ def _query_key(
     return Key(query.func_id, _runtime._self_refs[obj], argkey[1], argkey[2])
 
 
-def collect(
+def collect[T](
     query: Query,
     *args,
     obj: object | None = None,
-    cls: type | None = None,
+    cls: type[T] | None = None,
     transitive: bool = True,
     **kwargs,
-) -> frozenset[object]:
+) -> frozenset[T]:
     if not isinstance(query, Query):
         raise TypeError("collect expects a Query")
     key = _query_key(query, obj=obj, args=args, kwargs=kwargs)
-    return _runtime.collect(key, cls=cls, transitive=transitive)
+    return cast(frozenset[T], _runtime.collect(key, cls=cls, transitive=transitive))
 
 
-def collect_all(
+def collect_all[T](
     func: Query | None = None,
     *,
-    cls: type | None = None,
+    cls: type[T] | None = None,
     transitive: bool = True,
-) -> frozenset[object]:
+) -> frozenset[T]:
     func_id = None
     if func is not None:
         if not isinstance(func, Query):
             raise TypeError("collect_all expects a Query or None")
         func_id = func.func_id
-    return _runtime.collect_all(func_id, cls=cls, transitive=transitive)
+    return cast(frozenset[T], _runtime.collect_all(func_id, cls=cls, transitive=transitive))

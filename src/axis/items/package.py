@@ -1,12 +1,11 @@
-from typing import Self
+from typing import Iterable, Self
 
-from axis import dom, src
+from axis import dom, src, log
 from protobase import flux
 from typing import cast
 
 from axis.sem import Realm
 from .item import Item
-#from .index import GlobalIndex
 
 class Package(Realm):
     dir: src.SourceDir
@@ -39,110 +38,7 @@ class Package(Realm):
     def all_contexts(self):
         return tuple(self.items)
 
-
-if __name__ == "__main__":
-
-    def debug_package(path: str = "codebase/sandbox") -> None:
-        from rich import print
-
-        from axis import syn, val
-
-        realm = Package.from_path(path)
-        entities = realm.entities_by_anchor
-
-        eval = val.Evaluator()
-
-        def print_eval(value: str):
-            print(eval(syn.Expr.from_str(value)))
-
-        def print_syn(value: str):
-            print(syn.Expr.from_str(value))
-
-        print("realm.entities", len(entities))
-        print("realm.members", len(realm.namespaces_by_anchor))
-        print("realm.anchors", tuple(dom.ref_segments(ref) for ref in entities))
-
-        def find_entity(*segments):
-            return next(
-                (
-                    entity
-                for ref, entity in entities.items()
-                    if dom.ref_segments(ref) == tuple(segments)
-                ),
-                None,
-            )
-
-        sandbox_entity = find_entity("sandbox")
-        if sandbox_entity is not None:
-            print("sandbox.spec_buckets", len(sandbox_entity.spec_by_shape))
-            print("sandbox.overload_buckets", len(sandbox_entity.overload_by_shape))
-            print("sandbox.deref_bucket", len(sandbox_entity.impl_by_result))
-
-        basic_entity = find_entity("sandbox", "basic")
-        if basic_entity is not None:
-            print("sandbox.basic.spec_buckets", len(basic_entity.spec_by_shape))
-            print(
-                "sandbox.basic.overload_buckets",
-                len(basic_entity.overload_by_shape),
-            )
-            print("sandbox.basic.deref_bucket", len(basic_entity.impl_by_result))
-
-        demo_entity = find_entity("sandbox", "demo")
-        if demo_entity is not None:
-            print("sandbox.demo.spec_buckets", len(demo_entity.spec_by_shape))
-            print("sandbox.demo.overload_buckets", len(demo_entity.overload_by_shape))
-            print("sandbox.demo.deref_bucket", len(demo_entity.impl_by_result))
-
-        print_eval(
-            """
-            (
-                (1,0,0),
-                (0,1,0),
-                (0,0,1),
-            )
-            """
-        )
-
-    debug_package()
-
-    # @property
-    # def source_block_spec(self):
-    #     from axis import items
-    #     return items.Unit.build_outline_spec()
-
-    # def unit_ast(self, path: src.Path):
-    #     from axis import items
-
-    #     file = src.File.from_path(self.dir.path / path)
-    #     return self.source_block_spec.parse_outline(file)
-
-    # def file_bindings(self, path: src.Path) -> frozenset[Binding]:
-    #     from axis import items
-    #     #return items.Unit.build_outline_spec()
-
-    #     file = src.File.from_path(self.dir.path / path)
-    #     ast_item = items.Unit.outline_spec.parse_outline(file)
-    #     # ast_item = self.source_block_spec.parse_outline(file)
-    #     return frozenset(Binding.generate_from(ast_item, pkg=self, parent=self.root_binding))
-
-    # class RootBinding(Binding):
-    #     @property
-    #     def ref(self):
-    #         return val.Ref.root
-
-    # @cached_property
-    # def root_binding(self):
-    #     return self.RootBinding(
-    #         pkg=self,
-    #         parent=None,
-    #         item=self, # XXX: self not subclass of Item
-    #     )
-
-    # @property
-    # def global_index(self):
-    #     all_bindings = set()
-
-    #     for path in self.source_paths:
-    #         all_bindings.update(self.file_bindings(path))
-
-    #     return GlobalIndex.from_bindings(all_bindings)
+    @property
+    def all_reports(self) -> frozenset[log.Report]:
+        self.check()
+        return flux.collect(Package.check, obj=self, cls=log.Report)
