@@ -54,10 +54,8 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(dom.ref_segments(ref), ("std", "Array"))
 
     def test_type_var_helper(self):
-        meta = dom.Var.Type(id="T")
-        self.assertTrue(isinstance(meta, dom.Var.Type))
-        if isinstance(meta, dom.Var.Type):
-            self.assertEqual(meta.id, "T")
+        self.assertTrue(issubclass(dom.VarSpecType, dom.VarType))
+        self.assertTrue(issubclass(dom.VarParamType, dom.VarType))
 
     def test_nominal_schema_opaque(self):
         meta = dom.NominalType.from_str("std.Text")

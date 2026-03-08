@@ -14,9 +14,10 @@ from antlr4 import (
     Token,
 )
 from antlr4.tree.Tree import ErrorNodeImpl, TerminalNodeImpl, ParseTree
+from cyclopts import token
 from protobase import Inmutable, mutate, is_abstract, _
 
-from axis import src, syn
+from axis import src, syn, log
 from ..literals import Wildcard
 
 from .grammar import AxisLexer, AxisParser
@@ -37,6 +38,7 @@ IGNORED_TOKENS = {
 
 
 class Builder(Inmutable):
+    class SyntaxError(log.Report.Exception): ...
 
     source: src.Source.Span
 
@@ -47,7 +49,6 @@ class Builder(Inmutable):
             )
 
         if isinstance(ctx, ErrorNodeImpl):
-            from axis import log
 
             token = ctx.getSymbol()
             message = ctx.getText()
@@ -58,17 +59,27 @@ class Builder(Inmutable):
                 span = self.source
             if isinstance(span, src.Source.Position):
                 span = span.line
-            errnode = syn.SyntaxError()
-            span.tag(errnode)
-
+            # errnode = syn.SyntaxError()
+            # span.tag(errnode)
+            #print(dir(token.source))
             (
-                log.error(
-                    f"Syntax error: Unexpected error node '{token}' {token.source}"
+                
+                log.error(f"Syntax error {token.text!r} at {token.source}").label(
+                    span.tag(syn.SyntaxError())
                 )
-                .label(errnode)
-                .note(message)
-                .throw()
+                # .note()
+                .throw(self.SyntaxError)
             )
+
+            raise self.SyntaxError(message, span)
+            # (
+            #     log.error(
+            #         f"Syntax error: Unexpected error node '{token}' {token.source}"
+            #     )
+            #     .label(errnode)
+            #     .note(message)
+            #     .throw()
+            # )
 
         if isinstance(ctx, (TerminalNodeImpl, TerminalNode)):
             token = ctx.getSymbol()  # type: ignore
@@ -162,7 +173,7 @@ class FromSrcMixin(Inmutable, abstract=True):
     grammar_context_name: ClassVar[str]
     grammar_parser_name: ClassVar[str]
 
-    #span: src.Source.Span | None = None
+    # span: src.Source.Span | None = None
 
     @classmethod
     def __class_post_build__(cls):
@@ -201,7 +212,6 @@ class FromSrcMixin(Inmutable, abstract=True):
 
         lexer = AxisLexer(InputStream(src_span.content))
         parser = AxisParser(CommonTokenStream(lexer))
-        builder = Builder(src_span)
 
         parse = getattr(parser, cls.grammar_parser_name, None)
         if parse is None:
@@ -210,13 +220,19 @@ class FromSrcMixin(Inmutable, abstract=True):
             )
         ast_tree = parse()
 
-        if parser.getNumberOfSyntaxErrors() > 0:
-            raise SyntaxError(f"{src_span}")  # TODO: Only warns
+        # if parser.getNumberOfSyntaxErrors() > 0:
+        #     from axis import log
+        #     log.error(f"Syntax errors found while parsing {src_span}").throw()
+        # raise SyntaxError(f"{src_span}")  # TODO: Only warns
+        builder = Builder(src_span)
 
         self = builder(ast_tree, kwargs)
-        assert isinstance(
-            self, cls
-        ), f"Expected {cls.__qualname__}, got {type(self)}, probably build() returned wrong type"
+
+        if not isinstance(self, cls):
+            raise TypeError(
+                f"Expected {cls.__qualname__} from build(), got {type(self).__qualname__}"
+            )
+
         return self
 
     def with_span_of(self, other: FromSrcMixin) -> Self:

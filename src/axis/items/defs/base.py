@@ -48,7 +48,7 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
                 # assert bound is not None
                 sym = expr.to_sym(key)
 
-                var = binding_cls(sym=key, bound=bound, default=value)
+                var = binding_cls(key=key, bound=bound, default=value)
                 entries.append((expr.to_slot_name(key), var))
             case _:
                 log.error("Unsupported tuple element in block").label(element).throw()

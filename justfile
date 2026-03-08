@@ -18,9 +18,9 @@ test-all:
     done
     @just test
 
-watch:
+watch *ARGS:
     #@just tests
-    watchexec -r -e py,ax -- 'just test && just launch'
+    watchexec -r -e py -- 'just test && just launch {{ARGS}}'
 
 
 docs:

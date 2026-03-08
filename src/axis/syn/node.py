@@ -4,7 +4,7 @@ from typing import Any, Callable, ClassVar, Optional, Self
 from axis import src
 from protobase import Inmutable, classproperty, frozendict, is_abstract
 
-from .building import FromSrcMixin
+from .parsing import FromSrcMixin, Builder
 from .outline import OutlineTree, OutlineRule, OutlineSpec
 
 
@@ -129,7 +129,7 @@ class OutlineNode(Node, abstract=True):
         tree: OutlineTree[type[OutlineNode]],
         parent: Optional[SegregatedOutlineNode] = None,
         **kwargs,
-    ) -> tuple[Self, tuple[SegregatedOutlineNode, ...]]:
+    ) -> tuple[Self | None, tuple[SegregatedOutlineNode, ...]]:
         assert issubclass(tree.tag, EmbeddedOutlineNode) != issubclass(
             tree.tag, SegregatedOutlineNode
         ), "Class must be either Embedded or Segregated"
@@ -141,25 +141,30 @@ class OutlineNode(Node, abstract=True):
 
             if issubclass(child_tree.tag, EmbeddedOutlineNode):
                 child, segnodes = child_tree.tag.from_outline(child_tree, **kwargs)
-                embedded_children.append(child)
+                if child is not None:
+                    embedded_children.append(child)
                 segregated_nodes.extend(segnodes)
 
-        if issubclass(tree.tag, SegregatedOutlineNode):
-            self = tree.tag.from_str(
-                tree.content,
-                children=tuple(embedded_children),
-                parent=parent,
-                **kwargs,
-            )
-            parent = self
-        elif issubclass(tree.tag, EmbeddedOutlineNode):
-            self = tree.tag.from_str(
-                tree.content,
-                children=tuple(embedded_children),
-                **kwargs,
-            )
-        else:
-            raise TypeError("Class must be either Embedded or Segregated")
+        try:
+            if issubclass(tree.tag, SegregatedOutlineNode):
+                self = tree.tag.from_str(
+                    tree.content,
+                    children=tuple(embedded_children),
+                    parent=parent,
+                    **kwargs,
+                )
+                parent = self
+            elif issubclass(tree.tag, EmbeddedOutlineNode):
+                self = tree.tag.from_str(
+                    tree.content,
+                    children=tuple(embedded_children),
+                    **kwargs,
+                )
+            else:
+                raise TypeError("Class must be either Embedded or Segregated")
+        except Builder.SyntaxError as e:
+            e.report.emit()
+            return None, () # ignora los errores sintacticos y sigue procesando..
 
         for child_tree in tree.children:
             if issubclass(child_tree.tag, SegregatedOutlineNode):
@@ -168,7 +173,8 @@ class OutlineNode(Node, abstract=True):
                     parent=parent,
                     **kwargs,
                 )
-                segregated_nodes.append(child)
+                if child is not None:
+                    segregated_nodes.append(child)
                 segregated_nodes.extend(segnodes)
 
         assert isinstance(self, cls)
@@ -205,7 +211,7 @@ class SegregatedOutlineNode[P: OutlineNode](OutlineNode, abstract=True):
         cls,
         src_file: src.Source,
         **kwargs,
-    ) -> tuple[Self, *tuple[SegregatedOutlineNode, ...]]:
+    ) -> tuple[Self | None, *tuple[SegregatedOutlineNode, ...]]:
         tree = cls.parse_outline_tree(src_file)
         # from rich import print
         # print(tree)

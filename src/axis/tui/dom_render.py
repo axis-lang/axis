@@ -6,6 +6,7 @@ from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
 from rich.text import Text
 
 from axis import dom
+from axis.log.report import Report
 
 
 def format_ref(ref: dom.Ref) -> str:
@@ -31,14 +32,16 @@ def render_const(value: dom.Const) -> Text:
 
 
 def format_err(value: dom.Err) -> str:
-    if value.diagnostic is not None:
-        return f"Err({value.diagnostic.message})"
+    report = Report.of(value)
+    if report is not None:
+        return f"Err({report.message})"
     return "Err"
 
 
 def render_err(value: dom.Err) -> RenderableType:
-    if value.diagnostic is not None:
-        return value.diagnostic
+    report = Report.of(value)
+    if report is not None:
+        return report
     return Text(format_err(value))
 
 

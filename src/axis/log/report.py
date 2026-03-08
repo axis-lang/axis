@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from enum import Enum, auto
 
-from typing import NoReturn, Optional, Self, Iterable
+from typing import NoReturn, Optional, Self, Iterable, TYPE_CHECKING
 
 from protobase import Inmutable, Metadata, Record, flux, mutate
 from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.style import Style
 
-from axis import syn, dom
-from axis.src.source import Source
+from axis import syn, dom, src
 
 
-class Report(Inmutable, Metadata[dom.Val]):
+class Report(Inmutable, Metadata["dom.Val"]):
     class Exception(Exception):
         def __init__(self, report: "Report"):
             self.report = report
@@ -45,11 +44,11 @@ class Report(Inmutable, Metadata[dom.Val]):
         style: Optional["Report.LabelStyle"] = None
 
         @property
-        def span(self) -> Source.Span | None:
+        def span(self) -> src.Source.Span | None:
             return getattr(self.ast, "span", None)
 
         @property
-        def source(self) -> Source | None:
+        def source(self) -> src.Source | None:
             span = self.span
             if span is None:
                 return None
@@ -146,12 +145,14 @@ class Report(Inmutable, Metadata[dom.Val]):
         try:
             self.throw(and_show=False)
         except Report.Exception as e:
-            raise RuntimeError("Report emitted without being in a query context. ") # from e
+            raise RuntimeError(
+                "Report emitted without being in a query context. "
+            ) from e
 
-    def throw(self, and_show=True) -> NoReturn:
+    def throw(self, cls: type[Exception] = Exception, and_show=True) -> NoReturn:
         if and_show:
             self.show()
-        raise Report.Exception(self).with_traceback(None)
+        raise cls(self).with_traceback(None)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

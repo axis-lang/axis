@@ -273,7 +273,7 @@ def match_tuple(
             *head_and_tail_count
         )
 
-    except Exception:
+    except ValueError:
         return None
 
     result = syn.MatchResult.empty()

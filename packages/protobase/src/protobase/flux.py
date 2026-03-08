@@ -39,7 +39,7 @@ __all__ = [
     "CycleError",
 ]
 
-ObjT = TypeVar("ObjT", bound=object)
+ObjT = TypeVar("ObjT", bound=object, covariant=True)
 R = TypeVar("R")
 P = ParamSpec("P")
 

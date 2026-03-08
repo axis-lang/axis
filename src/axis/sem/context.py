@@ -4,18 +4,17 @@ from types import NotImplementedType
 from protobase import Consed, flux, _
 from protobase.cached_property import slot_cached_property
 
-from axis import dom, expr, syn, sem
+from axis import dom, syn, sem
 
 
 class Context[P: Context](syn.SegregatedItem[P], abstract=True):
 
     class Binding(Consed, abstract=True):
-        sym: expr.Sym = _
+        key: syn.Expr = _
         bound: syn.Expr | None = None
         default: syn.Expr | None = None
 
-    class Contribution(Consed, abstract=True):
-        anchor: dom.Anchor = _
+    class Contribution(dom.ContributionBase, abstract=True):
         origin: syn.Node = _
         ctx: Context = _
 

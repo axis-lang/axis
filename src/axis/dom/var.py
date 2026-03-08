@@ -1,42 +1,50 @@
 from __future__ import annotations
 
-from typing import cast
+from protobase import Consed, _
 
 from axis import dom
 
 
-class Var(dom.Val):
-    class Type(dom.Type):
-        id: str
+class ContributionBase(dom.Builtin, abstract=True):
+    """Base class for semantic contributions.
 
-    type: "Var.Type"  # type: ignore[override]
-    data: str
+    Defined in dom to break the dom <-> sem circular dependency.
+    sem.Context.Contribution extends this class.
+    """
+
+    anchor: dom.Anchor = _
+
+
+class VarType(dom.Type, abstract=True):
+    """Type of a domain variable, tracing it to its origin contribution."""
+
+
+class VarSpecType(VarType):
+    """Spec-level type variable (universal quantifier)."""
+
+    contribution: ContributionBase = _
+
+
+class VarParamType(VarType):
+    """Param-level variable (existentially constrained by a bound)."""
+
+    contribution: ContributionBase = _
+
+
+class Var(dom.Val, Consed):
+    """A named variable placeholder in the domain.
+
+    type: VarType traces origin (spec vs param, which contribution).
+    data: str is the variable name (scope key).
+    """
+
+    type: VarType = _
+    data: str = _
 
     @classmethod
-    def from_id(cls, ident: str) -> "Var":
-        return cls(type=Var.Type(id=ident), data=ident)
-
-    def __invariants__(self) -> None:
-        if not isinstance(self.data, str) or not self.data:
-            raise TypeError(f"Var.data must be a non-empty string, got {self.data!r}")
-        if cast(Var.Type, self.type).id != self.data:
-            raise TypeError("Var.type id must match Var.data id")
-
-
-class Bound(dom.Pure):
-    type: dom.Type
-    data: dom.Data
+    def spec(cls, name: str, contribution: ContributionBase) -> Var:
+        return cls(type=VarSpecType(contribution=contribution), data=name)
 
     @classmethod
-    def from_literal(cls, value: dom.Literal) -> "Bound":
-        literal = dom.Const.of_literal(value)
-        return cls(type=literal.type, data=literal.data)
-
-    @classmethod
-    def from_ref(cls, ref: dom.Ref) -> "Bound":
-        return cls(type=ref.type, data=ref.data)
-
-    @classmethod
-    def var(cls, ident: str) -> "Bound":
-        return cls(type=Var.Type(id=ident), data=ident)
-
+    def param(cls, name: str, contribution: ContributionBase) -> Var:
+        return cls(type=VarParamType(contribution=contribution), data=name)

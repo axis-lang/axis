@@ -1,13 +1,9 @@
 unit std
 
 def Boolean
-def Natural
 def Whole
 def Integer
 def Decimal
+def Text
 
-def Set V
-def Map[K] V
-
-def Struct[I] V
-
+use alpha.Beta

@@ -101,6 +101,7 @@ flowchart LR
 ## Documentacion interna
 
 - Guia de estilo y patrones de protobase/flux: `docs/style_guide.md`
+- Informe de auditoria del proyecto: `docs/audit.md`
 
 ## Notas
 
