@@ -6,12 +6,13 @@ from typing import Any, Callable, ClassVar, Iterable, Iterator, overload
 from protobase import Consed, cached_property
 
 from axis.dom.map import Map
+from .core import Builtin, Data
 
 __all__ = ["Struct"]
 
 
-class Struct[K, V](Consed):
-    class Shape[SK](Consed):
+class Struct[K: Data, V: Data](Builtin):
+    class Shape[SK: Data](Builtin):
         """
         def Shape[arity] K
 
@@ -51,7 +52,7 @@ class Struct[K, V](Consed):
         def __contains__(self, key: SK) -> bool:
             return key in self.keys
 
-    class Index[IK](Consed):
+    class Index[IK: Data](Builtin):
         """
         def Index[K] Whole
         Index[K]('a', 'b', None, 'x', 'y')
@@ -114,6 +115,8 @@ class Struct[K, V](Consed):
         def has(self):
             return self._keyed_indices.has
 
+    Empty: ClassVar["Struct[Any, Any]"]
+
     index: Index[K]  # Index[L] K
     values: tuple[V, ...]  # inner representation
 
@@ -148,7 +151,7 @@ class Struct[K, V](Consed):
         )
 
     @staticmethod
-    def new[T](*positional: T, **nominal: T) -> Struct[str, T]:
+    def new[T: Data](*positional: T, **nominal: T) -> Struct[str, T]:
         index = Struct.Index((None,) * len(positional) + tuple(nominal.keys()))
         values = positional + tuple(nominal.values())
         return Struct(index, values)
@@ -170,7 +173,7 @@ class Struct[K, V](Consed):
     ) -> "Struct[K, V]":
         return Struct.from_index(Struct.Index(keys), values)
 
-    EMPTY: ClassVar["Struct[Any, Any]"]
+
 
     def __contains__(self, value: V) -> bool:
         return value in self.values
@@ -196,11 +199,11 @@ class Struct[K, V](Consed):
             raise KeyError(f"Key not found: {key}")
         return self.values[offset]
 
-    def map[R](self, func: Callable[[V], R]) -> "Struct[K, R]":
+    def map[R: Data](self, func: Callable[[V], R]) -> "Struct[K, R]":
         return Struct(
             index=self.index,
             values=tuple(func(v) for v in self.values),
         )
 
 
-Struct.EMPTY = Struct(Struct.Index(()), ())
+Struct.Empty = Struct(Struct.Index(()), ())

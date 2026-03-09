@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from typing import ClassVar, Self
+from typing import ClassVar, Self, TYPE_CHECKING
+
+from protobase import Missing, MissingType
 
 from axis import dom
 from .core import Builtin, Data
+
+if TYPE_CHECKING:
+    from .struct import Struct
 
 
 class Type(Builtin, abstract=True):
@@ -22,6 +27,33 @@ class Type(Builtin, abstract=True):
     @property
     def as_val(self) -> dom.Const:
         return dom.Const(type=self.__type__, data=self.__data__)
+
+    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+        """Return the field map for this type, or None if opaque.
+
+        Subclasses override to expose their internal structure.
+        The base implementation returns None (opaque).
+        """
+        return None
+
+    def get(self, data: Data, key: str | int) -> dom.Val:
+        """Access a sub-value by key using cremallera decomposition.
+
+        The type side (self) tells us how to split the data side.
+        Requires dir() to return a Struct (not None).
+        """
+        fields = self.dir(data)
+        if fields is None:
+            raise KeyError(f"No member {key!r} on {type(self).__name__} (opaque)")
+        if isinstance(key, str):
+            offset = fields.index.get(key)
+        elif isinstance(key, int):
+            offset = key
+        else:
+            raise TypeError(f"Unsupported key type: {type(key)}")
+        if not isinstance(data, tuple):
+            raise TypeError(f"Expected tuple data for dir/get, got {type(data).__name__}")
+        return dom.Const(type=fields[offset], data=data[offset])
 
 
 class UnionType(Type):
@@ -57,6 +89,9 @@ class StructType(Type):
             "dom.Type.Struct", dom._literal_struct(*self.fields.index.keys)
         )
 
+    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+        return self.fields
+
 
 class NominalType(Type):
     """
@@ -71,44 +106,34 @@ class NominalType(Type):
         return dom._nominal_type(
             "dom.Type.Nominal",
             dom._struct(
-                spec_ref=dom.type_of(self.spec_ref),
+                spec_ref=self.spec_ref.type.as_val,
             ),
         )
 
-    @classmethod
-    def from_ref(cls, ref: dom.Ref) -> Self:
-        return cls(spec_ref=ref.spec)
-
-    @classmethod
-    def from_str(cls, value: str) -> Self:
-        return cls(spec_ref=dom._spec_ref(value))
-
+    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+        introspector = dom.INTROSPECTOR.get(None)
+        if introspector is not None:
+            return introspector.fields(self)
+        return None
 
 class Qualifier(Type, abstract=True):
-    ANCHOR: ClassVar[str] = "dom.Type.Qual"
+    ANCHOR: ClassVar[str] = "dom.Qual"
 
     underlying: Type
 
 
 class NominalQualifier(Qualifier):
-    ANCHOR: ClassVar[str] = "dom.Type.Qual.Nominal"
+    ANCHOR: ClassVar[str] = "dom.Qual.Nominal"
 
-    ref_spec: dom.SpecType
+    spec_ref: dom.Spec
 
     @property
     def __type__(self) -> Type:
         return dom._nominal_type(
-            "dom.Type.Qual.Nominal",
+            "dom.Qual.Nominal",
             dom._struct(
-                ref_spec=self.ref_spec.as_val,
+                spec_ref=self.spec_ref.type.as_val,
                 underlying=self.underlying.as_val,
             ),
         )
 
-    @classmethod
-    def from_ref(cls, ref: dom.Ref, underlying: Type) -> Self:
-        return cls(ref_spec=ref.spec.type, underlying=underlying)
-
-    @classmethod
-    def from_str(cls, value: str, underlying: Type) -> Self:
-        return cls.from_ref(dom.Anchor.from_str(value), underlying)

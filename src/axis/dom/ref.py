@@ -3,10 +3,12 @@ from __future__ import annotations
 from protobase import _
 
 from axis import dom
-from .type_ import Type
+from .type_ import Type, Data, Missing, MissingType
 
 
 class RefType(Type, abstract=True): ...
+    # NOTE: Podemos modelar Ref como un Tuple[...] Ref.Step
+    
 
 
 class Ref(dom.Pure, abstract=True):
@@ -28,9 +30,10 @@ class AnchorType(RefType):
     def __type__(self) -> Type:
         return dom._nominal_type("dom.Ref.Anchor")
 
-    @property
-    def __data__(self) -> dom.Data:
-        return ()
+    def dir(
+        self, data: Data | MissingType = Missing
+    ) -> dom.Struct[str, Type] | None:
+        return None
 
 
 type AnchorSegments = tuple[str, ...]
@@ -42,14 +45,17 @@ class Anchor(Ref):
 
     def __repr__(self) -> str:
         from axis.tui import render_dom
+
         return render_dom.format_dom(self)
 
     def __rich__(self):
         from axis.tui import render_dom
+
         return render_dom.render_dom(self)
 
     def __rich_console__(self, console, options):
         from axis.tui import render_dom
+
         yield from render_dom.rich_console_dom(self, console, options)
 
     def __str__(self) -> str:
@@ -121,9 +127,11 @@ class SpecType(RefType):
             ),
         )
 
-    @property
-    def __data__(self) -> dom.Data:
-        return (self.anchor.as_val.data, self.spec.as_val.data if self.spec else None)
+    def dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
+        return dom.Struct.new(
+            anchor=self.anchor,
+            spec=self.spec or dom.native_type(None),
+        )
 
 
 type SpecData = tuple[AnchorSegments, dom.Data]
@@ -135,14 +143,17 @@ class Spec(Ref):
 
     def __repr__(self) -> str:
         from axis.tui import render_dom
+
         return render_dom.format_dom(self)
 
     def __rich__(self):
         from axis.tui import render_dom
+
         return render_dom.render_dom(self)
 
     def __rich_console__(self, console, options):
         from axis.tui import render_dom
+
         yield from render_dom.rich_console_dom(self, console, options)
 
     @property

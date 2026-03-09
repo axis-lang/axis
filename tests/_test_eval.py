@@ -19,7 +19,7 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(result.data, 12)
         self.assertTrue(isinstance(result.type, dom.NominalType))
         if isinstance(result.type, dom.NominalType):
-            self.assertEqual(dom.ref_segments(result.type.spec), ("std", "Decimal"))
+            self.assertEqual(dom.ref_segments(result.type.spec_ref), ("std", "Decimal"))
 
     def test_eval_additive(self):
         result = self.eval("1 + 2")
@@ -98,14 +98,14 @@ class EvalTest(unittest.TestCase):
         mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
             dom.Const.new_struct(K)
         )
-        result = dom.Const.new_qual(ref_spec=mapping_spec, underlying=V)
+        result = dom.Const.new_qual(spec_ref=mapping_spec, underlying=V)
 
         # type side: NominalQualifier with SpecType and VarSpecType
         self.assertIsInstance(result.type, dom.NominalQualifier)
-        self.assertIsInstance(result.type.ref_spec, dom.SpecType)
+        self.assertIsInstance(result.type.spec_ref, dom.SpecType)
         self.assertEqual(result.type.underlying, dom.VarSpecType(contribution=contrib))
 
-        # data side: (underlying.data, ref_spec.data)
+        # data side: (underlying.data, spec_ref.data)
         self.assertEqual(result.data[0], "V")
         self.assertEqual(result.data[1], (("std", "Mapping"), ("K",)))
 
@@ -121,13 +121,13 @@ class EvalTest(unittest.TestCase):
         mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
             dom.Const.new_struct(K)
         )
-        inner = dom.Const.new_qual(ref_spec=mapping_spec, underlying=V)
+        inner = dom.Const.new_qual(spec_ref=mapping_spec, underlying=V)
 
         # outer: Array[2,2] (Mapping[K] V)
         array_spec = dom.Anchor.from_str("std.Array").specialize(
             dom.Const.new_struct(two, two)
         )
-        outer = dom.Const.new_qual(ref_spec=array_spec, underlying=inner)
+        outer = dom.Const.new_qual(spec_ref=array_spec, underlying=inner)
 
         # type side: nested NominalQualifiers
         self.assertIsInstance(outer.type, dom.NominalQualifier)

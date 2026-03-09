@@ -93,9 +93,7 @@ def _union(types: frozenset[Type], active: Pure | Var) -> Const[UnionType]:
     """
     union_type = _union_type(*types)
     if active.type not in union_type.types:
-        raise TypeError(
-            f"Active variant type {active.type} is not in the union types"
-        )
+        raise TypeError(f"Active variant type {active.type} is not in the union types")
     return Const(
         type=union_type,
         data=(active.type, active.data),
@@ -107,6 +105,13 @@ def _nominal_type(anchor: str | Anchor, struct: Const | None = None) -> NominalT
         anchor = _anchor(anchor)
 
     return NominalType(spec_ref=_spec_ref(anchor, struct))
+
+def _nominal_qual(anchor: str | Anchor, struct: Const | None = None, *, underlying: Type) -> NominalQualifier:
+    if isinstance(anchor, str):
+        anchor = _anchor(anchor)
+
+    return NominalQualifier(spec_ref=_spec_ref(anchor, struct), underlying=underlying)
+
 
 
 def _literal(value: Literal | None) -> Const:
@@ -131,13 +136,14 @@ INTEGER_TYPE = _nominal_type("std.Integer")
 DECIMAL_TYPE = _nominal_type("std.Decimal")
 TEXT_TYPE = _nominal_type("std.Text")
 
-TYPE_BY_NATIVE = {
+TYPE_BY_NATIVE: dict[type[Literal] | None, Type] = {
     bool: BOOLEAN_TYPE,
     int: INTEGER_TYPE,
     float: DECIMAL_TYPE,
     Decimal: DECIMAL_TYPE,
     str: TEXT_TYPE,
     type(None): EMPTY_TYPE,
+    None: EMPTY_TYPE,
 }
 
 
@@ -147,7 +153,16 @@ def type_of(val: Val) -> Const:
     return val.type.as_val
 
 
+def native_type(t: type[Literal] | None) -> Type:
+    if t is None:
+        t = type(None)
+    if t not in TYPE_BY_NATIVE:
+        raise TypeError(f"No dom type mapping for native type {t.__name__}")
+    return TYPE_BY_NATIVE[t]
+
+
 # --- Encoding: Builtin-rich → raw (JSON-like) ---
+
 
 def _encode(v: Data) -> Data:
     """Encode dom data to raw (JSON-like) form by stripping Builtins."""
@@ -164,70 +179,18 @@ def _encode(v: Data) -> Data:
     return v
 
 
-# --- Introspection: _dir / _get ---
+# --- Introspection: dir / get ---
 
-def _dir(val: Val) -> tuple[str | int, ...]:
-    """List accessible member keys of a value (cremallera decomposition)."""
+
+def dir(val: Val) -> Struct[str, Type] | None:
+    """Return the field map of a value, or Missing if opaque."""
     if not isinstance(val, Pure):
-        return ()
-    t = val.type
-    if isinstance(t, StructType):
-        return tuple(
-            k if k is not None else i
-            for i, k in enumerate(t.fields.index.keys)
-        )
-    elif isinstance(t, NominalQualifier):
-        # Qualifier _dir is disabled — rendering accesses type structure directly
-        return ()
-    elif isinstance(t, UnionType):
-        return ('discriminator', 'value')
-    elif isinstance(t, NominalType):
-        introspector = INTROSPECTOR.get(None)
-        if introspector is not None:
-            fields = introspector.fields(t)
-            if fields is not None:
-                return tuple(
-                    k if k is not None else i
-                    for i, k in enumerate(fields.index.keys)
-                )
-    return ()
+        return None
+    return val.type.dir(val.data)
 
 
-def _get(val: Val, key: str | int) -> Val:
-    """Access a sub-value by key (cremallera decomposition).
-
-    The type side tells us how to split the data side into sub-values.
-    """
+def get(val: Val, key: str | int) -> Val:
+    """Access a sub-value by key (cremallera decomposition)."""
     if not isinstance(val, Pure):
         raise TypeError(f"Cannot access member on {type(val).__name__}")
-    t, d = val.type, val.data
-    if isinstance(t, StructType) and isinstance(d, tuple):
-        if isinstance(key, str):
-            offset = t.fields.index.get(key)
-        elif isinstance(key, int):
-            offset = key
-        else:
-            raise TypeError(f"Unsupported key type: {type(key)}")
-        return Const(type=t.fields[offset], data=d[offset])
-    elif isinstance(t, NominalQualifier):
-        # Qualifier _get is disabled — return empty sentinel
-        return Const(type=EMPTY_TYPE, data=None)
-    elif isinstance(t, UnionType) and isinstance(d, tuple):
-        discriminator, value_data = d
-        if key == 'discriminator':
-            return discriminator.as_val
-        elif key == 'value':
-            return Const(type=discriminator, data=value_data)
-    elif isinstance(t, NominalType) and isinstance(d, tuple):
-        introspector = INTROSPECTOR.get(None)
-        if introspector is not None:
-            fields = introspector.fields(t)
-            if fields is not None:
-                if isinstance(key, str):
-                    offset = fields.index.get(key)
-                elif isinstance(key, int):
-                    offset = key
-                else:
-                    raise TypeError(f"Unsupported key type: {type(key)}")
-                return Const(type=fields[offset], data=d[offset])
-    raise KeyError(f"No member {key!r} on {type(t).__name__}")
+    return val.type.get(val.data, key)

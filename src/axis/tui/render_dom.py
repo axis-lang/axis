@@ -1,7 +1,7 @@
 """Dom value rendering — text and Rich.
 
 Replaces the old dom_render.py with a recursive renderer based on
-cremallera decomposition (_dir/_get) and direct type-structure access
+cremallera decomposition (dir/get) and direct type-structure access
 for qualifiers.
 
 Exports:
@@ -84,7 +84,7 @@ def _format_type(t: dom.Type) -> str:
     elif isinstance(t, dom.UnionType):
         return " | ".join(_format_type(m) for m in t.types)
     elif isinstance(t, dom.NominalQualifier):
-        ref_str = _spec_text(t.ref_spec)
+        ref_str = _spec_text(t.spec_ref.type)
         under_str = _format_type(t.underlying)
         return f"{ref_str} {under_str}"
     elif isinstance(t, dom.VarSpecType):
@@ -154,7 +154,7 @@ def _format_const(val: dom.Const) -> str:
         active = dom.Const(type=discriminator, data=value_data)
         return format_dom(active)
 
-    # Qualifier: juxtaposition — ref_spec[params] underlying
+    # Qualifier: juxtaposition — spec_ref[params] underlying
     if isinstance(t, dom.NominalQualifier) and isinstance(val.data, tuple):
         return _format_qualifier(val)
 
@@ -174,14 +174,14 @@ def _format_const(val: dom.Const) -> str:
 
 
 def _format_qualifier(val: dom.Const) -> str:
-    """Format NominalQualifier: ref_spec[params] underlying."""
+    """Format NominalQualifier: spec_ref[params] underlying."""
     t = val.type
     assert isinstance(t, dom.NominalQualifier)
     assert isinstance(val.data, tuple)
 
-    # Build the Spec value from type.ref_spec and data[1]
-    ref_spec = dom.Spec(type=t.ref_spec, data=val.data[1])
-    ref_str = _format_spec(ref_spec)
+    # Build the Spec value from type.spec_ref and data[1]
+    spec_ref = dom.Spec(type=t.spec_ref.type, data=val.data[1])
+    ref_str = _format_spec(spec_ref)
 
     # Build the underlying value
     underlying = dom.Const(type=t.underlying, data=val.data[0])
@@ -216,15 +216,15 @@ def _format_nominal(val: dom.Const) -> str:
     if _is_std_literal(t):
         return _format_std_literal(anchor[1], val.data)
 
-    # dom.* and others: show spec path + data repr via _dir/_get
+    # dom.* and others: show spec path + data repr via dir/get
     anchor_str = _anchor_path(anchor)
-    members = dom._dir(val)
-    if members:
+    fields = dom.dir(val)
+    if fields is not None:
         parts: list[str] = []
-        for key in members:
-            member = dom._get(val, key)
+        for i, key in enumerate(fields.index.keys):
+            member = dom.get(val, key if key is not None else i)
             member_str = format_dom(member)
-            if isinstance(key, str):
+            if key is not None:
                 parts.append(f"{key}={member_str}")
             else:
                 parts.append(member_str)
@@ -330,14 +330,14 @@ def _render_const(val: dom.Const) -> Text:
 
 
 def _render_qualifier(val: dom.Const) -> Text:
-    """Render NominalQualifier: ref_spec[params] underlying."""
+    """Render NominalQualifier: spec_ref[params] underlying."""
     t_type = val.type
     assert isinstance(t_type, dom.NominalQualifier)
     assert isinstance(val.data, tuple)
 
     t = Text()
-    ref_spec = dom.Spec(type=t_type.ref_spec, data=val.data[1])
-    t.append_text(_render_spec(ref_spec))
+    spec_ref = dom.Spec(type=t_type.spec_ref.type, data=val.data[1])
+    t.append_text(_render_spec(spec_ref))
     t.append(" ")
     underlying = dom.Const(type=t_type.underlying, data=val.data[0])
     t.append_text(_as_rich_text(render_dom(underlying)))
@@ -374,18 +374,18 @@ def _render_nominal(val: dom.Const) -> Text:
     if _is_std_literal(t_type):
         return _render_std_literal(anchor[1], val.data)
 
-    # dom.* and others: spec path + data via _dir/_get
+    # dom.* and others: spec path + data via dir/get
     t = Text()
     anchor_str = _anchor_path(anchor)
     t.append(anchor_str, style=_ANCHOR_STYLE)
-    members = dom._dir(val)
-    if members:
+    fields = dom.dir(val)
+    if fields is not None:
         t.append("(", style=_PUNCT_STYLE)
-        for idx, key in enumerate(members):
-            if idx > 0:
+        for i, key in enumerate(fields.index.keys):
+            if i > 0:
                 t.append(", ", style=_PUNCT_STYLE)
-            member = dom._get(val, key)
-            if isinstance(key, str):
+            member = dom.get(val, key if key is not None else i)
+            if key is not None:
                 t.append(f"{key}", style=_ANCHOR_STYLE)
                 t.append("=", style=_PUNCT_STYLE)
             t.append_text(_as_rich_text(render_dom(member)))

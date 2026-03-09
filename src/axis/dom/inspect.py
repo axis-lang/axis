@@ -2,7 +2,7 @@
 
 Provides an `Introspector` protocol and a `ContextVar`-based mechanism
 for resolving nominal types into their structural fields.  This powers
-the `_dir`/`_get` decomposition for opaque NominalType values whose
+the `dir`/`get` decomposition for opaque NominalType values whose
 internal structure is known only through Python annotations.
 """
 from __future__ import annotations
@@ -10,9 +10,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Protocol, runtime_checkable, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from axis.dom.struct import Struct
-    from axis.dom.type_ import NominalType, Type
+from axis import dom
 
 
 @runtime_checkable
@@ -24,7 +22,7 @@ class Introspector(Protocol):
     is opaque / not introspectable.
     """
 
-    def fields(self, type: NominalType) -> Struct[str, Type] | None:
+    def fields(self, type: dom.NominalType) -> dom.Struct[str, dom.Type] | None:
         """Return the field names and types of a nominal type, or None."""
         ...
 
@@ -33,3 +31,4 @@ INTROSPECTOR: ContextVar[Introspector | None] = ContextVar(
     "axis.dom.inspect.INTROSPECTOR",
     default=None,
 )
+

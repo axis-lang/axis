@@ -5,10 +5,13 @@ from typing import Callable, Iterable, Iterator, Optional, Self, overload
 
 from protobase import Consed, frozendict
 
+from .core import Builtin, Data
+
 
 __all__ = ["Map"]
 
-class Map[K, V](Consed):
+
+class Map[K: Data, V: Data](Builtin):
     "def Map[K] V"
 
     _inner: frozendict[K, V]
@@ -49,7 +52,5 @@ class Map[K, V](Consed):
     def has(self, key: K) -> bool:
         return key in self._inner
 
-    def apply[R](self, fn: Callable[[V], R]) -> Map[K, R]:
+    def apply[R: Data](self, fn: Callable[[V], R]) -> Map[K, R]:
         return Map(frozendict((k, fn(v)) for k, v in self._inner.items()))
-
-    

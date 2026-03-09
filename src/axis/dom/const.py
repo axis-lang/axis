@@ -39,19 +39,6 @@ class Const[T: dom.Type = Any, D: dom.Data = Any](dom.Pure[T, D]):
         return dom._struct(*positional, **nominal)
 
 
-    @staticmethod
-    def new_qual(
-        ref_spec: dom.Spec,
-        underlying: dom.Pure | dom.Var,
-    ) -> dom.Const[dom.NominalQualifier]:
-        return Const(
-            type=dom.NominalQualifier(
-                ref_spec=ref_spec.type,
-                underlying=underlying.type,
-            ),
-            data=(underlying.data, ref_spec.data),
-        )
-
 
     @staticmethod
     def new_union(
@@ -59,9 +46,3 @@ class Const[T: dom.Type = Any, D: dom.Data = Any](dom.Pure[T, D]):
         active: dom.Pure | dom.Var,
     ) -> dom.Const[dom.UnionType]:
         return dom._union(types, active)
-
-    @property
-    def encode(self) -> Const:
-        """Encode data side to raw (JSON-like) form; type side stays intact."""
-        return Const(type=self.type, data=dom._encode(self.data))
-

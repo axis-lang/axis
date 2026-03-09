@@ -1,4 +1,3 @@
-
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
@@ -6,12 +5,25 @@ from inspect import getattr_static
 from pathlib import Path
 from re import Pattern
 from types import GenericAlias, UnionType, GetSetDescriptorType, MemberDescriptorType
-from typing import Any, ForwardRef, Self, cast, get_args, get_origin, Union, TypeAliasType, TypeVar, TYPE_CHECKING
+from typing import (
+    Any,
+    ForwardRef,
+    Self,
+    cast,
+    dataclass_transform,
+    get_args,
+    get_origin,
+    Union,
+    TypeAliasType,
+    TypeVar,
+    TYPE_CHECKING,
+)
 
 from .derived import derived
 from .object import attr_info_of
 from .record import Record, impl_hash_method
 from .type import Type
+from .missing import Missing, MissingType
 
 __all__ = [
     "Inmutable",
@@ -26,7 +38,7 @@ _INMUTABLE_TYPES: set[type] = {
     type,
     type(None),
     type(...),
-    #type(lambda: None), # function es inmutable, 
+    # type(lambda: None), # function es inmutable,
     bool,
     int,
     float,
@@ -43,13 +55,14 @@ _INMUTABLE_TYPES: set[type] = {
     Enum,
 }
 
+
 def register_inmutable(*types: type):
     _INMUTABLE_TYPES.update(types)
+
 
 def inmutable(cls: type):
     _INMUTABLE_TYPES.add(cls)
     return cls
-
 
 
 def is_inmutable(cls: type) -> bool:
@@ -98,11 +111,10 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
         return
 
     if tp in (Self, Ellipsis):
-        return # a priori lo damos por bueno
+        return  # a priori lo damos por bueno
 
     if tp is type:
         return True
-
 
     if isinstance(tp, TypeVar):
         if tp.__bound__ is not None:
@@ -117,13 +129,12 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
     #     for arg in get_args(tp):
     #         check_inmutable(arg)
     #     return
-    
+
     if isinstance(tp, UnionType) or get_origin(tp) is Union:
         for arg in get_args(tp):
             check_inmutable(arg, _seen_aliases)
         return
-    
-    
+
     if isinstance(tp, type):
         if not is_inmutable(tp):
             raise TypeError(f"Type '{tp}' is not a know inmutable.")
@@ -146,8 +157,8 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
     origin_type = cast(type, origin)
     if not is_inmutable(origin_type):
         raise TypeError(f"Type '{tp}' is not a know inmutable.")
-    
-    #check_inmutable(origin)
+
+    # check_inmutable(origin)
 
     args = get_args(tp)
     if not args:
@@ -156,7 +167,7 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
     for arg in args:
         check_inmutable(arg, _seen_aliases)
 
-    #raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")
+    # raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")
 
 
 _FROZEN_SET_BLOCKLIST = (MemberDescriptorType, GetSetDescriptorType)
@@ -173,7 +184,7 @@ def _frozen_setattr(self, name, value):
         f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
     )
 
-
+@dataclass_transform(eq_default=True, order_default=True, frozen_default=True, field_specifiers=(MissingType,))
 class Inmutable(Record, abstract=True):
     @staticmethod
     def __class_build__(bld: Type.Builder):
@@ -192,9 +203,7 @@ class Inmutable(Record, abstract=True):
             try:
                 check_inmutable(attr.type)
             except TypeError as exc:
-                exc.add_note(
-                    f"Attribute {nm!r} of {cls.__name__!r} is not inmutable"
-                )
+                exc.add_note(f"Attribute {nm!r} of {cls.__name__!r} is not inmutable")
                 inmutability_errors.append(exc)
 
         if inmutability_errors:
@@ -203,7 +212,17 @@ class Inmutable(Record, abstract=True):
                 inmutability_errors,
             )
 
-    if not TYPE_CHECKING:
+    if TYPE_CHECKING:
+
+        def __structural_hash__(self) -> int: ...
+        def __hash__(self) -> int: ...
+        def __copy__(self) -> Self: ...
+        def __deepcopy__(self, memo) -> Self: ...
+        def __eq__(self, value) -> bool: ...
+            
+
+    else:
+
         @derived(impl_hash_method)
         def __structural_hash__(self): ...
 
@@ -220,4 +239,3 @@ class Inmutable(Record, abstract=True):
 
         def __deepcopy__(self, memo):
             return self
-    

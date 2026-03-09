@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any, Union, Self, cast
 
 from protobase import Inmutable, Consed, frozendict, attrs_of
-
 from axis import dom
 from rich.console import Console, ConsoleOptions, RenderResult
 
@@ -39,7 +38,6 @@ type Data = Union[
 ]
 
 
-
 class Val(Inmutable, abstract=True):
 
     def __repr__(self) -> str:
@@ -62,6 +60,11 @@ class Val(Inmutable, abstract=True):
         yield from render_dom.rich_console_dom(self, console, options)
 
 
-class Pure[T: "dom.Type" = Any, D: Data = Any](Val, Consed, abstract=True):
+class Pure[T: "dom.Type" = Any, D: "dom.Data" = Any](Val, Consed, abstract=True):
     type: T
     data: D
+
+    @property
+    def encoded(self) -> Self:
+        """Encode data side to raw (JSON-like) form; type side stays intact."""
+        return self.__class__(type=self.type, data=cast(D, dom._encode(self.data)))

@@ -21,7 +21,7 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
     if block_expr is None:
         if inline_expr is not None:
             log.error("Inline tuple ignored; block required").label(inline_expr).emit()
-        return dom.Struct.EMPTY
+        return dom.Struct.Empty
 
     # if inline_expr is not None:
     #     prefix, variadic = inline_expr.inline_prefix

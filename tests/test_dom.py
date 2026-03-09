@@ -164,16 +164,6 @@ class TestStructWithVars(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestNominalType(unittest.TestCase):
-    def test_from_str(self):
-        nt = dom.NominalType.from_str("std.Text")
-        self.assertIsInstance(nt, dom.NominalType)
-        self.assertEqual(dom.ref_segments(nt.spec_ref), ("std", "Text"))
-
-    def test_from_ref(self):
-        ref = dom.Anchor.from_str("std.Array")
-        nt = dom.NominalType.from_ref(ref)
-        self.assertIsInstance(nt, dom.NominalType)
-        self.assertEqual(dom.ref_segments(nt.spec_ref), ("std", "Array"))
 
     def test_predefined_constants(self):
         """All std.* constants should be NominalType instances."""
@@ -189,7 +179,7 @@ class TestNominalType(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Qualifier (cremallera: type = NominalQualifier, data = (underlying, ref_spec))
+# Qualifier (cremallera: type = NominalQualifier, data = (underlying, spec_ref))
 # ---------------------------------------------------------------------------
 
 class TestQualifier(unittest.TestCase):
@@ -199,46 +189,34 @@ class TestQualifier(unittest.TestCase):
         self.K = dom.Var.spec("K", self.contrib)
         self.V = dom.Var.spec("V", self.contrib)
 
-    def test_new_qual_simple(self):
-        """Mapping[K] V — single qualifier."""
-        mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
-            dom.Const.new_struct(self.K)
-        )
-        result = dom.Const.new_qual(ref_spec=mapping_spec, underlying=self.V)
 
-        self.assertIsInstance(result.type, dom.NominalQualifier)
-        self.assertIsInstance(result.type.ref_spec, dom.SpecType)
-        self.assertEqual(result.type.underlying, self.V.type)
-        # data side: (underlying.data, ref_spec.data)
-        self.assertEqual(result.data[0], "V")
-        self.assertEqual(result.data[1], (("std", "Mapping"), ("K",)))
 
-    def test_new_qual_chained(self):
-        """Array[2,2] Mapping[K] V — chained qualifiers (nested cremallera)."""
-        two = dom.Const.new_literal(2)
+    # def test_new_qual_chained(self):
+    #     """Array[2,2] Mapping[K] V — chained qualifiers (nested cremallera)."""
+    #     two = dom.Const.new_literal(2)
 
-        # inner: Mapping[K] V
-        mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
-            dom.Const.new_struct(self.K)
-        )
-        inner = dom.Const.new_qual(ref_spec=mapping_spec, underlying=self.V)
+    #     # inner: Mapping[K] V
+    #     mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
+    #         dom.Const.new_struct(self.K)
+    #     )
+    #     inner = dom.Const.new_qual(spec_ref=mapping_spec, underlying=self.V)
 
-        # outer: Array[2,2] (Mapping[K] V)
-        array_spec = dom.Anchor.from_str("std.Array").specialize(
-            dom.Const.new_struct(two, two)
-        )
-        outer = dom.Const.new_qual(ref_spec=array_spec, underlying=inner)
+    #     # outer: Array[2,2] (Mapping[K] V)
+    #     array_spec = dom.Anchor.from_str("std.Array").specialize(
+    #         dom.Const.new_struct(two, two)
+    #     )
+    #     outer = dom.Const.new_qual(spec_ref=array_spec, underlying=inner)
 
-        # type side: nested NominalQualifiers
-        self.assertIsInstance(outer.type, dom.NominalQualifier)
-        self.assertIsInstance(outer.type.underlying, dom.NominalQualifier)
-        self.assertEqual(outer.type.underlying.underlying, self.V.type)
+    #     # type side: nested NominalQualifiers
+    #     self.assertIsInstance(outer.type, dom.NominalQualifier)
+    #     self.assertIsInstance(outer.type.underlying, dom.NominalQualifier)
+    #     self.assertEqual(outer.type.underlying.underlying, self.V.type)
 
-        # data side
-        inner_data = outer.data[0]
-        array_data = outer.data[1]
-        self.assertEqual(inner_data, ("V", (("std", "Mapping"), ("K",))))
-        self.assertEqual(array_data, (("std", "Array"), (2, 2)))
+    #     # data side
+    #     inner_data = outer.data[0]
+    #     array_data = outer.data[1]
+    #     self.assertEqual(inner_data, ("V", (("std", "Mapping"), ("K",))))
+    #     self.assertEqual(array_data, (("std", "Array"), (2, 2)))
 
 
 # ---------------------------------------------------------------------------
@@ -297,9 +275,9 @@ class TestUnion(unittest.TestCase):
 
     def test_invariants_rejects_nested(self):
         """Direct UnionType() with nested UnionType violates __invariants__."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
         ab = dom.UnionType(types=frozenset({A, B}))
         # Direct construction with a nested UnionType is allowed by Consed,
         # but __invariants__ catches it.
@@ -309,8 +287,8 @@ class TestUnion(unittest.TestCase):
 
     def test_invariants_accepts_flat(self):
         """Flat UnionType passes __invariants__."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
         union = dom.UnionType(types=frozenset({A, B}))
         union.__invariants__()  # should not raise
 
@@ -324,9 +302,9 @@ class TestUnion(unittest.TestCase):
 
     def test_union_type_flatten_nested(self):
         """_union_type(A|B, C) flattens to {A, B, C}."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
         ab = dom.UnionType(types=frozenset({A, B}))
         abc = dom._union_type(ab, C)
         self.assertEqual(len(abc.types), 3)
@@ -334,10 +312,10 @@ class TestUnion(unittest.TestCase):
 
     def test_union_type_flatten_deeply_nested(self):
         """_union_type flattens ((A|B)|C, D) → {A, B, C, D}."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
-        D = dom.NominalType.from_str("D")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
+        D = dom._nominal_type("D")
         ab = dom.UnionType(types=frozenset({A, B}))
         # ab is flat, use _union_type for the rest
         abc = dom._union_type(ab, C)
@@ -347,10 +325,10 @@ class TestUnion(unittest.TestCase):
 
     def test_union_type_flatten_both_sides(self):
         """_union_type(A|B, C|D) flattens to {A, B, C, D}."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
-        D = dom.NominalType.from_str("D")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
+        D = dom._nominal_type("D")
         ab = dom.UnionType(types=frozenset({A, B}))
         cd = dom.UnionType(types=frozenset({C, D}))
         abcd = dom._union_type(ab, cd)
@@ -358,15 +336,15 @@ class TestUnion(unittest.TestCase):
 
     def test_union_type_no_op_when_flat(self):
         """_union_type on already-flat types is a no-op."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
         union = dom._union_type(A, B)
         self.assertEqual(len(union.types), 2)
 
     def test_union_type_deduplicates(self):
         """_union_type(A|B, A) deduplicates to {A, B}."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
         ab = dom.UnionType(types=frozenset({A, B}))
         aba = dom._union_type(ab, A)
         self.assertEqual(len(aba.types), 2)
@@ -374,9 +352,9 @@ class TestUnion(unittest.TestCase):
 
     def test_union_type_result_passes_invariants(self):
         """_union_type always produces a flat result."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
         ab = dom.UnionType(types=frozenset({A, B}))
         result = dom._union_type(ab, C)
         result.__invariants__()  # must not raise
@@ -422,9 +400,9 @@ class TestUnion(unittest.TestCase):
 
     def test_union_flattens_via_union(self):
         """_union flattens types that contain nested UnionTypes."""
-        A = dom.NominalType.from_str("A")
-        B = dom.NominalType.from_str("B")
-        C = dom.NominalType.from_str("C")
+        A = dom._nominal_type("A")
+        B = dom._nominal_type("B")
+        C = dom._nominal_type("C")
         ab = dom.UnionType(types=frozenset({A, B}))
         val = dom.Const(type=A, data=None)
         # Pass frozenset containing a UnionType — _union should flatten
@@ -432,41 +410,26 @@ class TestUnion(unittest.TestCase):
         self.assertEqual(len(union.type.types), 3)
         self.assertEqual(union.type.types, frozenset({A, B, C}))
 
-    # --- _dir / _get ---
+    # --- dir / get ---
 
     def test_dir_union(self):
-        """Union values expose discriminator and value."""
+        """Union dir returns Missing (unions resolved at construction)."""
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        self.assertEqual(dom._dir(union), ('discriminator', 'value'))
+        self.assertIs(dom.dir(union), None)
 
-    def test_get_union_discriminator(self):
-        """_get(union, 'discriminator') returns the active type as a value."""
-        int_val = dom.Const.new_literal(42)
-        types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
-        union = dom.Const.new_union(types, int_val)
-        disc = dom._get(union, 'discriminator')
-        self.assertIsInstance(disc, dom.Const)
-        self.assertIs(disc.data, dom.INTEGER_TYPE)
-
-    def test_get_union_value(self):
-        """_get(union, 'value') returns the active variant."""
-        int_val = dom.Const.new_literal(42)
-        types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
-        union = dom.Const.new_union(types, int_val)
-        val = dom._get(union, 'value')
-        self.assertIsInstance(val, dom.Const)
-        self.assertEqual(val.data, 42)
-        self.assertIs(val.type, dom.INTEGER_TYPE)
-
-    def test_get_union_invalid_key(self):
-        """_get on union with invalid key raises KeyError."""
+    def test_get_union_raises(self):
+        """get on union raises KeyError (opaque — resolved at construction)."""
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
         with self.assertRaises(KeyError):
-            dom._get(union, 'nonexistent')
+            dom.get(union, 'discriminator')
+        with self.assertRaises(KeyError):
+            dom.get(union, 'value')
+        with self.assertRaises(KeyError):
+            dom.get(union, 'nonexistent')
 
     def test_union_with_var_types(self):
         """Union over type variables with one active."""
@@ -525,14 +488,13 @@ class TestSelfDescription(unittest.TestCase):
 
     def test_qualifier_type_as_val(self):
         """NominalQualifier.as_val should work."""
-        ref_type = dom.SpecType(anchor=dom.AnchorType(), spec=None)
-        qual = dom.NominalQualifier(ref_spec=ref_type, underlying=dom.TEXT_TYPE)
+        qual = dom._nominal_qual(anchor="test.foo", underlying=dom.TEXT_TYPE)  # type: ignore
         val = qual.as_val
         self.assertIsInstance(val, dom.Const)
         self.assertIsInstance(val.type, dom.NominalType)
         self.assertEqual(
             dom.ref_segments(val.type.spec_ref),
-            ("dom", "Type", "Qual", "Nominal"),
+            ("dom", "Qual", "Nominal"),
         )
 
     def test_var_spec_type_as_val(self):
@@ -602,40 +564,44 @@ class TestEncode(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# _dir / _get: cremallera decomposition
+# dir / get: cremallera decomposition
 # ---------------------------------------------------------------------------
 
 class TestDirGet(unittest.TestCase):
     def test_dir_struct_positional(self):
         val = dom._literal_struct(1, 2, 3)
-        keys = dom._dir(val)
-        self.assertEqual(keys, (0, 1, 2))
+        fields = dom.dir(val)
+        self.assertIsInstance(fields, dom.Struct)
+        self.assertEqual(fields.index.keys, (None, None, None))
+        self.assertEqual(fields.arity, 3)
 
     def test_dir_struct_named(self):
         val = dom._literal_struct(x=1, y=2)
-        keys = dom._dir(val)
-        self.assertEqual(keys, ("x", "y"))
+        fields = dom.dir(val)
+        self.assertIsInstance(fields, dom.Struct)
+        self.assertEqual(fields.index.keys, ("x", "y"))
 
     def test_dir_struct_mixed(self):
-        """Positional fields get int keys, named fields get str keys."""
+        """Positional fields get None keys, named fields get str keys."""
         val = dom._literal_struct(1, x=2)
-        keys = dom._dir(val)
-        self.assertEqual(keys, (0, "x"))
+        fields = dom.dir(val)
+        self.assertIsInstance(fields, dom.Struct)
+        self.assertEqual(fields.index.keys, (None, "x"))
 
     def test_get_struct_by_name(self):
         val = dom._literal_struct(x=42, y="hello")
-        x = dom._get(val, "x")
+        x = dom.get(val, "x")
         self.assertIsInstance(x, dom.Const)
         self.assertEqual(x.data, 42)
         self.assertEqual(x.type, dom.INTEGER_TYPE)
 
     def test_get_struct_by_index(self):
         val = dom._literal_struct(1, 2, 3)
-        second = dom._get(val, 1)
+        second = dom.get(val, 1)
         self.assertEqual(second.data, 2)
 
-    def test_get_qualifier(self):
-        """_get on NominalQualifier returns empty sentinel (disabled)."""
+    def test_get_qualifier_raises(self):
+        """get on NominalQualifier raises KeyError (opaque)."""
         anchor = dom.Anchor.from_str("test.foo")
         contrib = _Contrib(anchor=anchor)
         K = dom.Var.spec("K", contrib)
@@ -643,16 +609,18 @@ class TestDirGet(unittest.TestCase):
         mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
             dom.Const.new_struct(K)
         )
-        qual = dom.Const.new_qual(ref_spec=mapping_spec, underlying=V)
+        qual_type = dom._nominal_qual(
+            anchor=mapping_spec.anchor,
+            struct=mapping_spec.specialization,
+            underlying=V.type,
+        )
+        qual = dom.Const(type=qual_type, data=(V.data, mapping_spec.data))
 
-        # Qualifier _get always returns the empty sentinel
-        result = dom._get(qual, "underlying")
-        self.assertIsInstance(result, dom.Const)
-        self.assertEqual(result.type, dom.EMPTY_TYPE)
-        self.assertIsNone(result.data)
+        with self.assertRaises(KeyError):
+            dom.get(qual, "underlying")
 
     def test_dir_qualifier(self):
-        """Qualifier _dir is disabled — returns empty tuple."""
+        """Qualifier dir returns None (opaque)."""
         anchor = dom.Anchor.from_str("test.foo")
         contrib = _Contrib(anchor=anchor)
         K = dom.Var.spec("K", contrib)
@@ -660,23 +628,41 @@ class TestDirGet(unittest.TestCase):
         mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
             dom.Const.new_struct(K)
         )
-        qual = dom.Const.new_qual(ref_spec=mapping_spec, underlying=V)
-        self.assertEqual(dom._dir(qual), ())
+        qual_type = dom._nominal_qual(
+            anchor=mapping_spec.anchor,
+            struct=mapping_spec.specialization,
+            underlying=V.type,
+        )
+        qual = dom.Const(type=qual_type, data=(V.data, mapping_spec.data))
+        self.assertIs(dom.dir(qual), None)
 
     def test_dir_nominal_empty(self):
         """NominalType values have no introspectable members (opaque)."""
         val = dom.Const.new_literal(42)
-        self.assertEqual(dom._dir(val), ())
+        self.assertIs(dom.dir(val), None)
 
     def test_get_nonexistent_raises(self):
         val = dom._literal_struct(x=1)
         with self.assertRaises(KeyError):
-            dom._get(val, "nonexistent")
+            dom.get(val, "nonexistent")
 
     def test_get_non_pure_raises(self):
         err = dom.Err()
         with self.assertRaises(TypeError):
-            dom._get(err, "x")
+            dom.get(err, "x")
+
+    def test_dir_non_pure_returns_none(self):
+        """dir on non-Pure values returns None."""
+        err = dom.Err()
+        self.assertIs(dom.dir(err), None)
+
+    def test_dir_struct_returns_types(self):
+        """dir on struct returns Struct with field types."""
+        val = dom._literal_struct(x=42, y="hello")
+        fields = dom.dir(val)
+        self.assertIsInstance(fields, dom.Struct)
+        self.assertEqual(fields[0], dom.INTEGER_TYPE)
+        self.assertEqual(fields[1], dom.TEXT_TYPE)
 
 
 # ---------------------------------------------------------------------------
@@ -720,7 +706,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encode
+        encoded = union.encoded
         self.assertIs(encoded.type, union.type)
 
     def test_encode_data_is_raw(self):
@@ -728,7 +714,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encode
+        encoded = union.encoded
         disc_raw, val_raw = encoded.data
         self.assertNotIsInstance(disc_raw, dom.Builtin)
         self.assertEqual(val_raw, 42)
@@ -748,7 +734,7 @@ class TestUnionEncode(unittest.TestCase):
         self.assertIsInstance(union.data[0], dom.Type)
 
         # After: discriminator is raw data (tuple)
-        encoded = union.encode
+        encoded = union.encoded
         self.assertNotIsInstance(encoded.data[0], dom.Type)
         self.assertIsInstance(encoded.data[0], tuple)
 
@@ -762,7 +748,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encode
+        encoded = union.encoded
         enc_disc = encoded.data[0]
 
         # Try to recover which type the discriminator represents
@@ -814,7 +800,7 @@ class TestUnionEncode(unittest.TestCase):
             frozenset({K_spec, K_param}),
             dom.Const(type=K_spec, data="K"),
         )
-        encoded = union.encode
+        encoded = union.encoded
         enc_disc = encoded.data[0]
 
         ambiguous = [
@@ -841,7 +827,7 @@ class TestUnionEncode(unittest.TestCase):
         struct_val = dom._literal_struct(x=1, y="hi")
         types = frozenset({struct_val.type, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, struct_val)
-        encoded = union.encode
+        encoded = union.encoded
 
         disc_raw, val_raw = encoded.data
         # value_data was (1, "hi") — already raw, unchanged
@@ -854,8 +840,8 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        once = union.encode
-        twice = once.encode
+        once = union.encoded
+        twice = once.encoded
         self.assertEqual(once.data, twice.data)
         self.assertIs(once.type, twice.type)
 
@@ -872,7 +858,7 @@ class TestUnionEncode(unittest.TestCase):
             dom.BOOLEAN_TYPE, dom.DECIMAL_TYPE,
         })
         union = dom.Const.new_union(types, text_val)
-        encoded = union.encode
+        encoded = union.encoded
 
         # The type side still knows all possible types
         self.assertEqual(encoded.type.types, types)
