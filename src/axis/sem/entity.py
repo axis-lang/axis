@@ -3,7 +3,7 @@ from __future__ import annotations
 from protobase import Consed, flux, frozendict, _
 
 from axis import dom, expr, syn, log
-from axis.log import report as logr
+
 
 from .context import Context
 from .scope import Scope
@@ -153,7 +153,7 @@ def resolve_bound(bound: syn.Expr | None, scope: Scope) -> dom.Val | None:
             return scope.lookup(sym)
         case _:
             return (
-                logr.error("Unsupported bound expression")
+                log.error("Unsupported bound expression")
                 .label(bound, "cannot resolve this bound yet")
                 .tag(dom.Err())
             )

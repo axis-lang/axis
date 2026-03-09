@@ -113,7 +113,7 @@ def eval_lit(evaluator: Evaluator, node: expr.Lit) -> dom.Val:
 
     assert not isinstance(value, (EllipsisType, WildcardType))
 
-    return dom.Const.of_literal(value)
+    return dom.Const.new_literal(value)
 
 
 @Evaluator.impl(expr.Tuple)
@@ -243,7 +243,7 @@ def _coerce_env(env: Mapping[str, dom.Val]) -> frozendict[str, dom.Val]:
 
 
 def _value_const(value: dom.Literal) -> dom.Const:
-    return dom.Const.of_literal(value)
+    return dom.Const.new_literal(value)
 
 
 def _as_const(node: syn.Node, value: dom.Val) -> dom.Const:

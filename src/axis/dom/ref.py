@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Self
-
 from protobase import _
 
 from axis import dom
@@ -26,7 +24,13 @@ class Ref(dom.Pure, abstract=True):
 
 
 class AnchorType(RefType):
-    pass
+    @property
+    def __type__(self) -> Type:
+        return dom._nominal_type("dom.Ref.Anchor")
+
+    @property
+    def __data__(self) -> dom.Data:
+        return ()
 
 
 type AnchorSegments = tuple[str, ...]
@@ -35,6 +39,18 @@ type AnchorSegments = tuple[str, ...]
 class Anchor(Ref):
     type: AnchorType = AnchorType()
     data: AnchorSegments = _
+
+    def __repr__(self) -> str:
+        from axis.tui import render_dom
+        return render_dom.format_dom(self)
+
+    def __rich__(self):
+        from axis.tui import render_dom
+        return render_dom.render_dom(self)
+
+    def __rich_console__(self, console, options):
+        from axis.tui import render_dom
+        yield from render_dom.rich_console_dom(self, console, options)
 
     def __str__(self) -> str:
         return ".".join(self.data)
@@ -54,8 +70,8 @@ class Anchor(Ref):
         return cls(data=(value,))
 
     @classmethod
-    def from_str(cls, value: str) -> "Anchor":
-        return cls(data=tuple(p for part in value.split(".") if (p := part.strip())))
+    def from_str(cls, path: str) -> "Anchor":
+        return dom._anchor(path)
 
     def child(self, name: str) -> "Anchor":
         return self.__class__(data=(*self.data, name))
@@ -83,46 +99,51 @@ class Anchor(Ref):
 
     @property
     def spec(self) -> "Spec":
-        return Spec.from_anchor_spec(self, None)
+        return dom._spec_ref(self, None)
 
     def specialize(self, spec: dom.Const | None) -> "Spec":
-        return Spec.from_anchor_spec(self, spec)
+        return dom._spec_ref(self, spec)
 
 
 class SpecType(RefType):
+    "dom.Ref.Spec.Type[..I]"
+
+    anchor: AnchorType = AnchorType()
     spec: dom.StructType | None = None
 
+    @property
+    def __type__(self) -> Type:
+        return dom._nominal_type(
+            "dom.Ref.Spec.Type",
+            dom._struct(
+                anchor=self.anchor.as_val,
+                spec=self.spec.as_val if self.spec else dom._literal(None),
+            ),
+        )
 
-type SpecData = tuple[AnchorSegments, tuple[dom.Data, ...] | None]
+    @property
+    def __data__(self) -> dom.Data:
+        return (self.anchor.as_val.data, self.spec.as_val.data if self.spec else None)
+
+
+type SpecData = tuple[AnchorSegments, dom.Data]
 
 
 class Spec(Ref):
-    type: SpecType = SpecType()
+    type: SpecType = _
     data: SpecData = _
 
-    @classmethod
-    def new(cls, ref: dom.Ref | str, **spec) -> "Spec":
-        if isinstance(ref, str):
-            ref = Anchor.from_str(ref)
-        return cls.from_anchor_spec(ref.anchor, dom.Const.of_struct(**spec))
+    def __repr__(self) -> str:
+        from axis.tui import render_dom
+        return render_dom.format_dom(self)
 
-    @classmethod
-    def from_anchor_spec(cls, anchor: Anchor, spec: dom.Const | None) -> Self:
-        if spec is None:
-            spec_type = None
-            spec_data = None
-        else:
-            if not isinstance(spec.type, dom.StructType):
-                raise TypeError("Spec.from_anchor_spec requires a StructType value")
-            if not isinstance(spec.data, tuple):
-                raise TypeError("Spec.from_anchor_spec requires tuple data")
-            spec_type = spec.type
-            spec_data = spec.data
+    def __rich__(self):
+        from axis.tui import render_dom
+        return render_dom.render_dom(self)
 
-        return cls(
-            type=SpecType(spec=spec_type),
-            data=(anchor.data, spec_data),
-        )
+    def __rich_console__(self, console, options):
+        from axis.tui import render_dom
+        yield from render_dom.rich_console_dom(self, console, options)
 
     @property
     def anchor(self) -> Anchor:

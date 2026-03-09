@@ -21,14 +21,26 @@ class VarType(dom.Type, abstract=True):
 
 class VarSpecType(VarType):
     """Spec-level type variable (universal quantifier)."""
+    ANCHOR = "dom.Type.Var.Spec"
 
     contribution: ContributionBase = _
+    name: str = _
+
+    @property
+    def __type__(self) -> dom.Type:
+        return dom._nominal_type("dom.Type.Var.Spec")
 
 
 class VarParamType(VarType):
     """Param-level variable (existentially constrained by a bound)."""
+    ANCHOR = "dom.Type.Var.Param"
 
     contribution: ContributionBase = _
+    name: str = _
+
+    @property
+    def __type__(self) -> dom.Type:
+        return dom._nominal_type("dom.Type.Var.Param")
 
 
 class Var(dom.Val, Consed):
@@ -41,10 +53,22 @@ class Var(dom.Val, Consed):
     type: VarType = _
     data: str = _
 
+    def __repr__(self) -> str:
+        from axis.tui import render_dom
+        return render_dom.format_dom(self)
+
+    def __rich__(self):
+        from axis.tui import render_dom
+        return render_dom.render_dom(self)
+
+    def __rich_console__(self, console, options):
+        from axis.tui import render_dom
+        yield from render_dom.rich_console_dom(self, console, options)
+
     @classmethod
     def spec(cls, name: str, contribution: ContributionBase) -> Var:
-        return cls(type=VarSpecType(contribution=contribution), data=name)
+        return cls(type=VarSpecType(contribution=contribution, name=name), data=name)
 
     @classmethod
     def param(cls, name: str, contribution: ContributionBase) -> Var:
-        return cls(type=VarParamType(contribution=contribution), data=name)
+        return cls(type=VarParamType(contribution=contribution, name=name), data=name)

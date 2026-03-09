@@ -315,7 +315,7 @@ class Object(metaclass=Type, abstract=True):
         member_slots = tuple(
             v.slotname(bld.name, k)
             for k, v in bld.namespace.items()
-            if isinstance(v, Type.SlotMember)  #  TODO: Type.SlotMember
+            if isinstance(v, Type.SlotMember)
         )
 
         inherited_slots = set(slots_of(bld.mro))
@@ -339,7 +339,7 @@ class Object(metaclass=Type, abstract=True):
         sticky_members = {
             k: v
             for k, v in bld.namespace.items()
-            if isinstance(v, Type.StickyMember)  # Type.StickyMember
+            if isinstance(v, Type.StickyMember)
         }
 
         bld.data(

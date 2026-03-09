@@ -1,5 +1,4 @@
-from typing import Self
-from axis import syn, val
+from axis import syn
 from .sym import Sym
 
 __all__ = ["Member"]

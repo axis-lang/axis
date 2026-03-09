@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
-from axis import syn, val
+from axis import syn
 
 
 class Sym(syn.Expr):

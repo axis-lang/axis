@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Union
 
-from protobase import Inmutable, Consed, frozendict
+from protobase import Inmutable, Consed, frozendict, attrs_of
 
 from axis import dom
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -18,8 +18,7 @@ __all__ = [
 ]
 
 
-class Builtin(Consed, abstract=True):
-    pass
+class Builtin(Consed, abstract=True): ...
 
 
 type Literal = Union[
@@ -40,26 +39,27 @@ type Data = Union[
 ]
 
 
+
 class Val(Inmutable, abstract=True):
 
     def __repr__(self) -> str:
-        from axis.tui import dom_render
+        from axis.tui import render_dom
 
-        return dom_render.format_dom(self)
+        return render_dom.format_dom(self)
 
     def __rich__(self):
-        from axis.tui import dom_render
+        from axis.tui import render_dom
 
-        return dom_render.render_dom(self)
+        return render_dom.render_dom(self)
 
     def __rich_console__(
         self,
         console: "Console",
         options: "ConsoleOptions",
     ) -> "RenderResult":
-        from axis.tui import dom_render
+        from axis.tui import render_dom
 
-        yield from dom_render.rich_console_dom(self, console, options)
+        yield from render_dom.rich_console_dom(self, console, options)
 
 
 class Pure[T: "dom.Type" = Any, D: Data = Any](Val, Consed, abstract=True):
