@@ -31,7 +31,7 @@ class Type(Builtin, abstract=True):
     def as_val(self) -> dom.Const:
         return dom.Const(type=self.__type__, data=self.__data__)
 
-    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+    def _axis_dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
         """Return the field map for this type, or None if opaque.
 
         Subclasses override to expose their internal structure.
@@ -39,13 +39,13 @@ class Type(Builtin, abstract=True):
         """
         return None
 
-    def get(self, data: Data, key: str | int) -> dom.Val:
+    def _axis_get(self, data: Data, key: str | int) -> dom.Val:
         """Access a sub-value by key using cremallera decomposition.
 
         The type side (self) tells us how to split the data side.
-        Requires dir() to return a Struct (not None).
+        Requires _axis_dir() to return a Struct (not None).
         """
-        fields = self.dir(data)
+        fields = self._axis_dir(data)
         if fields is None:
             raise KeyError(f"No member {key!r} on opaque type {type(self).__name__}")
 
@@ -101,7 +101,7 @@ class StructType(Type):
             "dom.Type.Struct", dom._literal_struct(*self.fields.index.keys)
         )
 
-    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+    def _axis_dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
         return self.fields
 
 
@@ -131,7 +131,7 @@ class NominalType(Type):
         return self.spec_ref.__rich__
 
 
-    def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
+    def _axis_dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
         introspector = dom.INTROSPECTOR.get(None)
         if introspector is not None:
             return introspector.fields(self)

@@ -1,4 +1,4 @@
-"""Introspection of Python type hints → dom Types.
+"""Introspection of Python type hints -> dom Types.
 
 Provides an `Introspector` protocol and a `ContextVar`-based mechanism
 for resolving nominal types into their structural fields.  This powers
@@ -7,15 +7,15 @@ internal structure is known only through Python annotations.
 
 Two-phase model
 ----------------
-Phase 1 – template registration (at class-creation time):
+Phase 1 -- template registration (at class-creation time):
     When a ``Builtin`` subclass is created, ``__class_post_build__``
     appends it to ``_PENDING_CLASSES``.  On the first introspection
     lookup, ``_drain_pending`` processes them: each field annotation is
-    converted via ``_python_to_axis_type`` (which maps ``TypeVar`` →
-    ``VarGenericType`` placeholders), and the result is stored as a
+    converted via ``_python_to_axis_type`` (which maps ``TypeVar`` ->
+    ``Var.generic`` placeholders), and the result is stored as a
     ``Bound`` keyed by ``dom.Anchor``.
 
-Phase 2 – specialization (at query time):
+Phase 2 -- specialization (at query time):
     ``NativeIntrospector.fields()`` looks up the ``Bound`` by anchor.
     If the bound carries generic vars, it substitutes them using the
     specialization data from the ``Spec`` and caches the resolved
@@ -25,8 +25,10 @@ Phase 2 – specialization (at query time):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
-from protobase import Record, frozendict, attr_info_of
+from protobase import Record, frozendict, attr_info_of, mutate
+from protobase.inmutable import register_inmutable
 from contextvars import ContextVar
 from typing import (
     Protocol,
@@ -35,7 +37,6 @@ from typing import (
     get_args,
     Any,
     Callable,
-    ClassVar,
     TypeVar,
     Union,
 )
@@ -58,13 +59,56 @@ class Introspector(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# VarGenericType – placeholder for Python TypeVars
+# IntrospectionContext — implements ContextProto for generic type vars
+# ---------------------------------------------------------------------------
+
+class IntrospectionContext(dom.ContextProto):
+    """Context for generic type variables created during introspection.
+
+    Implements ContextProto. Since introspection-phase variables are
+    placeholders (resolved later via specialization), lookup_bound
+    always returns None.
+
+    The anchor is created lazily to avoid circular import issues
+    (dom._anchor is not available when introspect.py is first imported
+    from dom/__init__.py).
+    """
+
+    # _SINGLETON_ANCHOR: dom.Anchor | None = None
+
+    # @classmethod
+    # def _get_anchor(cls) -> dom.Anchor:
+    #     if cls._SINGLETON_ANCHOR is None:
+    #         cls._SINGLETON_ANCHOR = dom.Anchor(
+    #             data=("dom", "introspect")
+    #         )
+    #     return cls._SINGLETON_ANCHOR
+
+    # @property
+    # def anchor(self) -> dom.Anchor:
+    #     return self._get_anchor()
+
+    def lookup_bound(self, name: str) -> dom.Type | None:
+        return None
+
+    def __hash__(self):
+        return hash(id(self))
+
+    def __eq__(self, other):
+        return self is other
+
+
+# Singleton context for all introspection-phase variables
+_INTROSPECTION_CTX = IntrospectionContext()
+
+
+# ---------------------------------------------------------------------------
+# VarGenericType -- metatype for Python TypeVar placeholders
 # ---------------------------------------------------------------------------
 
 class VarGenericType(dom.VarType):
-    """Placeholder type created during phase-1 introspection for ``TypeVar`` fields."""
+    """Metatype created during phase-1 introspection for ``TypeVar`` fields."""
     ANCHOR: ClassVar[str] = "dom.Type.Var.Generic"
-    name: str
 
     @property
     def __type__(self) -> dom.Type:
@@ -72,19 +116,19 @@ class VarGenericType(dom.VarType):
 
 
 # ---------------------------------------------------------------------------
-# Bound – per-anchor field template (phase 1 output)
+# Bound -- per-anchor field template (phase 1 output)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Bound:
     """Field structure of a Builtin, with tracked generic placeholders.
 
-    ``vars`` is the set of ``VarGenericType`` instances that appear in
+    ``vars`` is the set of ``Var`` instances that appear in
     ``fields``.  When empty, the bound is fully concrete and can be
     returned as-is.
     """
     fields: dom.Struct[str, dom.Type]
-    vars: frozenset[VarGenericType]
+    vars: frozenset[dom.Var]
 
     @property
     def is_generic(self) -> bool:
@@ -113,31 +157,75 @@ def _resolve_generics(
     bound: Bound,
     spec: dom.Spec,
 ) -> dom.Struct[str, dom.Type]:
-    """Substitute ``VarGenericType`` placeholders using specialization data.
+    """Substitute ``Var`` placeholders using specialization data.
 
     If the spec carries no specialization, all placeholders are
     replaced with ``dom.ANY_TYPE``.
     """
     specialization = spec.specialization
     if specialization is None:
-        return bound.fields.map(
-            lambda t: dom.ANY_TYPE if isinstance(t, VarGenericType) else t
-        )
+        # No specialization: replace all Var with ANY_TYPE
+        def substitute_any(field_type: dom.Type) -> dom.Type:
+            if isinstance(field_type, dom.Var):
+                return dom.ANY_TYPE
+
+            # Recursive cases for container types
+            if isinstance(field_type, dom.NominalQualifier):
+                new_underlying = substitute_any(field_type.underlying)
+                if new_underlying is field_type.underlying:
+                    return field_type
+                return mutate(field_type, underlying=new_underlying)
+
+            if isinstance(field_type, dom.StructType):
+                new_fields = field_type.fields.map(substitute_any)
+                if new_fields is field_type.fields:
+                    return field_type
+                return mutate(field_type, fields=new_fields)
+
+            if isinstance(field_type, dom.UnionType):
+                new_types = frozenset(substitute_any(t) for t in field_type.types)
+                if new_types == field_type.types:
+                    return field_type
+                return dom.UnionType(types=new_types)
+
+            return field_type
+
+        return bound.fields.map(substitute_any)
 
     # Build a keyed view over the specialization data so we can look up
-    # bindings by name (e.g. "T_Generic" → INTEGER_TYPE).
+    # bindings by name (e.g. "T" -> INTEGER_TYPE).
     spec_data = dom.Struct(
         index=specialization.type.fields.index,
         values=specialization.data,
     )
 
     def substitute(field_type: dom.Type) -> dom.Type:
-        if not isinstance(field_type, VarGenericType):
-            return field_type
-        binding = spec_data.get(field_type.name, default=None)
-        if isinstance(binding, dom.Type):
-            return binding
-        return dom.ANY_TYPE
+        # Base case: substitute Var
+        if isinstance(field_type, dom.Var):
+            binding = spec_data.get(field_type.data, default=None)
+            return binding if isinstance(binding, dom.Type) else dom.ANY_TYPE
+
+        # Recursive cases for container types
+        if isinstance(field_type, dom.NominalQualifier):
+            new_underlying = substitute(field_type.underlying)
+            if new_underlying is field_type.underlying:
+                return field_type
+            return mutate(field_type, underlying=new_underlying)
+
+        if isinstance(field_type, dom.StructType):
+            new_fields = field_type.fields.map(substitute)
+            if new_fields is field_type.fields:
+                return field_type
+            return mutate(field_type, fields=new_fields)
+
+        if isinstance(field_type, dom.UnionType):
+            new_types = frozenset(substitute(t) for t in field_type.types)
+            if new_types == field_type.types:
+                return field_type
+            return dom.UnionType(types=new_types)
+
+        # Other types pass through unchanged
+        return field_type
 
     return bound.fields.map(substitute)
 
@@ -186,14 +274,14 @@ INTROSPECTOR: ContextVar[Introspector | None] = ContextVar(
 
 
 # ---------------------------------------------------------------------------
-# PyAx interop: Python → Axis type projection registry
+# PyAx interop: Python -> Axis type projection registry
 # ---------------------------------------------------------------------------
 
 _PY_TO_AX_TRANSFORMS: dict[object, Callable[..., dom.Type]] = {}
 
 
 def register_py_to_ax(origin: object, transform: Callable[..., dom.Type]) -> None:
-    """Register a Python origin type → Axis type transform.
+    """Register a Python origin type -> Axis type transform.
 
     The *transform* receives type arguments already converted to
     ``dom.Type`` via ``_python_to_axis_type`` (except ``Ellipsis``,
@@ -204,16 +292,16 @@ def register_py_to_ax(origin: object, transform: Callable[..., dom.Type]) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Python type annotation → dom.Type conversion
+# Python type annotation -> dom.Type conversion
 # ---------------------------------------------------------------------------
 
 def _python_to_axis_type(
     annotation: Any,
-    vars: set[VarGenericType] | None = None,
+    vars: set[dom.Var] | None = None,
 ) -> dom.Type:
     """Convert a Python type annotation to an axis.dom Type.
 
-    When *vars* is provided, any ``VarGenericType`` created for a
+    When *vars* is provided, any ``Var`` created for a
     ``TypeVar`` is added to the set so the caller can build the
     ``Bound.vars`` frozenset without a post-hoc scan.
     """
@@ -221,7 +309,8 @@ def _python_to_axis_type(
         return dom.ANY_TYPE
 
     if isinstance(annotation, TypeVar):
-        var = VarGenericType(annotation.__name__)
+
+        var = dom.var(dom.VarGenericType, _INTROSPECTION_CTX, annotation.__name__)
         if vars is not None:
             vars.add(var)
         return var
@@ -239,11 +328,11 @@ def _python_to_axis_type(
     if scalar is not None:
         return scalar
 
-    # Generic types with parameters → registry lookup.
+    # Generic types with parameters -> registry lookup.
     if origin is not None:
         return _transform_generic(origin, args, vars)
 
-    # Named Builtin class → introspection registry lookup.
+    # Named Builtin class -> introspection registry lookup.
     if isinstance(annotation, type):
         return _try_builtin_mapping(annotation)
 
@@ -268,7 +357,7 @@ def _init_scalar_types() -> None:
 def _transform_generic(
     origin: type,
     args: tuple[Any, ...],
-    vars: set[VarGenericType] | None,
+    vars: set[dom.Var] | None,
 ) -> dom.Type:
     """Project a generic Python type via the transform registry."""
     converted = tuple(
@@ -312,7 +401,7 @@ def _drain_pending() -> None:
         if not attrs:
             continue
 
-        vars: set[VarGenericType] = set()
+        vars: set[dom.Var] = set()
         field_dict: dict[str, dom.Type] = {}
         for name, attr_info in attrs.items():
             field_dict[name] = _python_to_axis_type(attr_info.type, vars)
@@ -336,7 +425,7 @@ def _spec_from_types(**bindings: dom.Type) -> dom.Const | None:
 
 
 def _tuple_transform(*args: dom.Type) -> dom.Type:
-    """``tuple[V, ...]`` → ``std.List V``  |  ``tuple[A, B, C]`` → ``StructType``."""
+    """``tuple[V, ...]`` -> ``std.List V``  |  ``tuple[A, B, C]`` -> ``StructType``."""
     if len(args) == 2 and args[1] is Ellipsis:
         element = args[0]
         return dom._nominal_qual(
@@ -372,7 +461,7 @@ def _register_default_py_to_ax() -> None:
 def _bootstrap_introspection() -> None:
     """Initialize the introspection system.
 
-    Registers default Python → Axis type transforms and populates the
+    Registers default Python -> Axis type transforms and populates the
     scalar table.  The ``INTROSPECTOR`` ContextVar already defaults to
     a ``NativeIntrospector``, so no explicit ``set()`` is needed.
     """

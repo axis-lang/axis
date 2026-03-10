@@ -40,10 +40,10 @@ class Entity(Consed):
             """
             builder = Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
             # TODO: Agg a 'Self' definition here for the entity itself, so it can be referenced in specs?
-            builder.define("Self", dom.Var.spec("Self", contribution=self), origin=self.origin)
+            builder.define("Self", dom.var(Entity.HParamVarType, self, "Self"), origin=self.origin)
             for binding in self.spec:
                 name = expr.to_slot_name(binding.key)
-                var = dom.Var.spec(name, contribution=self)
+                var = dom.var(Entity.HParamVarType, self, name)
                 builder.define(name, var, origin=binding.key)
             return builder.build()
 
@@ -62,6 +62,8 @@ class Entity(Consed):
             # Trigger scope construction and bound resolution
             self.spec_scope
             self.resolved_spec
+
+    class HParamVarType(dom.VarType[SpecContribution]): ...
 
     class SpecBucket(Bucket):
         specs: frozenset[Entity.SpecContribution]
@@ -86,10 +88,10 @@ class Entity(Consed):
         def overload_scope(self) -> Scope:
             """Scope with spec_scope as parent, populated with Var.param for each param."""
             builder = Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
-            builder.define("self", dom.Var.param("self", contribution=self), origin=self.origin)
+            builder.define("self", dom.var(Entity.ParamVarType, self, "self"), origin=self.origin)
             for binding in self.params:
                 name = expr.to_slot_name(binding.key)
-                var = dom.Var.param(name, contribution=self)
+                var = dom.var(Entity.ParamVarType, self, name)
                 builder.define(name, var, origin=binding.key)
             return builder.build()
 
@@ -110,6 +112,8 @@ class Entity(Consed):
             self.resolved_spec
             self.resolved_params
 
+    class ParamVarType(dom.VarType[OverloadContribution]): ...
+
     class OverloadBucket(Bucket):
         overloads: frozenset[Entity.OverloadContribution]
 
@@ -128,12 +132,12 @@ class Entity(Consed):
             if self.returns is None:
                 log.warn("ImplContribution without returns").label(self.origin).emit()
 
-    # class ImplBucket(Bucket):
-    #     impls: frozenset[Entity.ImplContribution]
+    class ImplBucket(Bucket):
+        impls: frozenset[Entity.ImplContribution]
 
-    # @flux.property
-    # def impl_by_result(self) -> frozendict[syn.Expr | None, ImplBucket]:
-    #     return _impl_by_result_bucket(self.contributions)
+    @flux.property
+    def impl_by_result(self) -> frozendict[syn.Expr | None, ImplBucket]:
+        return _impl_by_result_bucket(self.contributions)
 
     @flux.method
     def check(self):

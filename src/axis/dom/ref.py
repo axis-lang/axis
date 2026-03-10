@@ -31,7 +31,7 @@ class AnchorType(RefType):
     def __type__(self) -> Type:
         return dom._nominal_type("dom.Ref.Anchor")
 
-    def dir(
+    def _axis_dir(
         self, data: Data | MissingType = Missing
     ) -> dom.Struct[str, Type] | None:
         return None
@@ -128,7 +128,7 @@ class SpecType(RefType):
             ),
         )
 
-    def dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
+    def _axis_dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
         return dom.Struct.new(
             anchor=self.anchor,
             spec=self.spec or dom.native_type(None),

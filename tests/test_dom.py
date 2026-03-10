@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Union, TypeVar, Generic
 from types import UnionType as PEP604Union
 
-from protobase import frozendict
+from protobase import frozendict, _
 
 from axis import dom
 from axis.dom.introspect import (
@@ -19,19 +19,12 @@ from axis.dom.introspect import (
     register_py_to_ax,
 )
 
-
-class _Contrib(dom.ContributionBase):
-    """Concrete ContributionBase for testing."""
-    pass
-
-
-T_Generic = TypeVar("T_Generic")
-
-
-class _GenericBuiltin(dom.Builtin, Generic[T_Generic]):
-    ANCHOR = "test.GenericBuiltin"
-
-    value: T_Generic
+class _Context(dom.ContextProto): 
+    anchor: dom.Anchor = _
+class _VarSpecType(dom.VarType[_Context]):
+    ANCHOR = 'text.VarSpec'
+class _VarParamType(dom.VarType[_Context]): 
+    ANCHOR = 'text.VarParam'
 
 
 # ---------------------------------------------------------------------------
@@ -148,20 +141,21 @@ class TestConst(unittest.TestCase):
 
 class TestStructWithVars(unittest.TestCase):
     def setUp(self):
+        
         self.anchor = dom.Anchor.from_str("test.foo")
-        self.contrib = _Contrib(anchor=self.anchor)
-        self.K = dom.Var.spec("K", self.contrib)
-        self.V = dom.Var.spec("V", self.contrib)
+        self.contrib = _Context(anchor=self.anchor)
+        self.K = dom.var(_VarSpecType, self.contrib, "K")
+        self.V = dom.var(_VarSpecType, self.contrib, "V")
 
     def test_new_struct_positional(self):
         result = dom.Const.new_struct(self.K, self.V)
         self.assertIsInstance(result.type, dom.StructType)
         # data side: variable names
         self.assertEqual(result.data, ("K", "V"))
-        # type side: distinct VarSpecTypes
+        # type side: Var instances (which ARE Types) with distinct data
         self.assertNotEqual(result.type.fields[0], result.type.fields[1])
-        self.assertIsInstance(result.type.fields[0], dom.VarSpecType)
-        self.assertIsInstance(result.type.fields[1], dom.VarSpecType)
+        self.assertIsInstance(result.type.fields[0], dom.Var)
+        self.assertIsInstance(result.type.fields[1], dom.Var)
 
     def test_new_struct_named(self):
         result = dom._struct(key=self.K, val=self.V)
@@ -175,7 +169,7 @@ class TestStructWithVars(unittest.TestCase):
         result = dom.Const.new_struct(lit, self.K)
         self.assertEqual(result.data, (42, "K"))
         self.assertEqual(result.type.fields[0], dom.INTEGER_TYPE)
-        self.assertIsInstance(result.type.fields[1], dom.VarSpecType)
+        self.assertIsInstance(result.type.fields[1], dom.Var)
 
 
 # ---------------------------------------------------------------------------
@@ -204,9 +198,9 @@ class TestNominalType(unittest.TestCase):
 class TestQualifier(unittest.TestCase):
     def setUp(self):
         self.anchor = dom.Anchor.from_str("test.foo")
-        self.contrib = _Contrib(anchor=self.anchor)
-        self.K = dom.Var.spec("K", self.contrib)
-        self.V = dom.Var.spec("V", self.contrib)
+        self.contrib = _Context(anchor=self.anchor)
+        self.K = dom.var(_VarSpecType, self.contrib, "K")
+        self.V = dom.var(_VarSpecType, self.contrib, "V")
 
 
 
@@ -245,7 +239,7 @@ class TestQualifier(unittest.TestCase):
 class TestVarType(unittest.TestCase):
     def setUp(self):
         self.anchor = dom.Anchor.from_str("test.foo")
-        self.contrib = _Contrib(anchor=self.anchor)
+        self.contrib = _Context(anchor=self.anchor)
 
     def test_subclass_relationships(self):
         self.assertTrue(issubclass(dom.VarSpecType, dom.VarType))
@@ -253,34 +247,39 @@ class TestVarType(unittest.TestCase):
         self.assertTrue(issubclass(dom.VarType, dom.Type))
 
     def test_spec_vars_distinguishable(self):
-        """K and V from same contribution must be distinct types."""
-        K = dom.Var.spec("K", self.contrib)
-        V = dom.Var.spec("V", self.contrib)
-        self.assertNotEqual(K.type, V.type)
-        self.assertEqual(K.type.name, "K")
-        self.assertEqual(V.type.name, "V")
+        """K and V from same contribution must be distinct Vars."""
+        K = dom.var(_VarSpecType, self.contrib, "K")
+        V = dom.var(_VarSpecType, self.contrib, "V")
+        # Var instances are distinct (different data)
+        self.assertNotEqual(K, V)
+        self.assertEqual(K.data, "K")
+        self.assertEqual(V.data, "V")
+        # VarTypes carry same ctx, so they are equal
+        self.assertEqual(K.type, V.type)
 
     def test_param_vars_distinguishable(self):
         """Param variables also distinguishable."""
-        a = dom.Var.param("a", self.contrib)
-        b = dom.Var.param("b", self.contrib)
-        self.assertNotEqual(a.type, b.type)
-        self.assertEqual(a.type.name, "a")
-        self.assertEqual(b.type.name, "b")
+        a = dom.var(_VarParamType, self.contrib, "a")
+        b = dom.var(_VarParamType, self.contrib, "b")
+        self.assertNotEqual(a, b)
+        self.assertEqual(a.data, "a")
+        self.assertEqual(b.data, "b")
 
     def test_spec_vs_param_distinct(self):
         """Spec and param vars with same name are distinct types."""
-        K_spec = dom.Var.spec("K", self.contrib)
-        K_param = dom.Var.param("K", self.contrib)
-        self.assertNotEqual(K_spec.type, K_param.type)
+        K_spec = dom.var(_VarSpecType, self.contrib, "K")
+        K_param = dom.var(_VarParamType, self.contrib, "K")
+        # Different Var instances (different metatype)
+        self.assertNotEqual(K_spec, K_param)
         self.assertIsInstance(K_spec.type, dom.VarSpecType)
         self.assertIsInstance(K_param.type, dom.VarParamType)
 
     def test_union_with_type_vars_no_collapse(self):
         """Union of two distinct type vars should have 2 members."""
-        K = dom.Var.spec("K", self.contrib)
-        V = dom.Var.spec("V", self.contrib)
-        union = dom.UnionType(types=frozenset({K.type, V.type}))
+        K = dom.var(_VarSpecType, self.contrib, "K")
+        V = dom.var(_VarSpecType, self.contrib, "V")
+        # Var IS a Type, so use Var instances directly in the union
+        union = dom.UnionType(types=frozenset({K, V}))
         self.assertEqual(len(union.types), 2)
 
 
@@ -453,13 +452,14 @@ class TestUnion(unittest.TestCase):
     def test_union_with_var_types(self):
         """Union over type variables with one active."""
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
-        types = frozenset({K.type, V.type})
+        contrib = _Context(anchor=anchor)
+        K = dom.var(_VarSpecType, contrib, "K")
+        V = dom.var(_VarSpecType, contrib, "V")
+        # Var IS a Type, so use Var instances directly
+        types = frozenset({K, V})
         # Active variant is K
         union = dom._union(types, K)
-        self.assertIs(union.data[0], K.type)
+        self.assertIs(union.data[0], K)
         self.assertEqual(union.data[1], "K")
 
 
@@ -517,14 +517,20 @@ class TestSelfDescription(unittest.TestCase):
         )
 
     def test_var_spec_type_as_val(self):
-        """VarSpecType.as_val should work."""
+        """Var.as_val should work (Var IS a Pure)."""
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        vt = dom.VarSpecType(contribution=contrib, name="K")
-        val = vt.as_val
+        contrib = _Context(anchor=anchor)
+        K = dom.var(_VarSpecType, contrib, "K")
+        val = K.as_val
         self.assertIsInstance(val, dom.Const)
+        # Var's metatype is VarSpecType (which is a VarType, not NominalType)
+        self.assertIsInstance(val.type, _VarSpecType)
+        # The VarSpecType itself is self-descriptive
+        vt_val = val.type.as_val
+        self.assertIsInstance(vt_val, dom.Const)
+        self.assertIsInstance(vt_val.type, dom.NominalType)
         self.assertEqual(
-            dom.ref_segments(val.type.spec_ref),
+            dom.ref_segments(vt_val.type.spec_ref),
             ("dom", "Type", "Var", "Spec"),
         )
 
@@ -622,9 +628,9 @@ class TestDirGet(unittest.TestCase):
     def test_get_qualifier_raises(self):
         """get on NominalQualifier raises KeyError (opaque)."""
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
+        contrib = _Context(anchor=anchor)
+        K = dom.var(_VarSpecType, contrib, "K")
+        V = dom.var(_VarSpecType, contrib, "V")
         mapping_spec = dom.Anchor.from_str("std.Map").specialize(
             dom.Const.new_struct(K)
         )
@@ -641,9 +647,9 @@ class TestDirGet(unittest.TestCase):
     def test_dir_qualifier(self):
         """Qualifier dir returns None (opaque)."""
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
+        contrib = _Context(anchor=anchor)
+        K = dom.var(_VarSpecType, contrib, "K")
+        V = dom.var(_VarSpecType, contrib, "V")
         mapping_spec = dom.Anchor.from_str("std.Map").specialize(
             dom.Const.new_struct(K)
         )
@@ -791,52 +797,41 @@ class TestUnionEncode(unittest.TestCase):
         self.assertNotEqual(enc_text, enc_bool)
 
     def test_encode_collision_var_spec_vs_param(self):
-        """KNOWN ISSUE: VarSpecType and VarParamType with the same name
-        and contribution encode to identical raw data.
+        """KNOWN ISSUE: VarSpecType and VarParamType with the same ctx
+        encode to identical raw data.
 
         _encode strips class identity — it only sees attrs. Both classes
-        have {contribution, name}, so the encoded tuples are equal.
+        have {ctx}, so the encoded tuples are equal.
 
-        This means: for a union of VarSpecType("K") | VarParamType("K"),
-        the encoded discriminator is ambiguous.
+        This means: for a union of Var.spec("K") | Var.param("K"),
+        the encoded discriminator could be ambiguous. However, with the
+        new model, Var IS a Type, so the union contains Var instances
+        (not VarTypes), and they have different data ("K" from spec vs
+        "K" from param) but the *types* (VarSpecType vs VarParamType)
+        still encode the same.
         """
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K_spec = dom.VarSpecType(contribution=contrib, name="K")
-        K_param = dom.VarParamType(contribution=contrib, name="K")
+        contrib = _Context(anchor=anchor)
+        K_spec = dom.var(_VarSpecType, contrib, "K")
+        K_param = dom.var(_VarParamType, contrib, "K")
 
-        enc_spec = dom._encode(K_spec)
-        enc_param = dom._encode(K_param)
+        enc_spec = dom._encode(K_spec.type)
+        enc_param = dom._encode(K_param.type)
 
-        # COLLISION: same attrs → same encoded form
+        # COLLISION: same ctx attrs → same encoded form for VarTypes
         self.assertEqual(enc_spec, enc_param)
 
-        # The types themselves ARE different (different classes)
+        # The Vars themselves ARE different (different metatype class)
         self.assertNotEqual(K_spec, K_param)
 
-        # In a union containing both, encode makes the discriminator ambiguous
-        union = dom.Const.new_union(
-            frozenset({K_spec, K_param}),
-            dom.Const(type=K_spec, data="K"),
-        )
-        encoded = union.encoded
-        enc_disc = encoded.data[0]
-
-        ambiguous = [
-            t for t in encoded.type.types
-            if dom._encode(t) == enc_disc
-        ]
-        # Two matches — ambiguous!
-        self.assertEqual(len(ambiguous), 2)
-
     def test_encode_no_collision_different_names(self):
-        """VarSpecType("K") vs VarSpecType("V") have different names,
-        so they encode to different raw data — no collision.
+        """Var("K") vs Var("V") are distinct Vars with different data,
+        so they encode to different raw forms.
         """
         anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.VarSpecType(contribution=contrib, name="K")
-        V = dom.VarSpecType(contribution=contrib, name="V")
+        contrib = _Context(anchor=anchor)
+        K = dom.var(_VarSpecType, contrib, "K")
+        V = dom.var(_VarSpecType, contrib, "V")
         self.assertNotEqual(dom._encode(K), dom._encode(V))
 
     def test_encode_struct_variant_preserves_data(self):
@@ -1331,6 +1326,15 @@ def _field_type(struct: dom.Struct[str, dom.Type], key: str) -> dom.Type:
     return struct[offset]
 
 
+# Generic test class for TestNativeIntrospectorGenerics
+T_Generic = TypeVar("T_Generic")
+
+class GenericBuiltin(dom.Builtin, Generic[T_Generic]):
+    """Generic builtin class for testing introspector substitution."""
+    ANCHOR = "test.GenericBuiltin"
+    value: T_Generic
+
+
 class TestNativeIntrospectorGenerics(unittest.TestCase):
     """NativeIntrospector substitutes VarGenericType placeholders using spec_ref."""
 
@@ -1351,6 +1355,323 @@ class TestNativeIntrospectorGenerics(unittest.TestCase):
         fields = introspector.fields(nominal)
         self.assertIsNotNone(fields)
         self.assertIs(_field_type(fields, "value"), dom.ANY_TYPE)
+
+
+class TestGenericIntrospectionComprehensive(unittest.TestCase):
+    """Comprehensive tests for generic type introspection with Python generics."""
+
+    def setUp(self):
+        """Create generic test classes for introspection."""
+        # Define TypeVars
+        self.T = TypeVar("T")
+        self.K = TypeVar("K")
+        self.V = TypeVar("V")
+        
+        # Basic generic with variadic tuple
+        class TestGeneric(dom.Builtin, Generic[self.T]):
+            ANCHOR = "test.TestGeneric"
+            tuple_t: tuple[self.T, ...]
+        
+        self.TestGeneric = TestGeneric
+        
+        # Multi-parameter generic
+        class TestMap(dom.Builtin, Generic[self.K, self.V]):
+            ANCHOR = "test.TestMap"
+            keys: frozenset[self.K]
+            values: tuple[self.V, ...]
+            mapping: frozendict[self.K, self.V]
+        
+        self.TestMap = TestMap
+        
+        # Nested generics
+        class TestNested(dom.Builtin, Generic[self.T]):
+            ANCHOR = "test.TestNested"
+            lists: tuple[frozenset[self.T], ...]
+            optional_t: self.T | None
+            struct_t: dom.Struct[str, self.T]
+        
+        self.TestNested = TestNested
+        
+        # Mixed concrete and generic
+        class TestMixed(dom.Builtin, Generic[self.T]):
+            ANCHOR = "test.TestMixed"
+            concrete_int: int
+            generic_t: self.T
+            tuple_mixed: tuple[int, self.T, str]
+            generic_list: tuple[self.T, ...]
+        
+        self.TestMixed = TestMixed
+        
+        # Ensure classes are drained
+        dom.introspect._drain_pending()
+        
+        self.introspector = dom.INTROSPECTOR.get()
+
+    def test_basic_generic_variadic_tuple(self):
+        """Test TestGeneric[int] with tuple[T, ...] field."""
+        # Create specialized type
+        spec = dom._struct(T=dom.INTEGER_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestGeneric", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # Check tuple_t field
+        tuple_t = _field_type(fields, "tuple_t")
+        self.assertIsInstance(tuple_t, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(tuple_t), "std.List")
+        self.assertIs(tuple_t.underlying, dom.INTEGER_TYPE)
+
+    def test_multi_parameter_generic(self):
+        """Test TestMap[str, int] with multiple type parameters."""
+        # Create specialized type
+        spec = dom._struct(
+            K=dom.TEXT_TYPE.as_val,
+            V=dom.INTEGER_TYPE.as_val
+        )
+        nominal = dom._nominal_type("test.TestMap", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # Check keys field
+        keys = _field_type(fields, "keys")
+        self.assertIsInstance(keys, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(keys), "std.Set")
+        self.assertIs(keys.underlying, dom.TEXT_TYPE)
+        
+        # Check values field
+        values = _field_type(fields, "values")
+        self.assertIsInstance(values, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(values), "std.List")
+        self.assertIs(values.underlying, dom.INTEGER_TYPE)
+        
+        # Check mapping field
+        mapping = _field_type(fields, "mapping")
+        self.assertIsInstance(mapping, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(mapping), "std.Map")
+        self.assertIs(mapping.underlying, dom.INTEGER_TYPE)
+
+    def test_nested_generics(self):
+        """Test TestNested[bool] with nested generic structures."""
+        # Create specialized type
+        spec = dom._struct(T=dom.BOOLEAN_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestNested", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # Check lists field: tuple[frozenset[T], ...]
+        lists = _field_type(fields, "lists")
+        self.assertIsInstance(lists, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(lists), "std.List")
+        
+        # Inner type should be frozenset[bool] -> std.Set bool
+        inner = lists.underlying
+        self.assertIsInstance(inner, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(inner), "std.Set")
+        self.assertIs(inner.underlying, dom.BOOLEAN_TYPE)
+        
+        # Check optional_t field: T | None
+        optional_t = _field_type(fields, "optional_t")
+        self.assertIsInstance(optional_t, dom.UnionType)
+        self.assertEqual(
+            optional_t.types,
+            frozenset({dom.BOOLEAN_TYPE, dom.EMPTY_TYPE})
+        )
+        
+        # Check struct_t field: Struct[str, T]
+        struct_t = _field_type(fields, "struct_t")
+        self.assertIsInstance(struct_t, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(struct_t), "Struct")
+
+    def test_mixed_concrete_and_generic(self):
+        """Test TestMixed[float] with both concrete and generic fields."""
+        # Create specialized type
+        spec = dom._struct(T=dom.DECIMAL_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestMixed", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # Check concrete field is unchanged
+        concrete_int = _field_type(fields, "concrete_int")
+        self.assertIs(concrete_int, dom.INTEGER_TYPE)
+        
+        # Check generic field is substituted
+        generic_t = _field_type(fields, "generic_t")
+        self.assertIs(generic_t, dom.DECIMAL_TYPE)
+        
+        # Check tuple_mixed: tuple[int, T, str]
+        tuple_mixed = _field_type(fields, "tuple_mixed")
+        self.assertIsInstance(tuple_mixed, dom.StructType)
+        self.assertEqual(tuple_mixed.fields.arity, 3)
+        self.assertIs(tuple_mixed.fields[0], dom.INTEGER_TYPE)
+        self.assertIs(tuple_mixed.fields[1], dom.DECIMAL_TYPE)
+        self.assertIs(tuple_mixed.fields[2], dom.TEXT_TYPE)
+        
+        # Check generic_list: tuple[T, ...]
+        generic_list = _field_type(fields, "generic_list")
+        self.assertIsInstance(generic_list, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(generic_list), "std.List")
+        self.assertIs(generic_list.underlying, dom.DECIMAL_TYPE)
+
+    def test_unspecialized_generic_defaults_to_any(self):
+        """Test that unspecialized generics default to ANY_TYPE."""
+        # Create nominal without spec
+        nominal = dom._nominal_type("test.TestGeneric")
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # Check tuple_t field defaults to tuple[Any, ...]
+        tuple_t = _field_type(fields, "tuple_t")
+        self.assertIsInstance(tuple_t, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(tuple_t), "std.List")
+        self.assertIs(tuple_t.underlying, dom.ANY_TYPE)
+
+    def test_partial_specialization(self):
+        """Test partial specialization (some params unbound)."""
+        # Only specify K, not V
+        spec = dom._struct(K=dom.TEXT_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestMap", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        
+        # K should be str
+        keys = _field_type(fields, "keys")
+        self.assertIsInstance(keys, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(keys), "std.Set")
+        self.assertIs(keys.underlying, dom.TEXT_TYPE)
+        
+        # V should default to ANY
+        values = _field_type(fields, "values")
+        self.assertIsInstance(values, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(values), "std.List")
+        self.assertIs(values.underlying, dom.ANY_TYPE)
+
+    def test_caching_by_spec(self):
+        """Test that specialized types are cached by spec."""
+        # Create two nominals with same spec
+        spec = dom._struct(T=dom.INTEGER_TYPE.as_val)
+        nominal1 = dom._nominal_type("test.TestGeneric", spec)
+        nominal2 = dom._nominal_type("test.TestGeneric", spec)
+        
+        # Get fields twice
+        fields1 = self.introspector.fields(nominal1)
+        fields2 = self.introspector.fields(nominal2)
+        
+        # Should be same cached result
+        self.assertIs(fields1, fields2)
+
+    def test_different_specs_produce_different_fields(self):
+        """Test that different specs produce different field structures."""
+        # Create two nominals with different specs
+        spec_int = dom._struct(T=dom.INTEGER_TYPE.as_val)
+        spec_str = dom._struct(T=dom.TEXT_TYPE.as_val)
+        
+        nominal_int = dom._nominal_type("test.TestGeneric", spec_int)
+        nominal_str = dom._nominal_type("test.TestGeneric", spec_str)
+        
+        # Get fields
+        fields_int = self.introspector.fields(nominal_int)
+        fields_str = self.introspector.fields(nominal_str)
+        
+        # Should be different objects
+        self.assertIsNot(fields_int, fields_str)
+        
+        # But with different underlying types
+        tuple_int = _field_type(fields_int, "tuple_t")
+        tuple_str = _field_type(fields_str, "tuple_t")
+        
+        self.assertIs(tuple_int.underlying, dom.INTEGER_TYPE)
+        self.assertIs(tuple_str.underlying, dom.TEXT_TYPE)
+
+    def test_complex_nested_substitution(self):
+        """Test complex nested generic substitution scenarios."""
+        # Create a class with deeply nested generics
+        class TestComplex(dom.Builtin, Generic[self.T]):
+            ANCHOR = "test.TestComplex"
+            # frozendict[str, tuple[frozenset[T], ...]]
+            complex_field: frozendict[str, tuple[frozenset[self.T], ...]]
+        
+        # Drain pending
+        dom.introspect._drain_pending()
+        
+        # Create specialized type
+        spec = dom._struct(T=dom.INTEGER_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestComplex", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        complex_field = _field_type(fields, "complex_field")
+        
+        # Should be std.Map
+        self.assertIsInstance(complex_field, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(complex_field), "std.Map")
+        
+        # Underlying should be tuple[frozenset[int], ...] -> std.List (std.Set int)
+        tuple_type = complex_field.underlying
+        self.assertIsInstance(tuple_type, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(tuple_type), "std.List")
+        
+        # Inner should be frozenset[int] -> std.Set int
+        set_type = tuple_type.underlying
+        self.assertIsInstance(set_type, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(set_type), "std.Set")
+        self.assertIs(set_type.underlying, dom.INTEGER_TYPE)
+
+    def test_union_with_generic_parameter(self):
+        """Test union types involving generic parameters."""
+        class TestUnion(dom.Builtin, Generic[self.T]):
+            ANCHOR = "test.TestUnion"
+            union_field: self.T | int | None
+            optional_union: tuple[self.T | str, ...] | None
+        
+        # Drain pending
+        dom.introspect._drain_pending()
+        
+        # Create specialized type
+        spec = dom._struct(T=dom.BOOLEAN_TYPE.as_val)
+        nominal = dom._nominal_type("test.TestUnion", spec)
+        
+        # Get fields
+        fields = self.introspector.fields(nominal)
+        
+        # Check union_field: bool | int | None
+        union_field = _field_type(fields, "union_field")
+        self.assertIsInstance(union_field, dom.UnionType)
+        self.assertEqual(
+            union_field.types,
+            frozenset({dom.BOOLEAN_TYPE, dom.INTEGER_TYPE, dom.EMPTY_TYPE})
+        )
+        
+        # Check optional_union: tuple[bool | str, ...] | None
+        optional_union = _field_type(fields, "optional_union")
+        self.assertIsInstance(optional_union, dom.UnionType)
+        
+        # Find the tuple type in the union
+        tuple_type = None
+        for t in optional_union.types:
+            if isinstance(t, dom.NominalQualifier) and _anchor_path(t) == "std.List":
+                tuple_type = t
+                break
+        
+        self.assertIsNotNone(tuple_type)
+        # Inner should be bool | str
+        inner_union = tuple_type.underlying
+        self.assertIsInstance(inner_union, dom.UnionType)
+        self.assertEqual(
+            inner_union.types,
+            frozenset({dom.BOOLEAN_TYPE, dom.TEXT_TYPE})
+        )
 
 
 if __name__ == "__main__":

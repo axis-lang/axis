@@ -1,10 +1,10 @@
 import unittest
 from decimal import Decimal
 
-from axis import dom, syn, val
+from axis import dom, syn
 
 
-class _Contrib(dom.ContributionBase):
+class _Context(dom.ContextProto):
     """Concrete ContributionBase for testing."""
     pass
 
@@ -78,22 +78,22 @@ class EvalTest(unittest.TestCase):
             self.assertTrue(isinstance(meta.spec, dom.Ref))
 
     def test_new_struct_with_vars(self):
-        anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
+        
+        ctx = _Context()
+        K = dom.Var.spec("K", ctx)
+        V = dom.Var.spec("V", ctx)
         result = dom.Const.new_struct(K, V)
         self.assertIsInstance(result.type, dom.StructType)
         self.assertEqual(result.data, ("K", "V"))
-        self.assertEqual(result.type.fields[0], dom.VarSpecType(contribution=contrib))
-        self.assertEqual(result.type.fields[1], dom.VarSpecType(contribution=contrib))
+        self.assertEqual(result.type.fields[0], dom.VarSpecType(contribution=ctx))
+        self.assertEqual(result.type.fields[1], dom.VarSpecType(contribution=ctx))
 
     def test_new_qual_simple(self):
         """Mapping[K] V — single qualifier with spec vars."""
-        anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
+        
+        ctx = _Context()
+        K = dom.Var.spec("K", ctx)
+        V = dom.Var.spec("V", ctx)
 
         mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
             dom.Const.new_struct(K)
@@ -103,7 +103,7 @@ class EvalTest(unittest.TestCase):
         # type side: NominalQualifier with SpecType and VarSpecType
         self.assertIsInstance(result.type, dom.NominalQualifier)
         self.assertIsInstance(result.type.spec_ref, dom.SpecType)
-        self.assertEqual(result.type.underlying, dom.VarSpecType(contribution=contrib))
+        self.assertEqual(result.type.underlying, dom.VarSpecType(contribution=ctx))
 
         # data side: (underlying.data, spec_ref.data)
         self.assertEqual(result.data[0], "V")
@@ -111,10 +111,10 @@ class EvalTest(unittest.TestCase):
 
     def test_new_qual_chained(self):
         """Array[2,2] Mapping[K] V — chained qualifiers."""
-        anchor = dom.Anchor.from_str("test.foo")
-        contrib = _Contrib(anchor=anchor)
-        K = dom.Var.spec("K", contrib)
-        V = dom.Var.spec("V", contrib)
+        
+        ctx = _Context()
+        K = dom.Var.spec("K", ctx)
+        V = dom.Var.spec("V", ctx)
         two = dom.Const.new_literal(2)
 
         # inner: Mapping[K] V
@@ -132,7 +132,7 @@ class EvalTest(unittest.TestCase):
         # type side: nested NominalQualifiers
         self.assertIsInstance(outer.type, dom.NominalQualifier)
         self.assertIsInstance(outer.type.underlying, dom.NominalQualifier)
-        self.assertEqual(outer.type.underlying.underlying, dom.VarSpecType(contribution=contrib))
+        self.assertEqual(outer.type.underlying.underlying, dom.VarSpecType(contribution=ctx))
 
         # data side: (inner.data, array_spec.data)
         inner_data = outer.data[0]

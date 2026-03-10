@@ -7,14 +7,15 @@ from protobase.cached_property import slot_cached_property
 from axis import dom, syn, sem
 
 
-class Context[P: Context](syn.SegregatedItem[P], abstract=True):
+class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
 
     class Binding(Consed, abstract=True):
         key: syn.Expr = _
         bound: syn.Expr | None = None
         default: syn.Expr | None = None
 
-    class Contribution(dom.ContributionBase, abstract=True):
+    class Contribution(dom.ContextProto, abstract=True):
+        anchor: dom.Anchor = _
         origin: syn.Node = _
         ctx: Context = _
 

@@ -87,10 +87,10 @@ def _format_type(t: dom.Type) -> str:
         ref_str = _spec_text(t.spec_ref.type)
         under_str = _format_type(t.underlying)
         return f"{ref_str} {under_str}"
-    elif isinstance(t, dom.VarSpecType):
-        return f"${t.name}"
-    elif isinstance(t, dom.VarParamType):
-        return f"${t.name}"
+    elif isinstance(t, dom.Var):
+        return f"${t.data}"
+    elif isinstance(t, dom.VarType):
+        return f"$?"
     return type(t).__name__
 
 

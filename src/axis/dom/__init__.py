@@ -46,7 +46,7 @@ def _struct(
     fields = Struct.new(*positional, **nominal)
     return Const(
         type=StructType(
-            fields=fields.map(lambda x: x.type),
+            fields=fields.map(lambda x: x if isinstance(x, Var) else x.type),
         ),
         data=fields.map(lambda x: x.data).values,
     )
@@ -91,13 +91,17 @@ def _union(types: frozenset[Type], active: Pure | Var) -> Const[UnionType]:
 
     The data is (discriminator, value_data) where discriminator is the
     active member's type — identifying which variant is inhabited.
+    For Var active variants, the Var itself is the discriminator
+    (since Var IS a Type).
     """
     union_type = _union_type(*types)
-    if active.type not in union_type.types:
-        raise TypeError(f"Active variant type {active.type} is not in the union types")
+    # For a Var, the discriminator is the Var itself (it IS a Type)
+    discriminator = active if isinstance(active, Var) else active.type
+    if discriminator not in union_type.types:
+        raise TypeError(f"Active variant type {discriminator} is not in the union types")
     return Const(
         type=union_type,
-        data=(active.type, active.data),
+        data=(discriminator, active.data),
     )
 
 
@@ -193,14 +197,14 @@ def dir(val: Val) -> Struct[str, Type] | None:
     """Return the field map of a value, or Missing if opaque."""
     if not isinstance(val, Pure):
         return None
-    return val.type.dir(val.data)
+    return val.type._axis_dir(val.data)
 
 
 def get(val: Val, key: str | int) -> Val:
     """Access a sub-value by key (cremallera decomposition)."""
     if not isinstance(val, Pure):
         raise TypeError(f"Cannot access member on {type(val).__name__}")
-    return val.type.get(val.data, key)
+    return val.type._axis_get(val.data, key)
 
 
 # Bootstrap introspection when module loads
