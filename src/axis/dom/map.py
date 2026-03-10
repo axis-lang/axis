@@ -11,7 +11,7 @@ from .core import Builtin, Data
 __all__ = ["Map"]
 
 
-class Map[K: Data, V: Data](Builtin):
+class Map[K, V](Builtin):
     "def Map[K] V"
 
     _inner: frozendict[K, V]

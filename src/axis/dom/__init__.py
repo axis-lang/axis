@@ -11,8 +11,9 @@ from .type_ import *
 from .const import *
 from .ref import *
 from .var import *
+from .introspect import *
 from .err import *
-from .inspect import INTROSPECTOR
+
 
 
 def _anchor(path: str) -> Anchor:
@@ -136,6 +137,12 @@ INTEGER_TYPE = _nominal_type("std.Integer")
 DECIMAL_TYPE = _nominal_type("std.Decimal")
 TEXT_TYPE = _nominal_type("std.Text")
 
+# Additional base types for introspection
+ANY_TYPE = _nominal_type("std.Any")
+MAP_TYPE = _nominal_type("std.Map")
+SET_TYPE = _nominal_type("std.Set")
+LIST_TYPE = _nominal_type("std.List")
+
 TYPE_BY_NATIVE: dict[type[Literal] | None, Type] = {
     bool: BOOLEAN_TYPE,
     int: INTEGER_TYPE,
@@ -194,3 +201,9 @@ def get(val: Val, key: str | int) -> Val:
     if not isinstance(val, Pure):
         raise TypeError(f"Cannot access member on {type(val).__name__}")
     return val.type.get(val.data, key)
+
+
+# Bootstrap introspection when module loads
+from .introspect import _bootstrap_introspection
+_bootstrap_introspection()
+

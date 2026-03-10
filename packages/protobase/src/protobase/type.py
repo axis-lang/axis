@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cache
 from sys import modules
-from typing import Any, Callable, Optional, Self, Sequence
+from typing import Any, Callable, Optional, Self, Sequence, cast
 from warnings import warn
 
 from .missing import Missing as _MISSING, MissingType as _MISSING_TYPE
+
 
 class Type(type):
 
@@ -73,17 +74,21 @@ class Type(type):
                     }
             self._metadata.update(kwargs)
             result = tuple(self._metadata.get(arg) for arg in args)
-            return result[0] if len(result) == 1 else result
+            return result[0] if len(args) == 1 else result
 
         def mro_data(self, name: str):
             return get_mro_protodata(self.mro, name)
 
+        def mro_dict(self, name: str) -> dict:
+            result = {}
+            for val in self.mro_data(name).values():
+                result.update(val)
+            return result
+
         def add_slots(self, *slots):
             self._slots.extend(slots)
 
-        prebuilders: list[Callable[[], None]] = field(
-            default_factory=list, init=False
-        )
+        prebuilders: list[Callable[[], None]] = field(default_factory=list, init=False)
 
         def prebuild(self, func: Callable[[], None]):
             self.prebuilders.append(func)
@@ -144,11 +149,11 @@ class Type(type):
         If the parent class cannot be found, a warning is issued.
 
         Returns:
-            Optional[type]: The parent class of the current class, 
+            Optional[type]: The parent class of the current class,
             or None if not found.
 
         """
-        path = self.__qualname__.split('.')
+        path = self.__qualname__.split(".")
         if len(path) == 1:
             return None
 
@@ -164,7 +169,7 @@ class Type(type):
             return None
 
         for part in path[:-1]:
-            if part =='<locals>':
+            if part == "<locals>":
                 warn(
                     f"Could not resolve parent for *local* class {self.__qualname__}",
                     UserWarning,
@@ -175,12 +180,12 @@ class Type(type):
             if parent is None:
                 warn(
                     f"Could not resolve parent for class {self.__qualname__}: ",
-                    #f"{part} not found in {parent.__name__}",
+                    # f"{part} not found in {parent.__name__}",
                     UserWarning,
                     2,
                 )
                 return None
-            
+
         if not isinstance(parent, type):
             warn(
                 f"Could not resolve parent for class {self.__qualname__}: "
@@ -192,10 +197,10 @@ class Type(type):
 
         return parent
 
+
 @cache
 def parent_of(cls: Type) -> Optional[type]:
     return getattr(cls, "__parent__", None)
-
 
 
 def get_mro_protodata(cls_or_mro: type | Sequence[type], name: str):
@@ -203,11 +208,9 @@ def get_mro_protodata(cls_or_mro: type | Sequence[type], name: str):
     return {
         base: baseval
         for base in reversed(mro)
-        if (basemeta := getattr(base, '__protodata__', None)) is not None
+        if (basemeta := getattr(base, "__protodata__", None)) is not None
         and (baseval := basemeta.get(name, _MISSING)) is not _MISSING
     }
-
-
 
 
 def _mro(cls):

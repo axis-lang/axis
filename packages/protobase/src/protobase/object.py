@@ -27,7 +27,7 @@ from weakref import WeakKeyDictionary
 
 from .utils import compile_function, dict_split
 from .derived import derived
-from .missing import Missing as _MISSING
+from .missing import Missing as Missing
 from .type import Type
 
 
@@ -76,7 +76,7 @@ class AttrInfo(NamedTuple):
 
     @property
     def has_default(self):
-        return self.default is not _MISSING
+        return self.default is not Missing
 
     @property
     def type(self) -> Any:
@@ -181,12 +181,12 @@ def impl_init_method(cls):
             args = ["self", *positional_attrs, "*", *nominal_attrs]
         else:
             args = ["self", *positional_attrs]
-        kwdefaults = {k: _MISSING for k, in nominal_attrs}
+        kwdefaults = {k: Missing for k, in nominal_attrs}
         defaults = ()
     else:
         args = ["self", *positional_attrs, *nominal_attrs]
         kwdefaults = {}
-        defaults = (_MISSING,) * len(nominal_attrs)
+        defaults = (Missing,) * len(nominal_attrs)
 
     attrs_factories = {
         f"_{attr}_factory": _default_factory(info.default)
@@ -200,11 +200,11 @@ def impl_init_method(cls):
             for attr in positional_attrs
         ],
         *[
-            f"    object.__setattr__(self, '{attr}', {attr} if {attr} is not __MISSING__ else _{attr}_factory())"
+            f"    object.__setattr__(self, '{attr}', {attr} if {attr} is not _Missing__ else _{attr}_factory())"
             for attr in nominal_attrs
         ],
         "    return",
-        globals={**attrs_factories, "__MISSING__": _MISSING},
+        globals={**attrs_factories, "_Missing__": Missing},
         __kwdefaults__=kwdefaults,
         __defaults__=defaults,
     )
@@ -303,7 +303,7 @@ class Object(metaclass=Type, abstract=True):
             return not _is_classvar_annotation(anno, bld.module)
 
         attrs = {
-            nm: bld.namespace.pop(nm, _MISSING)
+            nm: bld.namespace.pop(nm, Missing)
             for nm, anno in bld.annotations.items()
             if is_attr_member(nm, anno)
         }
@@ -336,11 +336,16 @@ class Object(metaclass=Type, abstract=True):
                     f"functools.cached_property '{k}' is not supported in protobase. Use protobase.cached_property instead."
                 )
 
-        sticky_members = {
+        sticky_members: Any = {
             k: v
             for k, v in bld.namespace.items()
             if isinstance(v, Type.StickyMember)
         }
+
+        for base_sticky_members in bld.mro_data("sticky").values():
+            for k, v in base_sticky_members.items():
+                if k in bld.namespace:
+                    sticky_members[k] = Missing
 
         bld.data(
             abstract=abstract,
@@ -374,10 +379,10 @@ class Object(metaclass=Type, abstract=True):
         @bld.postbuild
         def postbuild(cls):
             # assign sticky members
-            for base_sticky_members in bld.mro_data("sticky").values():
-                for k, v in base_sticky_members.items():
-                    if k not in bld.namespace:
-                        setattr(cls, k, v)
+
+            for k, v in bld.mro_dict("sticky").items():
+                if k not in bld.namespace and v is not Missing:
+                    setattr(cls, k, v)
 
             # assign self as parent of nested classes
             # for k, v in cls.__dict__.items():

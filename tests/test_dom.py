@@ -6,13 +6,32 @@ where type describes how to interpret data. Types are also values
 """
 import unittest
 from decimal import Decimal
+from typing import Union, TypeVar, Generic
+from types import UnionType as PEP604Union
+
+from protobase import frozendict
 
 from axis import dom
+from axis.dom.introspect import (
+    _python_to_axis_type,
+    _transform_generic,
+    _PY_TO_AX_TRANSFORMS,
+    register_py_to_ax,
+)
 
 
 class _Contrib(dom.ContributionBase):
     """Concrete ContributionBase for testing."""
     pass
+
+
+T_Generic = TypeVar("T_Generic")
+
+
+class _GenericBuiltin(dom.Builtin, Generic[T_Generic]):
+    ANCHOR = "test.GenericBuiltin"
+
+    value: T_Generic
 
 
 # ---------------------------------------------------------------------------
@@ -606,7 +625,7 @@ class TestDirGet(unittest.TestCase):
         contrib = _Contrib(anchor=anchor)
         K = dom.Var.spec("K", contrib)
         V = dom.Var.spec("V", contrib)
-        mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
+        mapping_spec = dom.Anchor.from_str("std.Map").specialize(
             dom.Const.new_struct(K)
         )
         qual_type = dom._nominal_qual(
@@ -625,7 +644,7 @@ class TestDirGet(unittest.TestCase):
         contrib = _Contrib(anchor=anchor)
         K = dom.Var.spec("K", contrib)
         V = dom.Var.spec("V", contrib)
-        mapping_spec = dom.Anchor.from_str("std.Mapping").specialize(
+        mapping_spec = dom.Anchor.from_str("std.Map").specialize(
             dom.Const.new_struct(K)
         )
         qual_type = dom._nominal_qual(
@@ -878,6 +897,460 @@ class TestUnionEncode(unittest.TestCase):
         recovered = dom.Const(type=recovered_type, data=recovered_data)
         self.assertEqual(recovered.type, dom.TEXT_TYPE)
         self.assertEqual(recovered.data, "world")
+
+
+# ---------------------------------------------------------------------------
+# PyAx interop: _python_to_axis_type / register_py_to_ax
+# ---------------------------------------------------------------------------
+
+
+def _anchor_path(t: dom.Type) -> str:
+    """Extract the dotted anchor path from a NominalType or NominalQualifier."""
+    if isinstance(t, dom.NominalQualifier):
+        return ".".join(t.spec_ref.anchor.data)
+    if isinstance(t, dom.NominalType):
+        return ".".join(t.spec_ref.anchor.data)
+    raise TypeError(f"Cannot extract anchor path from {type(t).__name__}")
+
+
+class TestPyToAxisScalar(unittest.TestCase):
+    """Scalar Python types map to the corresponding std.* NominalType."""
+
+    def test_int(self):
+        self.assertIs(_python_to_axis_type(int), dom.INTEGER_TYPE)
+
+    def test_str(self):
+        self.assertIs(_python_to_axis_type(str), dom.TEXT_TYPE)
+
+    def test_bool(self):
+        self.assertIs(_python_to_axis_type(bool), dom.BOOLEAN_TYPE)
+
+    def test_float(self):
+        self.assertIs(_python_to_axis_type(float), dom.DECIMAL_TYPE)
+
+    def test_decimal(self):
+        self.assertIs(_python_to_axis_type(Decimal), dom.DECIMAL_TYPE)
+
+    def test_none_type(self):
+        self.assertIs(_python_to_axis_type(type(None)), dom.EMPTY_TYPE)
+
+    def test_unknown_scalar_fallback(self):
+        """A plain class with no registration falls back to ANY_TYPE."""
+        class Unregistered:
+            pass
+        self.assertIs(_python_to_axis_type(Unregistered), dom.ANY_TYPE)
+
+
+class TestPyToAxisUnion(unittest.TestCase):
+    """Union annotations (typing.Union and PEP 604) produce UnionType."""
+
+    def test_typing_union(self):
+        result = _python_to_axis_type(Union[int, str])
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(result.types, frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE}))
+
+    def test_pep604_union(self):
+        """PEP 604 `int | str` is handled via the registered PEP604Union transform."""
+        result = _python_to_axis_type(int | str)
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(result.types, frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE}))
+
+    def test_typing_union_with_none(self):
+        result = _python_to_axis_type(Union[int, None])
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(result.types, frozenset({dom.INTEGER_TYPE, dom.EMPTY_TYPE}))
+
+    def test_pep604_union_with_none(self):
+        result = _python_to_axis_type(int | None)
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(result.types, frozenset({dom.INTEGER_TYPE, dom.EMPTY_TYPE}))
+
+    def test_triple_union_pep604(self):
+        result = _python_to_axis_type(int | str | None)
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(
+            result.types,
+            frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE, dom.EMPTY_TYPE}),
+        )
+
+    def test_triple_union_typing(self):
+        result = _python_to_axis_type(Union[int, str, bool])
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertIn(dom.INTEGER_TYPE, result.types)
+        self.assertIn(dom.TEXT_TYPE, result.types)
+        self.assertIn(dom.BOOLEAN_TYPE, result.types)
+
+    def test_nested_typing_union_flattens(self):
+        """Union[Union[int, str], bool] flattens via _union_type."""
+        inner = Union[int, str]
+        # Build the outer by hand — typing.Union auto-flattens,
+        # so we test _union_type's flattening directly.
+        inner_type = _python_to_axis_type(inner)
+        outer = dom._union_type(inner_type, dom.BOOLEAN_TYPE)
+        self.assertIsInstance(outer, dom.UnionType)
+        self.assertEqual(
+            outer.types,
+            frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE, dom.BOOLEAN_TYPE}),
+        )
+
+
+class TestPyToAxisGeneric(unittest.TestCase):
+    """Registered generic Python types project correctly to Axis types."""
+
+    # -- tuple --
+
+    def test_tuple_variadic(self):
+        """tuple[int, ...] -> std.List int"""
+        result = _python_to_axis_type(tuple[int, ...])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.List")
+        self.assertIs(result.underlying, dom.INTEGER_TYPE)
+
+    def test_tuple_fixed(self):
+        """tuple[int, str] -> StructType(fields=(INTEGER_TYPE, TEXT_TYPE))"""
+        result = _python_to_axis_type(tuple[int, str])
+        self.assertIsInstance(result, dom.StructType)
+        self.assertEqual(result.fields.arity, 2)
+        self.assertIs(result.fields[0], dom.INTEGER_TYPE)
+        self.assertIs(result.fields[1], dom.TEXT_TYPE)
+
+    def test_tuple_single_element(self):
+        """tuple[int] -> StructType with one positional field."""
+        result = _python_to_axis_type(tuple[int])
+        self.assertIsInstance(result, dom.StructType)
+        self.assertEqual(result.fields.arity, 1)
+        self.assertIs(result.fields[0], dom.INTEGER_TYPE)
+
+    def test_tuple_triple(self):
+        """tuple[int, str, bool] -> StructType with three fields."""
+        result = _python_to_axis_type(tuple[int, str, bool])
+        self.assertIsInstance(result, dom.StructType)
+        self.assertEqual(result.fields.arity, 3)
+        self.assertIs(result.fields[0], dom.INTEGER_TYPE)
+        self.assertIs(result.fields[1], dom.TEXT_TYPE)
+        self.assertIs(result.fields[2], dom.BOOLEAN_TYPE)
+
+    # -- frozenset / set --
+
+    def test_frozenset(self):
+        """frozenset[str] -> std.Set str"""
+        result = _python_to_axis_type(frozenset[str])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Set")
+        self.assertIs(result.underlying, dom.TEXT_TYPE)
+
+    def test_set(self):
+        """set[int] -> std.Set int"""
+        result = _python_to_axis_type(set[int])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Set")
+        self.assertIs(result.underlying, dom.INTEGER_TYPE)
+
+    # -- frozendict --
+
+    def test_frozendict(self):
+        """frozendict[str, int] -> std.Map int (keyed by str)"""
+        result = _python_to_axis_type(frozendict[str, int])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Map")
+        self.assertIs(result.underlying, dom.INTEGER_TYPE)
+
+    # -- Struct --
+
+    def test_struct_generic(self):
+        """Struct[str, Type] -> Struct qualifier with underlying=ANY (for Type)"""
+        result = _python_to_axis_type(dom.Struct[str, dom.Type])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "Struct")
+
+
+class TestPyToAxisComplex(unittest.TestCase):
+    """Nested and composed generic types are recursively projected."""
+
+    def test_tuple_variadic_of_union(self):
+        """tuple[int | str, ...] -> std.List (int | str)"""
+        result = _python_to_axis_type(tuple[int | str, ...])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.List")
+        self.assertIsInstance(result.underlying, dom.UnionType)
+        self.assertEqual(
+            result.underlying.types,
+            frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE}),
+        )
+
+    def test_frozenset_of_union(self):
+        """frozenset[int | None] -> std.Set (int | None)"""
+        result = _python_to_axis_type(frozenset[int | None])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Set")
+        self.assertIsInstance(result.underlying, dom.UnionType)
+        self.assertEqual(
+            result.underlying.types,
+            frozenset({dom.INTEGER_TYPE, dom.EMPTY_TYPE}),
+        )
+
+    def test_frozendict_of_nested_set(self):
+        """frozendict[str, frozenset[int]] -> std.Map (std.Set int)"""
+        result = _python_to_axis_type(frozendict[str, frozenset[int]])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Map")
+        inner = result.underlying
+        self.assertIsInstance(inner, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(inner), "std.Set")
+        self.assertIs(inner.underlying, dom.INTEGER_TYPE)
+
+    def test_tuple_fixed_with_nested_generics(self):
+        """tuple[frozenset[int], frozendict[str, bool]] -> StructType with nested types."""
+        result = _python_to_axis_type(tuple[frozenset[int], frozendict[str, bool]])
+        self.assertIsInstance(result, dom.StructType)
+        self.assertEqual(result.fields.arity, 2)
+
+        f0 = result.fields[0]
+        self.assertIsInstance(f0, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(f0), "std.Set")
+        self.assertIs(f0.underlying, dom.INTEGER_TYPE)
+
+        f1 = result.fields[1]
+        self.assertIsInstance(f1, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(f1), "std.Map")
+        self.assertIs(f1.underlying, dom.BOOLEAN_TYPE)
+
+    def test_union_of_generic_types(self):
+        """Union[frozenset[int], tuple[str, ...]] -> UnionType of (std.Set int, std.List str)"""
+        result = _python_to_axis_type(Union[frozenset[int], tuple[str, ...]])
+        self.assertIsInstance(result, dom.UnionType)
+        self.assertEqual(len(result.types), 2)
+
+        # Decompose the union members
+        types_by_class = {}
+        for t in result.types:
+            types_by_class[type(t).__name__] = t
+
+        set_type = types_by_class["NominalQualifier"]
+        # One should be std.Set, the other std.List — identify by anchor
+        anchors = {_anchor_path(t) for t in result.types}
+        self.assertEqual(anchors, {"std.Set", "std.List"})
+
+    def test_triple_nesting(self):
+        """frozendict[str, frozendict[str, frozenset[int]]] -> three levels deep."""
+        result = _python_to_axis_type(frozendict[str, frozendict[str, frozenset[int]]])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Map")
+
+        mid = result.underlying
+        self.assertIsInstance(mid, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(mid), "std.Map")
+
+        inner = mid.underlying
+        self.assertIsInstance(inner, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(inner), "std.Set")
+        self.assertIs(inner.underlying, dom.INTEGER_TYPE)
+
+    def test_tuple_variadic_of_tuple_fixed(self):
+        """tuple[tuple[int, str], ...] -> std.List (StructType(int, str))"""
+        result = _python_to_axis_type(tuple[tuple[int, str], ...])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.List")
+        self.assertIsInstance(result.underlying, dom.StructType)
+        self.assertEqual(result.underlying.fields.arity, 2)
+        self.assertIs(result.underlying.fields[0], dom.INTEGER_TYPE)
+        self.assertIs(result.underlying.fields[1], dom.TEXT_TYPE)
+
+    def test_pep604_union_of_generics(self):
+        """frozenset[int] | tuple[str, ...] via PEP 604."""
+        result = _python_to_axis_type(frozenset[int] | tuple[str, ...])
+        self.assertIsInstance(result, dom.UnionType)
+        anchors = {_anchor_path(t) for t in result.types}
+        self.assertEqual(anchors, {"std.Set", "std.List"})
+
+    def test_set_of_tuple_variadic(self):
+        """set[tuple[int, ...]] is not directly expressible as a Python type,
+        but set[int] | frozenset[str] tests mixed set transforms."""
+        result = _python_to_axis_type(set[int] | frozenset[str])
+        self.assertIsInstance(result, dom.UnionType)
+        for t in result.types:
+            self.assertIsInstance(t, dom.NominalQualifier)
+            self.assertEqual(_anchor_path(t), "std.Set")
+
+
+class TestPyToAxisEdgeCases(unittest.TestCase):
+    """Edge cases: unregistered origins, TypeVar, non-type annotations."""
+
+    def test_unregistered_generic_fallback(self):
+        """list[int] has no registered transform -> ANY_TYPE."""
+        result = _python_to_axis_type(list[int])
+        self.assertIs(result, dom.ANY_TYPE)
+
+    def test_dict_fallback(self):
+        """dict[str, int] has no registered transform -> ANY_TYPE."""
+        result = _python_to_axis_type(dict[str, int])
+        self.assertIs(result, dom.ANY_TYPE)
+
+    def test_bare_tuple_no_args(self):
+        """Plain `tuple` (no parameters) has origin=None, treated as a class."""
+        result = _python_to_axis_type(tuple)
+        # tuple itself is a type, falls through to _try_builtin_mapping
+        # which won't find a Builtin named 'tuple', so ANY_TYPE
+        self.assertIs(result, dom.ANY_TYPE)
+
+    def test_bare_int_is_scalar(self):
+        """Bare `int` is identity-matched, not via Builtin registry."""
+        self.assertIs(_python_to_axis_type(int), dom.INTEGER_TYPE)
+
+    def test_any_annotation(self):
+        """typing.Any is not a type class — fallback."""
+        from typing import Any
+        result = _python_to_axis_type(Any)
+        # Any has no origin, is not a type class — fallback
+        self.assertIs(result, dom.ANY_TYPE)
+
+    def test_none_literal(self):
+        """NoneType (type(None)) maps to EMPTY_TYPE."""
+        self.assertIs(_python_to_axis_type(type(None)), dom.EMPTY_TYPE)
+
+    def test_ellipsis_in_non_tuple_context(self):
+        """Ellipsis on its own is not a recognized type."""
+        result = _python_to_axis_type(...)
+        self.assertIs(result, dom.ANY_TYPE)
+
+
+class TestRegisterPyToAx(unittest.TestCase):
+    """register_py_to_ax allows extending and overriding transforms."""
+
+    def setUp(self):
+        """Snapshot the registry to restore after each test."""
+        self._snapshot = dict(_PY_TO_AX_TRANSFORMS)
+
+    def tearDown(self):
+        """Restore the original registry."""
+        _PY_TO_AX_TRANSFORMS.clear()
+        _PY_TO_AX_TRANSFORMS.update(self._snapshot)
+
+    def test_register_new_origin(self):
+        """Register a previously unhandled origin (list)."""
+        register_py_to_ax(
+            list,
+            lambda V: dom._nominal_qual('std.List', None, underlying=V),
+        )
+        result = _python_to_axis_type(list[int])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.List")
+        self.assertIs(result.underlying, dom.INTEGER_TYPE)
+
+    def test_register_dict(self):
+        """Register dict as a std.Map analog."""
+        register_py_to_ax(
+            dict,
+            lambda K, V: dom._nominal_qual('std.Map', None, underlying=V),
+        )
+        result = _python_to_axis_type(dict[str, int])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Map")
+        self.assertIs(result.underlying, dom.INTEGER_TYPE)
+
+    def test_override_existing_transform(self):
+        """Overriding an existing transform replaces the old one."""
+        # frozenset currently maps to std.Set
+        original = _python_to_axis_type(frozenset[int])
+        self.assertEqual(_anchor_path(original), "std.Set")
+
+        # Override to map frozenset to std.List instead
+        register_py_to_ax(
+            frozenset,
+            lambda V: dom._nominal_qual('std.List', None, underlying=V),
+        )
+        overridden = _python_to_axis_type(frozenset[int])
+        self.assertEqual(_anchor_path(overridden), "std.List")
+        self.assertIs(overridden.underlying, dom.INTEGER_TYPE)
+
+    def test_transform_receives_converted_args(self):
+        """Transform callback receives dom.Types, not raw Python types."""
+        received_args = []
+
+        def capture_transform(*args):
+            received_args.extend(args)
+            return dom.ANY_TYPE
+
+        register_py_to_ax(list, capture_transform)
+        _python_to_axis_type(list[int])
+
+        self.assertEqual(len(received_args), 1)
+        self.assertIs(received_args[0], dom.INTEGER_TYPE)
+
+    def test_transform_receives_ellipsis_unchanged(self):
+        """Ellipsis is not converted — passed through as-is."""
+        received_args = []
+
+        def capture_transform(*args):
+            received_args.extend(args)
+            return dom.ANY_TYPE
+
+        # Override tuple to capture what it receives
+        register_py_to_ax(tuple, capture_transform)
+        _python_to_axis_type(tuple[int, ...])
+
+        self.assertEqual(len(received_args), 2)
+        self.assertIs(received_args[0], dom.INTEGER_TYPE)
+        self.assertIs(received_args[1], ...)
+
+    def test_nested_generics_recurse_through_new_registration(self):
+        """A newly registered list transform is picked up inside nested types."""
+        register_py_to_ax(
+            list,
+            lambda V: dom._nominal_qual('std.List', None, underlying=V),
+        )
+        # frozenset[list[int]] -> std.Set (std.List int)
+        result = _python_to_axis_type(frozenset[list[int]])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Set")
+
+        inner = result.underlying
+        self.assertIsInstance(inner, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(inner), "std.List")
+        self.assertIs(inner.underlying, dom.INTEGER_TYPE)
+
+    def test_custom_struct_projection(self):
+        """Example from the design doc: custom Struct transform with spec."""
+        register_py_to_ax(
+            dom.Struct,
+            lambda K, V: dom._nominal_qual(
+                'std.Struct',
+                None,
+                underlying=V,
+            ),
+        )
+        result = _python_to_axis_type(dom.Struct[str, dom.Type])
+        self.assertIsInstance(result, dom.NominalQualifier)
+        self.assertEqual(_anchor_path(result), "std.Struct")
+
+
+def _field_type(struct: dom.Struct[str, dom.Type], key: str) -> dom.Type:
+    offset = struct.index.get(key)
+    if offset is None:
+        raise AssertionError(f"Struct has no key {key!r}")
+    return struct[offset]
+
+
+class TestNativeIntrospectorGenerics(unittest.TestCase):
+    """NativeIntrospector substitutes VarGenericType placeholders using spec_ref."""
+
+    def test_substitutes_placeholder_from_spec(self):
+        spec = dom._struct(T_Generic=dom.INTEGER_TYPE.as_val)
+        nominal = dom._nominal_type("test.GenericBuiltin", spec)
+
+        introspector = dom.INTROSPECTOR.get()
+        self.assertIsNotNone(introspector)
+
+        fields = introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        self.assertIs(_field_type(fields, "value"), dom.INTEGER_TYPE)
+
+    def test_placeholder_without_spec_defaults_to_any(self):
+        nominal = dom._nominal_type("test.GenericBuiltin")
+        introspector = dom.INTROSPECTOR.get()
+        fields = introspector.fields(nominal)
+        self.assertIsNotNone(fields)
+        self.assertIs(_field_type(fields, "value"), dom.ANY_TYPE)
 
 
 if __name__ == "__main__":

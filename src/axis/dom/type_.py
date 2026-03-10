@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 class Type(Builtin, abstract=True):
     ANCHOR: ClassVar[str]
 
+    def __repr__(self):
+        return self.ANCHOR
+
     @property
     def __type__(self) -> Type:
         raise NotImplementedError(
@@ -44,16 +47,25 @@ class Type(Builtin, abstract=True):
         """
         fields = self.dir(data)
         if fields is None:
-            raise KeyError(f"No member {key!r} on {type(self).__name__} (opaque)")
+            raise KeyError(f"No member {key!r} on opaque type {type(self).__name__}")
+
         if isinstance(key, str):
             offset = fields.index.get(key)
         elif isinstance(key, int):
             offset = key
         else:
             raise TypeError(f"Unsupported key type: {type(key)}")
-        if not isinstance(data, tuple):
-            raise TypeError(f"Expected tuple data for dir/get, got {type(data).__name__}")
-        return dom.Const(type=fields[offset], data=data[offset])
+
+
+        if isinstance(data, tuple):
+            return dom.Const(type=fields[offset], data=data[offset])
+        elif isinstance(data, Builtin):
+            k = fields.index.keys[offset]
+            if k is None:
+                raise KeyError(f"Struct has no positional field at offset {offset}")
+            return dom.Const(type=fields[offset], data=getattr(data, k))
+        else:
+            raise TypeError(f"Unsupported data type: {type(data)}")
 
 
 class UnionType(Type):
@@ -78,7 +90,7 @@ class UnionType(Type):
 
 
 class StructType(Type):
-    "dom.Type.Struct[..Index] Type -> ( fields: (..I: Type) )"
+    "def dom.Type.Struct[..Index] Type : ( fields: (..Index: Type) )"
     ANCHOR: ClassVar[str] = "dom.Type.Struct"
 
     fields: dom.Struct[str, Type]
@@ -95,7 +107,7 @@ class StructType(Type):
 
 class NominalType(Type):
     """
-    val nominal_type: dom.Type.Nominal[SpecType] = (spec_ref: SpecData)
+    def dom.Type.Nominal[..S](spec_ref: Ref.Spec[..S])
     """
     ANCHOR: ClassVar[str] = "dom.Type.Nominal"
 
@@ -105,10 +117,19 @@ class NominalType(Type):
     def __type__(self) -> Type:
         return dom._nominal_type(
             "dom.Type.Nominal",
-            dom._struct(
-                spec_ref=self.spec_ref.type.as_val,
-            ),
+            self.spec_ref.specialization
+            # dom._struct(
+            #     spec_ref=self.spec_ref.type.as_val,
+            # ),
         )
+    
+    def __repr__(self):
+        return repr(self.spec_ref)
+
+    @property
+    def __rich__(self):
+        return self.spec_ref.__rich__
+
 
     def dir(self, data: Data | MissingType = Missing) -> Struct[str, Type] | None:
         introspector = dom.INTROSPECTOR.get(None)
@@ -123,17 +144,28 @@ class Qualifier(Type, abstract=True):
 
 
 class NominalQualifier(Qualifier):
+    """
+    def dom.Qual.Nominal[..S, U](..super, spec_ref: Ref.Spec[..S])
+    extends dom.Qual[U]
+    """
+
     ANCHOR: ClassVar[str] = "dom.Qual.Nominal"
 
     spec_ref: dom.Spec
+
+    def __repr__(self):
+        return f"{self.spec_ref!r} {self.underlying!r}"
+    
+    # def __rich__(self):
+    #     raise NotImplementedError("NominalQualifier does not support __rich__; Use repl() instead")
 
     @property
     def __type__(self) -> Type:
         return dom._nominal_type(
             "dom.Qual.Nominal",
             dom._struct(
-                spec_ref=self.spec_ref.type.as_val,
-                underlying=self.underlying.as_val,
+                S=self.spec_ref.type.as_val,
+                U=self.underlying.as_val,
             ),
         )
 

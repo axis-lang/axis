@@ -7,18 +7,6 @@ from axis import dom
 
 class Const[T: dom.Type = Any, D: dom.Data = Any](dom.Pure[T, D]):
 
-    def __repr__(self) -> str:
-        from axis.tui import render_dom
-        return render_dom.format_dom(self)
-
-    def __rich__(self):
-        from axis.tui import render_dom
-        return render_dom.render_dom(self)
-
-    def __rich_console__(self, console, options):
-        from axis.tui import render_dom
-        yield from render_dom.rich_console_dom(self, console, options)
-
     @staticmethod
     def new_literal(value: dom.Literal):
         return dom._literal(value)
@@ -37,8 +25,6 @@ class Const[T: dom.Type = Any, D: dom.Data = Any](dom.Pure[T, D]):
         **nominal: dom.Pure  | dom.Var,
     ) -> dom.Const[dom.StructType]:
         return dom._struct(*positional, **nominal)
-
-
 
     @staticmethod
     def new_union(

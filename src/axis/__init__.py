@@ -1,6 +1,9 @@
 from rich import pretty
 from rich import traceback
-pretty.install()
+pretty.install(
+    crop=True,
+    overflow="fold",
+)
 traceback.install()
 
 

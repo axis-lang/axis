@@ -5,6 +5,7 @@ from protobase import _
 from axis import dom
 from .type_ import Type, Data, Missing, MissingType
 
+__all__ = ["RefType", "Ref", "AnchorType", "Anchor", "SpecType", "Spec", "ref_segments"]
 
 class RefType(Type, abstract=True): ...
     # NOTE: Podemos modelar Ref como un Tuple[...] Ref.Step

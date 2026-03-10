@@ -1,9 +1,9 @@
 # %%
 from __future__ import annotations
 
-from typing import Any, Callable, ClassVar, Iterable, Iterator, overload
+from typing import Any, Callable, ClassVar, Iterable, Iterator, overload, Self
 
-from protobase import Consed, cached_property
+from protobase import Consed, slot_cached_property
 
 from axis.dom.map import Map
 from .core import Builtin, Data
@@ -11,8 +11,8 @@ from .core import Builtin, Data
 __all__ = ["Struct"]
 
 
-class Struct[K: Data, V: Data](Builtin):
-    class Shape[SK: Data](Builtin):
+class Struct[K, V](Builtin):
+    class Shape[SK](Builtin):
         """
         def Shape[arity] K
 
@@ -52,7 +52,7 @@ class Struct[K: Data, V: Data](Builtin):
         def __contains__(self, key: SK) -> bool:
             return key in self.keys
 
-    class Index[IK: Data](Builtin):
+    class Index[IK](Builtin):
         """
         def Index[K] Whole
         Index[K]('a', 'b', None, 'x', 'y')
@@ -70,11 +70,11 @@ class Struct[K: Data, V: Data](Builtin):
         def arity(self) -> int:
             return len(self.keys)
 
-        @cached_property
+        @slot_cached_property
         def _keyed_indices(self) -> Map[IK, int]:  # Map[K] Whole
             return Map.new((k, i) for i, k in enumerate(self.keys) if k is not None)
 
-        @cached_property
+        @slot_cached_property
         def _indexed_keys(self) -> Map[int, IK]:  # Map[Whole] K
             return Map.new((i, k) for i, k in enumerate(self.keys) if k is not None)
 
@@ -90,7 +90,7 @@ class Struct[K: Data, V: Data](Builtin):
         def is_sparse(self) -> bool:
             return not self.is_empty and not self.is_full
 
-        @cached_property
+        @slot_cached_property
         def shape(self) -> "Struct.Shape[IK]":  # Shape[arity] K
             return Struct.Shape(arity=self.arity, keys=frozenset(self._indexed_keys))
 
@@ -151,7 +151,7 @@ class Struct[K: Data, V: Data](Builtin):
         )
 
     @staticmethod
-    def new[T: Data](*positional: T, **nominal: T) -> Struct[str, T]:
+    def new[T](*positional: T, **nominal: T) -> Struct[str, T]:
         index = Struct.Index((None,) * len(positional) + tuple(nominal.keys()))
         values = positional + tuple(nominal.values())
         return Struct(index, values)
@@ -159,19 +159,19 @@ class Struct[K: Data, V: Data](Builtin):
     @classmethod
     def from_index(
         cls, index: "Struct.Index[K]", values: tuple[V, ...]
-    ) -> "Struct[K, V]":
-        return Struct(index=index, values=values)
+    ) -> Self:
+        return cls(index=index, values=values)
 
     @classmethod
-    def from_iter(cls, entries: Iterable[tuple[K | None, V]]) -> "Struct[K, V]":
+    def from_iter(cls, entries: Iterable[tuple[K | None, V]]) -> Self:
         keys, values = zip(*entries) if entries else ((), ())
-        return Struct.from_index(Struct.Index(keys), values)
+        return cls.from_index(Struct.Index(keys), values)
 
     @classmethod
     def from_keys(
         cls, keys: tuple[K | None, ...], values: tuple[V, ...]
-    ) -> "Struct[K, V]":
-        return Struct.from_index(Struct.Index(keys), values)
+    ) -> Self:
+        return cls.from_index(Struct.Index(keys), values)
 
 
 
@@ -199,7 +199,7 @@ class Struct[K: Data, V: Data](Builtin):
             raise KeyError(f"Key not found: {key}")
         return self.values[offset]
 
-    def map[R: Data](self, func: Callable[[V], R]) -> "Struct[K, R]":
+    def map[R](self, func: Callable[[V], R]) -> "Struct[K, R]":
         return Struct(
             index=self.index,
             values=tuple(func(v) for v in self.values),
