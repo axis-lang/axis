@@ -146,7 +146,8 @@ def val(*positional, **nominal) -> Val:
     - dom.Val -> returned as-is
     - Python type tokens in ``LITERAL_TYPES`` -> dom.val(mapped dom.Type)
     - Python/typing annotations -> project via introspect and re-normalize
-    - dom.Builtin -> Const(type=value.__type__, data=value.__data__)
+    - dom.Type -> value.as_val
+    - dom.Builtin -> Const(type=type(value)._type(...), data=value)
     - Python literals -> Const literal
     - dict[str, _] / protobase.frozendict[str, _] -> Struct Const
     - tuple/list -> positional Struct Const
@@ -178,6 +179,9 @@ def val(*positional, **nominal) -> Val:
 
         if isinstance(value, Val):
             return value
+
+        if isinstance(value, Type):
+            return value.as_val
 
         try:
             literal_type_token = LITERAL_TYPES.get(value, None)
@@ -212,7 +216,24 @@ def val(*positional, **nominal) -> Val:
             return _struct(*args)
 
         if isinstance(value, Builtin):
-            return Const(type=value.__type__, data=value.__data__)
+            from .introspect import _builtin_runtime_type_args
+
+            builtin_cls = type(value)
+            runtime_args = _builtin_runtime_type_args(value)
+            parameters = tuple(getattr(builtin_cls, "__parameters__", ()))
+
+            if parameters and runtime_args is None:
+                raise ValueError(
+                    f"dom.val cannot infer type arguments for generic Builtin instance "
+                    f"{builtin_cls.__name__}; instantiate with explicit type args"
+                )
+
+            builtin_type = (
+                builtin_cls._type(*runtime_args)
+                if runtime_args is not None
+                else builtin_cls._type()
+            )
+            return Const(type=builtin_type, data=value)
 
         raise ValueError(f"dom.val does not support value of type {type(value).__name__}")
     except ValueError:
@@ -226,8 +247,8 @@ def val(*positional, **nominal) -> Val:
 # dom.* for internal structural types
 # std.* for user-facing generic types
 
-STRUCT_TYPE = _nominal_type("dom.Type.Struct")
-NOMINAL_TYPE = _nominal_type("dom.Type.Nominal")
+STRUCT_TYPE = _nominal_type("dom.Struct.Type")
+NOMINAL_TYPE = _nominal_type("dom.Nominal.Type")
 
 EMPTY_TYPE = _nominal_type("std.Empty")
 BOOLEAN_TYPE = _nominal_type("std.Boolean")
@@ -256,7 +277,7 @@ TYPE_BY_NATIVE: dict[type[Literal] | None, Type] = {
 # Mapping for Python literal *type tokens* used by dom.val(type_token)
 LITERAL_TYPES: dict[object, Type] = {
     bool: BOOLEAN_TYPE,
-    int: NATURAL_TYPE,
+    int: INTEGER_TYPE,
     float: DECIMAL_TYPE,
     Decimal: DECIMAL_TYPE,
     str: TEXT_TYPE,
@@ -293,7 +314,31 @@ def _encode(v: Data) -> Data:
         return tuple(_encode(item) for item in v)
     elif isinstance(v, frozenset):
         return frozenset(_encode(item) for item in v)
+    elif isinstance(v, frozendict):
+        return frozendict({k: _encode(vv) for k, vv in v.items()})
     return v
+
+
+def encode(val: Pure) -> Pure:
+    """Encode a Pure value to raw (JSON-like) form.
+    
+    The type side remains unchanged. The data side gets recursively 
+    encoded to strip all Builtin instances.
+    """
+    return val.__class__(type=val.type, data=_encode(val.data))
+
+
+def _decode(type: Type, data: Data) -> Data:
+    """Decode raw data using the type-side decode strategy."""
+    return type._decode(data)
+
+
+def decode(val: Pure) -> Pure:
+    """Decode a Pure value from raw (JSON-like) form to Builtin-rich form.
+    
+    Uses the type side to interpret the raw data and reconstruct Builtin instances.
+    """
+    return val.__class__(type=val.type, data=_decode(val.type, val.data))
 
 
 # --- Introspection: dir / get ---
@@ -303,14 +348,14 @@ def dir(val: Val) -> Struct[str, Type] | None:
     """Return the field map of a value, or Missing if opaque."""
     if not isinstance(val, Pure):
         return None
-    return val.type._axis_dir(val.data)
+    return val.type._dir(val.data)
 
 
 def get(val: Val, key: str | int) -> Val:
     """Access a sub-value by key (cremallera decomposition)."""
     if not isinstance(val, Pure):
         raise TypeError(f"Cannot access member on {type(val).__name__}")
-    return val.type._axis_get(val.data, key)
+    return val.type._get(val.data, key)
 
 
 # Bootstrap introspection when module loads

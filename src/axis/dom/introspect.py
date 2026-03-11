@@ -44,6 +44,22 @@ from axis import dom
 from .core import _PENDING_CLASSES
 
 
+
+_ENTRIES_BY_ANCHOR: dict[dom.Anchor, BuiltinEntry] = {}
+_RESOLVED_FIELDS_BY_SPEC: dict[dom.Spec, dom.Struct[str, dom.Type]] = {}
+
+_LITERAL_ANCHORS = {
+    "std.Integer",
+    "std.Text",
+    "std.Boolean",
+    "std.Decimal",
+    "std.Empty",
+    "std.Natural",
+    "std.Whole",
+}
+
+
+
 # ---------------------------------------------------------------------------
 # Introspector protocol
 # ---------------------------------------------------------------------------
@@ -54,19 +70,7 @@ class Introspector(Protocol):
 
     def fields(self, type: dom.NominalType) -> dom.Struct[str, dom.Type] | None: ...
 
-
-# ---------------------------------------------------------------------------
-# VarGenericType -- metatype for Python TypeVar placeholders
-# ---------------------------------------------------------------------------
-
-class VarGenericType(dom.VarType):
-    """Metatype created during phase-1 introspection for ``TypeVar`` fields."""
-    ANCHOR: ClassVar[str] = "dom.Type.Var.Generic"
-
-    @property
-    def __type__(self) -> dom.Type:
-        return dom._nominal_type("dom.Type.Var.Generic")
-
+    def class_for(self, type: dom.NominalType) -> type[dom.Builtin] | None: ...
 
 # ---------------------------------------------------------------------------
 # BuiltinEntry -- per-anchor builtin registration entry (replaces Bound)
@@ -124,18 +128,14 @@ class BuiltinEntry(dom.ContextProto, Consed):
         return bool(self.vars)
 
 
-_ENTRIES_BY_ANCHOR: dict[dom.Anchor, BuiltinEntry] = {}
-_RESOLVED_FIELDS_BY_SPEC: dict[dom.Spec, dom.Struct[str, dom.Type]] = {}
+# ---------------------------------------------------------------------------
+# VarGenericType -- metatype for Python TypeVar placeholders
+# ---------------------------------------------------------------------------
 
-_LITERAL_ANCHORS = {
-    "std.Integer",
-    "std.Text",
-    "std.Boolean",
-    "std.Decimal",
-    "std.Empty",
-    "std.Natural",
-    "std.Whole",
-}
+class VarGenericType(dom.VarType[BuiltinEntry]):
+    """Metatype created during phase-1 introspection for ``TypeVar`` fields."""
+    ANCHOR: ClassVar[str] = "dom.Type.Var.Generic"
+
 
 
 # ---------------------------------------------------------------------------
@@ -254,10 +254,22 @@ class NativeIntrospector(Record):
 
         return resolved_fields
 
+    def class_for(self, type: dom.NominalType) -> type[dom.Builtin] | None:
+        """Return the Python class for a NominalType, or None if not registered."""
+        _drain_pending()
+        
+        spec = type.spec_ref
+        anchor = spec.anchor
+        entry = _ENTRIES_BY_ANCHOR.get(anchor)
+        
+        return entry.builtin_cls if entry is not None else None
+
+
+DEFAULT_INTROSPECTOR: Introspector = NativeIntrospector()
 
 INTROSPECTOR: ContextVar[Introspector | None] = ContextVar(
     "axis.dom.introspect.INTROSPECTOR",
-    default=NativeIntrospector(),
+    default=DEFAULT_INTROSPECTOR,
 )
 
 
@@ -299,7 +311,7 @@ def _python_to_axis_type(
         return dom.ANY_TYPE
 
     if isinstance(annotation, TypeVar):
-        var = dom.var(dom.VarGenericType, ctx, annotation.__name__)
+        var = dom.var(dom.VarGenericType, ctx, annotation.__name__) # type: ignore
         if vars is not None:
             vars.add(var)
         return var
@@ -343,6 +355,113 @@ def _init_scalar_types() -> None:
     })
 
 
+class _TypeBuildContext(dom.ContextProto):
+    """Context used to project explicit Builtin type arguments."""
+
+    def lookup_bound(self, name: str) -> dom.Type | None:
+        return None
+
+
+_TYPE_BUILD_CTX = _TypeBuildContext()
+
+
+def _coerce_builtin_type_arg(arg: type | dom.Type) -> dom.Type:
+    """Project a Builtin type argument to ``dom.Type``."""
+    if isinstance(arg, dom.Type):
+        return arg
+
+    projected = _python_to_axis_type(arg, ctx=_TYPE_BUILD_CTX)
+    if projected is dom.ANY_TYPE and arg is not Any:
+        raise TypeError(f"Cannot project Builtin type argument {arg!r} to dom.Type")
+    return projected
+
+
+def _validate_builtin_type_arg(
+    param: TypeVar,
+    raw_arg: type | dom.Type,
+    projected_arg: dom.Type,
+) -> None:
+    """Validate one TypeVar binding.
+
+    Bounds/constraints validation is intentionally deferred. This function
+    is the integration point for the next iteration.
+    """
+    _ = (param, raw_arg, projected_arg)
+
+
+def _build_builtin_type(
+    builtin_cls: type[dom.Builtin],
+    *args: type | dom.Type,
+) -> dom.Type:
+    """Build the ``dom.Type`` descriptor for a Builtin class.
+
+    Arity is strict: explicit type arguments must match the class TypeVars.
+    """
+    parameters = tuple(getattr(builtin_cls, "__parameters__", ()))
+    expected = len(parameters)
+    received = len(args)
+
+    if expected == 0:
+        if received != 0:
+            raise TypeError(
+                f"{builtin_cls.__name__} expects no type arguments, got {received}"
+            )
+        return dom._nominal_type(builtin_cls._anchor_path())
+
+    if received != expected:
+        raise TypeError(
+            f"{builtin_cls.__name__} expects {expected} type arguments, got {received}"
+        )
+
+    projected_args = tuple(_coerce_builtin_type_arg(arg) for arg in args)
+
+    bindings: dict[str, dom.Type] = {}
+    for param, raw_arg, projected_arg in zip(parameters, args, projected_args):
+        if isinstance(param, TypeVar):
+            _validate_builtin_type_arg(param, raw_arg, projected_arg)
+
+        name = getattr(param, "__name__", None)
+        if not isinstance(name, str):
+            raise TypeError(
+                f"Unsupported type parameter {param!r} in {builtin_cls.__name__}"
+            )
+        bindings[name] = projected_arg
+
+    spec = _spec_from_types(**bindings)
+    return dom._nominal_type(builtin_cls._anchor_path(), spec)
+
+
+def _builtin_runtime_type_args(value: dom.Builtin) -> tuple[type | dom.Type, ...] | None:
+    """Extract explicit runtime type args from a generic Builtin instance.
+
+    Uses ``__orig_class__`` when present (e.g. ``Box[int](...)``). Returns
+    None when runtime args are unavailable.
+    """
+    orig_class = getattr(value, "__orig_class__", None)
+    if orig_class is None:
+        return None
+
+    origin = get_origin(orig_class)
+    if origin is None or not isinstance(origin, type):
+        return None
+    if origin is not value.__class__:
+        return None
+
+    runtime_args = get_args(orig_class)
+    if not runtime_args:
+        return ()
+
+    extracted: list[type | dom.Type] = []
+    for arg in runtime_args:
+        if isinstance(arg, dom.Type):
+            extracted.append(arg)
+        elif isinstance(arg, type):
+            extracted.append(arg)
+        else:
+            return None
+    return tuple(extracted)
+
+
 def _transform_generic(
     origin: object,
     args: tuple[Any, ...],
@@ -350,54 +469,29 @@ def _transform_generic(
     vars: set[dom.Var] | None,
 ) -> dom.Type:
     """Project a generic Python type via the transform registry."""
-    converted = tuple(
-        _python_to_axis_type(arg, ctx, vars) if arg is not Ellipsis else arg
-        for arg in args
-    )
-
     transform = _PY_TO_AX_TRANSFORMS.get(origin)
     if transform is not None:
+        converted = tuple(
+            _python_to_axis_type(arg, ctx, vars) if arg is not Ellipsis else arg
+            for arg in args
+        )
         return transform(*converted)
 
-    # Draft hook: generic Builtin aliases map to their nominal anchor,
-    # with best-effort specialization from type parameters.
+    # Builtin generic aliases delegate to Builtin._type().
     if isinstance(origin, type) and issubclass(origin, dom.Builtin):
-        return _builtin_generic_draft(origin, converted)
+        builtin_origin = cast(type[dom.Builtin], origin)
+        return builtin_origin._type(*cast(tuple[type | dom.Type, ...], args))
 
     return dom.ANY_TYPE
-
-
-def _builtin_generic_draft(
-    origin: type,
-    converted_args: tuple[Any, ...],
-) -> dom.Type:
-    """Best-effort projection for generic Builtin aliases.
-
-    Uses origin._anchor_path() and, when possible, maps generic args to
-    named TypeVar parameters to build a draft specialization.
-    """
-    parameters = getattr(origin, "__parameters__", ())
-    bindings: dict[str, dom.Type] = {}
-
-    if parameters and len(parameters) == len(converted_args):
-        for param, arg in zip(parameters, converted_args):
-            name = getattr(param, "__name__", None)
-            if isinstance(name, str) and isinstance(arg, dom.Type):
-                bindings[name] = arg
-
-    spec = _spec_from_types(**bindings) if bindings else None
-    return dom._nominal_type(origin._anchor_path(), spec)
 
 
 def _try_builtin_mapping(annotation: type) -> dom.Type:
     """Map a Python class to an Axis nominal type via the introspection registry."""
     _drain_pending()
 
-    # Match Builtin subclasses by their canonical anchor path.
     if issubclass(annotation, dom.Builtin):
-        anchor = dom._anchor(annotation._anchor_path())
-        if anchor in _ENTRIES_BY_ANCHOR:
-            return dom._nominal_type(anchor)
+        builtin_cls = cast(type[dom.Builtin], annotation)
+        return builtin_cls._type()
 
     return dom.ANY_TYPE
 

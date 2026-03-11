@@ -1,8 +1,7 @@
 """Comprehensive tests for the axis domain model (dom/).
 
 Tests the cremallera (zipper) pattern: every Pure is (type, data),
-where type describes how to interpret data. Types are also values
-(self-descriptive via __type__/__data__).
+where type describes how to interpret data. Types are also values.
 """
 import unittest
 from decimal import Decimal
@@ -163,8 +162,8 @@ class TestDomVal(unittest.TestCase):
         self.assertIs(result.type, dom.TEXT_TYPE.__type__)
         self.assertIs(result.data, dom.TEXT_TYPE)
 
-    def test_val_type_token_int_equals_val_natural_type(self):
-        self.assertEqual(dom.val(int), dom.val(dom.NATURAL_TYPE))
+    def test_val_type_token_int_equals_val_integer_type(self):
+        self.assertEqual(dom.val(int), dom.val(dom.INTEGER_TYPE))
 
     def test_val_dict_to_struct(self):
         result = dom.val({"a": 1})
@@ -258,6 +257,15 @@ class TestDomVal(unittest.TestCase):
         expected_anchor = dom._anchor(_DraftGenericBuiltin._anchor_path())
         self.assertEqual(result.data.spec_ref.anchor, expected_anchor)
 
+        specialization = result.data.spec_ref.specialization
+        self.assertIsNotNone(specialization)
+        self.assertEqual(specialization.type.fields.index.keys, ("_T_Draft",))
+        self.assertIs(specialization.data[0], dom.INTEGER_TYPE)
+
+    def test_val_generic_builtin_instance_without_runtime_args_raises(self):
+        with self.assertRaises(ValueError):
+            dom.val(_DraftGenericBuiltin())
+
     def test_val_dict_annotation_projects_to_map(self):
         result = dom.val(dict[str, int])
         self.assertIsInstance(result, dom.Const)
@@ -296,6 +304,40 @@ class TestRenderTypeValues(unittest.TestCase):
     def test_render_nominal_qualifier_value(self):
         rendered = render_dom.format_dom(dom.val(dict[str, int]))
         self.assertEqual(rendered, "std.Map[K=std.Text] std.Integer")
+
+
+class TestBuiltinTypeFactory(unittest.TestCase):
+    def test_non_generic_builtin_type_without_args(self):
+        builtin_type = _NoAnchorBuiltin._type()
+        self.assertIsInstance(builtin_type, dom.NominalType)
+        self.assertEqual(
+            builtin_type.spec_ref.anchor,
+            dom._anchor(_NoAnchorBuiltin._anchor_path()),
+        )
+
+    def test_non_generic_builtin_type_rejects_args(self):
+        with self.assertRaises(TypeError):
+            _NoAnchorBuiltin._type(int)
+
+    def test_generic_builtin_type_requires_exact_arity(self):
+        with self.assertRaises(TypeError):
+            _DraftGenericBuiltin._type()
+
+        with self.assertRaises(TypeError):
+            _DraftGenericBuiltin._type(int, str)
+
+    def test_generic_builtin_type_builds_specialization(self):
+        builtin_type = _DraftGenericBuiltin._type(int)
+        self.assertIsInstance(builtin_type, dom.NominalType)
+        self.assertEqual(
+            builtin_type.spec_ref.anchor,
+            dom._anchor(_DraftGenericBuiltin._anchor_path()),
+        )
+
+        specialization = builtin_type.spec_ref.specialization
+        self.assertIsNotNone(specialization)
+        self.assertEqual(specialization.type.fields.index.keys, ("_T_Draft",))
+        self.assertIs(specialization.data[0], dom.INTEGER_TYPE)
 
 
 # ---------------------------------------------------------------------------
@@ -627,7 +669,7 @@ class TestUnion(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Self-description: Type.as_val (__type__ / __data__)
+# Self-description: Type.as_val (metatype + value)
 # ---------------------------------------------------------------------------
 
 class TestSelfDescription(unittest.TestCase):
@@ -637,10 +679,10 @@ class TestSelfDescription(unittest.TestCase):
         val = nt.as_val
         self.assertIsInstance(val, dom.Const)
         self.assertIsInstance(val.type, dom.NominalType)
-        # The metatype should reference dom.Type.Nominal
+        # The metatype should reference dom.Nominal.Type
         self.assertEqual(
             dom.ref_segments(val.type.spec_ref),
-            ("dom", "Type", "Nominal"),
+            ("dom", "Nominal", "Type"),
         )
         # data side is the NominalType itself (no AUTO_ENCODE)
         self.assertIs(val.data, nt)
@@ -653,9 +695,20 @@ class TestSelfDescription(unittest.TestCase):
         self.assertIsInstance(val.type, dom.NominalType)
         self.assertEqual(
             dom.ref_segments(val.type.spec_ref),
-            ("dom", "Type", "Struct"),
+            ("dom", "Struct", "Type"),
         )
+        self.assertIsNotNone(val.type.spec_ref.specialization)
         self.assertIs(val.data, st)
+
+    def test_struct_type_metatype_carries_field_type_descriptors(self):
+        st = dom.StructType(fields=dom.Struct.new(x=dom.INTEGER_TYPE, y=dom.TEXT_TYPE))
+        metaspec = st._metaspec()
+        self.assertIsNotNone(metaspec)
+        self.assertEqual(metaspec.type.fields.index.keys, ("x", "y"))
+        self.assertEqual(
+            tuple(dom.ref_segments(dom.get(metaspec, key).type.spec_ref) for key in ("x", "y")),
+            (("dom", "Nominal", "Type"), ("dom", "Nominal", "Type")),
+        )
 
     def test_union_type_as_val(self):
         """UnionType.as_val should work (not raise NotImplementedError)."""
@@ -665,7 +718,7 @@ class TestSelfDescription(unittest.TestCase):
         self.assertIsInstance(val.type, dom.NominalType)
         self.assertEqual(
             dom.ref_segments(val.type.spec_ref),
-            ("dom", "Type", "Union"),
+            ("dom", "Union", "Type"),
         )
 
     def test_qualifier_type_as_val(self):
@@ -678,6 +731,12 @@ class TestSelfDescription(unittest.TestCase):
             dom.ref_segments(val.type.spec_ref),
             ("dom", "Qual", "Nominal"),
         )
+
+    def test_qualifier_metatype_carries_spec_and_underlying_descriptors(self):
+        qual = dom._nominal_qual(anchor="test.foo", underlying=dom.TEXT_TYPE)  # type: ignore
+        metaspec = qual._metaspec()
+        self.assertIsNotNone(metaspec)
+        self.assertEqual(metaspec.type.fields.index.keys, ("S", "U"))
 
     def test_var_spec_type_as_val(self):
         """Var.as_val should work (Var IS a Pure)."""
@@ -749,6 +808,99 @@ class TestEncode(unittest.TestCase):
         """Encoding already-raw data should be a no-op."""
         raw = (1, "hello", None, (2, 3))
         self.assertEqual(dom._encode(raw), raw)
+
+
+# ---------------------------------------------------------------------------
+# encode/decode: formal round-trip tests
+# ---------------------------------------------------------------------------
+
+class TestEncodeDecode(unittest.TestCase):
+    """Test the formal encode/decode round-trip property."""
+
+    def test_roundtrip_literals(self):
+        """Literals should round-trip perfectly."""
+        cases = [
+            dom.Const.new_literal(42),
+            dom.Const.new_literal("hello"),
+            dom.Const.new_literal(True),
+            dom.Const.new_literal(None),
+        ]
+        for val in cases:
+            with self.subTest(val=val):
+                encoded = dom.encode(val)
+                decoded = dom.decode(encoded)
+                self.assertEqual(val, decoded)
+
+    def test_roundtrip_struct(self):
+        """Struct values should round-trip perfectly."""
+        val = dom._literal_struct(x=1, y="hello", z=True)
+        encoded = dom.encode(val)
+        decoded = dom.decode(encoded)
+        self.assertEqual(val, decoded)
+
+    def test_roundtrip_frozendict(self):
+        """frozendict encoding should preserve structure."""
+        from protobase import frozendict
+        
+        # Create a test builtin with frozendict field
+        class TestBuiltin(dom.Builtin):
+            ANCHOR = "test.FrozenDictTest"
+            meta: frozendict[str, int]
+        
+        builtin = TestBuiltin(meta=frozendict({"a": 1, "b": 2}))
+        val = dom.val(builtin)
+        
+        # Encode should recurse into frozendict values
+        encoded = dom.encode(val)
+        self.assertIsInstance(encoded.data, tuple)  # Builtin becomes tuple
+        
+        # The encoded form should still be decodable
+        decoded = dom.decode(encoded)
+        self.assertEqual(val, decoded)
+
+    def test_roundtrip_builtin_with_fields(self):
+        """Builtin with fields should round-trip via introspection."""
+        class Person(dom.Builtin):
+            ANCHOR = "test.Person"
+            name: str
+            age: int
+        
+        builtin = Person(name="Alice", age=30)
+        val = dom.val(builtin)
+        
+        encoded = dom.encode(val)
+        decoded = dom.decode(encoded)
+        self.assertEqual(val, decoded)
+
+    def test_roundtrip_type_token_value(self):
+        """Type values should round-trip through Spec/Anchor decode."""
+        val = dom.val(int)
+        encoded = dom.encode(val)
+        decoded = dom.decode(encoded)
+        self.assertEqual(val, decoded)
+
+    def test_roundtrip_nominal_type_value(self):
+        """NominalType values should reconstruct Spec objects correctly."""
+        val = dom.val(dom.INTEGER_TYPE)
+        encoded = dom.encode(val)
+        decoded = dom.decode(encoded)
+        self.assertEqual(val, decoded)
+
+    def test_encode_preserves_type_side(self):
+        """The type side should be unchanged by encoding."""
+        val = dom._literal_struct(x=1, y=2)
+        encoded = dom.encode(val)
+        self.assertIs(val.type, encoded.type)
+
+    def test_union_decode_not_supported(self):
+        """Union decode should raise NotImplementedError."""
+        int_val = dom.Const.new_literal(42)
+        types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
+        union = dom.Const.new_union(types, int_val)
+        
+        encoded = dom.encode(union)
+        with self.assertRaises(NotImplementedError):
+            dom.decode(encoded)
 
 
 # ---------------------------------------------------------------------------
@@ -829,6 +981,20 @@ class TestDirGet(unittest.TestCase):
         val = dom.Const.new_literal(42)
         self.assertIs(dom.dir(val), None)
 
+    def test_dir_builtin_uses_default_introspector(self):
+        class TestBuiltin(dom.Builtin):
+            ANCHOR = "test.DirBuiltin"
+            name: str
+            meta: frozendict[str, int]
+
+        val = dom.val(TestBuiltin("john", frozendict({"tag": 1})))
+        fields = dom.dir(val)
+
+        self.assertIsNotNone(fields)
+        self.assertEqual(fields.index.keys, ("name", "meta"))
+        self.assertIs(fields[0], dom.TEXT_TYPE)
+        self.assertIsInstance(fields[1], dom.NominalQualifier)
+
     def test_get_nonexistent_raises(self):
         val = dom._literal_struct(x=1)
         with self.assertRaises(KeyError):
@@ -894,7 +1060,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encoded
+        encoded = dom.encode(union)
         self.assertIs(encoded.type, union.type)
 
     def test_encode_data_is_raw(self):
@@ -902,7 +1068,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encoded
+        encoded = dom.encode(union)
         disc_raw, val_raw = encoded.data
         self.assertNotIsInstance(disc_raw, dom.Builtin)
         self.assertEqual(val_raw, 42)
@@ -922,7 +1088,7 @@ class TestUnionEncode(unittest.TestCase):
         self.assertIsInstance(union.data[0], dom.Type)
 
         # After: discriminator is raw data (tuple)
-        encoded = union.encoded
+        encoded = dom.encode(union)
         self.assertNotIsInstance(encoded.data[0], dom.Type)
         self.assertIsInstance(encoded.data[0], tuple)
 
@@ -936,7 +1102,7 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        encoded = union.encoded
+        encoded = dom.encode(union)
         enc_disc = encoded.data[0]
 
         # Try to recover which type the discriminator represents
@@ -1004,7 +1170,7 @@ class TestUnionEncode(unittest.TestCase):
         struct_val = dom._literal_struct(x=1, y="hi")
         types = frozenset({struct_val.type, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, struct_val)
-        encoded = union.encoded
+        encoded = dom.encode(union)
 
         disc_raw, val_raw = encoded.data
         # value_data was (1, "hi") — already raw, unchanged
@@ -1017,8 +1183,8 @@ class TestUnionEncode(unittest.TestCase):
         int_val = dom.Const.new_literal(42)
         types = frozenset({dom.INTEGER_TYPE, dom.TEXT_TYPE})
         union = dom.Const.new_union(types, int_val)
-        once = union.encoded
-        twice = once.encoded
+        once = dom.encode(union)
+        twice = dom.encode(once)
         self.assertEqual(once.data, twice.data)
         self.assertIs(once.type, twice.type)
 
@@ -1035,7 +1201,7 @@ class TestUnionEncode(unittest.TestCase):
             dom.BOOLEAN_TYPE, dom.DECIMAL_TYPE,
         })
         union = dom.Const.new_union(types, text_val)
-        encoded = union.encoded
+        encoded = dom.encode(union)
 
         # The type side still knows all possible types
         self.assertEqual(encoded.type.types, types)

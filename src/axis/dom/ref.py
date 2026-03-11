@@ -15,6 +15,9 @@ class RefType(Type, abstract=True): ...
 
 
 class Ref(dom.Pure, abstract=True):
+    def _metaspec(self) -> dom.Const | None:
+        return self.type._metaspec()
+
     @property
     def anchor(self) -> "Anchor":
         raise NotImplementedError(
@@ -29,11 +32,16 @@ class Ref(dom.Pure, abstract=True):
 
 
 class AnchorType(RefType):
-    @property
-    def __type__(self) -> Type:
-        return dom._nominal_type("dom.Ref.Anchor")
+    ANCHOR = "dom.Ref.Anchor"
 
-    def _axis_dir(
+    def _decode(self, raw_data: Data) -> Data:
+        if not isinstance(raw_data, tuple) or not all(
+            isinstance(segment, str) for segment in raw_data
+        ):
+            return raw_data
+        return cast(Data, Anchor(data=cast(AnchorSegments, raw_data)))
+
+    def _dir(
         self, data: Data | MissingType = Missing
     ) -> dom.Struct[str, Type] | None:
         return None
@@ -117,23 +125,37 @@ class Anchor(Ref):
 class SpecType(RefType):
     "dom.Ref.Spec.Type[..I]"
 
-    anchor: AnchorType = AnchorType()
-    spec: dom.StructType | None = None
+    ANCHOR = "dom.Ref.Spec.Type"
 
-    @property
-    def __type__(self) -> Type:
-        return dom._nominal_type(
-            "dom.Ref.Spec.Type",
-            dom._struct(
-                anchor=cast(dom.Pure | dom.Var, dom.val(self.anchor)),
-                spec=cast(
-                    dom.Pure | dom.Var,
-                    dom.val(self.spec) if self.spec else dom._literal(None),
-                ),
-            ),
+    anchor: AnchorType = AnchorType()
+    spec: dom.StructType | None = None # TODO: renombrar como hparams
+
+    def _metaspec(self) -> dom.Const | None:
+        return self.spec._metaspec() if self.spec is not None else None
+
+
+
+    def _decode(self, raw_data: Data) -> Data:
+        if not isinstance(raw_data, tuple) or len(raw_data) != 2:
+            return raw_data
+
+        raw_anchor, raw_spec = raw_data
+        anchor = self.anchor._decode(raw_anchor)
+        if not isinstance(anchor, Anchor):
+            return raw_data
+
+        if self.spec is None or raw_spec is None:
+            return cast(Data, dom._spec_ref(anchor, None))
+
+        spec_data = self.spec._decode(raw_spec)
+        return cast(
+            Data,
+            dom._spec_ref(anchor, dom.Const(type=self.spec, data=cast(tuple[Data, ...], spec_data))),
         )
 
-    def _axis_dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
+
+
+    def _dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
         return dom.Struct.new(
             anchor=self.anchor,
             spec=self.spec or dom.native_type(None),

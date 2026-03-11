@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Union, Self, cast, ClassVar, Iterable
+from typing import Any, Union, ClassVar, Iterable
 
-from protobase import Inmutable, Consed, frozendict, attrs_of, is_abstract
+from protobase import Inmutable, Consed, frozendict, is_abstract
 from axis import dom
 from rich.console import Console, ConsoleOptions, RenderResult
 
@@ -18,8 +18,16 @@ __all__ = [
 
 _PENDING_CLASSES: list[type[dom.Builtin]] = []
 
+
 class Builtin(Consed, abstract=True):
     ANCHOR: ClassVar[str]
+
+    @classmethod
+    def __class_post_build__(cls):
+        """Register concrete Builtin subclasses for lazy introspection."""
+        if is_abstract(cls):
+            return
+        _PENDING_CLASSES.append(cls)
 
     @classmethod
     def _anchor_path(cls) -> str:
@@ -35,19 +43,10 @@ class Builtin(Consed, abstract=True):
         return f"{cls.__module__}.{cls.__qualname__}"
 
     @classmethod
-    def __class_post_build__(cls):
-        """Register concrete Builtin subclasses for lazy introspection."""
-        if is_abstract(cls):
-            return
-        _PENDING_CLASSES.append(cls)
+    def _type(cls, *args: type | dom.Type) -> dom.Type:
+        from .introspect import _build_builtin_type
 
-    @property
-    def __type__(self) -> dom.Type:
-        return dom._nominal_type(self.__class__._anchor_path())
-
-    @property
-    def __data__(self) -> Data:
-        return cast(Data, self)
+        return _build_builtin_type(cls, *args)
 
 
 type Literal = Union[
@@ -89,6 +88,9 @@ class Val(Inmutable, abstract=True):
 
         yield from render_dom.rich_console_dom(self, console, options)
 
+    def __getitem__(self, keyname: str | int) -> Val:
+        return self.get(keyname)
+
     def get(self, key: int | str) -> Val:
         return dom.get(self, key)
 
@@ -99,8 +101,3 @@ class Val(Inmutable, abstract=True):
 class Pure[T: "dom.Type" = Any, D: "dom.Data" = Any](Val, Consed, abstract=True):
     type: T
     data: D
-
-    @property
-    def encoded(self) -> Self:
-        """Encode data side to raw (JSON-like) form; type side stays intact."""
-        return self.__class__(type=self.type, data=cast(D, dom._encode(self.data)))

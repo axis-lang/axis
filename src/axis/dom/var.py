@@ -7,7 +7,6 @@ from protobase import Consed, Inmutable, _
 from axis import dom
 
 
-
 # ---------------------------------------------------------------------------
 # ContextProto — protocol for variable contexts
 # ---------------------------------------------------------------------------
@@ -18,7 +17,8 @@ class ContextProto(Inmutable):
 
     Concrete implementations live in user layers (sem, introspect).
     """
-    #anchor: dom.Anchor = _
+
+    # anchor: dom.Anchor = _
     def lookup_bound(self, name: str) -> dom.Type | None: ...
 
 
@@ -40,14 +40,6 @@ class VarType[C: ContextProto](dom.Type, abstract=True):
     def _val_type(self) -> type[Var]:
         """The Var class that corresponds to this VarType."""
         return Var
-
-    @property
-    def __type__(self) -> dom.Type:
-        return dom._nominal_type(
-            self.ANCHOR,
-            struct=None,
-            # struct=dom._struct(Ctx=self.ctx), TODO: reflecta el tipo de contexto en el nominal para que pueda ser accedido por introspection
-        )
 
     # @property
     # def __data__(self) -> str:
@@ -79,8 +71,6 @@ class VarType[C: ContextProto](dom.Type, abstract=True):
 # ---------------------------------------------------------------------------
 
 
-
-
 class Var(dom.Pure, dom.Type, Consed):
     """Variable that is simultaneously Type and Pure (Val).
 
@@ -97,8 +87,7 @@ class Var(dom.Pure, dom.Type, Consed):
     type: VarType = _
     data: str = _
 
-    @property
-    def __type__(self) -> VarType:
+    def _metatype(self) -> VarType:
         return self.type
 
     @property
@@ -160,6 +149,7 @@ class Var(dom.Pure, dom.Type, Consed):
 
     #     return cls(type=VarGenericType(ctx=ctx), data=name)
 
-def var(var_type_cls: type[VarType], ctx: ContextProto, name: str) -> Var:
+
+def var[C: ContextProto](var_type_cls: type[VarType[C]], ctx: C, name: str) -> Var:
     """Factory for creating Vars with the appropriate VarType subclass."""
     return Var(type=var_type_cls(ctx=ctx), data=name)
