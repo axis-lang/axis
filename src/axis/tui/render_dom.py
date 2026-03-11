@@ -51,27 +51,10 @@ def _anchor_path(segments: tuple[str, ...]) -> str:
     return ".".join(segments)
 
 
-def _spec_text(spec: dom.SpecType) -> str:
-    """Render a SpecType as 'a.b.c' or 'a.b.c[x, y=z]'."""
-    anchor_str = _anchor_path(spec.anchor.as_val.data)
-    if spec.spec is None:
-        return anchor_str
-    # Has specialization — render the struct fields
-    parts: list[str] = []
-    for i, key in enumerate(spec.spec.fields.index.keys):
-        field_type = spec.spec.fields[i]
-        field_str = _format_type(field_type)
-        if key is not None:
-            parts.append(f"{key}={field_str}")
-        else:
-            parts.append(field_str)
-    return f"{anchor_str}[{', '.join(parts)}]"
-
-
 def _format_type(t: dom.Type) -> str:
     """Quick text representation of a Type (for spec params, etc.)."""
     if isinstance(t, dom.NominalType):
-        return _anchor_path(t.spec_ref.anchor.data)
+        return _format_spec(t.spec_ref)
     elif isinstance(t, dom.StructType):
         parts: list[str] = []
         for i, key in enumerate(t.fields.index.keys):
@@ -84,7 +67,7 @@ def _format_type(t: dom.Type) -> str:
     elif isinstance(t, dom.UnionType):
         return " | ".join(_format_type(m) for m in t.types)
     elif isinstance(t, dom.NominalQualifier):
-        ref_str = _spec_text(t.spec_ref.type)
+        ref_str = _format_spec(t.spec_ref)
         under_str = _format_type(t.underlying)
         return f"{ref_str} {under_str}"
     elif isinstance(t, dom.Var):
@@ -147,6 +130,10 @@ def _format_spec(val: dom.Spec) -> str:
 
 def _format_const(val: dom.Const) -> str:
     t = val.type
+
+    # Type values: render the carried dom.Type directly.
+    if isinstance(val.data, dom.Type):
+        return _format_type(val.data)
 
     # Union: transparent — show the active value
     if isinstance(t, dom.UnionType) and isinstance(val.data, tuple):
@@ -217,7 +204,7 @@ def _format_nominal(val: dom.Const) -> str:
         return _format_std_literal(anchor[1], val.data)
 
     # dom.* and others: show spec path + data repr via dir/get
-    anchor_str = _anchor_path(anchor)
+    anchor_str = _format_spec(t.spec_ref)
     fields = dom.dir(val)
     if fields is not None:
         parts: list[str] = []
@@ -302,6 +289,10 @@ def _render_spec(val: dom.Spec) -> Text:
 def _render_const(val: dom.Const) -> Text:
     t_type = val.type
 
+    # Type values: render the carried dom.Type directly.
+    if isinstance(val.data, dom.Type):
+        return _render_type(val.data)
+
     # Union: transparent
     if isinstance(t_type, dom.UnionType) and isinstance(val.data, tuple):
         discriminator, value_data = val.data
@@ -364,6 +355,50 @@ def _render_struct(val: dom.Const) -> Text:
     return t
 
 
+def _render_type(t: dom.Type) -> Text:
+    """Rich text representation of a Type."""
+    if isinstance(t, dom.NominalType):
+        return _render_spec(t.spec_ref)
+
+    if isinstance(t, dom.StructType):
+        out = Text()
+        out.append("(", style=_PUNCT_STYLE)
+        for i, key in enumerate(t.fields.index.keys):
+            if i > 0:
+                out.append(", ", style=_PUNCT_STYLE)
+            if key is not None:
+                out.append(f"{key}", style=_ANCHOR_STYLE)
+                out.append("=", style=_PUNCT_STYLE)
+            out.append_text(_render_type(t.fields[i]))
+        out.append(")", style=_PUNCT_STYLE)
+        return out
+
+    if isinstance(t, dom.UnionType):
+        out = Text()
+        for i, member in enumerate(t.types):
+            if i > 0:
+                out.append(" | ", style=_PUNCT_STYLE)
+            out.append_text(_render_type(member))
+        return out
+
+    if isinstance(t, dom.NominalQualifier):
+        out = Text()
+        out.append_text(_render_spec(t.spec_ref))
+        out.append(" ")
+        out.append_text(_render_type(t.underlying))
+        return out
+
+    if isinstance(t, dom.Var):
+        return _render_var(t)
+
+    if isinstance(t, dom.VarType):
+        out = Text()
+        out.append("$?", style=_VAR_STYLE)
+        return out
+
+    return Text(type(t).__name__)
+
+
 def _render_nominal(val: dom.Const) -> Text:
     """Render NominalType: std.* literal or dom.* with fields."""
     t_type = val.type
@@ -375,9 +410,7 @@ def _render_nominal(val: dom.Const) -> Text:
         return _render_std_literal(anchor[1], val.data)
 
     # dom.* and others: spec path + data via dir/get
-    t = Text()
-    anchor_str = _anchor_path(anchor)
-    t.append(anchor_str, style=_ANCHOR_STYLE)
+    t = _render_spec(t_type.spec_ref)
     fields = dom.dir(val)
     if fields is not None:
         t.append("(", style=_PUNCT_STYLE)

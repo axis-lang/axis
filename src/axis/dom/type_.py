@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Self, TYPE_CHECKING
+from typing import ClassVar, Self, TYPE_CHECKING, cast
 
 from protobase import Missing, MissingType
 
@@ -15,17 +15,10 @@ class Type(Builtin, abstract=True):
     ANCHOR: ClassVar[str]
 
     def __repr__(self):
-        return self.ANCHOR
-
-    @property
-    def __type__(self) -> Type:
-        raise NotImplementedError(
-            f"{self.__class__.__name__}.__type__ is not implemented"
-        )
-
-    @property
-    def __data__(self) -> Data:
-        return self
+        anchor = getattr(self, "ANCHOR", None)
+        if isinstance(anchor, str):
+            return anchor
+        return self.__class__.__name__
 
     @property
     def as_val(self) -> dom.Const:
@@ -164,8 +157,7 @@ class NominalQualifier(Qualifier):
         return dom._nominal_type(
             "dom.Qual.Nominal",
             dom._struct(
-                S=self.spec_ref.type.as_val,
-                U=self.underlying.as_val,
+                S=cast(dom.Pure | dom.Var, dom.val(self.spec_ref.type)),
+                U=cast(dom.Pure | dom.Var, dom.val(self.underlying)),
             ),
         )
-

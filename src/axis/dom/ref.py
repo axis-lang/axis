@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from protobase import _
 
 from axis import dom
@@ -123,8 +125,11 @@ class SpecType(RefType):
         return dom._nominal_type(
             "dom.Ref.Spec.Type",
             dom._struct(
-                anchor=self.anchor.as_val,
-                spec=self.spec.as_val if self.spec else dom._literal(None),
+                anchor=cast(dom.Pure | dom.Var, dom.val(self.anchor)),
+                spec=cast(
+                    dom.Pure | dom.Var,
+                    dom.val(self.spec) if self.spec else dom._literal(None),
+                ),
             ),
         )
 

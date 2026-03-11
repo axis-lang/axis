@@ -22,13 +22,32 @@ class Builtin(Consed, abstract=True):
     ANCHOR: ClassVar[str]
 
     @classmethod
+    def _anchor_path(cls) -> str:
+        """Resolve the canonical anchor path for this Builtin class.
+
+        Priority:
+        1) Class-local ``ANCHOR`` when explicitly defined on the class
+        2) ``<module>.<qualname>`` fallback when ANCHOR is not defined
+        """
+        anchor = cls.__dict__.get("ANCHOR", None)
+        if isinstance(anchor, str):
+            return anchor
+        return f"{cls.__module__}.{cls.__qualname__}"
+
+    @classmethod
     def __class_post_build__(cls):
         """Register concrete Builtin subclasses for lazy introspection."""
         if is_abstract(cls):
             return
-        if "ANCHOR" not in cls.__dict__:
-            return
         _PENDING_CLASSES.append(cls)
+
+    @property
+    def __type__(self) -> dom.Type:
+        return dom._nominal_type(self.__class__._anchor_path())
+
+    @property
+    def __data__(self) -> Data:
+        return cast(Data, self)
 
 
 type Literal = Union[

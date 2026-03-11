@@ -1,6 +1,6 @@
-from typing import cast
+from typing import Any, cast, get_origin
 
-from protobase import attrs_of
+from protobase import attrs_of, frozendict
 from types import NoneType
 from decimal import Decimal
 from .map import *
@@ -126,6 +126,102 @@ def _literal(value: Literal | None) -> Const:
     return Const(type=t, data=value)
 
 
+class _ValContext(ContextProto):
+    def lookup_bound(self, name: str) -> Type | None:
+        return None
+
+
+_VAL_CTX = _ValContext()
+
+
+def val(*positional, **nominal) -> Val:
+    """Convert Python/dom values into a dom.Val.
+
+    Invocation modes:
+    - ``dom.val(x)``: coerce a single value
+    - ``dom.val(*args, **kwargs)``: build a Struct Const from positional
+      and named values
+
+    Single-value coercion rules:
+    - dom.Val -> returned as-is
+    - Python type tokens in ``LITERAL_TYPES`` -> dom.val(mapped dom.Type)
+    - Python/typing annotations -> project via introspect and re-normalize
+    - dom.Builtin -> Const(type=value.__type__, data=value.__data__)
+    - Python literals -> Const literal
+    - dict[str, _] / protobase.frozendict[str, _] -> Struct Const
+    - tuple/list -> positional Struct Const
+
+    Raises ValueError for unsupported inputs or failed conversions.
+    """
+
+    def _as_pure(value, where: str) -> Pure | Var:
+        coerced = val(value)
+        if not isinstance(coerced, Pure):
+            raise ValueError(
+                f"dom.val expected Pure value for {where}, got {type(coerced).__name__}"
+            )
+        return coerced
+
+    try:
+        if not positional and not nominal:
+            raise ValueError("dom.val requires at least one value")
+
+        if len(positional) != 1 or nominal:
+            args = [_as_pure(item, f"positional[{i}]") for i, item in enumerate(positional)]
+            kwargs = {
+                key: _as_pure(item, f"key {key!r}")
+                for key, item in nominal.items()
+            }
+            return _struct(*args, **kwargs)
+
+        value = positional[0]
+
+        if isinstance(value, Val):
+            return value
+
+        try:
+            literal_type_token = LITERAL_TYPES.get(value, None)
+        except TypeError:
+            literal_type_token = None
+        if literal_type_token is not None:
+            return val(literal_type_token)
+
+        literal_type = TYPE_BY_NATIVE.get(type(value), None)
+        if literal_type is not None:
+            return Const(type=literal_type, data=value)
+
+        origin = get_origin(value)
+        if value is Any or isinstance(value, type) or origin is not None:
+            from .introspect import _python_to_axis_type
+
+            projected = _python_to_axis_type(value, ctx=_VAL_CTX)
+            return val(projected)
+
+        if isinstance(value, dict) or isinstance(value, frozendict):
+            kwargs: dict[str, Pure | Var] = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise ValueError(
+                        "dom.val only supports dict/frozendict with string keys"
+                    )
+                kwargs[key] = _as_pure(item, f"key {key!r}")
+            return _struct(**kwargs)
+
+        if isinstance(value, tuple) or isinstance(value, list):
+            args = [_as_pure(item, f"sequence[{i}]") for i, item in enumerate(value)]
+            return _struct(*args)
+
+        if isinstance(value, Builtin):
+            return Const(type=value.__type__, data=value.__data__)
+
+        raise ValueError(f"dom.val does not support value of type {type(value).__name__}")
+    except ValueError:
+        raise
+    except Exception as exc:
+        typename = type(positional[0]).__name__ if positional else "<struct>"
+        raise ValueError(f"dom.val failed to convert {typename}") from exc
+
+
 # --- Metatype constants ---
 # dom.* for internal structural types
 # std.* for user-facing generic types
@@ -157,11 +253,21 @@ TYPE_BY_NATIVE: dict[type[Literal] | None, Type] = {
     None: EMPTY_TYPE,
 }
 
+# Mapping for Python literal *type tokens* used by dom.val(type_token)
+LITERAL_TYPES: dict[object, Type] = {
+    bool: BOOLEAN_TYPE,
+    int: NATURAL_TYPE,
+    float: DECIMAL_TYPE,
+    Decimal: DECIMAL_TYPE,
+    str: TEXT_TYPE,
+    NoneType: EMPTY_TYPE,
+}
 
-def type_of(val: Val) -> Const:
-    if not isinstance(val, Pure):
-        raise TypeError(f"Cannot determine type of non-Pure value: {val}")
-    return val.type.as_val
+
+def type_of(value: Val) -> Const:
+    if not isinstance(value, Pure):
+        raise TypeError(f"Cannot determine type of non-Pure value: {value}")
+    return cast(Const, val(value.type))
 
 
 def native_type(t: type[Literal] | None) -> Type:
@@ -210,4 +316,3 @@ def get(val: Val, key: str | int) -> Val:
 # Bootstrap introspection when module loads
 from .introspect import _bootstrap_introspection
 _bootstrap_introspection()
-
