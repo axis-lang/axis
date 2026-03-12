@@ -21,7 +21,7 @@ from typing import (
 
 from .derived import derived
 from .object import attr_info_of
-from .record import Record, impl_hash_method
+from .record import Record, impl_new_method
 from .type import Type
 from .missing import Missing, MissingType
 
@@ -184,6 +184,7 @@ def _frozen_setattr(self, name, value):
         f"Can't set attribute {name!r} on {self.__class__.__name__!r} object is frozen"
     )
 
+
 @dataclass_transform(eq_default=True, order_default=True, frozen_default=True, field_specifiers=(MissingType,))
 class Inmutable(Record, abstract=True):
     @staticmethod
@@ -214,25 +215,32 @@ class Inmutable(Record, abstract=True):
 
     if TYPE_CHECKING:
 
-        def __structural_hash__(self) -> int: ...
+        def __new__(cls, *args, **kwargs) -> Self: ...
         def __hash__(self) -> int: ...
         def __copy__(self) -> Self: ...
         def __deepcopy__(self, memo) -> Self: ...
         def __eq__(self, value) -> bool: ...
-            
 
     else:
 
-        @derived(impl_hash_method)
-        def __structural_hash__(self): ...
+        @derived(impl_new_method)
+        def __new__(cls, *args, **kwargs): ...
 
         def __hash__(self):
-            cache = getattr(self, "__hash_cache__", None)
-            if cache is not None:
-                return cache
-            hash_value = self.__structural_hash__()
-            object.__setattr__(self, "__hash_cache__", hash_value)
-            return hash_value
+            # Use object.__getattribute__ (not getattr) to avoid triggering
+            # user-defined __getattr__ when the slot is uninitialised.
+            try:
+                return object.__getattribute__(self, "__hash_cache__")
+            except AttributeError:
+                # Slot unset: compute structural hash, cache it, return it.
+                # This path covers classes whose __init__ calls hash(self)
+                # before __new__ finishes (e.g. via flux.input registration).
+                h = hash(tuple(
+                    object.__getattribute__(self, nm)
+                    for nm in attr_info_of(self)
+                ))
+                object.__setattr__(self, "__hash_cache__", h)
+                return h
 
         def __copy__(self):
             return self

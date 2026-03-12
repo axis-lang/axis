@@ -50,15 +50,18 @@ class RecordTest(unittest.TestCase):
 
 
 class InmutableRecordTest(unittest.TestCase):
-    def test_structural_hash_cache(self) -> None:
+    def test_hash_cache_prepopulated(self) -> None:
         class Symbol(Inmutable):
             name: str
 
         sym = Symbol("x")
-        self.assertFalse(hasattr(sym, "__hash_cache__"))
-        first = hash(sym)
+        # __hash_cache__ is pre-populated during construction, not lazily on first hash().
         self.assertTrue(hasattr(sym, "__hash_cache__"))
+        first = hash(sym)
         self.assertEqual(first, hash(sym))
+        # Equal objects must have equal hashes.
+        sym2 = Symbol("x")
+        self.assertEqual(hash(sym), hash(sym2))
 
     def test_immutable_setattr(self) -> None:
         class Box(Inmutable):

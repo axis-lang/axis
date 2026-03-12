@@ -1,28 +1,27 @@
 from __future__ import annotations
 
 from typing import ClassVar, TYPE_CHECKING
-from weakref import WeakKeyDictionary, ref
+from weakref import WeakValueDictionary
 
+from .derived import derived
 from .inmutable import Inmutable
+from .record import impl_consed_new_method
 from .type import Type
 
 __all__ = ["Consed"]
 
 
 class Consed(Inmutable, abstract=True):
-    __consign__: ClassVar[WeakKeyDictionary]
+    __consign__: ClassVar[WeakValueDictionary]
 
     @staticmethod
     def __class_build__(bld: Type.Builder):
         @bld.postbuild
         def post(cls):
             if not cls.__isabstract__:
-                cls.__consign__ = WeakKeyDictionary()
+                cls.__consign__ = WeakValueDictionary()
 
     if not TYPE_CHECKING:
-        def __new__(cls, *args, **kwargs):
-            self = super().__new__(cls, *args, **kwargs)
-            try:
-                return cls.__consign__.setdefault(self, ref(self))()
-            except TypeError as exc:
-                raise ValueError(f"Cannot hash-consed object {self}") from exc
+
+        @derived(impl_consed_new_method)
+        def __new__(cls, *args, **kwargs): ...

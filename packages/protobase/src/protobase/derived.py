@@ -44,14 +44,18 @@ class derived[**P](Type.StickyMember):
             )
         
         # update_wrapper(fn, self.proto, ('__name__', '__module__', '__doc__'), ())
-        fn.__name__ = self.proto.__name__
-        fn.__module__ = self.proto.__module__
-        fn.__doc__ = self.proto.__doc__
+        proto = self.proto
+        if isinstance(proto, (classmethod, staticmethod)):
+            proto = proto.__func__
 
+        fn.__name__ = proto.__name__
+        fn.__module__ = proto.__module__
+        fn.__doc__ = proto.__doc__
 
         if isinstance(self.proto, classmethod):
             fn = classmethod(fn)
-            #fn.__set_name__(self.owner, self.name)
+        elif isinstance(self.proto, staticmethod):
+            fn = staticmethod(fn)
 
         setattr(objtype, self.name, fn)
         #print(f"Derived {self.name} from {self.proto.__qualname__} to {objtype.__name__}")

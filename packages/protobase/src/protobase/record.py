@@ -2,12 +2,13 @@
 from copy import deepcopy
 from typing import TYPE_CHECKING, Literal, Self, dataclass_transform
 
-from .object import attr_info_of, attrs_of, Object
+from .object import attr_info_of, attrs_of, _default_factory, Object
 from .derived import derived
+from .missing import Missing
 from .type import Type
 from .utils import compile_function, dict_split
 
-__all__ = ["Record", "mutate"]
+__all__ = ["Record", "mutate", "impl_new_method", "impl_consed_new_method"]
 
 
 def impl_rich_repr_method(cls):
@@ -53,13 +54,105 @@ def impl_repr_method(cls):
     return __repr__
 
 
-def impl_hash_method(cls):
-    # TODO: Tansolo los atributos que participen en hash y eq (identity)
-    attrs = (f"self.{attr.name}" for attr in attr_info_of(cls).values())
+def impl_new_method(cls):
+    """
+    Compile a __new__ for Inmutable subclasses that:
+      1. Allocates via object.__new__
+      2. Calls self.__init__(*args, **kwargs) (preserving custom __init__ signatures)
+      3. Reads populated attribute slots to build the canonical key tuple
+      4. Pre-populates __hash_cache__ = hash(key)
+
+    For classes whose __init__ calls hash(self) before __new__ completes
+    (e.g. via flux.input), __hash__ has a lazy fallback. See Inmutable.__hash__.
+    Classes with zero attributes get key = () correctly.
+    """
+    attr_names = list(attr_info_of(cls).keys())
+
+    if attr_names:
+        key_expr = "({},)".format(", ".join(
+            f"_ogetattr__(self, {nm!r})" for nm in attr_names
+        ))
+    else:
+        key_expr = "()"
 
     return compile_function(
-        "def __hash__(self):",
-        f"    return hash(({', '.join(attrs)}))",
+        "def __new__(cls, *args, **kwargs):",
+        "    self = _object_new__(cls)",
+        "    self.__init__(*args, **kwargs)",
+        f"    key = {key_expr}",
+        "    _osetattr__(self, '__hash_cache__', hash(key))",
+        "    return self",
+        globals={
+            "_object_new__": object.__new__,
+            "_osetattr__": object.__setattr__,
+            "_ogetattr__": object.__getattribute__,
+        },
+    )
+
+
+def impl_consed_new_method(cls):
+    """
+    Compile a __new__ for Consed subclasses that:
+      1. Resolves the canonical key inline (same logic as impl_new_method)
+      2. Looks up the key in cls.__consign__ (WeakValueDictionary) — hit: return cached
+      3. Miss: allocates, inits, builds key from slots, sets __hash_cache__, stores in consign
+
+    All in one compiled function — no delegation to super().__new__ to avoid
+    recomputing the key twice.
+    """
+    attr_infos = list(attr_info_of(cls).values())
+    positional = [a for a in attr_infos if not a.has_default]
+    nominal    = [a for a in attr_infos if a.has_default]
+
+    fn_args  = ["cls", *[a.name for a in positional], *[a.name for a in nominal]]
+    defaults = (Missing,) * len(nominal)
+
+    nominal_factories = {
+        f"_{a.name}_factory": _default_factory(a.default)
+        for a in nominal
+    }
+
+    # Resolve defaults inline for the key (before __init__ is called)
+    attr_names = [a.name for a in attr_infos]
+    resolved_names = [
+        a.name if not a.has_default else f"_{a.name}_val"
+        for a in attr_infos
+    ]
+
+    # Lines that resolve nominal defaults into local vars
+    resolve_lines = [
+        f"    _{a.name}_val = {a.name} if {a.name} is not _Missing__ else _{a.name}_factory()"
+        for a in nominal
+    ]
+
+    if attr_names:
+        key_expr = "({},)".format(", ".join(resolved_names))
+    else:
+        key_expr = "()"
+
+    # Build __init__ call args using the resolved local vars
+    init_positional = ", ".join(a.name for a in positional)
+    init_nominal    = ", ".join(f"{a.name}=_{a.name}_val" for a in nominal)
+    init_call_args  = ", ".join(filter(None, [init_positional, init_nominal]))
+
+    return compile_function(
+        f"def __new__({', '.join(fn_args)}):",
+        *resolve_lines,
+        f"    key = {key_expr}",
+        f"    existing = cls.__consign__.get(key)",
+        f"    if existing is not None: return existing",
+        f"    self = _object_new__(cls)",
+        f"    _osetattr__(self, '__hash_cache__', hash(key))",
+        f"    self.__init__({init_call_args})",
+        f"    cls.__consign__[key] = self",
+        f"    return self",
+        globals={
+            **nominal_factories,
+            "_Missing__": Missing,
+            "_object_new__": object.__new__,
+            "_osetattr__": object.__setattr__,
+        },
+        __defaults__=defaults,
     )
 
 
