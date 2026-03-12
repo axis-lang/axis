@@ -37,6 +37,12 @@ class Introspector(Protocol):
 
     def construct(self, type: dom.NominalType, args: tuple[dom.Data, ...]) -> dom.Data: ...
 
+    def project(self, type: dom.Type, key: str | int) -> dom.Type: ...
+
+    def lift(self, qualifier: dom.Qualifier, result: dom.Type) -> dom.Type: ...
+
+    def combine(self, left: dom.Type, right: dom.Type, *, op: str | None = None) -> dom.Type: ...
+
 
 class BuiltinEntry(dom.ContextProto, Consed):
     anchor: dom.Anchor
@@ -213,6 +219,43 @@ class NativeIntrospector(Record):
             raise ValueError(
                 f"Cannot decode {anchor_path}: failed to construct {builtin_cls.__name__} from {attrs!r}"
             ) from exc
+
+    def project(self, type: dom.Type, key: str | int) -> dom.Type:
+        if isinstance(type, dom.NominalQualifier):
+            return self.lift(type, self.project(type.underlying, key))
+
+        if isinstance(type, dom.StructType):
+            return _project_fields(type.meta_attrs, key)
+
+        if isinstance(type, dom.NominalType):
+            fields = self.fields(type)
+            if fields is None:
+                raise KeyError(f"No member {key!r} on opaque nominal type {type!r}")
+            return _project_fields(fields, key)
+
+        raise KeyError(f"No member {key!r} on type {type!r}")
+
+    def lift(self, qualifier: dom.Qualifier, result: dom.Type) -> dom.Type:
+        if isinstance(qualifier, dom.NominalQualifier):
+            return mutate(qualifier, underlying=result)
+
+        raise NotImplementedError(
+            f"NativeIntrospector.lift does not support qualifier {type(qualifier).__name__}"
+        )
+
+    def combine(self, left: dom.Type, right: dom.Type, *, op: str | None = None) -> dom.Type:
+        _ = (left, right, op)
+        raise NotImplementedError(
+            "NativeIntrospector.combine is reserved for semantic-layer operator rules"
+        )
+
+
+def _project_fields(fields: dom.Struct[str, dom.Type], key: str | int) -> dom.Type:
+    if isinstance(key, str):
+        return fields.get(key)
+    if isinstance(key, int):
+        return fields[key]
+    raise TypeError(f"Unsupported key type: {type(key)}")
 
 
 DEFAULT_INTROSPECTOR: Introspector = NativeIntrospector()

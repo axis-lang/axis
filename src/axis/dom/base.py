@@ -93,6 +93,29 @@ class Val(Inmutable, abstract=True):
     def __getitem__(self, keyname: str | int) -> Val:
         return dom.get(self, keyname)
 
+    def wrap(self, data: "Data") -> Val:
+        if not self.type.is_meta:
+            raise TypeError(
+                f"{type(self).__name__}.wrap requires a type value, got {self.type!r}"
+            )
+
+        target_type = self.data if isinstance(self.data, dom.Type) else None
+        if target_type is None:
+            try:
+                decoded = dom.decode(self)
+            except Exception as exc:
+                raise TypeError(
+                    f"{type(self).__name__}.wrap requires a decodable type value"
+                ) from exc
+            target_type = decoded.data if isinstance(decoded.data, dom.Type) else None
+
+        if target_type is None:
+            raise TypeError(
+                f"{type(self).__name__}.wrap requires a value that resolves to dom.Type"
+            )
+
+        return target_type.wrap(data)
+
     @property
     def attrs(self) -> "dom.Struct[str | None, Val] | None":
         fields = dom.dir(self)

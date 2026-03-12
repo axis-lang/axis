@@ -12,6 +12,18 @@ class Type(Builtin, abstract=True):
     val_cls: ClassVar[type[dom.Val] | None] = None
     ANCHOR: ClassVar[str]
 
+    @property
+    def is_meta(self) -> bool:
+        introspector = dom.INTROSPECTOR.get(dom.DEFAULT_INTROSPECTOR)
+        if introspector is None:
+            return False
+
+        if not isinstance(self, dom.NominalType):
+            return False
+
+        builtin_cls = introspector.class_for(self)
+        return builtin_cls is not None and issubclass(builtin_cls, Type)
+
     @classmethod
     def _type(cls, *args: type | dom.Type) -> dom.Type:
         if args:
@@ -186,42 +198,6 @@ class NominalType(Type):
             for field_type, field_value in zip(fields, raw_data)
         )
         return introspector.construct(self, decoded_args)
-
-
-class Qualifier(Type, abstract=True):
-    ANCHOR: ClassVar[str] = "dom.Qual"
-
-    underlying: Type
-
-
-class NominalQualifier(Qualifier):
-    """
-    def dom.Qual.Nominal[..S, U](..super, spec_ref: Ref.Spec[..S])
-    extends dom.Qual[U]
-    """
-
-    ANCHOR: ClassVar[str] = "dom.Qual.Nominal"
-
-    spec_ref: dom.Spec
-
-    def _metaspec(self):
-        s = self.spec_ref._args_const()
-        return dom.struct(
-            S=cast(dom.Const, s if s else dom.val(None)),
-            U=cast(dom.Const, dom.val(self.underlying._metatype())),
-        )
-
-    def _dir(self, data: Data | MissingType = Missing) -> dom.Struct[str, Type] | None:
-        raise NotImplementedError("NominalQualifier._dir is not implemented yet")
-
-    def _get(self, data: Data, key: str | int) -> dom.Val:
-        raise NotImplementedError("NominalQualifier._get is not implemented yet")
-
-    def _encode(self, data: Data) -> Data:
-        raise NotImplementedError("NominalQualifier._encode is not implemented yet")
-
-    def _decode(self, raw_data: Data) -> Data:
-        raise NotImplementedError("NominalQualifier._decode is not implemented yet")
 
 
 class UnionType(Type):

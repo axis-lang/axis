@@ -3,6 +3,7 @@ from typing import Generic, TypeVar
 from typing import cast
 
 from axis import dom
+from protobase import frozendict
 
 
 class Person(dom.Builtin):
@@ -19,6 +20,13 @@ class Box(dom.Builtin, Generic[T]):
     ANCHOR = "test.Box"
 
     value: T
+
+
+class Inventory(dom.Builtin, Generic[T]):
+    ANCHOR = "test.Inventory"
+
+    owner: str
+    items: frozendict[str, T]
 
 
 class TestDomValueCreation(unittest.TestCase):
@@ -61,6 +69,7 @@ class TestDomValueCreation(unittest.TestCase):
 
     def test_collection_annotations_render_as_qualified_types(self):
         self.assertEqual(repr(dom.val(dict[str, int])), "std.Map[K=std.Text] std.Integer")
+        self.assertEqual(repr(dom.val(dict[str, str])), "std.Map[K=std.Text] std.Text")
         self.assertEqual(repr(dom.val(list[str])), "std.List std.Text")
 
 
@@ -131,6 +140,37 @@ class TestDomCodec(unittest.TestCase):
         self.assertIsInstance(err, dom.Err)
         self.assertIsNone(err.data)
 
+    def test_type_value_wrap_builds_values_for_type_values(self):
+        self.assertEqual(dom.val(int).wrap(42), dom.val(42))
+        self.assertEqual(
+            dom.val(Person).wrap(Person(name="Alice", age=30)),
+            dom.val(Person(name="Alice", age=30)),
+        )
+
+    def test_type_value_wrap_supports_builtin_qualifiers(self):
+        wrapped = dom.val(frozendict[str, str]).wrap(cast(dom.Data, frozendict({"a": "b"})))
+
+        self.assertIsInstance(wrapped, dom.Const)
+        self.assertEqual(wrapped.type, dom.val(frozendict[str, str]).data)
+        self.assertEqual(wrapped.data, frozendict({"a": "b"}))
+
+    def test_type_value_wrap_decodes_encoded_type_values(self):
+        encoded_type_value = dom.encode(cast(dom.Const, dom.val(Person)))
+
+        self.assertNotIsInstance(encoded_type_value.data, dom.Type)
+        self.assertEqual(
+            encoded_type_value.wrap(Person(name="Alice", age=30)),
+            dom.val(Person(name="Alice", age=30)),
+        )
+
+    def test_non_type_values_cannot_wrap(self):
+        with self.assertRaisesRegex(TypeError, "type value"):
+            dom.val(42).wrap(1)
+
+    def test_qualifier_meta_tracks_underlying_meta(self):
+        self.assertTrue(dom.nominal_qual("test.Meta", underlying=dom.NOMINAL_TYPE).is_meta)
+        self.assertFalse(dom.nominal_qual("test.Value", underlying=dom.TEXT_TYPE).is_meta)
+
     def test_roundtrip_err_value(self):
         value = dom.Err()
         self.assertEqual(dom.decode(dom.encode(value)), value)
@@ -155,10 +195,43 @@ class TestDomCurrentGaps(unittest.TestCase):
             dom.encode(qualified_value)
 
         with self.assertRaises(NotImplementedError):
-            dom.dir(qualified_value)
-
-        with self.assertRaises(NotImplementedError):
             dom.get(qualified_value, "value")
+
+
+class TestDomQualifierSemantics(unittest.TestCase):
+    def test_introspector_projects_through_qualified_nominal_types(self):
+        qualified = cast(dom.Type, dom.val(frozendict[str, Inventory[int]]).data)
+        projected_owner = dom.DEFAULT_INTROSPECTOR.project(qualified, "owner")
+        projected_items = dom.DEFAULT_INTROSPECTOR.project(qualified, "items")
+
+        self.assertEqual(repr(dom.val(projected_owner)), "std.Map[K=std.Text] std.Text")
+        self.assertEqual(
+            repr(dom.val(projected_items)),
+            "std.Map[K=std.Text] std.Map[K=std.Text] std.Integer",
+        )
+
+    def test_qualified_type_dir_lifts_underlying_fields(self):
+        qualified = cast(dom.Type, dom.val(frozendict[str, Inventory[int]]).data)
+        fields = qualified._dir()
+
+        self.assertIsNotNone(fields)
+        assert fields is not None
+        self.assertEqual(fields.index.keys, ("owner", "items"))
+        self.assertEqual(repr(dom.val(fields.get("owner"))), "std.Map[K=std.Text] std.Text")
+        self.assertEqual(
+            repr(dom.val(fields.get("items"))),
+            "std.Map[K=std.Text] std.Map[K=std.Text] std.Integer",
+        )
+
+    def test_introspector_lift_preserves_nominal_qualifier_context(self):
+        qualifier = dom.nominal_qual("std.Map", dom.struct(K=cast(dom.Const, dom.val(dom.TEXT_TYPE))), underlying=dom.INTEGER_TYPE)
+        lifted = dom.DEFAULT_INTROSPECTOR.lift(qualifier, dom.TEXT_TYPE)
+
+        self.assertEqual(repr(dom.val(lifted)), "std.Map[K=std.Text] std.Text")
+
+    def test_introspector_combine_remains_semantic_layer_extension_point(self):
+        with self.assertRaises(NotImplementedError):
+            dom.DEFAULT_INTROSPECTOR.combine(dom.INTEGER_TYPE, dom.INTEGER_TYPE, op="+")
 
 
 class TestDomReferences(unittest.TestCase):

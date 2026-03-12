@@ -76,6 +76,9 @@ def _format_const(value: dom.Const) -> str:
     if isinstance(value.data, dom.Type):
         return _format_type(value.data)
 
+    if isinstance(type_, dom.NominalQualifier):
+        return f"<{_format_type(type_)} value>"
+
     if isinstance(type_, dom.UnionType) and isinstance(value.data, tuple):
         discriminator, active_data = value.data
         if not isinstance(discriminator, dom.Type):
@@ -85,9 +88,6 @@ def _format_const(value: dom.Const) -> str:
     attrs = value.attrs
     if isinstance(type_, dom.StructType) and attrs is not None:
         return f"({_format_attrs(attrs)})"
-
-    if isinstance(type_, dom.NominalQualifier):
-        return f"<{_format_type(type_)} value>"
 
     if isinstance(type_, dom.VarType):
         return f"${value.data}"

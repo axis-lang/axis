@@ -6,10 +6,10 @@ from protobase import frozendict
 
 from .base import Builtin, Const, Data, Literal, Val
 from .errors import Err
+from .qualifiers import NominalQualifier
 from .refs import Anchor, Spec, SpecType
 from .struct import Struct
 from .types import (
-    NominalQualifier,
     NominalType,
     StructType,
     Type,

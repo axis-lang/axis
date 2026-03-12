@@ -10,6 +10,7 @@ un grafo inmutable y recomputar solo lo necesario ante cambios de entrada.
 
 overview
 pipeline
+dom_qualifiers
 style_guide
 development
 audit

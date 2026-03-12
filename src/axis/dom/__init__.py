@@ -4,6 +4,7 @@ from .map import *
 from .struct import *
 from .base import *
 from .types import *
+from .qualifiers import *
 from .refs import *
 from .vars import *
 from .introspection import *
