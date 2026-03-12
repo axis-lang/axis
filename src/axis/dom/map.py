@@ -5,7 +5,7 @@ from typing import Callable, Iterable, Iterator, Optional, Self, overload
 
 from protobase import Consed, frozendict
 
-from .core import Builtin, Data
+from .base import Builtin, Data
 
 
 __all__ = ["Map"]

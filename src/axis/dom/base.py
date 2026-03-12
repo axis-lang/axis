@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Union, ClassVar, Iterable
 
-from protobase import Inmutable, Consed, frozendict, is_abstract
+from protobase import Inmutable, Consed, Missing, MissingType, frozendict, is_abstract
 from axis import dom
 from rich.console import Console, ConsoleOptions, RenderResult
 
@@ -13,7 +13,7 @@ __all__ = [
     "Builtin",
     "Data",
     "Val",
-    "Pure",
+    "Const",
 ]
 
 _PENDING_CLASSES: list[type[dom.Builtin]] = []
@@ -44,9 +44,9 @@ class Builtin(Consed, abstract=True):
 
     @classmethod
     def _type(cls, *args: type | dom.Type) -> dom.Type:
-        from .introspect import _build_builtin_type
+        from .interop import build_builtin_type
 
-        return _build_builtin_type(cls, *args)
+        return build_builtin_type(cls, *args)
 
 
 type Literal = Union[
@@ -68,6 +68,8 @@ type Data = Union[
 
 
 class Val(Inmutable, abstract=True):
+    type: "dom.Type"
+    data: "Data"
 
     def __repr__(self) -> str:
         from axis.tui import render_dom
@@ -89,15 +91,39 @@ class Val(Inmutable, abstract=True):
         yield from render_dom.rich_console_dom(self, console, options)
 
     def __getitem__(self, keyname: str | int) -> Val:
-        return self.get(keyname)
+        return dom.get(self, keyname)
 
-    def get(self, key: int | str) -> Val:
-        return dom.get(self, key)
+    @property
+    def attrs(self) -> "dom.Struct[str | None, Val] | None":
+        fields = dom.dir(self)
+        if fields is None:
+            return None
+
+        values = tuple(
+            dom.get(self, key if key is not None else i)
+            for i, key in enumerate(fields.index.keys)
+        )
+        return dom.Struct.from_keys(fields.index.keys, values)
+
+    @property
+    def has_attrs(self) -> bool:
+        return self.attrs is not None
+
+    def __len__(self) -> int:
+        attrs = self.attrs
+        return 0 if attrs is None else len(attrs)
+
+    def get(self, key: int | str, default: Val | MissingType = Missing) -> Val | MissingType:
+        try:
+            return dom.get(self, key)
+        except KeyError:
+            if default is Missing:
+                raise
+            return default
 
     def dir(self) -> Iterable[str]:
         return (dom.dir(self) or dom.Struct.Empty).index._keyed_indices.keys
 
 
-class Pure[T: "dom.Type" = Any, D: "dom.Data" = Any](Val, Consed, abstract=True):
-    type: T
-    data: D
+class Const[T: "dom.Type" = Any, D: "Data" = Any](Val, Consed):
+    pass

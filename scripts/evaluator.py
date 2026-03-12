@@ -63,7 +63,7 @@ class Evaluator(Inmutable):
         fields = cast(
             dom.Struct[str, dom.Type], dom.Struct(index=index, values=tuple(bounds))
         )
-        struct = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
+        struct = dom.StructType(meta_fields=cast(dom.Struct[str, dom.Type], fields))
         return dom.Const(type=struct, data=tuple(values))
 
     def _error(self, node: syn.Node, message: str):

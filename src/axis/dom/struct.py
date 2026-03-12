@@ -6,7 +6,7 @@ from typing import Any, Callable, ClassVar, Iterable, Iterator, overload, Self
 from protobase import Consed, slot_cached_property
 
 from axis.dom.map import Map
-from .core import Builtin, Data
+from .base import Builtin, Data
 
 __all__ = ["Struct"]
 
