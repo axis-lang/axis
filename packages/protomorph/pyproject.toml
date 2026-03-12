@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "protomorph"
+version = "0.1.0"
+description = "Host-agnostic morphological data model"
+authors = ["jdluque <jdluque@leitat.org>"]
+
+[[tool.poetry.packages]]
+include = "protomorph"
+from = "src"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+protobase = { path = "../protobase", develop = true }
+
+[tool.poetry-monoranger-plugin]
+enabled = true
+monorepo-root = "../.."
+version-pinning-rule = "=="
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pyright (>=1.1.408,<2.0.0)",
+]

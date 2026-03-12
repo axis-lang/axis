@@ -1090,6 +1090,23 @@ type = "directory"
 url = "packages/protobase"
 
 [[package]]
+name = "protomorph"
+version = "0.1.0"
+description = "Host-agnostic morphological data model"
+optional = false
+python-versions = "^3.13"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+protobase = {path = "../protobase", develop = true}
+
+[package.source]
+type = "directory"
+url = "packages/protomorph"
+
+[[package]]
 name = "psutil"
 version = "7.0.0"
 description = "Cross-platform lib for process and system monitoring in Python.  NOTE: the syntax of this script MUST be kept compatible with Python 2.7."
@@ -1867,4 +1884,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "f4cde02f6635667879f1e8f62b8396d76563121041ffa8db0ee81cb0ff784647"
+content-hash = "37d3c8e492983115e5672617cd01b9b1d460db5f71396edb703fff4e56adcd0d"
