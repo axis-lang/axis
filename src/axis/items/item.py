@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from axis import dom, syn, sem
+import protomorph as pm
+
+from axis import syn, sem
 from protobase import slot_cached_property, cached_property
 
 
@@ -8,7 +10,7 @@ from protobase import slot_cached_property, cached_property
 class Item(sem.Context['Item'], abstract=True):
 
     @slot_cached_property 
-    def anchor(self) -> dom.Anchor:
+    def anchor(self) -> pm.Anchor:
         raise NotImplementedError("Item subclasses must implement anchor property")
 
     # @property

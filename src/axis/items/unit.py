@@ -2,7 +2,7 @@ from typing import ClassVar, cast
 
 from protobase import flux
 
-from axis import dom, expr
+from axis import expr
 from .mod import Mod
 
 class Unit(Mod):

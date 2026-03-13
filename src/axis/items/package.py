@@ -1,6 +1,6 @@
 from typing import Iterable, Self
 
-from axis import dom, src, log
+from axis import src, log
 from protobase import flux
 from typing import cast
 

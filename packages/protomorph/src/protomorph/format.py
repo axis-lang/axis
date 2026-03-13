@@ -46,7 +46,7 @@ def _format_type(type: morph.Type) -> str:
         return "$?"
     if isinstance(type, morph.ErrType):
         return "ErrType"
-    return type(type).__name__
+    return type.__class__.__name__
 
 
 def _format_std_literal(kind: str, data: morph.Data) -> str:
@@ -99,7 +99,7 @@ def format_morph(value: morph.Val) -> str:
     if isinstance(value, morph.Var):
         return f"${value.data}"
     if isinstance(value, morph.Anchor):
-        return _anchor_path(value.data)
+        return _anchor_path(value.segments)
     if isinstance(value, morph.Spec):
         return _format_spec(value)
     if isinstance(value, morph.Const):

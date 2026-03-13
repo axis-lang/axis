@@ -60,6 +60,30 @@ class TestProtoMorphCore(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             morph.DEFAULT_BRIDGE.combine(morph.INTEGER_TYPE, morph.INTEGER_TYPE, op="+")
 
+    def test_bridge_base_installs_context_var(self):
+        class Bridge(morph.SemanticBridgeBase):
+            pass
+
+        bridge = Bridge()
+        before = morph.BRIDGE.get()
+        with bridge:
+            self.assertIs(morph.BRIDGE.get(), bridge)
+        self.assertIs(morph.BRIDGE.get(), before)
+
+    def test_bridge_base_project_uses_structural_helpers(self):
+        class Bridge(morph.SemanticBridgeBase):
+            pass
+
+        bridge = Bridge()
+        inner = morph.StructType(meta_attrs=morph.Struct.new(name=morph.TEXT_TYPE))
+        qualified = morph.nominal_qual("test.Future", underlying=inner)
+
+        self.assertEqual(bridge.project(inner, "name"), morph.TEXT_TYPE)
+        self.assertEqual(
+            repr(morph.val(bridge.project(qualified, "name"))),
+            "test.Future std.Text",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

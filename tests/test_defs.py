@@ -2,15 +2,16 @@ import unittest
 from typing import cast
 
 from axis import expr, syn, sem
+from axis.items import blocks
 from axis.log.report import Report
-from axis.items.defs.base import merge_inline_block_tuple
+from axis.items.defs.base import build_binding_struct
 from axis.sem import Context
 
 
-class DefMergeInlineBlockTupleTest(unittest.TestCase):
+class DefBuildBindingStructTest(unittest.TestCase):
     def test_inline_ignored_when_no_block(self):
         inline_expr = expr.Tuple.from_str("(a, ..rest)")
-        struct = merge_inline_block_tuple(
+        struct = build_binding_struct(
             inline_expr=inline_expr,
             block_expr=None,
             binding_cls=sem.Entity.OverloadContribution.ParamBinding,
@@ -22,7 +23,7 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
     #     inline_expr = cast(expr.Tuple, syn.Expr.from_str("(a, ..rest)"))
     #     block_expr = cast(expr.Tuple, syn.Expr.from_str("(b: T)"))
     #     with self.assertRaises(Report.Exception):
-    #         merge_inline_block_tuple(
+    #         build_binding_struct(
     #             inline_expr=inline_expr,
     #             block_expr=block_expr,
     #             binding_cls=sem.Entity.OverloadContribution.ParamBinding,
@@ -30,8 +31,8 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
 
     def test_prefix_match_with_spread(self):
         inline_expr = expr.Tuple.from_str("(a, ..rest)")
-        block_expr = expr.Tuple.from_str("(a: T, b: U)")
-        struct = merge_inline_block_tuple(
+        block_expr = cast(blocks.TupleBlock, expr.Tuple.from_str("(a: T, b: U)"))
+        struct = build_binding_struct(
             inline_expr=inline_expr,
             block_expr=block_expr,
             binding_cls=sem.Entity.OverloadContribution.ParamBinding,
@@ -41,9 +42,9 @@ class DefMergeInlineBlockTupleTest(unittest.TestCase):
 
     def test_block_requires_bound(self):
         inline_expr = expr.Tuple.from_str("(a, ..rest)")
-        block_expr = expr.Tuple.from_str("(a)")
+        block_expr = cast(blocks.TupleBlock, expr.Tuple.from_str("(a)"))
         with self.assertRaises(Report.Exception):
-            merge_inline_block_tuple(
+            build_binding_struct(
                 inline_expr=inline_expr,
                 block_expr=block_expr,
                 binding_cls=sem.Entity.OverloadContribution.ParamBinding,

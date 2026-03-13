@@ -3,19 +3,21 @@ from __future__ import annotations
 from types import NotImplementedType
 from protobase import Consed, flux, _
 from protobase.cached_property import slot_cached_property
+import protomorph as pm
 
-from axis import dom, syn, sem
+from axis import expr, syn, sem
+from axis.expr.ir import Scope
 
 
 class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
 
     class Binding(Consed, abstract=True):
         key: syn.Expr = _
-        bound: syn.Expr | None = None
-        default: syn.Expr | None = None
+        bound_expr: syn.Expr | None = None
+        default_expr: syn.Expr | None = None
 
-    class Contribution(dom.ContextProto, abstract=True):
-        anchor: dom.Anchor = _
+    class Contribution(pm.ContextProto, abstract=True):
+        anchor: pm.Anchor = _
         origin: syn.Node = _
         ctx: Context = _
 
@@ -30,7 +32,7 @@ class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
         return frozenset()
 
     @property
-    def parent_scope(self) -> sem.Scope | None:
+    def parent_scope(self) -> Scope | None:
         parent = self.parent
         while parent is not None:
             if parent.scope is not NotImplemented:
@@ -43,13 +45,13 @@ class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
         return None
 
     @flux.property
-    def scope(self) -> sem.Scope | NotImplementedType:
-        builder = sem.Scope.Builder(name=self.name, parent=self.parent_scope)
+    def scope(self) -> Scope | NotImplementedType:
+        builder = Scope.Builder(name=self.name, parent=self.parent_scope)
         self._build_scope(builder)
         return builder.build()
 
 
-    def _build_scope(self, scope_builder: sem.Scope.Builder): ...
+    def _build_scope(self, scope_builder: Scope.Builder): ...
 
     @flux.method
     def check(self):

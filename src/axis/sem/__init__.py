@@ -3,4 +3,3 @@
 from .context import *
 from .entity import *
 from .realm import *
-from .scope import *

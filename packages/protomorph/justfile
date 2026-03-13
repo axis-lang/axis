@@ -1,0 +1,6 @@
+help:
+    @just --list
+
+test:
+    @clear && printf '\e[3J'
+    @poetry run python -m unittest discover -s tests

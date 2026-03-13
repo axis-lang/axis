@@ -2,9 +2,11 @@ from __future__ import annotations
 from typing import ClassVar, Literal, Optional
 
 from protobase import flux, slot_cached_property
+import protomorph as pm
 
-from axis import dom, expr, syn
-from axis.sem import Context, Scope
+from axis import expr, syn
+from axis.expr.ir import Scope
+from axis.sem import Context
 
 from .item import Item
 from .scopes import parent_scope
@@ -23,7 +25,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
     value: Optional[syn.Expr] = None
 
     @slot_cached_property
-    def anchor(self) -> dom.Anchor:
+    def anchor(self) -> pm.Anchor:
         parent = self.parent
         if parent is None:
             raise ValueError("Global requires a parent to build its anchor")

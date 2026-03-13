@@ -2,8 +2,10 @@ from typing import ClassVar, Literal, Self
 
 from protobase import Inmutable, frozendict
 from protobase.cached_property import slot_cached_property
+import protomorph as pm
 
-from axis import dom, expr, sem, syn
+from axis import expr, sem, syn
+from axis.expr.ir import Scope
 
 
 class Use(syn.Block, Inmutable):
@@ -13,7 +15,7 @@ class Use(syn.Block, Inmutable):
 
     import_expr: syn.Expr
 
-    type Entry = tuple[expr.Sym | expr.Lit, dom.Anchor | None]
+    type Entry = tuple[expr.Sym | expr.Lit, pm.Anchor | None]
 
     @classmethod
     def build(
@@ -30,7 +32,7 @@ class Use(syn.Block, Inmutable):
     def entries(self) -> frozenset[Entry]:
         entries: list[Use.Entry] = []
 
-        def walk(value: syn.Node, current_anchor: dom.Anchor | None) -> None:
+        def walk(value: syn.Node, current_anchor: pm.Anchor | None) -> None:
             match value:
                 case expr.Apply(function=function_expr, argument=argument_expr):
                     anchor = expr.as_anchor(function_expr, current_anchor)
@@ -51,19 +53,13 @@ class Use(syn.Block, Inmutable):
                 case expr.Tuple.Nominal(key=key, bound=bound, value=elem_value):
                     alias_expr = elem_value or bound or key
                     alias = expr.to_sym(alias_expr)
-                    scope = (
-                        current_anchor.anchor if current_anchor is not None else None
-                    )
+                    scope = current_anchor if current_anchor is not None else None
                     target_anchor = expr.as_anchor(key, scope)
-                    if target_anchor is None:
-                        return
                     entries.append((alias, target_anchor))
                 case expr.Lit() as lit if lit.value is Ellipsis:
                     entries.append((lit, current_anchor))
                 case syn.Expr() as expr_node:
-                    scope = (
-                        current_anchor.anchor if current_anchor is not None else None
-                    )
+                    scope = current_anchor if current_anchor is not None else None
                     target_anchor = expr.as_anchor(expr_node, scope)
                     alias = expr.to_sym(expr_node)
                     entries.append((alias, target_anchor))
@@ -75,7 +71,7 @@ class Use(syn.Block, Inmutable):
 
     def _contribute_to_scope(
         self,
-        scope_builder: sem.Scope.Builder,
+        scope_builder: Scope.Builder,
         namespaces: sem.Namespaces,
     ):
         for alias, target in self.entries:

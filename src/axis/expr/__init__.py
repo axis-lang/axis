@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, cast
 
-from axis import dom, syn
+from axis import syn
 from axis.log import report as log
 from axis.literals import Wildcard
 
@@ -16,21 +16,7 @@ from .tuple_ import *
 from .lit import *
 from .compound import *
 from .trail import *
-
-
-def as_anchor(ast: syn.Expr, scope_ref: dom.Anchor | None) -> dom.Anchor:
-    """Resolve an anchor path from a simple name/member expression."""
-    match ast:
-        case Sym(name=name, at=at):
-            if at is not None:
-                log.warn("Anchor cannot @-qualify a symbol").label(ast).emit()
-            return dom.Anchor.from_root(name) if scope_ref is None else scope_ref.child(name)
-        case Member(of=of, name=name):
-            return as_anchor(of, scope_ref).child(name)
-        case _:
-            log.error(f"Unsupported anchor expression type ({type(ast)})").label(
-                ast
-            ).throw()
+from .ir import *
 
 
 def to_sym(node: syn.Expr) -> Sym:

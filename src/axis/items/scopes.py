@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from axis import syn
-from axis.sem import Context, Scope
+from axis.expr.ir import Scope
+from axis.sem import Context
 
 
 def parent_scope(item: syn.Item) -> Scope | None:

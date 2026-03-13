@@ -5,9 +5,9 @@ from typing import ClassVar, Optional, cast
 from itertools import product
 from protobase import flux, slot_cached_property, _
 
-from axis import dom, expr, log, syn, sem
+from axis import expr, log, syn, sem
 
-from .base import SymDef, unify_args_takes, unify_spec_where
+from .base import SymDef, build_param_bindings, build_spec_bindings
 
 
 class ClassDef(SymDef):
@@ -31,8 +31,8 @@ class ClassDef(SymDef):
         return frozenset(
             sem.Entity.OverloadContribution(
                 anchor=self.anchor,
-                spec=unify_spec_where(self.spec, where),
-                params=unify_args_takes(self.args, takes),
+                spec_bindings=build_spec_bindings(self.spec, where),
+                param_bindings=build_param_bindings(self.args, takes),
                 origin=self.origin, #takes or where or returns,
                 ctx=self, # build scope here!
             )

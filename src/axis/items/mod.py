@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from typing import ClassVar, cast, Literal, Self
+import protomorph as pm
 
 from protobase import flux, _, slot_cached_property, frozendict
 
-from axis import dom, expr, syn, sem, log
+from axis import expr, syn, sem, log
+from axis.expr.ir import Scope
 
 # from axis.sem import Entity, Scope
 
@@ -38,16 +40,10 @@ class Mod(Item):
         return expr.as_anchor(self.path, anchor)
 
     @flux.property
-    def ref(self) -> dom.Anchor:
+    def ref(self) -> pm.Anchor:
         if self.path is None:
             raise ValueError("Mod requires a path to build its ref")
-        scope_ref = self.anchor
-        ref = expr.to_spec_ref(self.path, scope_ref)
-        if ref is None:
-            raise ValueError("Mod requires a path to build its ref")
-        if isinstance(ref, dom.Spec):
-            raise ValueError("Module ref cannot be specialized")
-        return cast(dom.Anchor, ref)
+        return self.anchor
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
@@ -67,7 +63,7 @@ class Mod(Item):
     def name(self) -> str | None:
         return expr.name_of(self.path) if self.path is not None else None
 
-    def _build_scope(self, scope_builder: sem.Scope.Builder) -> None:
+    def _build_scope(self, scope_builder: Scope.Builder) -> None:
         namespaces = self.realm.namespaces_by_anchor
         for resolved_target in namespaces.get(self.anchor, ()):
             scope_builder.define(resolved_target.name, resolved_target, origin=self)

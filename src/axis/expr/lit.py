@@ -1,13 +1,14 @@
 from decimal import Decimal
 from types import EllipsisType
 from typing import ClassVar, Self
+import protomorph as pm
 
 from axis.literals import WildcardType, Wildcard
-from axis import syn, dom
+from axis import syn
 
 
 class Lit(syn.Expr):
-    type Value = dom.Literal | EllipsisType | WildcardType
+    type Value = pm.Literal | EllipsisType | WildcardType
 
     @classmethod
     def build(cls, value: Value) -> Self:

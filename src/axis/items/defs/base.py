@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 from typing import ClassVar, Literal, Optional
+import protomorph as pm
 
 from protobase import flux, _, slot_cached_property
 
 
-from axis import dom, expr, syn, sem, log
+from axis import expr, syn, sem, log
 
 from .. import blocks
 from ..item import Item
 
 
-def merge_inline_block_tuple[B: sem.Context.Binding](
+def build_binding_struct[B: sem.Context.Binding](
     inline_expr: expr.Tuple | None,
     block_expr: blocks.TupleBlock | None,
     *,
     binding_cls: type[B],
-) -> dom.Struct[str, B]:
-    """Merge inline and block tuples into binding structs, enforcing prefix rules."""
+) -> pm.Struct[str, B]:
+    """Build the binding struct described by inline and block tuple forms."""
     if block_expr is None:
         if inline_expr is not None:
             log.error("Inline tuple ignored; block required").label(inline_expr).emit()
-        return dom.Struct.Empty
+        return pm.Struct.Empty
 
     # if inline_expr is not None:
     #     prefix, variadic = inline_expr.inline_prefix
@@ -42,38 +43,42 @@ def merge_inline_block_tuple[B: sem.Context.Binding](
 
     for element in block_expr.elements:
         match element:
-            case expr.Tuple.Nominal(key=key, bound=bound, value=value):
-                # if bound is None:
+            case expr.Tuple.Nominal(key=key, bound=bound_expr, value=default_expr):
+                # if bound_expr is None:
                 #     log.error("Tuple element requires a bound").label(element).throw()
-                # assert bound is not None
-                sym = expr.to_sym(key)
+                # assert bound_expr is not None
+                # sym = expr.to_sym(key)
 
-                var = binding_cls(key=key, bound=bound, default=value)
+                var = binding_cls(
+                    key=key,
+                    bound_expr=bound_expr,
+                    default_expr=default_expr,
+                )
                 entries.append((expr.to_slot_name(key), var))
             case _:
-                log.error("Unsupported tuple element in block").label(element).throw()
+                log.error("Unsupported tuple element in block").label(element).show()
 
-    return dom.Struct.from_iter(entries)
+    return pm.Struct.from_iter(entries)
 
 
-def unify_spec_where(
+def build_spec_bindings(
     inline_expr: expr.Tuple | None, block_expr: Def.Where | None
-) -> dom.Struct[str, sem.Entity.SpecContribution.SpecBinding]:
-    """Resolve where blocks into a spec struct, combining inline+block forms."""
+) -> pm.Struct[str, sem.Entity.SpecContribution.SpecBinding]:
+    """Build the specialization binding struct from `where` clauses."""
     block_tuple = block_expr if block_expr is not None else None
-    return merge_inline_block_tuple(
+    return build_binding_struct(
         inline_expr,
         block_tuple,
         binding_cls=sem.Entity.SpecContribution.SpecBinding,
     )
 
 
-def unify_args_takes(
+def build_param_bindings(
     inline_expr: expr.Tuple | None, block_expr: Def.Takes | None
-) -> dom.Struct[str, sem.Entity.OverloadContribution.ParamBinding]:
-    """Resolve takes blocks into a params struct, combining inline+block forms."""
+) -> pm.Struct[str, sem.Entity.OverloadContribution.ParamBinding]:
+    """Build the parameter binding struct from `takes` clauses."""
     block_tuple = block_expr if block_expr is not None else None
-    return merge_inline_block_tuple(
+    return build_binding_struct(
         inline_expr,
         block_tuple,
         binding_cls=sem.Entity.OverloadContribution.ParamBinding,
@@ -84,7 +89,6 @@ class Def(Item, syn.ClassMatcher):
 
     class Members(syn.Block):
         outline_keyword: ClassVar = "members"
-
 
     class Where(blocks.TupleBlock):
         outline_keyword: ClassVar = "where"
@@ -222,7 +226,7 @@ class SymDef(Def, abstract=True):
     sym: expr.Sym = _
 
     @slot_cached_property
-    def anchor(self) -> dom.Anchor:
+    def anchor(self) -> pm.Anchor:
         return expr.as_anchor(self.sym, self.parent.anchor if self.parent else None)
 
     @slot_cached_property

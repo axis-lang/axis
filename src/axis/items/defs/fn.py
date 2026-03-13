@@ -4,12 +4,12 @@ from typing import ClassVar, Optional
 from itertools import product
 
 from protobase import flux, _
+import protomorph as pm
 
-from axis import dom, expr, syn
+from axis import expr, syn, sem
 from axis.log import report as log
-from axis.sem import Context
 
-from .base import SymDef, unify_args_takes, unify_spec_where
+from .base import SymDef, build_param_bindings, build_spec_bindings
 
 
 class FnDef(SymDef):
@@ -31,12 +31,12 @@ class FnDef(SymDef):
     ctx: syn.Expr | None = None
 
     @flux.property
-    def contributions(self) -> frozenset[Context.Contribution]:
+    def contributions(self) -> frozenset[sem.Context.Contribution]:
         return frozenset(
-            Context.ImplContribution(
+            sem.Entity.ImplContribution(
                 anchor=self.anchor,
-                spec=unify_spec_where(self.spec, where),
-                params=unify_args_takes(self.args, takes),
+                spec_bindings=build_spec_bindings(self.spec, where),
+                param_bindings=build_param_bindings(self.args, takes),
                 origin=self.origin,  # takes or where or returns,
                 returns=merge_returns(self.ret, returns, self),
                 ctx=self,  # build scope here!

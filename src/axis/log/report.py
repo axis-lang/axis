@@ -5,14 +5,15 @@ from enum import Enum, auto
 from typing import NoReturn, Optional, Self, Iterable, TYPE_CHECKING
 
 from protobase import Inmutable, Metadata, Record, flux, mutate
+import protomorph as pm
 from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.style import Style
 
-from axis import syn, dom, src
+from axis import syn, src
 
 
-class Report(Inmutable, Metadata["dom.Val"]):
+class Report(Metadata[pm.Val]):
     class Exception(Exception):
         def __init__(self, report: "Report"):
             self.report = report

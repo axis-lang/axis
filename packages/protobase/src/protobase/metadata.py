@@ -1,11 +1,11 @@
 #%%
 from typing import Any, ClassVar, Self, cast
 
-from .object import Object
+from .inmutable import Inmutable
 from .type import Type
 from .weak import WeakKeyIdDictionary
 
-class Metadata[T=Any](Object, abstract=True):
+class Metadata[T=Any](Inmutable, abstract=True):
     __slots__ = "__weakref__",
     __storage__: ClassVar[WeakKeyIdDictionary[object, object]]
     
