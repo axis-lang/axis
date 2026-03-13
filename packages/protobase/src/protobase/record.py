@@ -79,8 +79,7 @@ def impl_new_method(cls):
         "def __new__(cls, *args, **kwargs):",
         "    self = _object_new__(cls)",
         "    self.__init__(*args, **kwargs)",
-        f"    key = {key_expr}",
-        "    _osetattr__(self, '__hash_cache__', hash(key))",
+        f"    _osetattr__(self, '__hash_cache__', hash({key_expr}))",
         "    return self",
         globals={
             "_object_new__": object.__new__,
@@ -138,13 +137,13 @@ def impl_consed_new_method(cls):
     return compile_function(
         f"def __new__({', '.join(fn_args)}):",
         *resolve_lines,
-        f"    key = {key_expr}",
-        f"    existing = cls.__consign__.get(key)",
+        f"    _key__ = {key_expr}",
+        f"    existing = cls.__consign__.get(_key__)",
         f"    if existing is not None: return existing",
         f"    self = _object_new__(cls)",
-        f"    _osetattr__(self, '__hash_cache__', hash(key))",
+        f"    _osetattr__(self, '__hash_cache__', hash(_key__))",
         f"    self.__init__({init_call_args})",
-        f"    cls.__consign__[key] = self",
+        f"    cls.__consign__[_key__] = self",
         f"    return self",
         globals={
             **nominal_factories,
