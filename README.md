@@ -46,6 +46,7 @@ Comandos con `just`:
 just help
 just launch -- --help
 just test
+just test-all
 just gen-parser
 ```
 

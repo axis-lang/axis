@@ -6,4 +6,7 @@ def Integer
 def Decimal
 def Text
 
-use alpha.Beta
+def Array[..Dims] T
+where:
+    val Dims: Tuple Natural
+

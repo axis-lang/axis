@@ -163,6 +163,9 @@ class Report(Metadata[pm.Val]):
         return render_report(self, console, options)
 
 
+def fatal(message: str) -> Report.Builder:
+    return Report.Builder(_severity=Report.Severity.ERROR, _message=message)
+
 def error(message: str) -> Report.Builder:
     return Report.Builder(_severity=Report.Severity.ERROR, _message=message)
 

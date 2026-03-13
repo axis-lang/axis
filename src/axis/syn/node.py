@@ -207,11 +207,13 @@ class SegregatedOutlineNode[P: OutlineNode](OutlineNode, abstract=True):
         return super().build(*args, parent=parent, children=children, **kwargs)
 
     @classmethod
-    def from_file(
+    def from_src(
         cls,
-        src_file: src.Source,
+        src_file: src.Source | str,
         **kwargs,
     ) -> tuple[Self | None, *tuple[SegregatedOutlineNode, ...]]:
+        if isinstance(src_file, str):
+            src_file = src.SourceBuffer.from_str(src_file)
         tree = cls.parse_outline_tree(src_file)
         # from rich import print
         # print(tree)

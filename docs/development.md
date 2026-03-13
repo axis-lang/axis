@@ -18,6 +18,7 @@ poetry install
 just help
 just launch -- --help
 just test
+just test-all
 just gen-parser
 just docs
 ```

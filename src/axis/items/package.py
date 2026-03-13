@@ -22,7 +22,7 @@ class Package(Realm):
     def file_items(self, file: src.SourceFile) -> frozenset[Item]:
         from axis import items
         return frozenset(
-            item for item in items.Unit.from_file(file, realm=self)
+            item for item in items.Unit.from_src(file, realm=self)
             if isinstance(item, Item)
         )
 

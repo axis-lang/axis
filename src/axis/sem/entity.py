@@ -87,9 +87,18 @@ class Entity(Consed):
         ) -> frozendict[pm.Struct.Shape, Entity.OverloadBucket]:
             return _overload_by_shape_bucket(self.specs)
 
+    class QualContribution(SpecContribution):
+        class UnderlyingBinding(Context.Binding):
+            pass
+
+        underlying_expr: syn.Expr = _
+
+
     @flux.property
     def spec_by_shape(self) -> frozendict[pm.Struct.Shape, SpecBucket]:
         return _spec_by_shape_bucket(self.contributions)
+
+
 
     class OverloadContribution(SpecContribution):
         class ParamBinding(Context.Binding):

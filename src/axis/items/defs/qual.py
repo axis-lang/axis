@@ -2,24 +2,36 @@ from __future__ import annotations
 
 from typing import ClassVar, Optional
 
-from protobase import flux
+from protobase import flux, _
 
-from axis import expr, syn
-from axis.sem import Context
+from axis import expr, log, syn, sem
 
-from .base import Def
+from .base import SymDef, build_spec_bindings
 
 
-class QualDef(Def):
+class QualDef(SymDef):
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym $target"),
-        syn.Expr.from_str("$sym[..$spec] $target"),
+        syn.Expr.from_str("$sym $under"),
+        syn.Expr.from_str("$sym[..$spec] $under"),
     )
 
-    sym: expr.Sym | None = None
     spec: Optional[expr.Tuple] = None
-    target: syn.Expr | None = None
+    under: syn.Expr = _
 
     @flux.property
-    def contributions(self) -> frozenset[Context.Contribution]:
-        return frozenset()
+    def contributions(self) -> frozenset[sem.Context.Contribution]:
+        try:
+            return frozenset(
+                sem.Entity.QualContribution(
+                    anchor=self.anchor,
+                    spec_bindings=build_spec_bindings(self.spec, where),
+                    underlying_expr=self.under,
+                    origin=self.origin, #takes or where or returns,
+                    ctx=self,
+                )
+                for where in self.where or (None,)
+            )
+        except Exception:
+            log.fatal("Failed to build QualContribution").label(self.origin).show()
+            raise
+

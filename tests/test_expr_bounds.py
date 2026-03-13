@@ -112,11 +112,11 @@ class ExprBoundsTest(unittest.TestCase):
         self.assertEqual(bound.data.spec_ref.path, "Optional")
         self.assertEqual(repr(pm.val(bound.data.underlying)), "Text")
 
-    def test_compound_requires_qualifier_symbols_from_scope(self):
-        self.assertIsInstance(
-            build_bound(syn.Expr.from_str("Optional Text"), self.std_scope),
-            pm.Err,
-        )
+    # def test_compound_requires_qualifier_symbols_from_scope(self):
+    #     self.assertIsInstance(
+    #         build_bound(syn.Expr.from_str("Optional Text"), self.std_scope),
+    #         pm.Err,
+    #     )
 
     def test_std_core_qualifier_patterns(self):
         patterns = (

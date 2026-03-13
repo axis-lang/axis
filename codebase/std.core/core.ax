@@ -25,13 +25,3 @@ where:
     val I: Struct.Index[N] Sym
     val N: Whole
     val T: Type = Sym
-
-def Struct.Index[N] K
-where: 
-    val N: Whole
-    val K: Type = Sym
-takes: 
-    val keymap: Array[N] Optional K
-
-
-

@@ -20,15 +20,15 @@ class FnDef(SymDef):
     match_patterns: ClassVar = (
         syn.Expr.from_str("$sym(..args) -> $ret"),
         syn.Expr.from_str("$sym[..$spec](..args) -> $ret"),
-        syn.Expr.from_str("$ctx.$sym(..args) -> $ret"),
-        syn.Expr.from_str("$ctx.$sym[..$spec](..args) -> $ret"),
+        syn.Expr.from_str("$self.$sym(..args) -> $ret"),
+        syn.Expr.from_str("$self.$sym[..$spec](..args) -> $ret"),
     )
 
     sym: expr.Sym = _
     spec: expr.Tuple | None = None
     args: expr.Tuple = _
     ret: syn.Expr = _
-    ctx: syn.Expr | None = None
+    self: syn.Expr | None = None
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:

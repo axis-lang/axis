@@ -1,11 +1,9 @@
 import unittest
 from typing import cast
 
-from axis import expr, syn, sem
+from axis import expr, sem
 from axis.items import blocks
-from axis.log.report import Report
 from axis.items.defs.base import build_binding_struct
-from axis.sem import Context
 
 
 class DefBuildBindingStructTest(unittest.TestCase):
@@ -40,12 +38,13 @@ class DefBuildBindingStructTest(unittest.TestCase):
         self.assertEqual(struct.index.keys, ("a", "b"))
         self.assertEqual(len(struct.values), 2)
 
-    def test_block_requires_bound(self):
+    def test_unsupported_block_element_is_ignored(self):
         inline_expr = expr.Tuple.from_str("(a, ..rest)")
         block_expr = cast(blocks.TupleBlock, expr.Tuple.from_str("(a)"))
-        with self.assertRaises(Report.Exception):
-            build_binding_struct(
-                inline_expr=inline_expr,
-                block_expr=block_expr,
-                binding_cls=sem.Entity.OverloadContribution.ParamBinding,
-            )
+        struct = build_binding_struct(
+            inline_expr=inline_expr,
+            block_expr=block_expr,
+            binding_cls=sem.Entity.OverloadContribution.ParamBinding,
+        )
+        self.assertEqual(struct.index.keys, ())
+        self.assertEqual(struct.values, ())

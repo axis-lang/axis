@@ -3,24 +3,28 @@ ANTLR4_TOOLS_ANTLR_VERSION:="4.13.2"
 help: 
     @just --list
 
-launch *ARGS: 
+run *ARGS: 
     @poetry run python -m axis {{ARGS}}
 
-test *ARGS:
+_test-root *ARGS:
     @clear && printf '\e[3J'
     @poetry run python -m unittest discover -s tests {{ARGS}}
 
-test-all:
+test *ARGS:
+    @just _test-root {{ARGS}}
+    @just -f "packages/protomorph/justfile" test
+
+test-all *ARGS:
     @for d in packages/*; do \
         if [ -d "$$d" ] && [ -f "$$d/justfile" ]; then \
             just -f "$$d/justfile" test; \
         fi; \
     done
-    @just test
+    @just _test-root {{ARGS}}
 
 watch *ARGS:
     #@just tests
-    watchexec -r -e py -- 'just test && just launch {{ARGS}}'
+    watchexec -r -e py -- 'just test && just run {{ARGS}}'
 
 
 docs:
