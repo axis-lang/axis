@@ -40,7 +40,9 @@ class Entity(Consed):
             """
 
             builder = Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
-            builder.define("Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin)
+            builder.define(
+                "Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin
+            )
             for binding in self.spec_bindings:
                 name = binding.binder_name
                 if name is None:
@@ -59,6 +61,11 @@ class Entity(Consed):
             scope = self.spec_scope
             return self.spec_bindings.map(
                 lambda binding: build_bound(binding.bound_expr, scope)
+                # lambda binding: (
+                #     binding.bound_expr.to_bound(scope)
+                #     if binding.bound_expr is not None
+                #     else None
+                # )
             )
 
         @flux.property
@@ -79,7 +86,6 @@ class Entity(Consed):
 
     class SpecBucket(Bucket):
         specs: frozenset[Entity.SpecContribution]
-        
 
         @flux.property
         def overload_by_shape(
@@ -90,12 +96,9 @@ class Entity(Consed):
     class QualContribution(SpecContribution):
         underlying_expr: syn.Expr = _
 
-
     @flux.property
     def spec_by_shape(self) -> frozendict[BindingShape, SpecBucket]:
         return _spec_by_shape_bucket(self.contributions)
-
-
 
     class OverloadContribution(SpecContribution):
         param_bindings: BindingStruct[Binding] = _
@@ -104,7 +107,9 @@ class Entity(Consed):
         def overload_scope(self) -> Scope:
             """Scope with spec_scope as parent, populated with ParamVars."""
             builder = Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
-            builder.define("self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin)
+            builder.define(
+                "self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin
+            )
             for binding in self.param_bindings:
                 name = binding.binder_name
                 if name is None:
@@ -171,6 +176,8 @@ class Entity(Consed):
     @flux.method
     def check(self):
         pass
+
+
 def _spec_by_shape_bucket(
     contributions: frozenset[Context.Contribution],
 ) -> frozendict[BindingShape, Entity.SpecBucket]:

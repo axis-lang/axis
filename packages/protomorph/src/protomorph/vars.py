@@ -18,7 +18,7 @@ class VarType[C: ContextProto](morph.Type, abstract=True):
 
     ANCHOR: ClassVar[str] = "dom.Var.Type"
 
-    def wrap(self, data: morph.Data) -> morph.Val:
+    def _wrap(self, data: morph.Data) -> morph.Val:
         if not isinstance(data, str):
             raise ValueError(
                 f"{type(self).__name__}.wrap expected variable name str, got {type(data).__name__}"
@@ -32,6 +32,17 @@ class Var(morph.Val, morph.Type, Consed):
 
     def _metatype(self) -> VarType:
         return cast(VarType, self.type)
+
+    def _wrap(self, data: morph.Data) -> morph.Val:
+        if not isinstance(data, str):
+            raise ValueError(
+                f"{type(self).__name__}.wrap expected variable name str, got {type(data).__name__}"
+            )
+        if data != self.__data__:
+            raise ValueError(
+                f"{type(self).__name__}.wrap expected variable name {self.__data__!r}, got {data!r}"
+            )
+        return self
 
 
 def var[C: ContextProto](var_type_cls: type[VarType[C]], ctx: C, name: str) -> Var:

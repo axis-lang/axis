@@ -36,7 +36,7 @@ class Type(Builtin, abstract=True):
         return False
 
     @classmethod
-    def _type(cls, *args: morph.Type) -> morph.Type:
+    def _type(cls, *args: type | morph.Type) -> morph.Type:
         if args:
             raise TypeError(
                 f"{cls.__name__}._type does not accept host-specific type arguments in protomorph core"
@@ -46,7 +46,7 @@ class Type(Builtin, abstract=True):
     def _metatype(self) -> morph.Type:
         return morph.nominal_type(self._anchor_path(), self._metaspec())
 
-    def wrap(self, data: Data) -> morph.Val:
+    def _wrap(self, data: Data) -> morph.Val:
         val_cls = type(self).val_cls or morph.Const
         return val_cls(self, data)
 
@@ -76,12 +76,12 @@ class Type(Builtin, abstract=True):
             raise TypeError(f"Unsupported key type: {type(key)}")
 
         if isinstance(data, tuple):
-            return fields[offset].wrap(data[offset])
+            return fields[offset]._wrap(data[offset])
         if isinstance(data, Builtin):
             attr_name = fields.index.keys[offset]
             if attr_name is None:
                 raise KeyError(f"Struct has no positional field at offset {offset}")
-            return fields[offset].wrap(getattr(data, attr_name))
+            return fields[offset]._wrap(getattr(data, attr_name))
         raise TypeError(f"Unsupported data type: {type(data)}")
 
 
@@ -160,11 +160,18 @@ class NominalType(Type):
 
     def _decode(self, raw_data: Data) -> Data:
         fields = self._fields()
+        bridge = morph.BRIDGE.get(morph.DEFAULT_BRIDGE)
 
         if self.spec_ref.path == "std.Any":
             return raw_data
 
         if fields is None:
+            construct = getattr(bridge, "construct", None)
+            if construct is not None:
+                try:
+                    return construct(self, ())
+                except ValueError:
+                    return raw_data
             return raw_data
 
         if not isinstance(raw_data, tuple):
@@ -176,10 +183,17 @@ class NominalType(Type):
 
         from .api import _decode
 
-        return tuple(
+        decoded = tuple(
             _decode(field_type, field_value)
             for field_type, field_value in zip(fields, raw_data)
         )
+        construct = getattr(bridge, "construct", None)
+        if construct is not None:
+            try:
+                return construct(self, decoded)
+            except ValueError:
+                pass
+        return decoded
 
 
 class UnionType(Type):

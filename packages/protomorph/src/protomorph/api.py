@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast, get_origin
 
 from protobase import frozendict
 
@@ -9,6 +9,7 @@ import protomorph as morph
 from . import refs
 from .base import Builtin, Const, Data, Literal, Val
 from .errors import Err
+from .native import builtin_runtime_type_args, type_from_python
 from .qualifiers import NominalQualifier
 from .refs import Anchor, Spec, SpecType
 from .struct import Struct
@@ -32,7 +33,7 @@ MAP_TYPE: Type
 SET_TYPE: Type
 LIST_TYPE: Type
 
-TYPE_BY_NATIVE: dict[object, Type] = {}
+TYPE_BY_NATIVE: dict[type, Type] = {}
 LITERAL_TYPES = TYPE_BY_NATIVE
 
 
@@ -43,19 +44,18 @@ def anchor(path: str) -> Anchor:
 def spec_ref(anchor_: str | Anchor, spec: Const | None = None) -> Spec:
     if isinstance(anchor_, str):
         anchor_ = anchor(anchor_)
-    anchor_value = cast(Anchor, anchor_)
 
     if spec is not None:
         assert isinstance(spec.type, StructType)
         assert isinstance(spec.data, tuple)
         return Spec(
             SpecType(meta_args=spec.type),
-            cast(tuple[tuple[str, ...], Data], (anchor_value.segments, spec.data)),
+            (anchor_.segments, spec.data),
         )
 
     return Spec(
         SpecType(meta_args=None),
-        cast(tuple[tuple[str, ...], Data], (anchor_value.segments, None)),
+        (anchor_.segments, None),
     )
 
 
@@ -64,20 +64,24 @@ def struct(*positional: Const | Var, **nominal: Const | Var) -> Const[StructType
     struct_type = StructType(
         meta_attrs=fields.map(lambda x: x if isinstance(x, Var) else x.type),
     )
-    return cast(Const[StructType], struct_type.wrap(fields.map(lambda x: x.data).values))
+    return cast(
+        Const[StructType], struct_type._wrap(fields.map(lambda x: x.data).values)
+    )
 
 
 def literal(value: Literal | None) -> Const:
     type_ = TYPE_BY_NATIVE.get(type(value))
     if type_ is None:
         raise TypeError(f"Unsupported literal type: {type(value).__name__}")
-    return cast(Const, type_.wrap(value))
+    return cast(Const, type_._wrap(value))
 
 
 def literal_struct(*positional: Literal, **nominal: Literal) -> Const[StructType]:
     fields = Struct.new(*positional, **nominal).map(literal)
     struct_type = StructType(meta_attrs=fields.map(lambda x: x.type))
-    return cast(Const[StructType], struct_type.wrap(fields.map(lambda x: x.data).values))
+    return cast(
+        Const[StructType], struct_type._wrap(fields.map(lambda x: x.data).values)
+    )
 
 
 def union_type(*types: Type) -> UnionType:
@@ -94,8 +98,10 @@ def union(types: frozenset[Type], active: Const | Var) -> Const[UnionType]:
     active_union_type = union_type(*types)
     discriminator = active if isinstance(active, Var) else active.type
     if discriminator not in active_union_type.types:
-        raise TypeError(f"Active variant type {discriminator} is not in the union types")
-    return cast(Const[UnionType], active_union_type.wrap((discriminator, active.data)))
+        raise TypeError(
+            f"Active variant type {discriminator} is not in the union types"
+        )
+    return cast(Const[UnionType], active_union_type._wrap((discriminator, active.data)))
 
 
 def nominal_type(anchor_: str | Anchor, args: Const | None = None) -> NominalType:
@@ -125,15 +131,23 @@ def val(*positional, **nominal) -> Val:
             raise ValueError("protomorph.val requires at least one value")
 
         if len(positional) != 1 or nominal:
-            args = [as_const(item, f"positional[{i}]") for i, item in enumerate(positional)]
-            kwargs = {key: as_const(item, f"key {key!r}") for key, item in nominal.items()}
+            args = [
+                as_const(item, f"positional[{i}]") for i, item in enumerate(positional)
+            ]
+            kwargs = {
+                key: as_const(item, f"key {key!r}") for key, item in nominal.items()
+            }
             return struct(*args, **kwargs)
 
         value = positional[0]
         if isinstance(value, Val):
             return value
         if isinstance(value, Type):
-            return value._metatype().wrap(value)
+            return value._metatype()._wrap(value)
+
+        origin = get_origin(value)
+        if value is Any or isinstance(value, type) or origin is not None:
+            return val(type_from_python(value))
 
         try:
             literal_type_token = LITERAL_TYPES.get(value)
@@ -144,7 +158,7 @@ def val(*positional, **nominal) -> Val:
 
         literal_type = TYPE_BY_NATIVE.get(type(value))
         if literal_type is not None:
-            return literal_type.wrap(value)
+            return literal_type._wrap(value)
 
         if isinstance(value, (dict, frozendict)):
             kwargs: dict[str, Const | Var] = {}
@@ -157,17 +171,24 @@ def val(*positional, **nominal) -> Val:
             return struct(**kwargs)
 
         if isinstance(value, (tuple, list)):
-            return struct(*[as_const(item, f"sequence[{i}]") for i, item in enumerate(value)])
+            return struct(
+                *[as_const(item, f"sequence[{i}]") for i, item in enumerate(value)]
+            )
 
         if isinstance(value, Builtin):
-            return value._type().wrap(value)
+            runtime_args = builtin_runtime_type_args(value)
+            typed_runtime_args = cast(tuple[type | Type, ...], runtime_args)
+            builtin_type = value._type(*typed_runtime_args) if runtime_args is not None else value._type()
+            return builtin_type._wrap(value)
 
-        raise ValueError(f"protomorph.val does not support value of type {type(value).__name__}")
+        raise ValueError(
+            f"protomorph.val does not support value of type {type(value).__name__}"
+        )
     except ValueError:
         raise
-    except Exception as exc:
-        typename = type(positional[0]).__name__ if positional else "<struct>"
-        raise ValueError(f"protomorph.val failed to convert {typename}") from exc
+    # except Exception as exc:
+    #     typename = type(positional[0]).__name__ if positional else "<struct>"
+    #     raise ValueError(f"protomorph.val failed to convert {typename}") from exc
 
 
 def type_of(value: Val) -> Const:
@@ -202,7 +223,7 @@ def encode(value: Val) -> Val:
         raise TypeError(
             f"protomorph.encode only supports Const/Err values, got {type(value).__name__}"
         )
-    return value.type.wrap(_encode(value.type, value.data))
+    return value.type._wrap(_encode(value.type, value.data))
 
 
 def decode(value: Val) -> Val:
@@ -210,7 +231,7 @@ def decode(value: Val) -> Val:
         raise TypeError(
             f"protomorph.decode only supports Const/Err values, got {type(value).__name__}"
         )
-    return value.type.wrap(_decode(value.type, value.data))
+    return value.type._wrap(_decode(value.type, value.data))
 
 
 def dir(value: Val) -> Struct[str, Type] | None:

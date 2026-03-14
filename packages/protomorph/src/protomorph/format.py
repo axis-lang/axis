@@ -72,7 +72,7 @@ def _format_const(value: morph.Const) -> str:
         discriminator, active_data = value.data
         if not isinstance(discriminator, morph.Type):
             return repr(active_data)
-        return format_morph(discriminator.wrap(active_data))
+        return format_morph(discriminator._wrap(active_data))
 
     attrs = value.attrs
     if isinstance(type, morph.StructType) and attrs is not None:

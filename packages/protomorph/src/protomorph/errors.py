@@ -10,7 +10,7 @@ __all__ = ["ErrType", "Err"]
 class ErrType(morph.Type):
     ANCHOR = "dom.Err.Type"
 
-    def wrap(self, data: morph.Data) -> morph.Val:
+    def _wrap(self, data: morph.Data) -> morph.Val:
         return Err(self, data)
 
 

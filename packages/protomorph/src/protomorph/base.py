@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, ClassVar, Iterable, Union
 
-from protobase import Inmutable, Consed, Missing, MissingType, frozendict
+from protobase import Inmutable, Consed, Missing, MissingType, frozendict, is_abstract
 
 import protomorph as morph
 
@@ -14,6 +14,9 @@ __all__ = [
     "Val",
     "Const",
 ]
+
+
+_PENDING_BUILTINS: list[type["Builtin"]] = []
 
 
 type Literal = Union[
@@ -38,6 +41,12 @@ class Builtin(Consed, abstract=True):
     ANCHOR: ClassVar[str]
 
     @classmethod
+    def __class_post_build__(cls) -> None:
+        if is_abstract(cls):
+            return
+        _PENDING_BUILTINS.append(cls)
+
+    @classmethod
     def _anchor_path(cls) -> str:
         anchor = cls.__dict__.get("ANCHOR", None)
         if isinstance(anchor, str):
@@ -45,12 +54,10 @@ class Builtin(Consed, abstract=True):
         return f"{cls.__module__}.{cls.__qualname__}"
 
     @classmethod
-    def _type(cls, *args: morph.Type) -> morph.Type:
-        if args:
-            raise TypeError(
-                f"{cls.__name__}._type does not accept host-specific type arguments in protomorph core"
-            )
-        return morph.nominal_type(cls._anchor_path())
+    def _type(cls, *args: type | morph.Type) -> morph.Type:
+        from .native import build_builtin_type
+
+        return build_builtin_type(cls, *args)
 
 
 class Val(Inmutable, abstract=True):
@@ -77,12 +84,14 @@ class Val(Inmutable, abstract=True):
         if not self.__type__.is_meta:
             raise TypeError(
                 f"{type(self).__name__}.wrap requires a type value, got {self.__type__!r}"
+                f" with data {self.__data__!r}"
             )
         if not isinstance(self.__data__, morph.Type):
             raise TypeError(
                 f"{type(self).__name__}.wrap requires a value that resolves to protomorph.Type"
+                f" as its type, got {self.__data__!r} of type {type(self.__data__)}"
             )
-        return self.__data__.wrap(data)
+        return self.__data__._wrap(data)
 
     @property
     def attrs(self) -> morph.Struct[str, Val] | None:

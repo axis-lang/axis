@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from . import api, refs
+from .native import _bootstrap_defaults
 from .types import register_meta_type_paths
 
 
@@ -23,16 +24,7 @@ def _bootstrap() -> None:
     api.SET_TYPE = api.nominal_type("std.Set")
     api.LIST_TYPE = api.nominal_type("std.List")
 
-    api.TYPE_BY_NATIVE.clear()
-    api.TYPE_BY_NATIVE.update(
-        {
-            bool: api.BOOLEAN_TYPE,
-            int: api.INTEGER_TYPE,
-            float: api.DECIMAL_TYPE,
-            str: api.TEXT_TYPE,
-            type(None): api.EMPTY_TYPE,
-        }
-    )
+    _bootstrap_defaults()
 
     register_meta_type_paths(
         "dom.Struct.Type",

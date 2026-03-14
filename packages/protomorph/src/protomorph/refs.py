@@ -165,23 +165,25 @@ class Spec(Ref):
 
     @property
     def anchor(self) -> Anchor:
-        return Anchor(_anchor_type_instance(), cast(AnchorSegments, self.data[0]))
+        return Anchor(_anchor_type_instance(), self.__data__[0])
 
     @property
     def segments(self) -> AnchorSegments:
-        return self.data[0]
+        return self.__data__[0]
 
     @property
     def args(self) -> morph.Struct[str | None, morph.Val] | None:
-        if self.data[1] is None or self.type.meta_args is None:
+        meta_args = self.__type__.meta_args
+
+        if self.__data__[1] is None or meta_args is None:
             return None
 
-        raw_args = cast(tuple[morph.Data, ...], self.data[1])
+        raw_args = cast(tuple[morph.Data, ...], self.__data__[1])
         values = tuple(
-            field_type.wrap(field_data)
-            for field_type, field_data in zip(self.type.meta_args.meta_attrs, raw_args)
+            field_type._wrap(field_data)
+            for field_type, field_data in zip(meta_args.meta_attrs, raw_args)
         )
-        return morph.Struct.from_keys(self.type.meta_args.meta_attrs.index.keys, values)
+        return morph.Struct.from_keys(meta_args.meta_attrs.index.keys, values)
 
     def _args_const(self) -> morph.Const | None:
         args = self.args

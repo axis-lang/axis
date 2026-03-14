@@ -11,11 +11,16 @@ def build_bound(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | N
 
     try:
         return bound_expr.to_bound(scope)
+    
     except syn.BoundLoweringError as exc:
+        
         return (
             log.error("Unsupported bound expression")
             .label(bound_expr, str(exc))
+            .show()
             .tag(pm.Err())
+            
+            
         )
 
 

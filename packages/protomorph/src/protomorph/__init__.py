@@ -9,6 +9,7 @@ from .refs import *
 from .vars import *
 from .bridge import *
 from .errors import *
+from .native import *
 from .bootstrap import _bootstrap
 
 _bootstrap()

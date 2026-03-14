@@ -41,17 +41,15 @@ def build_compound_bound(
     underlying_type = as_type_bound_val(underlying_val, underlying_expr)
     if isinstance(underlying_type, pm.Err):
         return underlying_type
+    
+    if isinstance(qualifier_ref, pm.Anchor):
+        return pm.val(pm.nominal_qual(qualifier_ref, underlying=underlying_type))
 
-    args = qualifier_ref._args_const() if isinstance(qualifier_ref, pm.Spec) else None
-    return pm.val(
-        pm.nominal_qual(
-            qualifier_ref.anchor if isinstance(qualifier_ref, pm.Spec) else qualifier_ref,
-            args,
-            underlying=underlying_type,
-        )
-    )
+    if isinstance(qualifier_ref, pm.Spec):
+        return pm.val(pm.NominalQualifier(spec_ref=qualifier_ref, underlying=underlying_type))
 
-
+    return unsupported_bound(None, f"unsupported qualifier type {type(qualifier_ref).__name__} in compound expression")
+    
 def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> pm.Const | None:
     from axis import expr as expr_module
 
