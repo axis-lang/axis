@@ -85,7 +85,7 @@ class Val(Inmutable, abstract=True):
         return self.__data__.wrap(data)
 
     @property
-    def attrs(self) -> morph.Struct[str | None, Val] | None:
+    def attrs(self) -> morph.Struct[str, Val] | None:
         fields = morph.dir(self)
         if fields is None:
             return None

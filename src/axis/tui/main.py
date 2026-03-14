@@ -6,9 +6,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import RichLog, Static, TabbedContent, TabPane, Tree
 
-from axis import items, src
+from axis import items, log, src
 from protobase import flux
-from axis.log.report import Report
 
 
 class MainView(App[None]):
@@ -97,10 +96,10 @@ class MainView(App[None]):
                 detail.update(f"entity: {anchor}")
 
     def show_reports(self, reports: Iterable[object]) -> None:
-        log = self.query_one("#reports-log", RichLog)
-        log.clear()
+        report_log = self.query_one("#reports-log", RichLog)
+        report_log.clear()
         for report in reports:
-            if not isinstance(report, Report):
+            if not isinstance(report, log.Report):
                 continue
-            log.write(report)
-            log.write("")
+            report_log.write(report)
+            report_log.write("")

@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import ClassVar, Literal, Optional
-from axis import syn
+
+import protomorph as pm
+
+from axis import log, syn
 
 
 class Sym(syn.Expr):
@@ -42,6 +45,14 @@ class Sym(syn.Expr):
     def build(cls, name: str, at: Literal["@"] | None = None, scope: Optional[str] = None):
         return cls(name=name, at=scope)
 
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+        return scope.lookup(self, origin=self)
+
+    def to_anchor(self, scope_ref: pm.Anchor | None) -> pm.Anchor:
+        if self.at is not None:
+            log.warn("Anchor cannot @-qualify a symbol").label(self).emit()
+        return pm.Anchor.from_root(self.name) if scope_ref is None else scope_ref.child(self.name)
+
 
 Sym.ROOT = Sym("@root")
 
@@ -76,12 +87,12 @@ def _sym_as_str(self: Sym) -> str:
     return self.name
 
 
-@syn.Reifier.impl(Sym)
-def reify_sym(self: syn.Reifier, sym: Sym):
-    if not sym.is_wildcard:
-        return self.reify_node(sym)
+# @syn.Reifier.impl(Sym)
+# def reify_sym(self: syn.Reifier, sym: Sym):
+#     if not sym.is_wildcard:
+#         return self.reify_node(sym)
 
-    return self.reify(self.value(sym.name))
+#     return self.reify(self.value(sym.name))
 
 
 # @val.Ref.Evaluator.eval.register(Sym)

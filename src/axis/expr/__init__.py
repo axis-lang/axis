@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, cast
 
-from axis import syn
-from axis.log import report as log
+from axis import log, syn
 from axis.literals import Wildcard
 
 from .apply import *

@@ -8,8 +8,7 @@ from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
 from rich.style import Style
 from rich.text import Text
 
-from axis import src
-from axis.log.report import Report
+from axis import log, src
 
 
 @dataclass(frozen=True)
@@ -70,7 +69,7 @@ class ReportStyles:
     gutter: Style
     note: Style
     suggestion: Style
-    label_styles: dict[Report.LabelStyle, Style]
+    label_styles: dict[log.Report.LabelStyle, Style]
     highlights: tuple[Style, ...]
 
     @staticmethod
@@ -86,8 +85,8 @@ class ReportStyles:
             note=Style(italic=True),
             suggestion=Style(underline=True),
             label_styles={
-                Report.LabelStyle.PRIMARY: Style(color="red", bold=True),
-                Report.LabelStyle.SECONDARY: Style(color="blue"),
+                log.Report.LabelStyle.PRIMARY: Style(color="red", bold=True),
+                log.Report.LabelStyle.SECONDARY: Style(color="blue"),
             },
             highlights=(
                 Style(color="magenta", bold=True),
@@ -110,8 +109,8 @@ class ReportStyles:
             note=base,
             suggestion=base,
             label_styles={
-                Report.LabelStyle.PRIMARY: base,
-                Report.LabelStyle.SECONDARY: base,
+                log.Report.LabelStyle.PRIMARY: base,
+                log.Report.LabelStyle.SECONDARY: base,
             },
             highlights=(base,),
         )
@@ -151,7 +150,7 @@ class ReportRenderOptions:
 
 @dataclass(frozen=True)
 class LabelInfo:
-    label: Report.Label
+    label: log.Report.Label
     start_line: int
     end_line: int
     start_col: int
@@ -178,7 +177,7 @@ class ReportRenderer:
     ) -> "ReportRenderer":
         return cls(theme or _default_theme(console), options)
 
-    def render(self, report: Report) -> list[RenderableType]:
+    def render(self, report: log.Report) -> list[RenderableType]:
         renderables: list[RenderableType] = []
 
         header = self._render_header(report)
@@ -202,7 +201,7 @@ class ReportRenderer:
 
         return renderables
 
-    def _render_header(self, report: Report) -> Text | None:
+    def _render_header(self, report: log.Report) -> Text | None:
         severity = report.severity
         severity_style = self._severity_style(severity)
         icon = self._severity_icon(severity)
@@ -215,9 +214,9 @@ class ReportRenderer:
         return label
 
     def _group_labels(
-        self, labels: Iterable[Report.Label]
-    ) -> dict[src.Source, list[Report.Label]]:
-        grouped: dict[src.Source, list[Report.Label]] = {}
+        self, labels: Iterable[log.Report.Label]
+    ) -> dict[src.Source, list[log.Report.Label]]:
+        grouped: dict[src.Source, list[log.Report.Label]] = {}
         for label in labels:
             if label.source is None:
                 continue
@@ -225,7 +224,7 @@ class ReportRenderer:
         return grouped
 
     def _render_source_block(
-        self, source: src.Source, labels: list[Report.Label]
+        self, source: src.Source, labels: list[log.Report.Label]
     ) -> list[RenderableType]:
         renderables: list[RenderableType] = []
         infos = self._label_infos(source, labels)
@@ -299,7 +298,7 @@ class ReportRenderer:
         return renderables
 
     def _label_infos(
-        self, source: src.Source, labels: list[Report.Label]
+        self, source: src.Source, labels: list[log.Report.Label]
     ) -> list[LabelInfo]:
         infos: list[LabelInfo] = []
         highlight_styles = self.theme.styles.highlights
@@ -320,9 +319,9 @@ class ReportRenderer:
                 style = highlight_styles[index % len(highlight_styles)]
 
             priority = 0
-            if label_style == Report.LabelStyle.PRIMARY:
+            if label_style == log.Report.LabelStyle.PRIMARY:
                 priority = 2
-            elif label_style == Report.LabelStyle.SECONDARY:
+            elif label_style == log.Report.LabelStyle.SECONDARY:
                 priority = 1
 
             infos.append(
@@ -494,23 +493,23 @@ class ReportRenderer:
                 return self.theme.characters.vbar
         return " "
 
-    def _severity_style(self, severity: Report.Severity) -> Style:
+    def _severity_style(self, severity: log.Report.Severity) -> Style:
         match severity:
-            case Report.Severity.ERROR:
+            case log.Report.Severity.ERROR:
                 return self.theme.styles.error
-            case Report.Severity.WARNING:
+            case log.Report.Severity.WARNING:
                 return self.theme.styles.warning
-            case Report.Severity.INFO:
+            case log.Report.Severity.INFO:
                 return self.theme.styles.info
         return self.theme.styles.header
 
-    def _severity_icon(self, severity: Report.Severity) -> str:
+    def _severity_icon(self, severity: log.Report.Severity) -> str:
         match severity:
-            case Report.Severity.ERROR:
+            case log.Report.Severity.ERROR:
                 return self.theme.characters.error
-            case Report.Severity.WARNING:
+            case log.Report.Severity.WARNING:
                 return self.theme.characters.warning
-            case Report.Severity.INFO:
+            case log.Report.Severity.INFO:
                 return self.theme.characters.info
         return "!"
 
@@ -579,7 +578,7 @@ def _default_theme(console: Console) -> ReportTheme:
 
 
 def render_report(
-    report: Report, console: Console, options: ConsoleOptions
+    report: log.Report, console: Console, options: ConsoleOptions
 ) -> RenderResult:
     renderer = ReportRenderer.for_console(console)
     for renderable in renderer.render(report):

@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 from types import NotImplementedType
-from protobase import Consed, flux, _
+from protobase import flux, _
 from protobase.cached_property import slot_cached_property
 import protomorph as pm
 
-from axis import expr, syn, sem
-from axis.expr.ir import Scope
+from axis import syn, sem
+
+from .binding import Binding as IrBinding, BindingStruct as IrBindingStruct
+from .scope import Scope
+
+
+Binding = IrBinding
+BindingStruct = IrBindingStruct
 
 
 class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
-
-    class Binding(Consed, abstract=True):
-        key: syn.Expr = _
-        bound_expr: syn.Expr | None = None
-        default_expr: syn.Expr | None = None
+    Binding = IrBinding
+    BindingStruct = IrBindingStruct
 
     class Contribution(pm.ContextProto, abstract=True):
         anchor: pm.Anchor = _

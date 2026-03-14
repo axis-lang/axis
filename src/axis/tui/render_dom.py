@@ -10,8 +10,7 @@ from __future__ import annotations
 from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
 from rich.text import Text
 
-from axis import dom
-from axis.log.report import Report
+from axis import dom, log
 
 
 def _anchor_path(segments: tuple[str, ...]) -> str:
@@ -106,7 +105,7 @@ def _format_const(value: dom.Const) -> str:
 
 def format_dom(value: dom.Val) -> str:
     if isinstance(value, dom.Err):
-        report = Report.of(value)
+        report = log.Report.of(value)
         return f"Err({report.message})" if report is not None else "Err"
     if isinstance(value, dom.Var):
         return f"${value.data}"
@@ -121,7 +120,7 @@ def format_dom(value: dom.Val) -> str:
 
 def render_dom(value: dom.Val) -> RenderableType:
     if isinstance(value, dom.Err):
-        report = Report.of(value)
+        report = log.Report.of(value)
         if report is not None:
             return report
     return Text(format_dom(value))

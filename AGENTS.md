@@ -66,6 +66,9 @@ Imports
 - Separate groups with a blank line
 - Prefer explicit imports; wildcard only in `__init__.py` for re-exports
 - Keep relative imports within axis package where possible
+- For Axis internals, prefer top-level package imports and namespace access
+  (`from axis import log` -> `log.Report`, `log.error(...)`) over deep imports
+  like `from axis.log.report import Report`
 
 Formatting
 - Use 4-space indentation

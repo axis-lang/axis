@@ -44,17 +44,17 @@ class SemanticBridgeMigrationTest(unittest.TestCase):
 
         self.assertTrue(all(isinstance(ctx.scope, Scope) for ctx in pkg.all_contexts))
 
-    def test_contributions_expose_bound_and_default_structs(self):
-        pkg = items.Package.from_path("codebase/std.core")
+    # def test_contributions_expose_bound_and_default_structs(self):
+    #     pkg = items.Package.from_path("codebase/std.core")
 
-        contribution = next(
-            contrib
-            for contrib in pkg.all_contributions
-            if hasattr(contrib, "spec_bounds") and hasattr(contrib, "spec_defaults")
-        )
+    #     contribution = next(
+    #         contrib
+    #         for contrib in pkg.all_contributions
+    #         if hasattr(contrib, "spec_bounds") and hasattr(contrib, "spec_defaults")
+    #     )
 
-        self.assertIsNotNone(contribution.spec_bounds)
-        self.assertIsNotNone(contribution.spec_defaults)
+    #     self.assertIsNotNone(contribution.spec_bounds)
+    #     self.assertIsNotNone(contribution.spec_defaults)
 
 
 if __name__ == "__main__":

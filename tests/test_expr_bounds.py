@@ -2,7 +2,7 @@ import unittest
 
 import protomorph as pm
 
-from axis import expr, items, syn
+from axis import expr, items, log, syn
 from axis.expr.ir import Scope
 from axis.expr.ir.bound import build_bound, build_default
 
@@ -96,6 +96,13 @@ class ExprBoundsTest(unittest.TestCase):
         )
 
         self.assertIsInstance(bound, pm.Err)
+
+    def test_unsupported_anchor_expression_throws_structured_report(self):
+        with self.assertRaises(log.Report.Exception):
+            expr.Index(
+                origin=expr.Sym(name="Text"),
+                indices=expr.Sym(name="Natural"),
+            ).to_anchor(None)
 
     def test_default_construction_matches_bound_rules(self):
         self.assertEqual(build_default(expr.Lit(value=7), self.std_scope), pm.literal(7))

@@ -89,7 +89,7 @@ class TestDomNavigation(unittest.TestCase):
 
     def test_attrs_expose_struct_children_as_values(self):
         value = dom.val({"x": 1, "y": "hi"})
-        attrs = cast(dom.Struct[str | None, dom.Val], value.attrs)
+        attrs = cast(dom.Struct[str, dom.Val], value.attrs)
 
         self.assertIsNotNone(attrs)
         self.assertTrue(value.has_attrs)
@@ -237,7 +237,7 @@ class TestDomQualifierSemantics(unittest.TestCase):
 class TestDomReferences(unittest.TestCase):
     def test_spec_args_expose_specialization_as_values(self):
         spec = dom.spec_ref("std.Map", dom.struct(K=cast(dom.Const, dom.val(dom.TEXT_TYPE))))
-        args = cast(dom.Struct[str | None, dom.Val], spec.args)
+        args = cast(dom.Struct[str, dom.Val], spec.args)
 
         self.assertIsNotNone(args)
         self.assertEqual(args.index.keys, ("K",))

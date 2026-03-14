@@ -1,5 +1,10 @@
 from typing import Self
+
+import protomorph as pm
+
 from axis import syn
+
+from .bound_support import build_compound_bound
 
 
 class Compound(syn.Expr):
@@ -13,3 +18,6 @@ class Compound(syn.Expr):
 
     def __str__(self):
         return " ".join(str(c) for c in self.components)
+
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+        return build_compound_bound(self.components, scope)

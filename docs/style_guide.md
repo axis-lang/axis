@@ -147,5 +147,11 @@ Referencias: `src/axis/items/item.py`, `src/axis/items/global_.py`.
   despues de defaults.
 - Prefiere `type | None` sobre `Optional[type]` en runtime.
 - Orden de imports: stdlib, terceros, locales (separados por linea en blanco).
+- Para modulos internos de Axis, prefiere importar el modulo toplevel del
+  paquete y acceder a sus tipos/constructores por namespace. Ejemplos:
+  - `from axis import log` y luego `log.Report`, `log.error(...)`
+  - `from axis import syn` y luego `syn.Expr`, `syn.OutlineChildren`
+  - evita imports profundos como `from axis.log.report import Report`, salvo en
+    compatibilidad o cuando un modulo externo lo requiera explicitamente
 
 Referencias: `packages/protobase/docs/core.md`, `pyproject.toml`.

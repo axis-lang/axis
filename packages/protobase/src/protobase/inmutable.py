@@ -8,6 +8,7 @@ from types import GenericAlias, UnionType, GetSetDescriptorType, MemberDescripto
 from typing import (
     Any,
     ForwardRef,
+    Literal,
     Self,
     cast,
     dataclass_transform,
@@ -135,6 +136,11 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
             check_inmutable(arg, _seen_aliases)
         return
 
+    if get_origin(tp) is Literal:
+        for arg in get_args(tp):
+            _check_inmutable_literal_value(arg)
+        return
+
     if isinstance(tp, type):
         if not is_inmutable(tp):
             raise TypeError(f"Type '{tp}' is not a know inmutable.")
@@ -168,6 +174,26 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
         check_inmutable(arg, _seen_aliases)
 
     # raise TypeError(f"Can not determine inmutability for '{tp}' of type '{type(tp)}'")
+
+
+def _check_inmutable_literal_value(value: object) -> None:
+    if value in (Ellipsis,):
+        return
+
+    if isinstance(value, tuple):
+        for item in value:
+            _check_inmutable_literal_value(item)
+        return
+
+    if isinstance(value, frozenset):
+        for item in value:
+            _check_inmutable_literal_value(item)
+        return
+
+    if not is_inmutable(type(value)):
+        raise TypeError(
+            f"Literal value {value!r} of type '{type(value)}' is not a know inmutable."
+        )
 
 
 _FROZEN_SET_BLOCKLIST = (MemberDescriptorType, GetSetDescriptorType)

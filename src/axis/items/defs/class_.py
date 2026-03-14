@@ -26,23 +26,22 @@ class ClassDef(SymDef):
     spec: expr.Tuple | None = None
     args: expr.Tuple | None = None
 
+    def __invariant__(self):
+        if len(self.returns) > 0:
+            log.warn("ClassDef should not have returns").label(self.origin).emit()
+
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
         return frozenset(
             sem.Entity.OverloadContribution(
                 anchor=self.anchor,
-                spec_bindings=build_spec_bindings(self.spec, where),
-                param_bindings=build_param_bindings(self.args, takes),
-                origin=self.origin, #takes or where or returns,
-                ctx=self, # build scope here!
+                spec_bindings=expr.build_binding_struct(self.spec, where),
+                param_bindings=expr.build_binding_struct(self.args, takes),
+                origin=self.origin,
+                ctx=self,
             )
             for where, takes in product(
                 self.where or (None,),
                 self.takes or (None,),
-                #self.returns or (None,),
             )
         )
-    
-    def __invariant__(self):
-        if len(self.returns) > 0:
-            log.warn("ClassDef should not have returns").label(self.origin).emit()

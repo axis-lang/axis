@@ -3,12 +3,13 @@ from __future__ import annotations
 from protobase import Consed, flux, frozendict, _
 import protomorph as pm
 
-from axis import expr, syn, log
-from axis.expr.ir import build_bound, build_default
-from axis.expr.ir import Scope
+from axis import syn, log
 
 
+from .binding import Binding, BindingShape, BindingStruct
+from .bound import build_bound, build_default
 from .context import Context
+from .scope import Scope
 
 
 class Entity(Consed):
@@ -28,10 +29,7 @@ class Entity(Consed):
             pass
 
     class SpecContribution(Context.Contribution):
-        class SpecBinding(Context.Binding):
-            pass
-
-        spec_bindings: pm.Struct[str, SpecBinding] = _
+        spec_bindings: BindingStruct[Binding] = _
 
         @flux.property
         def spec_scope(self) -> Scope:
@@ -44,13 +42,15 @@ class Entity(Consed):
             builder = Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
             builder.define("Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin)
             for binding in self.spec_bindings:
-                name = expr.to_slot_name(binding.key)
+                name = binding.binder_name
+                if name is None:
+                    continue
                 var = pm.var(Entity.SpecVar, self, name)
                 builder.define(name, var, origin=binding.key)
             return builder.build()
 
         @flux.property
-        def spec_bounds(self) -> pm.Struct[str, pm.Val | None]:
+        def spec_bounds(self) -> BindingStruct[pm.Val | None]:
             """Build bound values for each specialization binding.
 
             Uses spec_scope so that SpecVars and enclosing context names
@@ -62,7 +62,7 @@ class Entity(Consed):
             )
 
         @flux.property
-        def spec_defaults(self) -> pm.Struct[str, pm.Val | None]:
+        def spec_defaults(self) -> BindingStruct[pm.Val | None]:
             scope = self.spec_scope
             return self.spec_bindings.map(
                 lambda binding: build_default(binding.default_expr, scope)
@@ -84,27 +84,21 @@ class Entity(Consed):
         @flux.property
         def overload_by_shape(
             self,
-        ) -> frozendict[pm.Struct.Shape, Entity.OverloadBucket]:
+        ) -> frozendict[BindingShape, Entity.OverloadBucket]:
             return _overload_by_shape_bucket(self.specs)
 
     class QualContribution(SpecContribution):
-        class UnderlyingBinding(Context.Binding):
-            pass
-
         underlying_expr: syn.Expr = _
 
 
     @flux.property
-    def spec_by_shape(self) -> frozendict[pm.Struct.Shape, SpecBucket]:
+    def spec_by_shape(self) -> frozendict[BindingShape, SpecBucket]:
         return _spec_by_shape_bucket(self.contributions)
 
 
 
     class OverloadContribution(SpecContribution):
-        class ParamBinding(Context.Binding):
-            pass
-
-        param_bindings: pm.Struct[str, ParamBinding] = _
+        param_bindings: BindingStruct[Binding] = _
 
         @flux.property
         def overload_scope(self) -> Scope:
@@ -112,13 +106,15 @@ class Entity(Consed):
             builder = Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
             builder.define("self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin)
             for binding in self.param_bindings:
-                name = expr.to_slot_name(binding.key)
+                name = binding.binder_name
+                if name is None:
+                    continue
                 var = pm.var(Entity.ParamVar, self, name)
                 builder.define(name, var, origin=binding.key)
             return builder.build()
 
         @flux.property
-        def param_bounds(self) -> pm.Struct[str, pm.Val | None]:
+        def param_bounds(self) -> BindingStruct[pm.Val | None]:
             """Build bound values for each parameter binding.
 
             Uses overload_scope so that SpecVars, ParamVars, and enclosing
@@ -130,7 +126,7 @@ class Entity(Consed):
             )
 
         @flux.property
-        def param_defaults(self) -> pm.Struct[str, pm.Val | None]:
+        def param_defaults(self) -> BindingStruct[pm.Val | None]:
             scope = self.overload_scope
             return self.param_bindings.map(
                 lambda binding: build_default(binding.default_expr, scope)
@@ -155,7 +151,7 @@ class Entity(Consed):
         #     return _impl_by_result_bucket(self.overloads)
 
     @flux.property
-    def overload_by_shape(self) -> frozendict[pm.Struct.Shape, OverloadBucket]:
+    def overload_by_shape(self) -> frozendict[BindingShape, OverloadBucket]:
         return _overload_by_shape_bucket(self.contributions)
 
     class ImplContribution(OverloadContribution):
@@ -177,8 +173,8 @@ class Entity(Consed):
         pass
 def _spec_by_shape_bucket(
     contributions: frozenset[Context.Contribution],
-) -> frozendict[pm.Struct.Shape, Entity.SpecBucket]:
-    specs: dict[pm.Struct.Shape, list[Entity.SpecContribution]] = {}
+) -> frozendict[BindingShape, Entity.SpecBucket]:
+    specs: dict[BindingShape, list[Entity.SpecContribution]] = {}
     for contrib in contributions:
         if isinstance(contrib, Entity.SpecContribution):
             specs.setdefault(contrib.spec_bindings.shape, []).append(contrib)
@@ -193,8 +189,8 @@ def _spec_by_shape_bucket(
 
 def _overload_by_shape_bucket(
     contributions: frozenset[Context.Contribution],
-) -> frozendict[pm.Struct.Shape, Entity.OverloadBucket]:
-    overloads: dict[pm.Struct.Shape, list[Entity.OverloadContribution]] = {}
+) -> frozendict[BindingShape, Entity.OverloadBucket]:
+    overloads: dict[BindingShape, list[Entity.OverloadContribution]] = {}
     for contrib in contributions:
         if isinstance(contrib, Entity.OverloadContribution):
             overloads.setdefault(contrib.param_bindings.shape, []).append(contrib)

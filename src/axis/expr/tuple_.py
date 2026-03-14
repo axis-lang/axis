@@ -1,8 +1,12 @@
 from typing import ClassVar, Literal, Optional, Self
 
+import protomorph as pm
+
 from protobase import slot_cached_property, frozendict
 
 from axis import syn, expr, log
+
+from .bound_support import build_tuple_bound
 
 
 class Tuple(syn.Expr):
@@ -130,6 +134,9 @@ class Tuple(syn.Expr):
 
     def __iter__(self):
         return iter(self.elements)
+
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+        return build_tuple_bound(self.elements, scope)
 
     @slot_cached_property
     def variadic_offsets(self) -> tuple[int, ...]:
@@ -333,23 +340,3 @@ def match_tuple(
         result = syn.MatchResult.unify(result, tail_result)
 
     return result
-
-
-@syn.Reifier.impl(Tuple)
-def reify_tuple(self: syn.Reifier, tup: Tuple) -> Tuple:
-    """
-    Reifies a Tuple expression, resolving any wildcards or named elements.
-    """
-    elements = []
-    for elem in tup.elements:
-        match elem:
-            case Tuple.Positional(
-                value=expr.Etc(rhs=expr.Sym(name=wildcard_name) as sym)
-            ) if sym.is_wildcard:
-                target = self.value(wildcard_name, Tuple)
-                elements.extend(target.elements)
-
-            case elem:
-                elements.append(self.reify(elem))
-
-    return tup.with_attr(elements=tuple(elements))

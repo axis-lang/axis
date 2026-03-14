@@ -60,25 +60,6 @@ class ExprMatchingTest(unittest.TestCase):
 
 
 
-class ExprReificationTest(unittest.TestCase):
-    # parser = Parser()
-
-    def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
-        if isinstance(expected, str):
-            expected = syn.Expr.from_str(expected)
-        self.assertEqual(expr, expected)
-
-    def test_reify(self):
-        match = syn.Matcher.from_str("$m.$n($a, ..$etc, $b)")
-        reify = syn.Reify.expr("$n.$m($b, ..$etc, $a)")
-
-        vals = match("foo.bar(1, 2, 3, 4, 5)")
-        #print(vals)
-
-
-        #print(reify(vals))
-
-
 class ProjectionMatchTest(unittest.TestCase):
     def assertEqualExpr(self, expr: syn.Expr, expected: syn.Expr | str):
         if isinstance(expected, str):

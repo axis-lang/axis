@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Self, Sequence
+from functools import cache
+from typing import Any, ClassVar, Optional, Self, Sequence, cast
 
-from protobase import Inmutable, Record, cached_property, frozendict
+from protobase import (
+    Inmutable,
+    Record,
+    cached_property,
+    classproperty,
+    frozendict,
+    is_abstract,
+)
 
 from axis import src
+
+from .parsing import Builder, FromStrNodeMixin
 
 
 EMPTY_LINE = re.compile(r"^\s*$", re.MULTILINE)
@@ -197,70 +207,185 @@ class OutlineSpec[T](Inmutable):
         return current_entry.as_tree()
 
 
-# if __name__ == "__main__":
-#     from rich import print
+class FromOutlineNodeMixin(FromStrNodeMixin, abstract=True):
+    type Children = tuple[EmbeddedOutlineNode, ...]
 
-#     class Elem(Inmutable):
-#         keyword: str
-#         keyword_sep: str = " \t"
+    outline_keyword: ClassVar[str]
+    outline_keyword_sep: ClassVar[str] = ": \t"
+    outline_children: ClassVar[dict[type[FromOutlineNodeMixin], Optional[bool]]]
 
-#     mod = Elem("mod")
-#     doc = Elem("---", "")
-#     def_ = Elem("def")
-#     val = Elem("val")
-#     where = Elem("where", ": \t")
+    # @classmethod
+    # def build(cls, *args, **kwargs) -> Self:
+    #     return cast(Any, super()).build(*args, **kwargs)
 
-#     outline = OutlineSpec.from_rules(
-#         OutlineSpec.Rule(
-#             mod,
-#             frozendict(
-#                 {
-#                     doc: OutlineSpec.Identation.OPT,
-#                     def_: OutlineSpec.Identation.SAME,
-#                     val: OutlineSpec.Identation.SAME,
-#                 }
-#             ),
-#         ),
-#         OutlineSpec.Rule(
-#             def_,
-#             frozendict(
-#                 {
-#                     doc: OutlineSpec.Identation.OPT,
-#                     where: OutlineSpec.Identation.SAME,
-#                 }
-#             ),
-#         ),
-#         OutlineSpec.Rule(
-#             where,
-#             frozendict(
-#                 {
-#                     val: OutlineSpec.Identation.NEST,
-#                 }
-#             ),
-#         ),
-#         OutlineSpec.Rule(val, frozendict({})),
-#         OutlineSpec.Rule(doc, frozendict({})),
-#     )
+    # @classmethod
+    # def from_str(cls, src_span: src.Source.Span | str, **kwargs) -> Self:
+    #     return cast(Any, super()).from_str(src_span, **kwargs)
 
-#     file = src.File.from_buffer(
-#         Path("test.txt"),
-#         """
-#         mod alpha
-#             -----
-#             alpha documentation
+    @classmethod
+    def __class_post_build__(cls):
+        super().__class_post_build__()
+        # super_post_build = getattr(cast(Any, super()), "__class_post_build__", None)
+        # if super_post_build is not None:
+        #     super_post_build()
+        if "outline_children" not in vars(cls):
+            cls.outline_children = {}
+        if is_abstract(cls):
+            return
 
-#         def foo
-#             ---
-#             foo documentation
-#         where:
-#             val alpha: Natural = 42
+        is_embedded = issubclass(cls, EmbeddedOutlineNode)
+        is_segregated = issubclass(cls, SegregatedOutlineNode)
+        if not (is_embedded or is_segregated):
+            return
 
-#         def bar
-#             ---
-#             bar documentation
-#         where:
-#             val beta: Natural = 42
-#         """,
-#     )
+        assert (
+            getattr(cls, "outline_keyword", None) is not None
+        ), f"{cls.__qualname__} must have an outline keyword"
 
-#     print(outline.parse_tree(mod, file))
+        assert is_embedded != is_segregated, (
+            f"{cls.__qualname__} must be either Embedded or Segregated"
+        )
+
+    @classmethod
+    def register_outline_children(
+        cls,
+        child_class: type[FromOutlineNodeMixin],
+        /,
+        must_be_indented: Optional[bool] = None,
+    ):
+        cls.outline_children[child_class] = must_be_indented
+        return child_class
+
+    @classproperty
+    @classmethod
+    @cache
+    def outline_spec(cls) -> OutlineSpec[type[FromOutlineNodeMixin]]:
+        rules: dict[type[FromOutlineNodeMixin], OutlineRule[type[FromOutlineNodeMixin]]] = {}
+
+        def process_cls(node_cls: type[FromOutlineNodeMixin]):
+            if node_cls in rules:
+                return
+
+            rule = OutlineRule.from_children(
+                tag=node_cls,
+                children=[
+                    OutlineRule.Child(
+                        tag=child_cls,
+                        identation=child_ident,
+                        keyword=child_cls.outline_keyword,
+                        keyword_sep=child_cls.outline_keyword_sep,
+                    )
+                    for base in reversed(node_cls.__mro__)
+                    if issubclass(base, FromOutlineNodeMixin)
+                    for child_cls, child_ident in base.outline_children.items()
+                ],
+            )
+
+            rules[node_cls] = rule
+
+            for child in rule.children.values():
+                process_cls(child.tag)
+
+        process_cls(cls)
+
+        return OutlineSpec(cls, frozendict(rules))
+
+    @classmethod
+    def parse_outline_tree(cls, file: src.Source) -> OutlineTree[type[FromOutlineNodeMixin]]:
+        return cls.outline_spec.parse_tree(file)
+
+    @classmethod
+    def from_outline(
+        cls,
+        tree: OutlineTree[type[FromOutlineNodeMixin]],
+        parent: Optional[SegregatedOutlineNode] = None,
+        **kwargs,
+    ) -> tuple[Self | None, tuple[SegregatedOutlineNode, ...]]:
+        assert issubclass(tree.tag, EmbeddedOutlineNode) != issubclass(
+            tree.tag, SegregatedOutlineNode
+        ), "Class must be either Embedded or Segregated"
+
+        segregated_nodes = []
+        embedded_children = []
+
+        for child_tree in tree.children:
+            if issubclass(child_tree.tag, EmbeddedOutlineNode):
+                child, segnodes = child_tree.tag.from_outline(child_tree, **kwargs)
+                if child is not None:
+                    embedded_children.append(child)
+                segregated_nodes.extend(segnodes)
+
+        try:
+            if issubclass(tree.tag, SegregatedOutlineNode):
+                self = cast(Any, tree.tag).from_str(
+                    tree.content,
+                    children=tuple(embedded_children),
+                    parent=parent,
+                    **kwargs,
+                )
+                parent = self
+            elif issubclass(tree.tag, EmbeddedOutlineNode):
+                self = cast(Any, tree.tag).from_str(
+                    tree.content,
+                    children=tuple(embedded_children),
+                    **kwargs,
+                )
+            else:
+                raise TypeError("Class must be either Embedded or Segregated")
+        except Builder.SyntaxError as e:
+            e.report.emit()
+            return None, ()
+
+        for child_tree in tree.children:
+            if issubclass(child_tree.tag, SegregatedOutlineNode):
+                child, segnodes = cast(Any, child_tree.tag).from_outline(
+                    child_tree,
+                    parent=parent,
+                    **kwargs,
+                )
+                if child is not None:
+                    segregated_nodes.append(child)
+                segregated_nodes.extend(segnodes)
+
+        assert isinstance(self, cls)
+        return self, tuple(segregated_nodes)
+
+
+class EmbeddedOutlineNode(FromOutlineNodeMixin, abstract=True):
+    @classmethod
+    def build(
+        cls,
+        *args,
+        children: FromOutlineNodeMixin.Children,
+        **kwargs,
+    ) -> Self:
+        return super().build(*args, children=children, **kwargs)
+
+
+class SegregatedOutlineNode[P: FromOutlineNodeMixin](FromOutlineNodeMixin, abstract=True):
+    parent: Optional[P] = None
+
+    @classmethod
+    def build(
+        cls,
+        *args,
+        parent: Optional[P],
+        children: FromOutlineNodeMixin.Children,
+        **kwargs,
+    ) -> Self:
+        return super().build(*args, parent=parent, children=children, **kwargs)
+
+    @classmethod
+    def from_src(
+        cls,
+        src_file: src.Source | str,
+        **kwargs,
+    ) -> tuple[Self | None, *tuple[SegregatedOutlineNode, ...]]:
+        if isinstance(src_file, str):
+            src_file = src.SourceBuffer.from_str(src_file)
+        tree = cls.parse_outline_tree(src_file)
+        self, more = cls.from_outline(tree, **kwargs)
+        return (self, *more)
+
+
+type OutlineChildren = tuple[EmbeddedOutlineNode, ...]

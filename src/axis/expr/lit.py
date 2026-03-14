@@ -1,10 +1,13 @@
 from decimal import Decimal
 from types import EllipsisType
 from typing import ClassVar, Self
+
 import protomorph as pm
 
 from axis.literals import WildcardType, Wildcard
 from axis import syn
+
+from .bound_support import literal_to_bound
 
 
 class Lit(syn.Expr):
@@ -23,6 +26,10 @@ class Lit(syn.Expr):
     @property
     def is_ellipsis(self) -> bool:
         return self.value is Ellipsis
+
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+        _ = scope
+        return literal_to_bound(self.value, self)
 
 
 #Special -> Wildcard, Ellipsis

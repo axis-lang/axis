@@ -6,7 +6,7 @@ import protomorph as pm
 from protobase import flux, _, slot_cached_property, frozendict
 
 from axis import expr, syn, sem, log
-from axis.expr.ir import Scope
+from axis.sem import Scope
 
 # from axis.sem import Entity, Scope
 
@@ -28,7 +28,7 @@ class Mod(Item):
         kw: Literal["mod", "unit"],
         path: syn.Expr,
         *,
-        children: syn.OutlineNode.Children,
+        children: syn.OutlineChildren,
         **kwargs,
     ):
         uses = tuple(child for child in children if isinstance(child, Use))
@@ -37,7 +37,7 @@ class Mod(Item):
     @slot_cached_property
     def anchor(self):
         anchor = self.parent.anchor if self.parent is not None else None
-        return expr.as_anchor(self.path, anchor)
+        return self.path.to_anchor(anchor)
 
     @flux.property
     def ref(self) -> pm.Anchor:

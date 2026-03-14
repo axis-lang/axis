@@ -1,92 +1,42 @@
 from __future__ import annotations
 
 from typing import ClassVar, Literal, Optional
+
 import protomorph as pm
 
-from protobase import flux, _, slot_cached_property
+from protobase import _, slot_cached_property
 
-
-from axis import expr, syn, sem, log
+from axis import expr, log, sem, syn
 
 from .. import blocks
 from ..item import Item
 
 
-def build_binding_struct[B: sem.Context.Binding](
+def build_binding_struct(
     inline_expr: expr.Tuple | None,
     block_expr: blocks.TupleBlock | None,
-    *,
-    binding_cls: type[B],
-) -> pm.Struct[str, B]:
+) -> sem.BindingStruct[sem.Binding]:
     """Build the binding struct described by inline and block tuple forms."""
-    if block_expr is None:
-        if inline_expr is not None:
-            log.error("Inline tuple ignored; block required").label(inline_expr).emit()
-        return pm.Struct.Empty
-
-    # if inline_expr is not None:
-    #     prefix, variadic = inline_expr.inline_prefix
-    #     if not variadic and len(block_expr.elements) != len(prefix):
-    #         log.error("Block must match inline prefix exactly").label(
-    #             block_expr
-    #         ).throw()
-    #     if variadic and len(block_expr.elements) < len(prefix):
-    #         log.error("Block shorter than inline prefix").label(block_expr).throw()
-    #     for index, prefix_elem in enumerate(prefix):
-    #         block_elem = block_expr.elements[index]
-    #         if prefix_elem.name != block_elem.name:
-    #             log.error("Inline prefix does not match block").label(
-    #                 block_elem
-    #             ).throw()
-
-    entries: list[tuple[str | None, B]] = []
-
-    for element in block_expr.elements:
-        match element:
-            case expr.Tuple.Nominal(key=key, bound=bound_expr, value=default_expr):
-                # if bound_expr is None:
-                #     log.error("Tuple element requires a bound").label(element).throw()
-                # assert bound_expr is not None
-                # sym = expr.to_sym(key)
-
-                var = binding_cls(
-                    key=key,
-                    bound_expr=bound_expr,
-                    default_expr=default_expr,
-                )
-                entries.append((expr.to_slot_name(key), var))
-            case _:
-                log.error("Unsupported tuple element in block").label(element).show()
-
-    return pm.Struct.from_iter(entries)
+    return expr.build_binding_struct(inline_expr, block_expr)
 
 
 def build_spec_bindings(
-    inline_expr: expr.Tuple | None, block_expr: Def.Where | None
-) -> pm.Struct[str, sem.Entity.SpecContribution.SpecBinding]:
+    inline_expr: expr.Tuple | None,
+    block_expr: Def.Where | None,
+) -> sem.BindingStruct[sem.Binding]:
     """Build the specialization binding struct from `where` clauses."""
-    block_tuple = block_expr if block_expr is not None else None
-    return build_binding_struct(
-        inline_expr,
-        block_tuple,
-        binding_cls=sem.Entity.SpecContribution.SpecBinding,
-    )
+    return build_binding_struct(inline_expr, block_expr)
 
 
 def build_param_bindings(
-    inline_expr: expr.Tuple | None, block_expr: Def.Takes | None
-) -> pm.Struct[str, sem.Entity.OverloadContribution.ParamBinding]:
+    inline_expr: expr.Tuple | None,
+    block_expr: Def.Takes | None,
+) -> sem.BindingStruct[sem.Binding]:
     """Build the parameter binding struct from `takes` clauses."""
-    block_tuple = block_expr if block_expr is not None else None
-    return build_binding_struct(
-        inline_expr,
-        block_tuple,
-        binding_cls=sem.Entity.OverloadContribution.ParamBinding,
-    )
+    return build_binding_struct(inline_expr, block_expr)
 
 
 class Def(Item, syn.ClassMatcher):
-
     class Members(syn.Block):
         outline_keyword: ClassVar = "members"
 
@@ -152,9 +102,7 @@ class Def(Item, syn.ClassMatcher):
         children: tuple[syn.Block, ...],
         **kwargs,
     ) -> Def:
-        assert (
-            kw == cls.outline_keyword
-        ), f"Expected keyword {cls.outline_keyword}, got {kw}"
+        assert kw == cls.outline_keyword, f"Expected keyword {cls.outline_keyword}, got {kw}"
 
         where: list[Def.Where] = []
         takes: list[Def.Takes] = []
@@ -227,7 +175,7 @@ class SymDef(Def, abstract=True):
 
     @slot_cached_property
     def anchor(self) -> pm.Anchor:
-        return expr.as_anchor(self.sym, self.parent.anchor if self.parent else None)
+        return self.sym.to_anchor(self.parent.anchor if self.parent else None)
 
     @slot_cached_property
     def name(self) -> str | None:

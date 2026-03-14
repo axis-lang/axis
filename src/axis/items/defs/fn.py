@@ -6,8 +6,7 @@ from itertools import product
 from protobase import flux, _
 import protomorph as pm
 
-from axis import expr, syn, sem
-from axis.log import report as log
+from axis import expr, log, sem, syn
 
 from .base import SymDef, build_param_bindings, build_spec_bindings
 

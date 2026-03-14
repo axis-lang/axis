@@ -5,11 +5,9 @@ from protobase import flux, slot_cached_property
 import protomorph as pm
 
 from axis import expr, syn
-from axis.expr.ir import Scope
-from axis.sem import Context
+from axis.sem import Context, Scope
 
 from .item import Item
-from .scopes import parent_scope
 
 
 
@@ -31,7 +29,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
             raise ValueError("Global requires a parent to build its anchor")
         if self.key is None:
             raise ValueError("Global requires a key to build its anchor")
-        anchor = expr.as_anchor(self.key, parent.anchor)
+        anchor = self.key.to_anchor(parent.anchor)
         if anchor is None:
             raise ValueError("Global requires a valid key to build its anchor")
         return anchor
@@ -47,7 +45,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
         # op2: Optional[str] = None,
         # e2: Optional[syn.Expr] = None,
         #*, 
-        children: syn.OutlineNode.Children,
+        children: syn.OutlineChildren,
         **kwargs
     ):
         assert kw == cls.outline_keyword, f'Expected keyword {cls.outline_keyword}, got {kw}'        
@@ -82,7 +80,7 @@ class Global(Item, syn.ClassMatcher, abstract=True): ## expr.Tuple.Nominal Value
     @flux.property
     def scope(self) -> Scope:
         scope_name = expr.name_of(self.key) if self.key is not None else None
-        builder = Scope.Builder(name=scope_name, parent=parent_scope(self))
+        builder = Scope.Builder(name=scope_name, parent=self.parent_scope)
         return builder.build()
 
 

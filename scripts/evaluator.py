@@ -1,13 +1,13 @@
 from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, cast
+
+from functools import singledispatchmethod
+
 from protobase import Inmutable, frozendict, mutate
-from axis import syn, expr, dom
-from axis.log import report as log
-from axis.log.report import Report
+from axis import dom, expr, log, syn
 from axis.literals import Wildcard, WildcardType, EllipsisType
 from axis.sem import Scope
-from functools import singledispatchmethod
 
 
 class Evaluator(Inmutable):
@@ -278,9 +278,9 @@ def _numeric_operand(
 
 
 def _raise_err(err: dom.Err, node: syn.Node | None = None) -> None:
-    report = Report.of(err)
+    report = log.Report.of(err)
     if report is not None:
-        raise Report.Exception(report).with_traceback(None)
+        raise log.Report.Exception(report).with_traceback(None)
     message = "Invalid error value"
     builder = log.error(message)
     if node is not None:

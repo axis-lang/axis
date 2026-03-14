@@ -1,5 +1,5 @@
 import unittest
-from typing import TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 from protobase.inmutable import check_inmutable, inmutable, is_inmutable, register_inmutable
 
@@ -40,3 +40,11 @@ class InmutableTest(unittest.TestCase):
     def test_check_inmutable_special_cases(self) -> None:
         check_inmutable("ForwardRef")
         check_inmutable(...)
+
+    def test_check_inmutable_literal(self) -> None:
+        check_inmutable(Literal["binding", 1, None, True])
+
+    def test_check_inmutable_literal_rejects_mutable_value(self) -> None:
+        literal_factory = Literal
+        with self.assertRaises(TypeError):
+            check_inmutable(cast(Any, literal_factory).__getitem__((object(),)))

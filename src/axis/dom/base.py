@@ -117,7 +117,7 @@ class Val(Inmutable, abstract=True):
         return target_type.wrap(data)
 
     @property
-    def attrs(self) -> "dom.Struct[str | None, Val] | None":
+    def attrs(self) -> "dom.Struct[str, Val] | None":
         fields = dom.dir(self)
         if fields is None:
             return None

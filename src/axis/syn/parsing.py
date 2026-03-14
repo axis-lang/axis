@@ -168,7 +168,7 @@ class Builder(Inmutable):
         return intern(token.text)
 
 
-class FromSrcMixin(Inmutable, abstract=True):
+class FromStrNodeMixin(Inmutable, abstract=True):
     grammar_context_infix: ClassVar[str] = ""
     grammar_context_name: ClassVar[str]
     grammar_parser_name: ClassVar[str]
@@ -177,7 +177,7 @@ class FromSrcMixin(Inmutable, abstract=True):
 
     @classmethod
     def __class_post_build__(cls):
-        # super().__class_post_build__()
+
         if is_abstract(cls):
             return
 
@@ -235,7 +235,7 @@ class FromSrcMixin(Inmutable, abstract=True):
 
         return self
 
-    def with_span_of(self, other: FromSrcMixin) -> Self:
+    def with_span_of(self, other: FromStrNodeMixin) -> Self:
         src.tag_span_from(other, self)
         return self
 
@@ -247,6 +247,9 @@ class FromSrcMixin(Inmutable, abstract=True):
     @property
     def span(self) -> src.Source.Span | None:
         return src.span_of(self)
+
+
+FromSrcMixin = FromStrNodeMixin
 
     # @property
     # def as_label(self, *args, **kwargs):

@@ -5,7 +5,7 @@ from protobase.cached_property import slot_cached_property
 import protomorph as pm
 
 from axis import expr, sem, syn
-from axis.expr.ir import Scope
+from axis.sem import Scope
 
 
 class Use(syn.Block, Inmutable):
@@ -35,7 +35,7 @@ class Use(syn.Block, Inmutable):
         def walk(value: syn.Node, current_anchor: pm.Anchor | None) -> None:
             match value:
                 case expr.Apply(function=function_expr, argument=argument_expr):
-                    anchor = expr.as_anchor(function_expr, current_anchor)
+                    anchor = function_expr.to_anchor(current_anchor)
                     walk(argument_expr, anchor)
                 case expr.Tuple(elements=elements):
                     for element in elements:
@@ -54,13 +54,13 @@ class Use(syn.Block, Inmutable):
                     alias_expr = elem_value or bound or key
                     alias = expr.to_sym(alias_expr)
                     scope = current_anchor if current_anchor is not None else None
-                    target_anchor = expr.as_anchor(key, scope)
+                    target_anchor = key.to_anchor(scope)
                     entries.append((alias, target_anchor))
                 case expr.Lit() as lit if lit.value is Ellipsis:
                     entries.append((lit, current_anchor))
                 case syn.Expr() as expr_node:
                     scope = current_anchor if current_anchor is not None else None
-                    target_anchor = expr.as_anchor(expr_node, scope)
+                    target_anchor = expr_node.to_anchor(scope)
                     alias = expr.to_sym(expr_node)
                     entries.append((alias, target_anchor))
                 case _:

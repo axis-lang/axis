@@ -7,7 +7,7 @@ run *ARGS:
     @poetry run python -m axis {{ARGS}}
 
 _test-root *ARGS:
-    @clear && printf '\e[3J'
+    # @clear && printf '\e[3J'
     @poetry run python -m unittest discover -s tests {{ARGS}}
 
 test *ARGS:
@@ -23,14 +23,14 @@ test-all *ARGS:
     @just _test-root {{ARGS}}
 
 watch *ARGS:
-    #@just tests
+    # @just tests
     watchexec -r -e py -- 'just test && just run {{ARGS}}'
 
 
 docs:
-    @clear && printf '\e[3J'
+    # @clear && printf '\e[3J'
     @poetry run sphinx-build docs dist/docs
-    #@poetry export --only docs > docs/requirements.txt
+    # @poetry export --only docs > docs/requirements.txt
 
 
 gen-parser: 
