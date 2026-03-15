@@ -15,6 +15,14 @@ def _format_attrs(attrs: morph.Struct[str | None, morph.Val]) -> str:
     return ", ".join(parts)
 
 
+def _format_named_attrs(attrs: morph.Struct[str, morph.Val]) -> str:
+    parts: list[str] = []
+    for key, value in zip(attrs.index.keys, attrs.values):
+        rendered = format_morph(value)
+        parts.append(rendered if key is None else f"{key}={rendered}")
+    return ", ".join(parts)
+
+
 def _format_type_attrs(type: morph.StructType) -> str:
     parts: list[str] = []
     for key, field_type in zip(type.meta_attrs.index.keys, type.meta_attrs.values):
@@ -41,7 +49,7 @@ def _format_type(type: morph.Type) -> str:
     if isinstance(type, morph.NominalQualifier):
         return f"{_format_spec(type.spec_ref)} {_format_type(type.underlying)}"
     if isinstance(type, morph.Var):
-        return f"${type.data}"
+        return f"${type.__data__}"
     if isinstance(type, morph.VarType):
         return "$?"
     if isinstance(type, morph.ErrType):
@@ -60,44 +68,44 @@ def _format_std_literal(kind: str, data: morph.Data) -> str:
 
 
 def _format_const(value: morph.Const) -> str:
-    type = value.type
+    type = value.__type__
 
-    if isinstance(value.data, morph.Type):
-        return _format_type(value.data)
+    if isinstance(value.__data__, morph.Type):
+        return _format_type(value.__data__)
 
     if isinstance(type, morph.NominalQualifier):
         return f"<{_format_type(type)} value>"
 
-    if isinstance(type, morph.UnionType) and isinstance(value.data, tuple):
-        discriminator, active_data = value.data
+    if isinstance(type, morph.UnionType) and isinstance(value.__data__, tuple):
+        discriminator, active_data = value.__data__
         if not isinstance(discriminator, morph.Type):
             return repr(active_data)
         return format_morph(discriminator._wrap(active_data))
 
     attrs = value.attrs
     if isinstance(type, morph.StructType) and attrs is not None:
-        return f"({_format_attrs(attrs)})"
+        return f"({_format_named_attrs(attrs)})"
 
     if isinstance(type, morph.VarType):
-        return f"${value.data}"
+        return f"${value.__data__}"
 
     if isinstance(type, morph.NominalType):
         anchor = tuple(type.spec_ref.path.split("."))
         if len(anchor) == 2 and anchor[0] == "std":
-            return _format_std_literal(anchor[1], value.data)
+            return _format_std_literal(anchor[1], value.__data__)
 
         if attrs is None:
             return _format_spec(type.spec_ref)
-        return f"{_format_spec(type.spec_ref)}({_format_attrs(attrs)})"
+        return f"{_format_spec(type.spec_ref)}({_format_named_attrs(attrs)})"
 
-    return f"Const(type={_format_type(type)}, data={value.data!r})"
+    return f"Const(type={_format_type(type)}, data={value.__data__!r})"
 
 
 def format_morph(value: morph.Val) -> str:
     if isinstance(value, morph.Err):
-        return "Err" if value.data is None else f"Err({value.data!r})"
+        return "Err" if value.__data__ is None else f"Err({value.__data__!r})"
     if isinstance(value, morph.Var):
-        return f"${value.data}"
+        return f"${value.__data__}"
     if isinstance(value, morph.Anchor):
         return _anchor_path(value.segments)
     if isinstance(value, morph.Spec):

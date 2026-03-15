@@ -75,7 +75,7 @@ class MainView(App[None]):
         for child in list(root.children):
             child.remove()
         entities = self._pkg.entities_by_anchor
-        for anchor in sorted(entities.keys(), key=lambda a: a.data):
+        for anchor in sorted(entities.keys(), key=lambda a: a.__data__):
             anchor_node = root.add(str(anchor), data=anchor)
             #anchor_node.add("Entity", data=("entity", anchor))
             anchor_node.add("Specs", data=("specs", anchor))

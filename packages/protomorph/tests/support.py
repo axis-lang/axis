@@ -35,6 +35,13 @@ class PairBox[K, V](morph.Builtin):
     right: V
 
 
+class FancyBox[T](morph.Builtin):
+    ANCHOR = "test.FancyBox"
+
+    pair: PairBox[T, int]
+    box: Box[T]
+
+
 class StrictThing(morph.Builtin):
     ANCHOR = "test.StrictThing"
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import ClassVar, cast
 
-from protobase import Missing, MissingType
-
 import protomorph as morph
 
 from .types import Data, Type
@@ -33,22 +31,45 @@ class NominalQualifier(Qualifier):
             U=cast(morph.Const, morph.val(self.underlying._metatype())),
         )
 
-    def _dir(self, data: Data | MissingType = Missing) -> morph.Struct[str, Type] | None:
-        _ = data
+    def layout(self) -> morph.Layout | None:
         bridge = morph.BRIDGE.get(morph.DEFAULT_BRIDGE)
-        fields = self.underlying._dir(Missing)
-        if fields is None:
-            return None
-        return fields.map(lambda field_type: bridge.lift(self, field_type))
+        return bridge.layout(self)
+
+    def decode(self, raw_data: Data) -> morph.Val:
+        resolved_layout = self.layout()
+        if not isinstance(resolved_layout, morph.StructLayout):
+            raise TypeError(f"{type(self).__name__}.decode is not available for opaque qualified types")
+        layout = resolved_layout
+
+        decoded = morph._decode_struct_data(layout.fields, raw_data)
+        if layout.builtin_cls is None:
+            return self._wrap(decoded)
+
+        attrs = {
+            key: value
+            for key, value in zip(layout.fields.index.keys, decoded)
+            if key is not None
+        }
+        return self._wrap(layout.builtin_cls(**attrs))
+
+    def construct(self, *args, **kwargs) -> morph.Val:
+        resolved_layout = self.layout()
+        if not isinstance(resolved_layout, morph.StructLayout):
+            raise TypeError(f"{type(self).__name__}.construct is not available for opaque qualified types")
+        layout = resolved_layout
+        raw = morph._normalize_struct_input(layout.fields, args, kwargs)
+        return self.decode(raw)
+
+    def serialize(self, data: Data, format: str | None = None) -> Data:
+        _ = format
+        resolved_layout = self.layout()
+        if not isinstance(resolved_layout, morph.StructLayout):
+            raise TypeError(f"{type(self).__name__}.encode is not available for opaque qualified types")
+        layout = resolved_layout
+        return morph._encode_struct_data(layout.fields, data)
 
     def _get(self, data: Data, key: str | int) -> morph.Val:
         _ = (data, key)
         raise NotImplementedError(
             "NominalQualifier._get remains undefined for value projection; use SemanticBridge.project for type-level semantics"
         )
-
-    def _encode(self, data: Data) -> Data:
-        raise NotImplementedError("NominalQualifier._encode is not implemented in protomorph core")
-
-    def _decode(self, raw_data: Data) -> Data:
-        raise NotImplementedError("NominalQualifier._decode is not implemented in protomorph core")

@@ -8,7 +8,6 @@ import protomorph as morph
 
 from . import refs
 from .base import Builtin, Const, Data, Literal, Val
-from .errors import Err
 from .native import builtin_runtime_type_args, type_from_python
 from .qualifiers import NominalQualifier
 from .refs import Anchor, Spec, SpecType
@@ -37,6 +36,27 @@ TYPE_BY_NATIVE: dict[type, Type] = {}
 LITERAL_TYPES = TYPE_BY_NATIVE
 
 
+def spec(*positional: type | Type | Const | Var, **nominal: type | Type | Const | Var) -> Const | None:
+    if not positional and not nominal:
+        return None
+
+    def as_spec_value(value: type | Type | Const | Var) -> Const | Var:
+        if isinstance(value, (Const, Var)):
+            return value
+        return cast(Const | Var, val(type_(value)))
+
+    return struct(
+        *[as_spec_value(item) for item in positional],
+        **{key: as_spec_value(item) for key, item in nominal.items()},
+    )
+
+
+def type_(annotation: type | Type) -> Type:
+    if isinstance(annotation, Type):
+        return annotation
+    return type_from_python(annotation)
+
+
 def anchor(path: str) -> Anchor:
     return Anchor(refs._anchor_type_instance(), tuple(path.split(".")))
 
@@ -46,11 +66,11 @@ def spec_ref(anchor_: str | Anchor, spec: Const | None = None) -> Spec:
         anchor_ = anchor(anchor_)
 
     if spec is not None:
-        assert isinstance(spec.type, StructType)
-        assert isinstance(spec.data, tuple)
+        assert isinstance(spec.__type__, StructType)
+        assert isinstance(spec.__data__, tuple)
         return Spec(
-            SpecType(meta_args=spec.type),
-            (anchor_.segments, spec.data),
+            SpecType(meta_args=spec.__type__),
+            (anchor_.segments, spec.__data__),
         )
 
     return Spec(
@@ -62,10 +82,20 @@ def spec_ref(anchor_: str | Anchor, spec: Const | None = None) -> Spec:
 def struct(*positional: Const | Var, **nominal: Const | Var) -> Const[StructType]:
     fields = Struct.new(*positional, **nominal)
     struct_type = StructType(
-        meta_attrs=fields.map(lambda x: x if isinstance(x, Var) else x.type),
+        meta_attrs=fields.map(lambda x: x if isinstance(x, Var) else x.__type__),
     )
     return cast(
-        Const[StructType], struct_type._wrap(fields.map(lambda x: x.data).values)
+        Const[StructType], struct_type._wrap(fields.map(lambda x: x.__data__).values)
+    )
+
+
+def struct_value(*positional: Const | Var, **nominal: Const | Var) -> Const[StructType]:
+    return struct(*positional, **nominal)
+
+
+def struct_type(*positional: type | Type, **nominal: type | Type) -> StructType:
+    return StructType(
+        meta_attrs=Struct.new(*[type_(item) for item in positional], **{key: type_(item) for key, item in nominal.items()})
     )
 
 
@@ -78,10 +108,14 @@ def literal(value: Literal | None) -> Const:
 
 def literal_struct(*positional: Literal, **nominal: Literal) -> Const[StructType]:
     fields = Struct.new(*positional, **nominal).map(literal)
-    struct_type = StructType(meta_attrs=fields.map(lambda x: x.type))
+    struct_type = StructType(meta_attrs=fields.map(lambda x: x.__type__))
     return cast(
-        Const[StructType], struct_type._wrap(fields.map(lambda x: x.data).values)
+        Const[StructType], struct_type._wrap(fields.map(lambda x: x.__data__).values)
     )
+
+
+def struct_literal(*positional: Literal, **nominal: Literal) -> Const[StructType]:
+    return literal_struct(*positional, **nominal)
 
 
 def union_type(*types: Type) -> UnionType:
@@ -96,12 +130,18 @@ def union_type(*types: Type) -> UnionType:
 
 def union(types: frozenset[Type], active: Const | Var) -> Const[UnionType]:
     active_union_type = union_type(*types)
-    discriminator = active if isinstance(active, Var) else active.type
+    discriminator = active if isinstance(active, Var) else active.__type__
     if discriminator not in active_union_type.types:
         raise TypeError(
             f"Active variant type {discriminator} is not in the union types"
         )
-    return cast(Const[UnionType], active_union_type._wrap((discriminator, active.data)))
+    return cast(Const[UnionType], active_union_type._wrap((discriminator, active.__data__)))
+
+
+def union_value(*types: type | Type, active: type | Type | Const | Var | Literal) -> Const[UnionType]:
+    union_types = frozenset(type_(item) for item in types)
+    active_value = active if isinstance(active, (Const, Var)) else cast(Const | Var, val(active))
+    return union(union_types, active_value)
 
 
 def nominal_type(anchor_: str | Anchor, args: Const | None = None) -> NominalType:
@@ -192,7 +232,7 @@ def val(*positional, **nominal) -> Val:
 
 
 def type_of(value: Val) -> Const:
-    return cast(Const, val(value.type))
+    return cast(Const, val(value.__type__))
 
 
 def native_type(type_: type[Literal] | None) -> Type:
@@ -203,40 +243,5 @@ def native_type(type_: type[Literal] | None) -> Type:
     return TYPE_BY_NATIVE[type_]
 
 
-def _encode(type_: Type, value) -> Data:
-    match value:
-        case Struct(values=values):
-            value = values
-        case Val(type=value_type, data=data):
-            value = _encode(value_type, data)
-        case Builtin():
-            pass
-    return type_._encode(value)
-
-
-def _decode(type_: Type, raw_data):
-    return type_._decode(raw_data)
-
-
-def encode(value: Val) -> Val:
-    if not isinstance(value, (Const, Err)):
-        raise TypeError(
-            f"protomorph.encode only supports Const/Err values, got {type(value).__name__}"
-        )
-    return value.type._wrap(_encode(value.type, value.data))
-
-
-def decode(value: Val) -> Val:
-    if not isinstance(value, (Const, Err)):
-        raise TypeError(
-            f"protomorph.decode only supports Const/Err values, got {type(value).__name__}"
-        )
-    return value.type._wrap(_decode(value.type, value.data))
-
-
-def dir(value: Val) -> Struct[str, Type] | None:
-    return value.type._dir(value.data)
-
-
-def get(value: Val, key: str | int) -> Val:
-    return value.type._get(value.data, key)
+def encode(value: Val, format: str | None = None) -> Data:
+    return value.encode(format)

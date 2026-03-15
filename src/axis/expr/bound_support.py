@@ -151,8 +151,8 @@ def as_type_bound_val(
 ) -> pm.Type | pm.Err:
     if isinstance(bound_val, pm.Type):
         return bound_val
-    if isinstance(bound_val, pm.Const) and isinstance(bound_val.data, pm.Type):
-        return cast(pm.Type, bound_val.data)
+    if isinstance(bound_val, pm.Const) and isinstance(bound_val.__data__, pm.Type):
+        return cast(pm.Type, bound_val.__data__)
     if isinstance(bound_val, pm.Anchor):
         return pm.nominal_type(bound_val)
     if isinstance(bound_val, pm.Spec):

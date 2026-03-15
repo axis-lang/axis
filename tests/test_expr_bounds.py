@@ -115,9 +115,9 @@ class ExprBoundsTest(unittest.TestCase):
         bound = build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope)
 
         assert isinstance(bound, pm.Const)
-        assert isinstance(bound.data, pm.NominalQualifier)
-        self.assertEqual(bound.data.spec_ref.path, "Optional")
-        self.assertEqual(repr(pm.val(bound.data.underlying)), "Text")
+        assert isinstance(bound.__data__, pm.NominalQualifier)
+        self.assertEqual(bound.__data__.spec_ref.path, "Optional")
+        self.assertEqual(repr(pm.val(bound.__data__.underlying)), "Text")
 
     # def test_compound_requires_qualifier_symbols_from_scope(self):
     #     self.assertIsInstance(
@@ -134,8 +134,8 @@ class ExprBoundsTest(unittest.TestCase):
         for source, path in patterns:
             value = build_bound(syn.Expr.from_str(source), self.bound_scope)
             assert isinstance(value, pm.Const)
-            assert isinstance(value.data, pm.NominalQualifier)
-            self.assertEqual(value.data.spec_ref.path, path)
+            assert isinstance(value.__data__, pm.NominalQualifier)
+            self.assertEqual(value.__data__.spec_ref.path, path)
 
     def test_nested_member_plus_index_builds_qualified_value(self):
         nested_scope = Scope.Builder(name="nested")
@@ -159,8 +159,8 @@ class ExprBoundsTest(unittest.TestCase):
         value = build_bound(syn.Expr.from_str("Struct.Index[Whole] Sym"), scope)
 
         assert isinstance(value, pm.Const)
-        assert isinstance(value.data, pm.NominalQualifier)
-        self.assertEqual(value.data.spec_ref.path, "Struct.Index")
+        assert isinstance(value.__data__, pm.NominalQualifier)
+        self.assertEqual(value.__data__.spec_ref.path, "Struct.Index")
 
 
 if __name__ == "__main__":

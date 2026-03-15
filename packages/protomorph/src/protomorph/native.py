@@ -7,7 +7,7 @@ from typing import Any, Callable, TypeVar, Union, cast, get_args, get_origin
 from protobase import Record, attr_info_of, frozendict, mutate
 
 from .base import Builtin, Const, Data, _PENDING_BUILTINS
-from .bridge import BRIDGE, DEFAULT_BRIDGE, SemanticBridgeBase
+from .bridge import AtomicLayout, BRIDGE, DEFAULT_BRIDGE, Layout, SemanticBridgeBase, StructLayout
 from .qualifiers import NominalQualifier
 from .refs import Anchor, Spec
 from .struct import Struct
@@ -56,6 +56,7 @@ class NativeRegistry:
         self.type_by_python: dict[object, Type] = {}
         self.python_transforms: dict[object, PythonTransform] = {}
         self.builtin_by_anchor: dict[Anchor, type[Builtin]] = {}
+        self.atomic_layout_by_anchor: dict[Anchor, AtomicLayout] = {}
         self._templates_by_builtin: dict[
             type[Builtin], tuple[Struct[str, Type], frozenset[Var]]
         ] = {}
@@ -75,6 +76,13 @@ class NativeRegistry:
         self.builtin_by_anchor[anchor] = builtin_cls
         self._templates_by_builtin.pop(builtin_cls, None)
         self._resolved_fields_by_spec.clear()
+
+    def register_atomic_layout(self, anchor: Anchor | str, layout: AtomicLayout) -> None:
+        from . import api
+
+        if isinstance(anchor, str):
+            anchor = api.anchor(anchor)
+        self.atomic_layout_by_anchor[anchor] = layout
 
     def drain_pending_builtins(self) -> None:
         pending = _PENDING_BUILTINS[self._drained_builtin_count :]
@@ -117,68 +125,55 @@ class NativeRegistry:
         self.drain_pending_builtins()
         return self.builtin_by_anchor.get(type_.spec_ref.anchor)
 
-    def fields(self, type_: NominalType) -> Struct[str, Type] | None:
+    def layout(self, type_: NominalType) -> Layout | None:
+        atomic_layout = self.atomic_layout_by_anchor.get(type_.spec_ref.anchor)
+        if atomic_layout is not None:
+            return atomic_layout
+
         builtin_cls = self.class_for(type_)
         if builtin_cls is None:
             return None
 
         template, vars = self.template_for(builtin_cls)
         if not vars:
-            return template
+            return StructLayout(fields=template, builtin_cls=builtin_cls)
 
         spec = type_.spec_ref
         cached = self._resolved_fields_by_spec.get(spec)
         if cached is not None:
-            return cached
+            return StructLayout(fields=cached, builtin_cls=builtin_cls)
 
         resolved = template.map(
             lambda field_type: self._substitute_type(field_type, spec, builtin_cls)
         )
         self._resolved_fields_by_spec[spec] = resolved
-        return resolved
+        return StructLayout(fields=resolved, builtin_cls=builtin_cls)
 
     def construct(self, type_: NominalType, args: tuple[Data, ...]) -> Data:
-        builtin_cls = self.class_for(type_)
+        resolved_layout = self.layout(type_)
+        if not isinstance(resolved_layout, StructLayout):
+            raise ValueError(f"No materializable layout for {type_!r}")
+        layout = resolved_layout
+        builtin_cls = layout.builtin_cls
         if builtin_cls is None:
-            raise ValueError(f"No registered builtin class for {type_!r}")
+            raise ValueError(f"No materializable layout for {type_!r}")
 
-        fields = self.fields(type_)
-        if fields is None:
-            if args:
-                raise ValueError(
-                    f"Cannot construct {builtin_cls.__name__}: expected no args, got {len(args)}"
-                )
-            try:
-                return cast(Data, builtin_cls())
-            except Exception as exc:
-                raise ValueError(
-                    f"Cannot construct {builtin_cls.__name__} without args"
-                ) from exc
-
-        if len(args) != len(fields):
+        if len(args) != len(layout.fields):
             raise ValueError(
-                f"Cannot construct {builtin_cls.__name__}: expected {len(fields)} args, got {len(args)}"
+                f"Cannot construct {builtin_cls.__name__}: expected {len(layout.fields)} args, got {len(args)}"
             )
 
-        attrs: dict[str, Data] = {}
-        for key, value in zip(fields.index.keys, args):
-            if key is None:
-                raise ValueError(
-                    f"Cannot construct {builtin_cls.__name__}: positional fields are unsupported"
-                )
-            attrs[key] = value
-
-        try:
-            return cast(Data, builtin_cls(**attrs))
-        except Exception as exc:
-            raise ValueError(
-                f"Cannot construct {builtin_cls.__name__} from {attrs!r}"
-            ) from exc
+        attrs = {
+            key: value
+            for key, value in zip(layout.fields.index.keys, args)
+            if key is not None
+        }
+        return cast(Data, builtin_cls(**attrs))
 
     def _matches_builtin_context(self, var: Var, builtin_cls: type[Builtin]) -> bool:
-        if not isinstance(var.type, NativeGenericVarType):
+        if not isinstance(var.__type__, NativeGenericVarType):
             return False
-        ctx = var.type.ctx
+        ctx = var.__type__.ctx
         return isinstance(ctx, BuiltinContext) and ctx.builtin_cls is builtin_cls
 
     def _resolve_var(self, var: Var, spec: Spec, builtin_cls: type[Builtin]) -> Type:
@@ -191,11 +186,11 @@ class NativeRegistry:
         if args is None:
             return api.ANY_TYPE
 
-        binding = args.get(cast(str, var.data), default=None)
+        binding = args.get(cast(str, var.__data__), default=None)
         if isinstance(binding, Var):
             return binding
-        if isinstance(binding, Const) and isinstance(binding.data, Type):
-            return cast(Type, binding.data)
+        if isinstance(binding, Const) and isinstance(binding.__data__, Type):
+            return cast(Type, binding.__data__)
         return api.ANY_TYPE
 
     def _substitute_value(
@@ -210,9 +205,9 @@ class NativeRegistry:
             substituted = self._substitute_type(value, spec, builtin_cls)
             return cast(Const | Var, api.val(substituted))
 
-        if isinstance(value, Const) and isinstance(value.data, Type):
-            substituted = self._substitute_type(cast(Type, value.data), spec, builtin_cls)
-            if substituted is value.data:
+        if isinstance(value, Const) and isinstance(value.__data__, Type):
+            substituted = self._substitute_type(cast(Type, value.__data__), spec, builtin_cls)
+            if substituted is value.__data__:
                 return value
             return cast(Const | Var, api.val(substituted))
 
@@ -283,13 +278,10 @@ class NativeRegistry:
 class NativeBackend(SemanticBridgeBase, Record):
     registry: NativeRegistry
 
-    def fields(self, type: Type) -> Struct[str, Type] | None:
+    def layout(self, type: Type) -> Layout | None:
         if isinstance(type, NominalType):
-            return self.registry.fields(type)
-        return None
-
-    def class_for(self, type: NominalType) -> type[Builtin] | None:
-        return self.registry.class_for(type)
+            return self.registry.layout(type)
+        return super().layout(type)
 
     def construct(self, type: NominalType, args: tuple[Data, ...]) -> Data:
         return self.registry.construct(type, args)
@@ -335,6 +327,15 @@ def register_builtin(
     registry: NativeRegistry | None = None,
 ) -> None:
     _active_registry(registry).register_builtin(builtin_cls)
+
+
+def register_atomic_layout(
+    anchor: Anchor | str,
+    layout: AtomicLayout,
+    *,
+    registry: NativeRegistry | None = None,
+) -> None:
+    _active_registry(registry).register_atomic_layout(anchor, layout)
 
 
 def drain_pending_builtins(*, registry: NativeRegistry | None = None) -> None:
@@ -538,6 +539,7 @@ def _bootstrap_defaults() -> None:
     registry.type_by_python.clear()
     registry.python_transforms.clear()
     registry._resolved_fields_by_spec.clear()
+    registry.atomic_layout_by_anchor.clear()
 
     api.TYPE_BY_NATIVE.clear()
     scalar_types = {
@@ -551,6 +553,26 @@ def _bootstrap_defaults() -> None:
     api.TYPE_BY_NATIVE.update(scalar_types)
     for native, type_ in scalar_types.items():
         registry.register_native_type(native, type_)
+
+    registry.register_atomic_layout("std.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
+    registry.register_atomic_layout("std.Boolean", AtomicLayout(valid_types=frozenset({bool})))
+    registry.register_atomic_layout(
+        "std.Natural",
+        AtomicLayout(valid_types=frozenset({int})),
+    )
+    registry.register_atomic_layout(
+        "std.Whole",
+        AtomicLayout(valid_types=frozenset({int})),
+    )
+    registry.register_atomic_layout(
+        "std.Integer",
+        AtomicLayout(valid_types=frozenset({int})),
+    )
+    registry.register_atomic_layout(
+        "std.Decimal",
+        AtomicLayout(valid_types=frozenset({int, float, Decimal})),
+    )
+    registry.register_atomic_layout("std.Text", AtomicLayout(valid_types=frozenset({str})))
 
     set_transform = lambda value_type: nominal_qual(
         "std.Set",

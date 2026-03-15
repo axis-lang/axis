@@ -4,6 +4,23 @@ This package uses a path-oriented test strategy.
 
 The goal is not only to assert outcomes, but to make the intended execution path obvious so future contributors can extend coverage deliberately and diagnose regressions quickly.
 
+## Runtime Model
+
+The current Protomorph runtime is organized around a small set of core ideas:
+
+- `type.construct(...)` is the Python-friendly entry point.
+- `type.decode(raw)` is the canonical typed deserializer.
+- `type.serialize(data)` is the low-level type serializer.
+- `value.encode()` is the public value serializer.
+- `type.layout()` describes the semantic shape of a type.
+
+Layout kinds:
+
+- `AtomicLayout(valid_types=...)` validates raw scalar-like host values.
+- `StructLayout(fields=..., builtin_cls=...)` describes structured values and optional host materialization.
+
+Tests should prefer these surfaces over older implementation details.
+
 ## Core Principles
 
 - Write tests by subsystem, not as one large smoke file.
@@ -17,14 +34,9 @@ The goal is not only to assert outcomes, but to make the intended execution path
 
 Group tests by runtime area so missing coverage is easy to spot:
 
-- `test_api_happy_paths.py`
-- `test_api_exception_paths.py`
-- `test_base_and_format.py`
-- `test_bridge_paths.py`
-- `test_refs_and_vars.py`
-- `test_struct_and_map_paths.py`
-- `test_types_and_qualifiers_paths.py`
-- `test_native_frontend_and_backend_paths.py`
+- `test_core_api.py`
+- `test_failure_paths.py`
+- `test_layout_and_native.py`
 
 Shared fixtures and helper classes live in `tests/support.py`.
 
@@ -42,9 +54,9 @@ Recommended pattern:
 
 Examples:
 
-- `test_val_route_accepts_struct_inputs_and_sequences`
-- `test_registry_construct_routes_cover_success_and_exceptional_paths`
-- `test_spec_type_exception_routes_reject_incompatible_meta_payloads`
+- `test_struct_and_struct_type_routes_cover_value_and_schema_construction`
+- `test_construct_route_rejects_opaque_types_and_layout_mismatches`
+- `test_native_registry_routes_cover_template_layout_and_construct`
 
 The name should answer: "what path is this test trying to force?"
 
@@ -56,7 +68,7 @@ For each API or module, add tests in this order:
 2. Alternative branches of the same route.
 3. Boundary cases.
 4. Exceptional or unsupported paths.
-5. Formatting and representation checks for debugging value.
+5. Encoding, layout, and representation checks that make debugging easier.
 
 This keeps the suite readable and makes it easier to see what still lacks coverage.
 
@@ -67,6 +79,10 @@ This keeps the suite readable and makes it easier to see what still lacks covera
 - For unordered results, assert sets instead of string order.
 - When validating a branch-specific behavior, keep assertions narrow so failures identify the branch clearly.
 - Prefer explicit `assertRaises` around the smallest possible call.
+- Prefer the type-centric API (`type.decode(...)`, `type.construct(...)`, `value.encode()`) over legacy global helpers.
+- Prefer `spec(...)`, `struct_type(...)`, and `union_value(...)` when expressing new API examples over hand-built structural constants.
+- When testing codecs, distinguish clearly between `type.serialize(data)` and `value.encode()`.
+- When testing shape-dependent behavior, assert the `Layout` kind explicitly before asserting fields or atomic contracts.
 
 ## Coverage Workflow
 
@@ -95,6 +111,7 @@ Use the report to choose the next tests intentionally:
 - Avoid broad integration tests when a direct unit route is available.
 - If a new test exposes surprising current behavior, keep the test and document whether it is intentional or provisional.
 - If a bug depends on a very specific construction, encode that construction directly in the test instead of hiding it behind helpers.
+- Exercise both canonical tuple decoding and Python-friendly construction when covering structural layouts.
 
 ## Fixture Policy
 

@@ -5,22 +5,39 @@ from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
 from weakref import WeakKeyDictionary
 
-from protobase import Object, Record, mutate
+from protobase import Consed, Object, Record, mutate
 
 import protomorph as morph
 
 __all__ = [
+    "Layout",
+    "AtomicLayout",
+    "StructLayout",
     "SemanticBridge",
     "SemanticBridgeBase",
     "StructuralBridge",
     "DEFAULT_BRIDGE",
     "BRIDGE",
+    "layout_of",
 ]
+
+
+class Layout(Consed, abstract=True):
+    pass
+
+
+class AtomicLayout(Layout):
+    valid_types: frozenset[type]
+
+
+class StructLayout(Layout):
+    fields: morph.Struct[str, morph.Type]
+    builtin_cls: type[morph.Builtin] | None = None
 
 
 @runtime_checkable
 class SemanticBridge(Protocol):
-    def fields(self, type: morph.Type) -> morph.Struct[str, morph.Type] | None: ...
+    def layout(self, type: morph.Type) -> Layout | None: ...
 
     def project(self, type: morph.Type, key: str | int) -> morph.Type: ...
 
@@ -36,8 +53,20 @@ class SemanticBridge(Protocol):
 
 
 class SemanticBridgeBase(Object, abstract=True):
-    def fields(self, type: morph.Type) -> morph.Struct[str, morph.Type] | None:
-        _ = type
+    def layout(self, type: morph.Type) -> Layout | None:
+        if isinstance(type, morph.NominalQualifier):
+            underlying_layout = type.underlying.layout()
+            if underlying_layout is None:
+                return None
+            if isinstance(underlying_layout, AtomicLayout):
+                return AtomicLayout(valid_types=underlying_layout.valid_types)
+            assert isinstance(underlying_layout, StructLayout)
+            return StructLayout(
+                fields=underlying_layout.fields.map(
+                    lambda field_type: self.lift(type, field_type)
+                ),
+                builtin_cls=underlying_layout.builtin_cls,
+            )
         return None
 
     def project(self, type: morph.Type, key: str | int) -> morph.Type:
@@ -83,10 +112,6 @@ class SemanticBridgeBase(Object, abstract=True):
 
 
 class StructuralBridge(SemanticBridgeBase, Record):
-    def fields(self, type: morph.Type) -> morph.Struct[str, morph.Type] | None:
-        _ = type
-        return None
-
     def project(self, type: morph.Type, key: str | int) -> morph.Type:
         return _project_type(self, type, key)
 
@@ -111,19 +136,10 @@ def _project_type(
     type: morph.Type,
     key: str | int,
 ) -> morph.Type:
-    if isinstance(type, morph.NominalQualifier):
-        return bridge.lift(type, bridge.project(type.underlying, key))
-
-    if isinstance(type, morph.StructType):
-        return _project_fields(type.meta_attrs, key)
-
-    if isinstance(type, morph.NominalType):
-        fields = bridge.fields(type)
-        if fields is None:
-            raise KeyError(f"No member {key!r} on opaque nominal type {type!r}")
-        return _project_fields(fields, key)
-
-    raise KeyError(f"No member {key!r} on type {type!r}")
+    layout = type.layout()
+    if not isinstance(layout, StructLayout):
+        raise KeyError(f"No member {key!r} on opaque type {type!r}")
+    return _project_fields(layout.fields, key)
 
 
 def _lift_qualifier(
@@ -159,3 +175,14 @@ BRIDGE: ContextVar[SemanticBridge] = ContextVar(
 _BRIDGE_TOKENS: WeakKeyDictionary[SemanticBridgeBase, list[Token[SemanticBridge]]] = (
     WeakKeyDictionary()
 )
+
+
+def layout_of(type: morph.Type) -> Layout | None:
+    bridge = BRIDGE.get(DEFAULT_BRIDGE)
+    layout = bridge.layout(type)
+    if layout is not None:
+        return layout
+
+    from .native import DEFAULT_NATIVE_REGISTRY
+
+    return DEFAULT_NATIVE_REGISTRY.layout(type) if isinstance(type, morph.NominalType) else None

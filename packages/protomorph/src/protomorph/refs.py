@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from protobase import _, Consed, Missing, MissingType
+from protobase import _, Consed
 
 import protomorph as morph
 
@@ -51,16 +51,12 @@ class Ref(morph.Val, Consed, abstract=True):
 class AnchorType(RefType):
     ANCHOR = "dom.Ref.Anchor"
 
-    def _decode(self, raw_data: Data) -> Data:
+    def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
             case tuple() as segments if all(isinstance(segment, str) for segment in segments):
                 return segments
             case _:
                 raise ValueError(f"Invalid raw data for AnchorType: {raw_data!r}")
-
-    def _dir(self, data: Data | MissingType = Missing) -> morph.Struct[str, Type] | None:
-        _ = data
-        return None
 
 
 class Anchor(Ref):
@@ -68,12 +64,12 @@ class Anchor(Ref):
     __data__: AnchorSegments = _
 
     def __str__(self) -> str:
-        return ".".join(self.data)
+        return ".".join(self.__data__)
 
     def __invariants__(self) -> None:
-        if not isinstance(self.data, tuple) or not all(isinstance(seg, str) for seg in self.data):
-            raise TypeError(f"Anchor.data must be a tuple of strings, got {self.data!r}")
-        if not self.data:
+        if not isinstance(self.__data__, tuple) or not all(isinstance(seg, str) for seg in self.__data__):
+            raise TypeError(f"Anchor.data must be a tuple of strings, got {self.__data__!r}")
+        if not self.__data__:
             raise ValueError("Anchor.data must have at least one segment")
 
     @classmethod
@@ -87,26 +83,26 @@ class Anchor(Ref):
     def child(self, name: str) -> Anchor:
         return self.__class__(
             _anchor_type_instance(),
-            cast(AnchorSegments, (*self.data, name)),
+            cast(AnchorSegments, (*self.__data__, name)),
         )
 
     @property
     def root(self) -> str:
-        return self.data[0]
+        return self.__data__[0]
 
     @property
     def name(self) -> str:
-        return self.data[-1]
+        return self.__data__[-1]
 
     @property
     def parent(self) -> Anchor | None:
-        if len(self.data) > 1:
-            return self.__class__(_anchor_type_instance(), self.data[:-1])
+        if len(self.__data__) > 1:
+            return self.__class__(_anchor_type_instance(), self.__data__[:-1])
         return None
 
     @property
     def segments(self) -> AnchorSegments:
-        return self.data
+        return self.__data__
 
     def specialize(self, spec: morph.Const | None) -> Spec:
         return morph.spec_ref(self, spec)
@@ -120,7 +116,8 @@ class SpecType(RefType):
     def _metaspec(self):
         return self.meta_args._metaspec() if self.meta_args is not None else None
 
-    def _encode(self, data):
+    def serialize(self, data, format: str | None = None):
+        _ = format
         match data:
             case (anchor_data, None):
                 return anchor_data, None
@@ -132,13 +129,13 @@ class SpecType(RefType):
                         f"Expected tuple data for SpecType args, got {type(spec_data)}"
                     )
                 encoded_spec = tuple(
-                    self.meta_args.meta_attrs[n]._encode(v) for n, v in enumerate(spec_data)
+                    self.meta_args.meta_attrs[n].serialize(v) for n, v in enumerate(spec_data)
                 )
                 return anchor_data, encoded_spec
             case _:
                 raise ValueError(f"Invalid data for SpecType: {data!r}")
 
-    def _decode(self, raw_data: Data) -> Data:
+    def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
             case (raw_anchor, None):
                 return raw_anchor, None
@@ -149,14 +146,15 @@ class SpecType(RefType):
                     )
                 if self.meta_args is None:
                     raise ValueError("Unexpected args data for SpecType with no meta_args")
-                spec = tuple(self.meta_args.meta_attrs[n]._decode(v) for n, v in enumerate(raw_spec))
+                spec = tuple(self.meta_args.meta_attrs[n].deserialize(v) for n, v in enumerate(raw_spec))
                 return raw_anchor, spec
             case _:
                 raise ValueError(f"Invalid raw data for SpecType: {raw_data!r}")
 
-    def _dir(self, data: Data | MissingType = Missing) -> morph.Struct[str, Type] | None:
-        _ = data
-        return self.meta_args.meta_attrs if self.meta_args is not None else None
+    def layout(self) -> morph.StructLayout | None:
+        if self.meta_args is None:
+            return None
+        return morph.StructLayout(fields=self.meta_args.meta_attrs)
 
 
 class Spec(Ref):

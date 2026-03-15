@@ -31,7 +31,7 @@ class Var(morph.Val, morph.Type, Consed):
     __data__: str = _
 
     def _metatype(self) -> VarType:
-        return cast(VarType, self.type)
+        return cast(VarType, self.__type__)
 
     def _wrap(self, data: morph.Data) -> morph.Val:
         if not isinstance(data, str):
@@ -43,6 +43,7 @@ class Var(morph.Val, morph.Type, Consed):
                 f"{type(self).__name__}.wrap expected variable name {self.__data__!r}, got {data!r}"
             )
         return self
+
 
 
 def var[C: ContextProto](var_type_cls: type[VarType[C]], ctx: C, name: str) -> Var:

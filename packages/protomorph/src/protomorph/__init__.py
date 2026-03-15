@@ -15,3 +15,4 @@ from .bootstrap import _bootstrap
 _bootstrap()
 
 from .api import *
+from .types import _normalize_struct_input, _decode_struct_data, _encode_struct_data

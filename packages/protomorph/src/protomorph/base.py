@@ -64,21 +64,13 @@ class Val(Inmutable, abstract=True):
     __type__: morph.Type
     __data__: Data
 
-    @property
-    def type(self) -> morph.Type:
-        return self.__type__
-
-    @property
-    def data(self) -> Data:
-        return self.__data__
-
     def __repr__(self) -> str:
         from .format import format_morph
 
         return format_morph(self)
 
     def __getitem__(self, keyname: str | int) -> Val:
-        return morph.get(self, keyname)
+        return self.__type__._get(self.__data__, keyname)
 
     def wrap(self, data: Data) -> Val:
         if not self.__type__.is_meta:
@@ -93,14 +85,18 @@ class Val(Inmutable, abstract=True):
             )
         return self.__data__._wrap(data)
 
+    def encode(self, format: str | None = None) -> Data:
+        return self.__type__.serialize(self.__data__, format)
+
     @property
     def attrs(self) -> morph.Struct[str, Val] | None:
-        fields = morph.dir(self)
+        layout = self.__type__.layout()
+        fields = layout.fields if isinstance(layout, morph.StructLayout) else None
         if fields is None:
             return None
 
         values = tuple(
-            morph.get(self, key if key is not None else i)
+            self.__type__._get(self.__data__, key if key is not None else i)
             for i, key in enumerate(fields.index.keys)
         )
         return morph.Struct.from_keys(fields.index.keys, values)
@@ -113,16 +109,30 @@ class Val(Inmutable, abstract=True):
         attrs = self.attrs
         return 0 if attrs is None else len(attrs)
 
-    def get(self, key: int | str, default: Val | MissingType = Missing) -> Val | MissingType:
+    def get(
+        self, key: int | str, default: Val | MissingType = Missing
+    ) -> Val | MissingType:
         try:
-            return morph.get(self, key)
+            return self.__type__._get(self.__data__, key)
         except KeyError:
             if default is Missing:
                 raise
             return default
 
     def dir(self) -> Iterable[str]:
-        return (morph.dir(self) or morph.Struct.Empty).index._keyed_indices.keys
+        layout = self.__type__.layout()
+        fields = morph.Struct.Empty
+        if isinstance(layout, morph.StructLayout):
+            fields = layout.fields
+        return fields.index._keyed_indices.keys
+
+    @property
+    def type(self) -> morph.Type:
+        return self.__type__
+
+    @property
+    def data(self) -> Data:
+        return self.__data__
 
 
 class Const[T: morph.Type = Any, D: Data = Any](Val, Consed):
