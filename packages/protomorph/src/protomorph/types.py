@@ -99,6 +99,14 @@ class StructType(Type):
 
     meta_attrs: morph.Struct[str, Type]
 
+    @property
+    def struct_shape(self) -> morph.Struct.Shape[str]:
+        return self.meta_attrs.shape
+
+    @property
+    def struct_index(self) -> morph.Struct.Index[str]:
+        return self.meta_attrs.index
+
     def _metaspec(self):
         return morph.struct(
             *self.meta_attrs.map(lambda meta_attr: morph.type_of(morph.val(meta_attr)))

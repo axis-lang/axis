@@ -7,17 +7,10 @@ import protomorph as pm
 
 from axis import syn, sem
 
-from .binding import Binding as IrBinding, BindingStruct as IrBindingStruct
 from .scope import Scope
 
 
-Binding = IrBinding
-BindingStruct = IrBindingStruct
-
-
-class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
-    Binding = IrBinding
-    BindingStruct = IrBindingStruct
+class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
 
     class Contribution(pm.ContextProto, abstract=True):
         anchor: pm.Anchor = _
@@ -52,7 +45,6 @@ class Context[P: 'Context'](syn.SegregatedItem[P], abstract=True):
         builder = Scope.Builder(name=self.name, parent=self.parent_scope)
         self._build_scope(builder)
         return builder.build()
-
 
     def _build_scope(self, scope_builder: Scope.Builder): ...
 

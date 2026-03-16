@@ -10,6 +10,7 @@ from .types import Type, Data
 
 __all__ = [
     "ANCHOR_TYPE_INSTANCE",
+    "Fact",
     "RefType",
     "Ref",
     "AnchorType",
@@ -183,6 +184,20 @@ class Spec(Ref):
         )
         return morph.Struct.from_keys(meta_args.meta_attrs.index.keys, values)
 
+    @property
+    def struct_shape(self) -> morph.Struct.Shape[str | None]:
+        args = self.args
+        if args is None:
+            return morph.Struct.Empty.shape
+        return args.shape
+
+    @property
+    def struct_index(self) -> morph.Struct.Index[str | None]:
+        args = self.args
+        if args is None:
+            return morph.Struct.Empty.index
+        return args.index
+
     def _args_const(self) -> morph.Const | None:
         args = self.args
         if args is None:
@@ -200,3 +215,6 @@ class Spec(Ref):
 
     def __invariants__(self) -> None:
         pass
+
+
+Fact = Spec

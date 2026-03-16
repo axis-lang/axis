@@ -19,7 +19,10 @@ def build_compound_bound(
 
     *head_components, underlying_expr = components
     if not head_components:
-        return underlying_expr.to_bound(scope)
+        value = underlying_expr.to_bound(scope)
+        if value is None:
+            return unsupported_bound(underlying_expr, "expression did not produce a bound")
+        return value
 
     qualifier_expr = (
         head_components[0]
@@ -28,6 +31,11 @@ def build_compound_bound(
     )
     qualifier_val = qualifier_expr.to_bound(scope)
     underlying_val = underlying_expr.to_bound(scope)
+
+    if qualifier_val is None:
+        return unsupported_bound(qualifier_expr, "qualifier expression did not produce a bound")
+    if underlying_val is None:
+        return unsupported_bound(underlying_expr, "underlying expression did not produce a bound")
 
     if isinstance(qualifier_val, pm.Err):
         return qualifier_val
@@ -119,6 +127,8 @@ def build_tuple_element_bound(
 def literal_to_bound(literal: object, origin: syn.Expr) -> pm.Val:
     if literal is Wildcard or literal is Ellipsis:
         return unsupported_bound(origin, f"unsupported literal {literal!r}")
+    if not isinstance(literal, (int, float, str, bool, type(None))):
+        return unsupported_bound(origin, f"unsupported literal type {type(literal).__name__}")
     return pm.literal(literal)
 
 
@@ -126,7 +136,7 @@ def as_const_or_var(value: pm.Val | None, origin: syn.Expr | None) -> pm.Const |
     if isinstance(value, (pm.Const, pm.Var)):
         return value
     if isinstance(value, (pm.Anchor, pm.Spec)):
-        return pm.val(value)
+        return cast(pm.Const | pm.Var, pm.val(value))
     raise unsupported_bound_exception(
         origin,
         f"tuple/spec element must build a Const or Var, got {val_type_name(value)}",
@@ -149,14 +159,9 @@ def as_type_bound_val(
     bound_val: pm.Val,
     origin: syn.Expr | None,
 ) -> pm.Type | pm.Err:
-    if isinstance(bound_val, pm.Type):
-        return bound_val
-    if isinstance(bound_val, pm.Const) and isinstance(bound_val.__data__, pm.Type):
-        return cast(pm.Type, bound_val.__data__)
-    if isinstance(bound_val, pm.Anchor):
-        return pm.nominal_type(bound_val)
-    if isinstance(bound_val, pm.Spec):
-        return pm.nominal_type(bound_val.anchor, bound_val._args_const())
+    bound_type = bound_val.as_type()
+    if bound_type is not None:
+        return bound_type
     return unsupported_bound(
         origin,
         f"expected a type-like bound, got {val_type_name(bound_val)}",

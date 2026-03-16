@@ -4,13 +4,14 @@ from decimal import Decimal
 from types import NoneType, UnionType as PEP604Union
 from typing import Any, Callable, TypeVar, Union, cast, get_args, get_origin
 
-from protobase import Record, attr_info_of, frozendict, mutate
+from protobase import Consed, Record, attr_info_of, frozendict, mutate
 
 from .base import Builtin, Const, Data, _PENDING_BUILTINS
-from .bridge import AtomicLayout, BRIDGE, DEFAULT_BRIDGE, Layout, SemanticBridgeBase, StructLayout
+from .bridge import AtomicLayout, Layout, SemanticBridgeBase, StructLayout
 from .qualifiers import NominalQualifier
 from .refs import Anchor, Spec
 from .struct import Struct
+from .subst import as_type, _subst_spec, _subst_type
 from .types import NominalType, StructType, Type, UnionType
 from .vars import ContextProto, Var, VarType
 
@@ -170,125 +171,84 @@ class NativeRegistry:
         }
         return cast(Data, builtin_cls(**attrs))
 
-    def _matches_builtin_context(self, var: Var, builtin_cls: type[Builtin]) -> bool:
-        if not isinstance(var.__type__, NativeGenericVarType):
-            return False
-        ctx = var.__type__.ctx
-        return isinstance(ctx, BuiltinContext) and ctx.builtin_cls is builtin_cls
-
     def _resolve_var(self, var: Var, spec: Spec, builtin_cls: type[Builtin]) -> Type:
-        from . import api
-
-        if not self._matches_builtin_context(var, builtin_cls):
+        if not isinstance(var.__type__, NativeGenericVarType):
+            return var
+        ctx = var.__type__.ctx
+        if not isinstance(ctx, BuiltinContext) or ctx.builtin_cls is not builtin_cls:
             return var
 
         args = spec.args
         if args is None:
-            return api.ANY_TYPE
+            return _any_type()
 
-        binding = args.get(cast(str, var.__data__), default=None)
-        if isinstance(binding, Var):
-            return binding
-        if isinstance(binding, Const) and isinstance(binding.__data__, Type):
-            return cast(Type, binding.__data__)
-        return api.ANY_TYPE
+        name = var.__data__
+        if not isinstance(name, str):
+            return _any_type()
 
-    def _substitute_value(
-        self,
-        value: Const | Var,
-        spec: Spec,
-        builtin_cls: type[Builtin],
-    ) -> Const | Var:
-        from . import api
-
-        if isinstance(value, Var):
-            substituted = self._substitute_type(value, spec, builtin_cls)
-            return cast(Const | Var, api.val(substituted))
-
-        if isinstance(value, Const) and isinstance(value.__data__, Type):
-            substituted = self._substitute_type(cast(Type, value.__data__), spec, builtin_cls)
-            if substituted is value.__data__:
-                return value
-            return cast(Const | Var, api.val(substituted))
-
-        return value
+        binding = args.get(name, default=None)
+        resolved = as_type(binding)
+        return resolved if resolved is not None else _any_type()
 
     def _substitute_spec(self, spec: Spec, builtin_cls: type[Builtin]) -> Spec:
         from . import api
-
-        args = spec.args
-        if args is None:
-            return spec
-
-        positional: list[Const | Var] = []
-        nominal: dict[str, Const | Var] = {}
-        changed = False
-        for key, value in zip(args.index.keys, args.values):
-            typed = cast(Const | Var, value)
-            substituted = self._substitute_value(typed, spec, builtin_cls)
-            if substituted is not typed:
-                changed = True
-            if key is None:
-                positional.append(substituted)
-            else:
-                nominal[key] = substituted
-
-        if not changed:
-            return spec
-
-        return api.spec_ref(spec.anchor, api.struct(*positional, **nominal))
+        return _subst_spec(spec, lambda var: api.val(self._resolve_var(var, spec, builtin_cls)))
 
     def _substitute_type(self, type_: Type, spec: Spec, builtin_cls: type[Builtin]) -> Type:
-        if isinstance(type_, Var):
-            return self._resolve_var(type_, spec, builtin_cls)
-
-        if isinstance(type_, NominalQualifier):
-            new_spec = self._substitute_spec(type_.spec_ref, builtin_cls)
-            new_underlying = self._substitute_type(type_.underlying, spec, builtin_cls)
-            if new_spec is type_.spec_ref and new_underlying is type_.underlying:
-                return type_
-            return mutate(type_, spec_ref=new_spec, underlying=new_underlying)
-
-        if isinstance(type_, NominalType):
-            new_spec = self._substitute_spec(type_.spec_ref, builtin_cls)
-            if new_spec is type_.spec_ref:
-                return type_
-            return mutate(type_, spec_ref=new_spec)
-
-        if isinstance(type_, StructType):
-            new_attrs = type_.meta_attrs.map(
-                lambda meta_attr: self._substitute_type(meta_attr, spec, builtin_cls)
-            )
-            if new_attrs is type_.meta_attrs:
-                return type_
-            return mutate(type_, meta_attrs=new_attrs)
-
-        if isinstance(type_, UnionType):
-            new_types = frozenset(
-                self._substitute_type(member, spec, builtin_cls)
-                for member in type_.types
-            )
-            if new_types == type_.types:
-                return type_
-            return UnionType(types=new_types)
-
-        return type_
+        from . import api
+        return _subst_type(type_, lambda var: api.val(self._resolve_var(var, spec, builtin_cls)))
 
 
-class NativeBackend(SemanticBridgeBase, Record):
-    registry: NativeRegistry
+DEFAULT_NATIVE_REGISTRY = NativeRegistry()
+
+
+class NativeBackend:
+    def __init__(self, *, registry: NativeRegistry | None = None):
+        self.registry = registry or DEFAULT_NATIVE_REGISTRY
 
     def layout(self, type: Type) -> Layout | None:
         if isinstance(type, NominalType):
             return self.registry.layout(type)
-        return super().layout(type)
+        from .bridge import StructuralBridge
+        bridge = StructuralBridge()
+        return bridge.layout(type)
+
+    def project(self, type: Type, key: str | int) -> Type:
+        from .bridge import StructuralBridge
+        bridge = StructuralBridge()
+        return bridge.project(type, key)
+
+    def lift(self, qualifier, result: Type) -> Type:
+        from .bridge import StructuralBridge
+        bridge = StructuralBridge()
+        return bridge.lift(qualifier, result)
+
+    def combine(
+        self,
+        left: Type,
+        right: Type,
+        *,
+        op: str | None = None,
+    ) -> Type:
+        from .bridge import StructuralBridge
+        bridge = StructuralBridge()
+        return bridge.combine(left, right, op=op)
 
     def construct(self, type: NominalType, args: tuple[Data, ...]) -> Data:
         return self.registry.construct(type, args)
 
+    # Support context manager protocol for testing
+    def __enter__(self):
+        from .bridge import BRIDGE, DEFAULT_BRIDGE
+        self._token = BRIDGE.set(self)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        from .bridge import BRIDGE
+        BRIDGE.reset(self._token)
 
-DEFAULT_NATIVE_REGISTRY = NativeRegistry()
-DEFAULT_NATIVE_BACKEND = NativeBackend(registry=DEFAULT_NATIVE_REGISTRY)
+
+DEFAULT_NATIVE_BACKEND = NativeBackend()
 
 _TYPE_BUILD_CTX = TypeBuildContext()
 
@@ -296,7 +256,9 @@ _TYPE_BUILD_CTX = TypeBuildContext()
 def _active_registry(registry: NativeRegistry | None = None) -> NativeRegistry:
     if registry is not None:
         return registry
-
+    
+    from .bridge import BRIDGE, DEFAULT_BRIDGE
+    
     bridge = BRIDGE.get(DEFAULT_BRIDGE)
     if isinstance(bridge, NativeBackend):
         return bridge.registry

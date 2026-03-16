@@ -38,9 +38,35 @@ class CoreApiTests(unittest.TestCase):
     def test_spec_and_union_value_routes_cover_new_public_api_aliases(self):
         boxed = morph.nominal_type("test.Box", morph.spec(T=str))
         value = morph.union_value(int, str, active="x")
+        fact = morph.Fact(boxed.spec_ref.__type__, boxed.spec_ref.__data__)
 
         self.assertEqual(repr(morph.val(boxed)), "test.Box[T=std.Text]")
         self.assertEqual(repr(value), "'x'")
+        self.assertEqual(fact, boxed.spec_ref)
+
+    def test_as_type_and_struct_shape_routes_cover_symbolic_term_views(self):
+        spec = morph.spec_ref("test.Box", morph.spec(T=str))
+        type_value = morph.val(morph.INTEGER_TYPE)
+        spec_args = spec.args
+        assert spec_args is not None
+
+        self.assertIs(type_value.data, morph.INTEGER_TYPE)
+        self.assertEqual(type_value.as_type(), morph.INTEGER_TYPE)
+        self.assertEqual(morph.anchor("std.Text").as_type(), morph.TEXT_TYPE)
+        self.assertEqual(spec.as_type(), morph.nominal_type("test.Box", morph.spec(T=str)))
+        self.assertIsNone(morph.literal(1).as_type())
+        self.assertEqual(spec.struct_shape, spec_args.shape)
+        self.assertEqual(morph.struct_type(name=str, value=int).struct_shape, morph.Struct.new(name=morph.TEXT_TYPE, value=morph.INTEGER_TYPE).shape)
+
+    def test_subst_route_substitutes_symbolic_values_through_specs(self):
+        ctx = DummyContext()
+        type_var = morph.var(DummyVarType, ctx, "T")
+        spec = morph.spec_ref("test.Box", morph.spec(T=type_var))
+
+        resolved = spec.subst(lambda var: morph.val(morph.TEXT_TYPE) if var == type_var else None)
+
+        self.assertEqual(resolved, morph.spec_ref("test.Box", morph.spec(T=str)))
+        self.assertEqual(resolved.as_type(), morph.nominal_type("test.Box", morph.spec(T=str)))
 
     def test_type_route_covers_type_projection_and_nominal_qualify(self):
         self.assertEqual(morph.type_(int), morph.INTEGER_TYPE)

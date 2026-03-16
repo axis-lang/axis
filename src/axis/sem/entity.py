@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from protobase import Consed, flux, frozendict, _
 import protomorph as pm
 
@@ -94,7 +96,11 @@ class Entity(Consed):
             return _overload_by_shape_bucket(self.specs)
 
     class QualContribution(SpecContribution):
-        underlying_expr: syn.Expr = _
+        underlying_bound_expr: syn.Expr = _
+
+        @flux.property
+        def underlying_bound(self) -> pm.Val | None:
+            return build_bound(self.underlying_bound_expr, self.spec_scope)
 
     @flux.property
     def spec_by_shape(self) -> frozendict[BindingShape, SpecBucket]:
@@ -138,6 +144,15 @@ class Entity(Consed):
             )
 
         @flux.method
+        def layout(self, args: pm.Struct[str, pm.Val]) -> pm.StructLayout | None:
+            keys = self.param_bindings.index.keys
+            field_types = tuple(
+                _param_bound_type(self, bound, args)
+                for bound in self.param_bounds.values
+            )
+            return pm.StructLayout(fields=pm.Struct.from_keys(keys, field_types))
+
+        @flux.method
         def check(self):
             # Trigger scope construction and bound creation for both levels
             self.overload_scope
@@ -160,10 +175,14 @@ class Entity(Consed):
         return _overload_by_shape_bucket(self.contributions)
 
     class ImplContribution(OverloadContribution):
-        returns: syn.Expr | None = _
+        result_bound_expr: syn.Expr | None = _
+
+        @flux.property
+        def result_bound(self) -> pm.Val | None:
+            return build_bound(self.result_bound_expr, self.overload_scope)
 
         def __invariant__(self):
-            if self.returns is None:
+            if self.result_bound_expr is None:
                 log.warn("ImplContribution without returns").label(self.origin).emit()
 
     class ImplBucket(Bucket):
@@ -181,32 +200,37 @@ class Entity(Consed):
 def _spec_by_shape_bucket(
     contributions: frozenset[Context.Contribution],
 ) -> frozendict[BindingShape, Entity.SpecBucket]:
-    specs: dict[BindingShape, list[Entity.SpecContribution]] = {}
-    for contrib in contributions:
-        if isinstance(contrib, Entity.SpecContribution):
-            specs.setdefault(contrib.spec_bindings.shape, []).append(contrib)
-
-    return frozendict(
-        (
-            (shape, Entity.SpecBucket(specs=frozenset(spec)))
-            for shape, spec in specs.items()
-        )
+    return _group_by_shape(
+        contributions,
+        Entity.SpecContribution,
+        lambda c: c.spec_bindings.shape,
+        lambda items: Entity.SpecBucket(specs=items),
     )
 
 
 def _overload_by_shape_bucket(
     contributions: frozenset[Context.Contribution],
 ) -> frozendict[BindingShape, Entity.OverloadBucket]:
-    overloads: dict[BindingShape, list[Entity.OverloadContribution]] = {}
-    for contrib in contributions:
-        if isinstance(contrib, Entity.OverloadContribution):
-            overloads.setdefault(contrib.param_bindings.shape, []).append(contrib)
+    return _group_by_shape(
+        contributions,
+        Entity.OverloadContribution,
+        lambda c: c.param_bindings.shape,
+        lambda items: Entity.OverloadBucket(overloads=items),
+    )
 
+
+def _group_by_shape[C, K, B](
+    contributions: frozenset[Context.Contribution],
+    contrib_type: type[C],
+    shape_key: Callable[[C], K],
+    make_bucket: Callable[[frozenset[C]], B],
+) -> frozendict[K, B]:
+    groups: dict[K, list[C]] = {}
+    for contrib in contributions:
+        if isinstance(contrib, contrib_type):
+            groups.setdefault(shape_key(contrib), []).append(contrib)
     return frozendict(
-        (
-            (shape, Entity.OverloadBucket(overloads=frozenset(overload)))
-            for shape, overload in overloads.items()
-        )
+        (key, make_bucket(frozenset(items))) for key, items in groups.items()
     )
 
 
@@ -217,7 +241,7 @@ def _impl_by_result_bucket(
     for contrib in contributions:
         if isinstance(contrib, Entity.ImplContribution):
             if contrib.param_bindings.index.is_empty:
-                impls.setdefault(contrib.returns, []).append(contrib)
+                impls.setdefault(contrib.result_bound_expr, []).append(contrib)
 
     return frozendict(
         (
@@ -225,3 +249,28 @@ def _impl_by_result_bucket(
             for returns, impl in impls.items()
         )
     )
+
+
+def _param_bound_type(
+    contrib: Entity.OverloadContribution,
+    bound: pm.Val | None,
+    args: pm.Struct[str, pm.Val],
+) -> pm.Type:
+    if bound is None:
+        return pm.ANY_TYPE
+
+    resolved = bound.subst(lambda var: _resolve_spec_var(contrib, var, args))
+    resolved_type = resolved.as_type()
+    return pm.ANY_TYPE if resolved_type is None else resolved_type
+
+
+def _resolve_spec_var(
+    contrib: Entity.OverloadContribution,
+    var: pm.Var,
+    args: pm.Struct[str, pm.Val],
+) -> pm.Val | None:
+    if not isinstance(var.__type__, Entity.SpecVar):
+        return None
+    if var.__type__.ctx is not contrib:
+        return None
+    return args.get(var.__data__, default=None)

@@ -37,7 +37,7 @@ class FnDef(SymDef):
                 spec_bindings=build_spec_bindings(self.spec, where),
                 param_bindings=build_param_bindings(self.args, takes),
                 origin=self.origin,  # takes or where or returns,
-                returns=merge_returns(self.ret, returns, self),
+                result_bound_expr=merge_returns(self.ret, returns, self),
                 ctx=self,  # build scope here!
             )
             for where, takes, returns in product(

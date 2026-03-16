@@ -25,7 +25,7 @@ class QualDef(SymDef):
                 sem.Entity.QualContribution(
                     anchor=self.anchor,
                     spec_bindings=build_spec_bindings(self.spec, where),
-                    underlying_expr=self.under,
+                    underlying_bound_expr=self.under,
                     origin=self.origin, #takes or where or returns,
                     ctx=self,
                 )
@@ -34,4 +34,3 @@ class QualDef(SymDef):
         except Exception:
             log.fatal("Failed to build QualContribution").label(self.origin).show()
             raise
-

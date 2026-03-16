@@ -5,7 +5,7 @@ from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
 from weakref import WeakKeyDictionary
 
-from protobase import Consed, Object, Record, mutate
+from protobase import Consed, Inmutable, mutate
 
 import protomorph as morph
 
@@ -52,7 +52,7 @@ class SemanticBridge(Protocol):
     ) -> morph.Type: ...
 
 
-class SemanticBridgeBase(Object, abstract=True):
+class SemanticBridgeBase(Inmutable, abstract=True):
     def layout(self, type: morph.Type) -> Layout | None:
         if isinstance(type, morph.NominalQualifier):
             underlying_layout = type.underlying.layout()
@@ -111,7 +111,7 @@ class SemanticBridgeBase(Object, abstract=True):
             BRIDGE.reset(token)
 
 
-class StructuralBridge(SemanticBridgeBase, Record):
+class StructuralBridge(SemanticBridgeBase, Consed):
     def project(self, type: morph.Type, key: str | int) -> morph.Type:
         return _project_type(self, type, key)
 

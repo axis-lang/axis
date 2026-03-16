@@ -8,17 +8,38 @@ semantic backend.
 
 ## Current Baseline
 
-- The repository already has the right scaffolding: `Realm`, `Context`,
-  `Entity`, lexical `Scope`, and bound/default lowering in `axis.expr.ir`.
-- `spec_scope`, `overload_scope`, `spec_bounds`, `param_bounds`,
-  `spec_defaults`, and `param_defaults` already exist.
-- What is still missing is validation: there is no semantic relation like
-  `satisfies(actual, bound)`, no specialization resolver, and no call resolver.
-- Declaration support is still incomplete: inline bindings are currently lost,
-  `QualDef` emits no contributions, `returns` remain mostly as raw syntax, and
-  `Type` is not yet a usable type-value in semantic scopes.
-- `just test` is the gate for all milestones and must be green before moving to
-  the next stage.
+- The repository already has the core scaffolding: `Realm`, `Context`,
+  `Entity`, lexical `Scope`, semantic bindings in `axis.sem`, and bound/default
+  lowering through `syn.Expr.to_bound(...)` and `sem.build_bound(...)`.
+- Inline and block binding forms now converge on one semantic binding model, and
+  `QualDef` already emits semantic contributions.
+- `packages/protomorph` has evolved significantly and now exposes a layout-based
+  semantic backend centered on:
+  - `Layout`
+  - `AtomicLayout`
+  - `StructLayout`
+  - `type.construct(...)`
+  - `type.decode(...)`
+  - `type.serialize(...)`
+  - `value.encode()`
+  - **NEW**: `Val.subst(env)` for symbolic term substitution
+  - **NEW**: `Val.as_type()` for type-like interpretation
+  - **NEW**: `Fact = Spec` alias for logical term model
+- `axis.sem` now aligns with Protomorph's layout-based model:
+  - `Realm.layout(nominal_type)` resolves entities and delegates to overload layouts
+  - `OverloadContribution.layout(args)` constructs preliminary layouts from param bounds
+  - Bound expressions use `bound.subst(env).as_type()` pattern
+- What is still missing is decision-making semantics in `axis.sem`: there is no
+  reusable semantic relation like `satisfies(actual, bound)`, no specialization
+  resolver, and no call resolver.
+- Declaration support is still incomplete even after the binding work:
+  - `returns` remain mostly as raw `syn.Expr`
+  - `underlying_expr` remains raw syntax
+  - contribution `check()` methods mostly force lowering instead of performing
+    declaration validation
+- `just test` remains the package-level gate and `just test-all` is the
+  repository-level integration gate; both must be green before moving to the
+  next stage.
 
 ## Design Rules
 
@@ -26,6 +47,8 @@ semantic backend.
   but it does not decide validity.
 - `axis.sem` owns validation, candidate selection, ambiguity handling, and
   diagnostics.
+- `axis.sem` should talk to `protomorph` using the current layout-centric model,
+  not older ad-hoc structural hooks.
 - Bound construction and bound satisfaction are separate concerns.
 - The first iteration uses strict compatibility, not subtyping.
 - `Realm` and `SemanticBridgeBase` should only grow when the semantic layer
@@ -57,6 +80,12 @@ Exit criteria:
 - The test suite reflects the intended declaration semantics, not stale
   behavior.
 
+Status:
+
+- Completed.
+- The repository baseline is green and declaration tests already reflect the
+  current binding intent.
+
 ## Milestone 1 - Declaration Integrity
 
 Target files: `src/axis/items/defs/base.py`, `src/axis/items/defs/qual.py`,
@@ -79,6 +108,60 @@ Exit criteria:
 - Inline and block binding forms produce the same semantic binding model.
 - Contributions expose bounds, defaults, and returns as semantic values with
   meaningful diagnostics.
+
+Status:
+
+- Partially completed.
+- Done:
+  - inline/block bindings converge on one semantic binding model
+  - `QualDef` emits semantic contributions
+  - qualifier-like definitions from `std.core` appear in the semantic graph
+- Still open:
+  - `Type` as an explicitly usable semantic type-value in scopes
+  - lowering `returns` and `underlying_expr` into semantic values
+  - turning contribution `check()` into real declaration validation
+
+## Milestone 1.5 - Semantic Bridge Alignment
+
+Target files: `packages/protomorph/src/protomorph/`, `src/axis/sem/realm.py`,
+`src/axis/sem/entity.py`, `src/axis/items/defs/fn.py`,
+`src/axis/items/defs/qual.py`, and focused tests.
+
+- Align `axis.sem` with the new Protomorph runtime model:
+  - `Layout`
+  - `AtomicLayout`
+  - `StructLayout`
+  - `type.construct(...)`
+  - `type.decode(...)`
+  - `type.serialize(...)`
+  - `value.encode()`
+- Replace remaining older structural assumptions in `axis.sem` with
+  `layout(...)`-based reasoning.
+- Decide what semantic entities in Axis should expose structural or atomic
+  layouts through `Realm`.
+- Lower declaration-level `returns` and qualifier `underlying_expr` into
+  semantic values that are meaningful to the Protomorph backend.
+- Re-evaluate whether Axis-specific contribution logic still belongs inside
+  `sem.Entity` or should move into `items`-owned contribution types.
+
+Exit criteria:
+
+- `Realm` participates coherently in the layout-based Protomorph model.
+- `NominalType` / `NominalQualifier` semantics used by Axis no longer rely on
+  stale bridge assumptions.
+- Return and underlying declarations are represented as semantic values instead
+  of raw syntax where needed by later validation.
+
+Status:
+
+- Completed.
+- Done:
+  - Added logical term model to Protomorph: `Val.subst(env)`, `Val.as_type()`, `Fact = Spec` alias
+  - Implemented `OverloadContribution.layout(args)` for preliminary layout construction
+  - Implemented `Realm.layout(nominal_type)` to resolve and delegate to overload layouts
+  - Updated bound expression processing to use `bound.subst(env).as_type()` pattern
+  - Aligned field naming: `underlying_bound_expr`/`underlying_bound`, `result_bound_expr`/`result_bound`
+  - All tests passing: 101 tests in `just test-all`
 
 ## Milestone 2 - Constraint Kernel
 
@@ -177,7 +260,8 @@ Exit criteria:
 
 1. Restore the green baseline under `just test`.
 2. Fix declaration integrity: inline bindings, `QualDef`, `Type`, and returns.
-3. Add the constraint kernel in `sem`.
-4. Implement specialization resolution.
-5. Implement call and overload resolution.
-6. Revisit result semantics and expand tests.
+3. Align `axis.sem` with the current Protomorph bridge and layout model.
+4. Add the constraint kernel in `sem`.
+5. Implement specialization resolution.
+6. Implement call and overload resolution.
+7. Revisit result semantics and expand tests.

@@ -1,7 +1,9 @@
 import unittest
 from typing import cast
 
-from axis import expr, items, log, sem
+import protomorph as pm
+
+from axis import expr, items, log, sem, syn
 from axis.items.defs.base import build_binding_struct
 
 
@@ -216,3 +218,50 @@ where:
                 inline_expr=inline_expr,
                 block_expr=None,
             )
+
+
+class ContributionBoundExprTest(unittest.TestCase):
+    def test_qual_contribution_exposes_underlying_bound_expr_and_bound(self):
+        pkg = items.Package.from_path("codebase/std.core")
+        contrib = next(
+            contrib
+            for contrib in pkg.all_contributions
+            if isinstance(contrib, sem.Entity.QualContribution)
+            and contrib.anchor.path == "std.Optional"
+        )
+
+        self.assertEqual(str(contrib.underlying_bound_expr), "T")
+        self.assertIsInstance(contrib.underlying_bound, pm.Var)
+
+    def test_array_qual_contribution_exposes_nontrivial_underlying_bound(self):
+        pkg = items.Package.from_path("codebase/std.core")
+        contrib = next(
+            contrib
+            for contrib in pkg.all_contributions
+            if isinstance(contrib, sem.Entity.QualContribution)
+            and contrib.anchor.path == "std.Array"
+            and str(contrib.underlying_bound_expr) == "dtype"
+        )
+
+        self.assertEqual(str(contrib.underlying_bound_expr), "dtype")
+        self.assertIsNotNone(contrib.underlying_bound)
+
+    def test_overload_layout_resolves_spec_vars_from_args(self):
+        node = parse_def(
+            """def Box[T](value)
+where:
+    val T: Type
+takes:
+    val value: T
+"""
+        )
+        assert isinstance(node, items.ClassDef)
+        contrib = next(iter(node.contributions))
+        assert isinstance(contrib, sem.Entity.OverloadContribution)
+
+        layout = contrib.layout(pm.Struct.new(T=pm.val(pm.nominal_type("std.Sym"))))
+
+        self.assertIsNotNone(layout)
+        assert isinstance(layout, pm.StructLayout)
+        self.assertEqual(tuple(layout.fields.index.keys), (None,))
+        self.assertEqual(layout.fields.values[0], pm.nominal_type("std.Sym"))

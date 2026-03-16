@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from collections.abc import Callable
 from typing import Any, ClassVar, Iterable, Union
 
 from protobase import Inmutable, Consed, Missing, MissingType, frozendict, is_abstract
@@ -87,6 +88,19 @@ class Val(Inmutable, abstract=True):
 
     def encode(self, format: str | None = None) -> Data:
         return self.__type__.serialize(self.__data__, format)
+
+    def as_type(self) -> morph.Type | None:
+        from .subst import as_type
+
+        return as_type(self)
+
+    def subst(
+        self,
+        env: Callable[[morph.Var], morph.Val | None],
+    ) -> Val:
+        from .subst import subst_val
+
+        return subst_val(self, env)
 
     @property
     def attrs(self) -> morph.Struct[str, Val] | None:

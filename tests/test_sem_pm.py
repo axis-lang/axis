@@ -44,6 +44,17 @@ class SemanticBridgeMigrationTest(unittest.TestCase):
 
         self.assertTrue(all(isinstance(ctx.scope, Scope) for ctx in pkg.all_contexts))
 
+    def test_realm_exposes_layout_contract_not_fields(self):
+        pkg = items.Package.from_path("codebase/std.core")
+
+        self.assertTrue(hasattr(pkg, "layout"))
+        self.assertFalse(hasattr(pkg, "fields"))
+
+    def test_realm_layout_returns_none_without_matching_nominal_overload(self):
+        pkg = items.Package.from_path("codebase/std.core")
+
+        self.assertIsNone(pkg.layout(pm.nominal_type("std.Struct", pm.spec(I=pm.nominal_type("std.Sym")))))
+
     # def test_contributions_expose_bound_and_default_structs(self):
     #     pkg = items.Package.from_path("codebase/std.core")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Iterable
+
 from protobase import Consed, flux, frozendict
 import protomorph as pm
 
@@ -68,9 +69,23 @@ class Realm(pm.SemanticBridgeBase, Consed):
 
         return self.entities_by_anchor[anchor]
 
-    def fields(self, type: pm.Type) -> pm.Struct[str, pm.Type] | None:
-        _ = type
-        return None
+    def layout(self, type: pm.Type) -> pm.Layout | None:
+        if not isinstance(type, pm.NominalType):
+            return super().layout(type)
+
+        entity = (
+            self.entities_by_anchor[type.spec_ref.anchor]
+            if type.spec_ref.anchor in self.entities_by_anchor
+            else None
+        )
+        if entity is None:
+            return super().layout(type)
+
+        overload = _resolve_nominal_overload(entity, type)
+        if overload is None:
+            return super().layout(type)
+
+        return overload.layout(_spec_args_for_overload(overload, type.spec_ref))
 
     def project(self, type: pm.Type, key: str | int) -> pm.Type:
         return super().project(type, key)
@@ -98,3 +113,40 @@ class Realm(pm.SemanticBridgeBase, Consed):
                 contribution.check()
             for entity in self.all_entities:
                 entity.check()
+
+
+def _resolve_nominal_overload(
+    entity: Entity,
+    type_: pm.NominalType,
+) -> Entity.OverloadContribution | None:
+    target_shape = type_.spec_ref.struct_shape
+    matches: list[Entity.OverloadContribution] = []
+    for binding_shape, bucket in entity.spec_by_shape.items():
+        struct_shape, open_tail = binding_shape
+        if open_tail:
+            continue
+        if struct_shape != target_shape:
+            continue
+        for contrib in bucket.specs:
+            if isinstance(contrib, Entity.OverloadContribution):
+                matches.append(contrib)
+
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _spec_args_for_overload(
+    overload: Entity.OverloadContribution,
+    spec_ref: pm.Spec,
+) -> pm.Struct[str, pm.Val]:
+    spec_args = spec_ref.args
+    if spec_args is None:
+        return pm.Struct.Empty
+
+    entries: list[tuple[str, pm.Val]] = []
+    for binding, value in zip(overload.spec_bindings.values, spec_args.values):
+        if binding.binder_name is None:
+            continue
+        entries.append((binding.binder_name, value))
+    return pm.Struct.from_iter(entries)

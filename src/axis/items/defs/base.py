@@ -8,6 +8,7 @@ from protobase import _, slot_cached_property
 
 from axis import expr, log, sem, syn
 
+
 from .. import blocks
 from ..item import Item
 
