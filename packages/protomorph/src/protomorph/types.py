@@ -4,13 +4,11 @@ from typing import Any, ClassVar, cast
 
 from protobase import frozendict
 
-import protomorph as morph
+import protomorph as pm
 
 from .base import Builtin, Data
 
 __all__ = [
-    "META_TYPE_PATHS",
-    "register_meta_type_paths",
     "Type",
     "StructType",
     "NominalType",
@@ -18,48 +16,35 @@ __all__ = [
 ]
 
 
-META_TYPE_PATHS: set[str] = set()
-
-
-def register_meta_type_paths(*paths: str) -> None:
-    META_TYPE_PATHS.update(paths)
-
-
 class Type(Builtin, abstract=True):
-    val_cls: ClassVar[type[morph.Val] | None] = None
+    val_cls: ClassVar[type[pm.Val] | None] = None
     ANCHOR: ClassVar[str]
 
-    @property
-    def is_meta(self) -> bool:
-        if isinstance(self, morph.NominalType):
-            return self.spec_ref.path in META_TYPE_PATHS
-        return False
-
     @classmethod
-    def _type(cls, *args: type | morph.Type) -> morph.Type:
+    def _type(cls, *args: type | pm.Type) -> pm.Type:
         if args:
             raise TypeError(
                 f"{cls.__name__}._type does not accept host-specific type arguments in protomorph core"
             )
-        return morph.nominal_type(cls._anchor_path())
+        return pm.nominal_type(cls._anchor_path())
 
-    def _metatype(self) -> morph.Type:
-        return morph.nominal_type(self._anchor_path(), self._metaspec())
+    def _metatype(self) -> pm.Type:
+        return pm.nominal_type(self._anchor_path(), self._metaspec())
 
-    def _wrap(self, data: Data) -> morph.Val:
-        val_cls = type(self).val_cls or morph.Const
+    def _wrap(self, data: Data) -> pm.Val:
+        val_cls = type(self).val_cls or pm.Const
         return val_cls(self, data)
 
-    def _metaspec(self) -> morph.Const | None:
+    def _metaspec(self) -> pm.Const:
+        return pm.EmptyStruct
+
+    def layout(self) -> pm.Layout | None:
         return None
 
-    def layout(self) -> morph.Layout | None:
-        return None
-
-    def decode(self, raw_data: Data) -> morph.Val:
+    def decode(self, raw_data: Data) -> pm.Val:
         return self._wrap(self.deserialize(raw_data))
 
-    def construct(self, *args, **kwargs) -> morph.Val:
+    def construct(self, *args, **kwargs) -> pm.Val:
         raise TypeError(f"{type(self).__name__}.construct is not available for opaque types")
 
     def serialize(self, data: Data, format: str | None = None) -> Data:
@@ -69,11 +54,11 @@ class Type(Builtin, abstract=True):
     def deserialize(self, raw_data: Data) -> Data:
         return raw_data
 
-    def _get(self, data: Data, key: str | int) -> morph.Val:
+    def _get(self, data: Data, key: str | int) -> pm.Val:
         layout = self.layout()
         if layout is None:
             raise KeyError(f"No member {key!r} on opaque type {type(self).__name__}")
-        if not isinstance(layout, morph.StructLayout):
+        if not isinstance(layout, pm.StructLayout):
             raise KeyError(f"No member {key!r} on non-struct type {type(self).__name__}")
         fields = layout.fields
 
@@ -95,22 +80,31 @@ class Type(Builtin, abstract=True):
 
 
 class StructType(Type):
-    ANCHOR: ClassVar[str] = "dom.Struct.Type"
+    ANCHOR: ClassVar[str] = "std.Struct.Type"
 
-    meta_attrs: morph.Struct[str, Type]
+    meta_attrs: pm.Struct[str, Type]
 
     @property
-    def struct_shape(self) -> morph.Struct.Shape[str]:
+    def struct_shape(self) -> pm.Struct.Shape[str]:
         return self.meta_attrs.shape
 
     @property
-    def struct_index(self) -> morph.Struct.Index[str]:
+    def struct_index(self) -> pm.Struct.Index[str]:
         return self.meta_attrs.index
 
-    def _metaspec(self):
-        return morph.struct(
-            *self.meta_attrs.map(lambda meta_attr: morph.type_of(morph.val(meta_attr)))
-        )
+    def _metaspec(self) -> pm.Const:
+        positional: list[pm.Const | pm.Var] = []
+        nominal: dict[str, pm.Const | pm.Var] = {}
+
+        schema_fields = self.meta_attrs.map(lambda meta_attr: pm.type_of(pm.val(meta_attr)))
+        for key, value in zip(schema_fields.index.keys, schema_fields.values):
+            typed = cast(pm.Const | pm.Var, value)
+            if key is None:
+                positional.append(typed)
+            else:
+                nominal[key] = typed
+
+        return pm.struct(*positional, **nominal)
 
     def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
@@ -128,13 +122,13 @@ class StructType(Type):
                     f"Expected tuple data for StructType, got {type(raw_data)}"
                 )
 
-    def layout(self) -> morph.StructLayout:
-        return morph.StructLayout(fields=self.meta_attrs)
+    def layout(self) -> pm.StructLayout:
+        return pm.StructLayout(fields=self.meta_attrs)
 
-    def decode(self, raw_data: Data) -> morph.Val:
+    def decode(self, raw_data: Data) -> pm.Val:
         return self._wrap(self.deserialize(raw_data))
 
-    def construct(self, *args, **kwargs) -> morph.Val:
+    def construct(self, *args, **kwargs) -> pm.Val:
         raw = _normalize_struct_input(self.meta_attrs, args, kwargs)
         return self.decode(raw)
 
@@ -144,26 +138,26 @@ class StructType(Type):
 
 
 class NominalType(Type):
-    ANCHOR: ClassVar[str] = "dom.Nominal.Type"
+    ANCHOR: ClassVar[str] = "std.Nominal.Type"
 
-    spec_ref: morph.Spec
+    spec_ref: pm.Spec
 
     def _metaspec(self):
-        return self.spec_ref._args_const()
+        return self.spec_ref.__type__._metaspec()
 
-    def layout(self) -> morph.Layout | None:
-        return morph.layout_of(self)
+    def layout(self) -> pm.Layout | None:
+        return pm.layout_of(self)
 
-    def qualify(self, underlying: type | morph.Type) -> morph.NominalQualifier:
-        return morph.nominal_qual(self.spec_ref.anchor, self.spec_ref._args_const(), underlying=morph.type_(underlying))
+    def qualify(self, underlying: type | pm.Type) -> pm.NominalQualifier:
+        return pm.nominal_qual(self.spec_ref.anchor, self.spec_ref._args_const(), underlying=pm.type_(underlying))
 
-    def decode(self, raw_data: Data) -> morph.Val:
+    def decode(self, raw_data: Data) -> pm.Val:
         decoded = self.deserialize(raw_data)
         return self._wrap(decoded)
 
-    def construct(self, *args, **kwargs) -> morph.Val:
+    def construct(self, *args, **kwargs) -> pm.Val:
         layout = self.layout()
-        if not isinstance(layout, morph.StructLayout):
+        if not isinstance(layout, pm.StructLayout):
             raise TypeError(f"{type(self).__name__}.construct is not available for opaque nominal types")
         raw = _normalize_struct_input(layout.fields, args, kwargs)
         return self.decode(raw)
@@ -171,23 +165,23 @@ class NominalType(Type):
     def serialize(self, data: Data, format: str | None = None) -> Data:
         _ = format
         layout = self.layout()
-        if isinstance(layout, morph.AtomicLayout):
+        if isinstance(layout, pm.AtomicLayout):
             _validate_atomic_data(self, layout, data)
             return data
         if layout is None:
-            raise TypeError(f"{type(self).__name__}.encode is not available for opaque nominal types")
-        if not isinstance(layout, morph.StructLayout):
-            raise TypeError(f"{type(self).__name__}.encode requires a struct or atomic layout")
+            raise TypeError(f"{type(self).__name__}.encode is not available for {self.spec_ref!r}")
+        if not isinstance(layout, pm.StructLayout):
+            raise TypeError(f"{type(self).__name__}.encode requires a struct or atomic layout for {self.spec_ref!r}")
         return _encode_struct_data(layout.fields, data)
 
     def deserialize(self, raw_data: Data) -> Data:
         layout = self.layout()
-        if isinstance(layout, morph.AtomicLayout):
+        if isinstance(layout, pm.AtomicLayout):
             _validate_atomic_data(self, layout, raw_data)
             return raw_data
         if layout is None:
             raise TypeError(f"{type(self).__name__}.decode is not available for opaque nominal types")
-        if not isinstance(layout, morph.StructLayout):
+        if not isinstance(layout, pm.StructLayout):
             raise TypeError(f"{type(self).__name__}.decode requires a struct or atomic layout")
 
         decoded = _decode_struct_data(layout.fields, raw_data)
@@ -203,7 +197,7 @@ class NominalType(Type):
 
 
 class UnionType(Type):
-    ANCHOR: ClassVar[str] = "dom.Union.Type"
+    ANCHOR: ClassVar[str] = "std.Union.Type"
 
     types: frozenset[Type]
 
@@ -221,7 +215,7 @@ class UnionType(Type):
 
 
 def _normalize_struct_input(
-    fields: morph.Struct[str, Type],
+    fields: pm.Struct[str, Type],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> tuple[Data, ...]:
@@ -262,7 +256,7 @@ def _normalize_struct_input(
 
 
 def _normalize_input_for_type(type_: Type, value: Any) -> Data:
-    if isinstance(value, morph.Val):
+    if isinstance(value, pm.Val):
         if value.__type__ != type_:
             raise TypeError(f"Expected value of type {type_!r}, got {value.__type__!r}")
         return value.__data__
@@ -277,7 +271,7 @@ def _normalize_input_for_type(type_: Type, value: Any) -> Data:
         raise TypeError(f"Expected tuple/list/dict input for {type_!r}")
 
     layout = type_.layout()
-    if isinstance(layout, morph.StructLayout):
+    if isinstance(layout, pm.StructLayout):
         if isinstance(value, tuple):
             return cast(Data, _decode_struct_data(layout.fields, value, preserve_raw=True))
         if isinstance(value, list):
@@ -286,7 +280,7 @@ def _normalize_input_for_type(type_: Type, value: Any) -> Data:
             return cast(Data, _normalize_struct_input(layout.fields, (), value))
         raise TypeError(f"Expected tuple/list/dict input for {type_!r}")
 
-    if isinstance(layout, morph.AtomicLayout):
+    if isinstance(layout, pm.AtomicLayout):
         if isinstance(value, list):
             return cast(Data, tuple(value))
         if isinstance(value, dict):
@@ -298,7 +292,7 @@ def _normalize_input_for_type(type_: Type, value: Any) -> Data:
 
 
 def _decode_struct_data(
-    fields: morph.Struct[str, Type],
+    fields: pm.Struct[str, Type],
     raw_data: Any,
     *,
     preserve_raw: bool = False,
@@ -315,7 +309,7 @@ def _decode_struct_data(
                 field_raw = tuple(field_raw)
             if isinstance(field_raw, dict):
                 layout = field_type.layout()
-                if not isinstance(layout, morph.StructLayout):
+                if not isinstance(layout, pm.StructLayout):
                     raise TypeError(f"Cannot normalize mapping for opaque field type {field_type!r}")
                 field_raw = _normalize_struct_input(layout.fields, (), field_raw)
             decoded.append(cast(Data, field_raw))
@@ -324,7 +318,7 @@ def _decode_struct_data(
     return tuple(decoded)
 
 
-def _encode_struct_data(fields: morph.Struct[str, Type], data: Data) -> tuple[Data, ...]:
+def _encode_struct_data(fields: pm.Struct[str, Type], data: Data) -> tuple[Data, ...]:
     if isinstance(data, Builtin):
         data = tuple(
             getattr(data, key)
@@ -340,7 +334,7 @@ def _encode_struct_data(fields: morph.Struct[str, Type], data: Data) -> tuple[Da
     return tuple(field_type.serialize(field_data) for field_type, field_data in zip(fields.values, data))
 
 
-def _validate_atomic_data(type_: Type, layout: morph.AtomicLayout, data: Data) -> None:
+def _validate_atomic_data(type_: Type, layout: pm.AtomicLayout, data: Data) -> None:
     valid_types = tuple(layout.valid_types)
     if not isinstance(data, valid_types):
         names = ", ".join(sorted(tp.__name__ for tp in layout.valid_types))

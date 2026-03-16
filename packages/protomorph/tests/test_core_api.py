@@ -35,6 +35,15 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(pair.encode(), (1, 2))
         self.assertEqual(repr(named), "(name='a', value=1)")
 
+        named_metaspec = morph.struct_type(name=str, value=int)._metaspec()
+        self.assertIsNotNone(named_metaspec)
+        assert named_metaspec is not None
+        self.assertEqual(repr(named_metaspec), "(name=std.Nominal.Type, value=std.Nominal.Type)")
+        self.assertEqual(
+            tuple(cast(morph.StructType, named_metaspec.__type__).meta_attrs.index.keys),
+            ("name", "value"),
+        )
+
     def test_spec_and_union_value_routes_cover_new_public_api_aliases(self):
         boxed = morph.nominal_type("test.Box", morph.spec(T=str))
         value = morph.union_value(int, str, active="x")
@@ -73,7 +82,7 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(repr(morph.nominal_type("std.List").qualify(int)), "NominalQualifier(NominalType(std.Integer), std.List)")
 
     def test_nominal_decode_and_construct_routes_materialize_with_native_layout(self):
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             type_ = cast(morph.NominalType, Thing._type())
             decoded = type_.decode(("x", 1))
             constructed = type_.construct(name="x", value=1)
@@ -101,7 +110,7 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(value.encode(), ("x", 1))
 
     def test_runtime_generic_builtin_values_use_native_type_builder(self):
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             value = morph.val(RuntimeArgsBox(value="x", runtime_orig_class_repr="str"))
 
         rendered = repr(value)
@@ -111,7 +120,7 @@ class CoreApiTests(unittest.TestCase):
         self.assertEqual(repr(morph.val(Box._type(str))), "test.Box[T=std.Text]")
 
     def test_layout_and_projection_routes_expose_structural_information(self):
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             type_ = cast(morph.NominalType, Thing._type())
             layout = type_.layout()
             projected = type_._get(Thing(name="x", value=1), "name")

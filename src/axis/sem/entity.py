@@ -21,7 +21,7 @@ class Entity(Consed):
     # @classmethod
     # def from_contributions(
     #     cls,
-    #     anchor: dom.Anchor,
+    #     anchor: std.Anchor,
     #     contributions: Iterable[Context.Contribution],
     # ) -> "Entity":
     #     return cls(anchor=anchor, contributions=frozenset(contributions))
@@ -32,6 +32,7 @@ class Entity(Consed):
 
     class SpecContribution(Context.Contribution):
         spec_bindings: BindingStruct[Binding] = _
+        extends_bound_expr: syn.Expr | None = None
 
         @flux.property
         def spec_scope(self) -> Scope:
@@ -77,12 +78,17 @@ class Entity(Consed):
                 lambda binding: build_default(binding.default_expr, scope)
             )
 
+        @flux.property
+        def extends_bound(self) -> pm.Val | None:
+            return build_bound(self.extends_bound_expr, self.spec_scope)
+
         @flux.method
         def check(self):
             # Trigger scope construction and bound creation
             self.spec_scope
             self.spec_bounds
             self.spec_defaults
+            self.extends_bound
 
     class SpecVar(pm.VarType[SpecContribution]): ...
 
@@ -96,17 +102,52 @@ class Entity(Consed):
             return _overload_by_shape_bucket(self.specs)
 
     class QualContribution(SpecContribution):
+        extends_bound_expr: syn.Expr | None = None
         underlying_bound_expr: syn.Expr = _
+        param_bindings: BindingStruct[Binding] = _
+
+        @flux.property
+        def param_bounds(self) -> BindingStruct[pm.Val | None]:
+            scope = self.spec_scope
+            return self.param_bindings.map(
+                lambda binding: build_bound(binding.bound_expr, scope)
+            )
+
+        @flux.property
+        def param_defaults(self) -> BindingStruct[pm.Val | None]:
+            scope = self.spec_scope
+            return self.param_bindings.map(
+                lambda binding: build_default(binding.default_expr, scope)
+            )
 
         @flux.property
         def underlying_bound(self) -> pm.Val | None:
             return build_bound(self.underlying_bound_expr, self.spec_scope)
+
+        @flux.method
+        def layout(self, args: pm.Struct[str, pm.Val]) -> pm.StructLayout | None:
+            field_keys = tuple(_layout_field_key(binding) for binding in self.param_bindings.values)
+            field_types = tuple(
+                _bound_type(self, bound, args)
+                for bound in self.param_bounds.values
+            )
+            return pm.StructLayout(fields=pm.Struct.from_keys(field_keys, field_types))
+
+        @flux.method
+        def check(self):
+            self.spec_scope
+            self.spec_bounds
+            self.spec_defaults
+            self.param_bounds
+            self.param_defaults
+            self.underlying_bound
 
     @flux.property
     def spec_by_shape(self) -> frozendict[BindingShape, SpecBucket]:
         return _spec_by_shape_bucket(self.contributions)
 
     class OverloadContribution(SpecContribution):
+        extends_bound_expr: syn.Expr | None = None
         param_bindings: BindingStruct[Binding] = _
 
         @flux.property
@@ -147,7 +188,7 @@ class Entity(Consed):
         def layout(self, args: pm.Struct[str, pm.Val]) -> pm.StructLayout | None:
             keys = self.param_bindings.index.keys
             field_types = tuple(
-                _param_bound_type(self, bound, args)
+                _bound_type(self, bound, args)
                 for bound in self.param_bounds.values
             )
             return pm.StructLayout(fields=pm.Struct.from_keys(keys, field_types))
@@ -264,8 +305,25 @@ def _param_bound_type(
     return pm.ANY_TYPE if resolved_type is None else resolved_type
 
 
+def _bound_type(
+    contrib: Entity.SpecContribution,
+    bound: pm.Val | None,
+    args: pm.Struct[str, pm.Val],
+) -> pm.Type:
+    if bound is None:
+        return pm.ANY_TYPE
+
+    resolved = bound.subst(lambda var: _resolve_spec_var(contrib, var, args))
+    resolved_type = resolved.as_type()
+    return pm.ANY_TYPE if resolved_type is None else resolved_type
+
+
+def _layout_field_key(binding: Binding) -> str | None:
+    return binding.slot_key if binding.slot_key is not None else binding.binder_name
+
+
 def _resolve_spec_var(
-    contrib: Entity.OverloadContribution,
+    contrib: Entity.SpecContribution,
     var: pm.Var,
     args: pm.Struct[str, pm.Val],
 ) -> pm.Val | None:

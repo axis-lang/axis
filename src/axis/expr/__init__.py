@@ -62,7 +62,7 @@ def name_of(node: syn.Expr) -> str:
 
 
 
-# def to_anchor_ref(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Anchor | None:
+# def to_anchor_ref(node: syn.Expr, scope: std.Anchor | None = None) -> std.Anchor | None:
 #     """Resolve an expression into an anchor, ignoring specialization parts."""
 #     match node:
 #         case Compound(components=components):
@@ -77,16 +77,16 @@ def name_of(node: syn.Expr) -> str:
 #             return base
 #         case Sym(name=name):
 #             if scope is None:
-#                 return dom.Anchor.from_str(name)
+#                 return std.Anchor.from_str(name)
 #             return scope.child(name)
 #         case Member(of=of_expr, name=name):
 #             base = to_spec_ref(of_expr, scope)
 #             if base is None:
 #                 return None
-#             if isinstance(base, dom.Spec):
+#             if isinstance(base, std.Spec):
 #                 log.error("Cannot access member of a specialized ref").label(node).emit()
 #                 return base.anchor
-#             return cast(dom.Anchor, base).child(name)
+#             return cast(std.Anchor, base).child(name)
 #         case Index(origin=origin_expr, indices=_):
 #             base = to_anchor_ref(origin_expr, scope)
 #             if base is None:
@@ -100,7 +100,7 @@ def name_of(node: syn.Expr) -> str:
 #             return None
 
 
-# def to_spec_ref(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Ref | None:
+# def to_spec_ref(node: syn.Expr, scope: std.Anchor | None = None) -> std.Ref | None:
 #     """Resolve an expression into a Ref (anchor or specialized ref) for types."""
 #     match node:
 #         case Compound(components=components):
@@ -113,33 +113,33 @@ def name_of(node: syn.Expr) -> str:
 #             spec = to_spec_components(components[1:], scope)
 #             if spec is None:
 #                 return base
-#             if isinstance(base, dom.Spec):
+#             if isinstance(base, std.Spec):
 #                 log.error("Cannot access member of a specialized ref").label(node).emit()
 #                 return base
-#             return cast(dom.Anchor, base).specialize(spec)
+#             return cast(std.Anchor, base).specialize(spec)
 #         case Sym(name=name):
 #             if scope is None:
-#                 return dom.Anchor.from_str(name)
+#                 return std.Anchor.from_str(name)
 #             return scope.child(name)
 #         case Member(of=of_expr, name=name):
 #             base = to_spec_ref(of_expr, scope)
 #             if base is None:
 #                 return None
-#             if isinstance(base, dom.Spec):
+#             if isinstance(base, std.Spec):
 #                 log.error("Cannot access member of a specialized ref").label(node).emit()
 #                 return base
-#             return cast(dom.Anchor, base).child(name)
+#             return cast(std.Anchor, base).child(name)
 #         case Index(origin=origin_expr, indices=indices):
 #             base = to_spec_ref(origin_expr, scope)
 #             if base is None:
 #                 return None
-#             if isinstance(base, dom.Spec):
+#             if isinstance(base, std.Spec):
 #                 log.error("Cannot specialize an already specialized ref").label(node).emit()
 #                 return base
 #             spec = to_spec(indices, scope)
 #             if spec is None:
 #                 return base
-#             return cast(dom.Anchor, base).specialize(spec)
+#             return cast(std.Anchor, base).specialize(spec)
 #         case Apply(function=function_expr):
 #             return to_spec_ref(function_expr, scope=scope)
 #         case _:
@@ -148,26 +148,26 @@ def name_of(node: syn.Expr) -> str:
 
 
 # def _struct_const_from_values(
-#     keys: tuple[str | None, ...], values: tuple[dom.Const, ...]
-# ) -> dom.Const:
+#     keys: tuple[str | None, ...], values: tuple[std.Const, ...]
+# ) -> std.Const:
 #     """Build a Struct constant from aligned keys and constant values."""
-#     index = dom.Struct.Index(tuple(keys))
-#     fields = dom.Struct(
+#     index = std.Struct.Index(tuple(keys))
+#     fields = std.Struct(
 #         index=index, values=tuple(value.type for value in values)
 #     )
-#     struct_type = dom.StructType(fields=cast(dom.Struct[str, dom.Type], fields))
-#     return dom.Const(
+#     struct_type = std.StructType(fields=cast(std.Struct[str, std.Type], fields))
+#     return std.Const(
 #         type=struct_type, data=tuple(value.data for value in values)
 #     )
 
 
-# def to_const(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Const:
+# def to_const(node: syn.Expr, scope: std.Anchor | None = None) -> std.Const:
 #     """Evaluate an expression into a constant, erroring on symbols."""
 #     match node:
 #         case Lit(value=value):
 #             if value is Ellipsis or value is Wildcard:
-#                 return dom.Const.of_literal(str(value))
-#             return dom.Const.of_literal(cast(dom.Literal, value))
+#                 return std.Const.of_literal(str(value))
+#             return std.Const.of_literal(cast(std.Literal, value))
 #         case Sym():
 #             log.error("Cannot evaluate symbol to constant").label(node).throw()
 #         case Member() | Index() | Compound() | Apply():
@@ -175,17 +175,17 @@ def name_of(node: syn.Expr) -> str:
 #             if ref is None:
 #                 log.error("Cannot resolve ref for constant").label(node).throw()
 #             assert ref is not None
-#             return dom.Const(type=ref.type, data=ref.data)
+#             return std.Const(type=ref.type, data=ref.data)
 #         case _:
 #             log.error("Unsupported expression for constant evaluation").label(node).throw()
 #     raise ValueError("Unreachable")
 
 
-# def to_spec(node: syn.Expr, scope: dom.Anchor | None = None) -> dom.Const | None:
+# def to_spec(node: syn.Expr, scope: std.Anchor | None = None) -> std.Const | None:
 #     """Build a specialization constant from tuples or a single expression."""
 #     if isinstance(node, Tuple):
 #         keys: list[str | None] = []
-#         values: list[dom.Const] = []
+#         values: list[std.Const] = []
 #         for element in node.elements:
 #             match element:
 #                 case Tuple.Positional(value=value):
@@ -206,8 +206,8 @@ def name_of(node: syn.Expr) -> str:
 
 
 # def to_spec_components(
-#     components: Iterable[syn.Expr], scope: dom.Anchor | None = None
-# ) -> dom.Const | None:
+#     components: Iterable[syn.Expr], scope: std.Anchor | None = None
+# ) -> std.Const | None:
 #     """Build a struct constant from ordered specialization components."""
 #     items = tuple(components)
 #     if not items:

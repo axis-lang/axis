@@ -18,7 +18,7 @@ class DummyBoundVar(pm.VarType[DummyBoundContext]):
 class ExprBoundsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.pkg = items.Package.from_path("codebase/std.core")
+        cls.pkg = items.Package.from_path("codebase/std-core")
         cls.std_scope = next(
             ctx for ctx in cls.pkg.all_contexts if type(ctx).__name__ == "Unit"
         ).scope
@@ -40,6 +40,10 @@ class ExprBoundsTest(unittest.TestCase):
         self.assertEqual(
             build_bound(expr.Sym(name="Text"), self.std_scope),
             pm.anchor("std.Text"),
+        )
+        self.assertEqual(
+            build_bound(expr.Sym(name="Ref"), self.std_scope),
+            pm.anchor("std.Ref"),
         )
 
     def test_member_requires_anchor_base(self):
@@ -64,6 +68,19 @@ class ExprBoundsTest(unittest.TestCase):
         assert isinstance(indexed, pm.Spec)
         self.assertEqual(indexed.path, "std.Text")
         self.assertIsNotNone(indexed.args)
+
+    def test_nested_std_module_spec_anchor_resolves_from_scope(self):
+        indexed = build_bound(
+            syn.Expr.from_str("Ref.Spec.Type[Text]"),
+            self.std_scope,
+        )
+
+        assert isinstance(indexed, pm.Spec)
+        self.assertEqual(indexed.path, "std.Ref.Spec.Type")
+        args = indexed.args
+        self.assertIsNotNone(args)
+        assert args is not None
+        self.assertEqual(args.values[0].data, pm.anchor("std.Text").data)
 
     def test_lit_and_tuple_build_structural_values(self):
         self.assertEqual(build_bound(expr.Lit(value=42), self.std_scope), pm.literal(42))

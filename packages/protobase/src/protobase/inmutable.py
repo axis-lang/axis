@@ -1,3 +1,4 @@
+import collections.abc
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
@@ -7,6 +8,7 @@ from re import Pattern
 from types import GenericAlias, UnionType, GetSetDescriptorType, MemberDescriptorType
 from typing import (
     Any,
+    Callable,
     ForwardRef,
     Literal,
     Self,
@@ -39,7 +41,8 @@ _INMUTABLE_TYPES: set[type] = {
     type,
     type(None),
     type(...),
-    # type(lambda: None), # function es inmutable,
+    type(lambda: None),  # functions are immutable
+    cast(type, collections.abc.Callable),  # Callable types are immutable
     bool,
     int,
     float,

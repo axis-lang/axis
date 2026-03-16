@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from protobase import _, Consed
 
-import protomorph as morph
+import protomorph as pm
 
 __all__ = ["ErrType", "Err"]
 
 
-class ErrType(morph.Type):
-    ANCHOR = "dom.Err.Type"
+class ErrType(pm.Type):
+    ANCHOR = "std.Err.Type"
 
-    def _wrap(self, data: morph.Data) -> morph.Val:
+    def _wrap(self, data: pm.Data) -> pm.Val:
         return Err(self, data)
 
 
-class Err(morph.Val, Consed):
+class Err(pm.Val, Consed):
     __type__: ErrType = ErrType()
-    __data__: morph.Data | None = None
+    __data__: pm.Data | None = None

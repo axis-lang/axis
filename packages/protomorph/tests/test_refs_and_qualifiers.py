@@ -43,8 +43,17 @@ class RefsAndQualifiersTests(unittest.TestCase):
         assert isinstance(layout, morph.StructLayout)
         self.assertEqual(tuple(layout.fields.index.keys), ("K", "V"))
 
+        metaspec = spec_type._metaspec()
+        self.assertIsNotNone(metaspec)
+        assert metaspec is not None
+        self.assertEqual(repr(metaspec), "(K=std.Nominal.Type, V=std.Nominal.Type)")
+        self.assertEqual(
+            tuple(cast(morph.StructType, metaspec.__type__).meta_attrs.index.keys),
+            ("K", "V"),
+        )
+
     def test_spec_type_exception_routes_reject_invalid_meta_payloads(self):
-        plain = morph.refs.SpecType(meta_args=None)
+        plain = morph.refs.SpecType(meta_args=morph.EMPTY_STRUCT_TYPE)
         typed = morph.refs.SpecType(meta_args=morph.struct_type(K=str))
 
         with self.assertRaises(ValueError):
@@ -56,15 +65,31 @@ class RefsAndQualifiersTests(unittest.TestCase):
 
     def test_spec_args_routes_cover_roundtrip_back_to_struct_consts(self):
         spec = morph.spec_ref("test.Box", morph.spec(T=str))
+        bare = morph.spec_ref("std.Text")
 
         args = spec.args
         self.assertIsNotNone(args)
         assert args is not None
         self.assertEqual(repr(args.get("T")), "std.Text")
         self.assertEqual(spec._args_const(), morph.spec(T=str))
+        self.assertEqual(bare.args, morph.Struct.Empty)
+        self.assertEqual(bare._args_const(), morph.spec())
+
+    def test_nominal_and_qualifier_metaspecs_track_arg_schema(self):
+        left = morph.nominal_type("std.Map", morph.spec(K=str, V=int))
+        right = morph.nominal_type("std.Map", morph.spec(K=int, V=str))
+
+        self.assertEqual(left._metaspec(), right._metaspec())
+        self.assertEqual(repr(left._metaspec()), "(K=std.Nominal.Type, V=std.Nominal.Type)")
+
+        left_qual = morph.nominal_qual("std.Map", morph.spec(K=str), underlying=morph.INTEGER_TYPE)
+        right_qual = morph.nominal_qual("std.Map", morph.spec(K=int), underlying=morph.INTEGER_TYPE)
+
+        self.assertEqual(left_qual._metaspec(), right_qual._metaspec())
+        self.assertEqual(repr(left_qual._metaspec()), "(S=(K=std.Nominal.Type), U=std.Nominal.Type)")
 
     def test_qualifier_routes_cover_layout_and_opaque_decode_contract(self):
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             qualified = morph.nominal_type("test.Future").qualify(morph.struct_type(name=str, value=int))
             layout = qualified.layout()
 

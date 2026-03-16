@@ -6,7 +6,7 @@ from protobase import flux, _
 
 from axis import expr, log, syn, sem
 
-from .base import SymDef, build_spec_bindings
+from .base import SymDef, build_param_bindings, build_spec_bindings
 
 
 class QualDef(SymDef):
@@ -25,11 +25,14 @@ class QualDef(SymDef):
                 sem.Entity.QualContribution(
                     anchor=self.anchor,
                     spec_bindings=build_spec_bindings(self.spec, where),
+                    param_bindings=build_param_bindings(None, takes),
+                    extends_bound_expr=self.extends[0].expr if self.extends else None,
                     underlying_bound_expr=self.under,
                     origin=self.origin, #takes or where or returns,
                     ctx=self,
                 )
                 for where in self.where or (None,)
+                for takes in self.takes or (None,)
             )
         except Exception:
             log.fatal("Failed to build QualContribution").label(self.origin).show()

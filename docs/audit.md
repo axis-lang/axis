@@ -33,7 +33,7 @@ Fecha del informe: 2026-03-08
 - `packages/protobase/`: runtime de records inmutables, consing y Flux.
 - `tests/`: tests unittest.
 - `docs/`: documentacion Sphinx (MyST).
-- `codebase/`: ejemplos de lenguaje (`sandbox`, `std.core`).
+- `codebase/`: ejemplos de lenguaje (`sandbox`, `std-core`).
 - `data/`: PDFs y referencias tecnicas.
 - `scripts/`: scripts experimentales.
 

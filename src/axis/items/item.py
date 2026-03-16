@@ -14,14 +14,14 @@ class Item(sem.Context['Item'], abstract=True):
         raise NotImplementedError("Item subclasses must implement anchor property")
 
     # @property
-    # def anchor(self) -> dom.Anchor | None:
+    # def anchor(self) -> std.Anchor | None:
     #     parent = self.parent
     #     #parent = getattr(self, "parent", None)
     #     while isinstance(parent, syn.Item):
     #         ref = getattr(parent, "ref", None)
-    #         if isinstance(ref, dom.Ref):
+    #         if isinstance(ref, std.Ref):
     #             return ref.anchor
-    #         if isinstance(ref, dom.Anchor):
+    #         if isinstance(ref, std.Anchor):
     #             return ref
     #         parent = getattr(parent, "parent", None)
     #     return None

@@ -16,6 +16,7 @@ tupleBlockMutElement: 'mut' expr (':' expr)? ('=' expr)? EOF;
 useBlock: 'use' expr EOF;
 defWhereBlock: 'where' ':' EOF;
 defTakesBlock: 'takes' expr? ':' EOF;
+defExtendsBlock: 'extends' expr EOF;
 defReturnsBlock: 'returns' expr EOF;
 suiteBlock: 'suite' statement* EOF;
 

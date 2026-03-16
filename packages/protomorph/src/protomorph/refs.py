@@ -4,12 +4,12 @@ from typing import cast
 
 from protobase import _, Consed
 
-import protomorph as morph
+import protomorph as pm
 
-from .types import Type, Data
+from .base import Data
+from .types import Type
 
 __all__ = [
-    "ANCHOR_TYPE_INSTANCE",
     "Fact",
     "RefType",
     "Ref",
@@ -20,24 +20,15 @@ __all__ = [
 ]
 
 
-ANCHOR_TYPE_INSTANCE: AnchorType | None = None
-
-
-def _anchor_type_instance() -> AnchorType:
-    if ANCHOR_TYPE_INSTANCE is None:
-        raise RuntimeError("protomorph.ANCHOR_TYPE_INSTANCE is not initialized")
-    return ANCHOR_TYPE_INSTANCE
-
-
 class RefType(Type, abstract=True):
     pass
 
 
 type AnchorSegments = tuple[str, ...]
-type SpecData = tuple[AnchorSegments, morph.Data]
+type SpecData = tuple[AnchorSegments, pm.Data]
 
 
-class Ref(morph.Val, Consed, abstract=True):
+class Ref(pm.Val, Consed, abstract=True):
     @property
     def segments(self) -> AnchorSegments:
         raise NotImplementedError(
@@ -50,7 +41,7 @@ class Ref(morph.Val, Consed, abstract=True):
 
 
 class AnchorType(RefType):
-    ANCHOR = "dom.Ref.Anchor"
+    ANCHOR = "std.Ref.Anchor"
 
     def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
@@ -75,15 +66,15 @@ class Anchor(Ref):
 
     @classmethod
     def from_root(cls, value: str) -> Anchor:
-        return cls(_anchor_type_instance(), (value,))
+        return cls(pm._ANCHOR_TYPE, (value,))
 
     @classmethod
     def from_str(cls, path: str) -> Anchor:
-        return morph.anchor(path)
+        return pm.anchor(path)
 
     def child(self, name: str) -> Anchor:
         return self.__class__(
-            _anchor_type_instance(),
+            pm._ANCHOR_TYPE,
             cast(AnchorSegments, (*self.__data__, name)),
         )
 
@@ -98,36 +89,38 @@ class Anchor(Ref):
     @property
     def parent(self) -> Anchor | None:
         if len(self.__data__) > 1:
-            return self.__class__(_anchor_type_instance(), self.__data__[:-1])
+            return self.__class__(pm._ANCHOR_TYPE, self.__data__[:-1])
         return None
 
     @property
     def segments(self) -> AnchorSegments:
         return self.__data__
 
-    def specialize(self, spec: morph.Const | None) -> Spec:
-        return morph.spec_ref(self, spec)
+    def specialize(self, spec: pm.Const | None) -> Spec:
+        return pm.spec_ref(self, spec)
 
 
 class SpecType(RefType):
-    ANCHOR = "dom.Ref.Spec.Type"
+    ANCHOR = "std.Ref.Spec.Type"
 
-    meta_args: morph.StructType | None = None
+    meta_args: pm.StructType = _
 
     def _metaspec(self):
-        return self.meta_args._metaspec() if self.meta_args is not None else None
+        return self.meta_args._metaspec()
 
     def serialize(self, data, format: str | None = None):
         _ = format
         match data:
-            case (anchor_data, None):
-                return anchor_data, None
             case (anchor_data, spec_data):
-                if self.meta_args is None:
-                    raise ValueError("Unexpected args data for SpecType with no meta_args")
                 if not isinstance(spec_data, tuple):
                     raise ValueError(
                         f"Expected tuple data for SpecType args, got {type(spec_data)}"
+                    )
+                if not spec_data and self.meta_args == pm.EMPTY_STRUCT_TYPE:
+                    return anchor_data, ()
+                if len(spec_data) != len(self.meta_args.meta_attrs):
+                    raise ValueError(
+                        f"Expected {len(self.meta_args.meta_attrs)} spec args, got {len(spec_data)}"
                     )
                 encoded_spec = tuple(
                     self.meta_args.meta_attrs[n].serialize(v) for n, v in enumerate(spec_data)
@@ -138,24 +131,24 @@ class SpecType(RefType):
 
     def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
-            case (raw_anchor, None):
-                return raw_anchor, None
             case (raw_anchor, raw_spec):
                 if not isinstance(raw_spec, tuple):
                     raise ValueError(
                         f"Expected tuple data for SpecType args, got {type(raw_spec)}"
                     )
-                if self.meta_args is None:
-                    raise ValueError("Unexpected args data for SpecType with no meta_args")
+                if not raw_spec and self.meta_args == pm.EMPTY_STRUCT_TYPE:
+                    return raw_anchor, ()
+                if len(raw_spec) != len(self.meta_args.meta_attrs):
+                    raise ValueError(
+                        f"Expected {len(self.meta_args.meta_attrs)} spec args, got {len(raw_spec)}"
+                    )
                 spec = tuple(self.meta_args.meta_attrs[n].deserialize(v) for n, v in enumerate(raw_spec))
                 return raw_anchor, spec
             case _:
                 raise ValueError(f"Invalid raw data for SpecType: {raw_data!r}")
 
-    def layout(self) -> morph.StructLayout | None:
-        if self.meta_args is None:
-            return None
-        return morph.StructLayout(fields=self.meta_args.meta_attrs)
+    def layout(self) -> pm.StructLayout | None:
+        return pm.StructLayout(fields=self.meta_args.meta_attrs)
 
 
 class Spec(Ref):
@@ -164,54 +157,56 @@ class Spec(Ref):
 
     @property
     def anchor(self) -> Anchor:
-        return Anchor(_anchor_type_instance(), self.__data__[0])
+        return Anchor(pm._ANCHOR_TYPE, self.__data__[0])
 
     @property
     def segments(self) -> AnchorSegments:
         return self.__data__[0]
 
     @property
-    def args(self) -> morph.Struct[str | None, morph.Val] | None:
+    def args(self) -> pm.Struct[str | None, pm.Val] | None:
         meta_args = self.__type__.meta_args
 
-        if self.__data__[1] is None or meta_args is None:
+        if self.__data__[1] is None:
             return None
 
-        raw_args = cast(tuple[morph.Data, ...], self.__data__[1])
+        raw_args = cast(tuple[pm.Data, ...], self.__data__[1])
+        if not raw_args and meta_args == pm.EMPTY_STRUCT_TYPE:
+            return pm.Struct.Empty
         values = tuple(
             field_type._wrap(field_data)
             for field_type, field_data in zip(meta_args.meta_attrs, raw_args)
         )
-        return morph.Struct.from_keys(meta_args.meta_attrs.index.keys, values)
+        return pm.Struct.from_keys(meta_args.meta_attrs.index.keys, values)
 
     @property
-    def struct_shape(self) -> morph.Struct.Shape[str | None]:
+    def struct_shape(self) -> pm.Struct.Shape[str | None]:
         args = self.args
         if args is None:
-            return morph.Struct.Empty.shape
+            return pm.Struct.Empty.shape
         return args.shape
 
     @property
-    def struct_index(self) -> morph.Struct.Index[str | None]:
+    def struct_index(self) -> pm.Struct.Index[str | None]:
         args = self.args
         if args is None:
-            return morph.Struct.Empty.index
+            return pm.Struct.Empty.index
         return args.index
 
-    def _args_const(self) -> morph.Const | None:
+    def _args_const(self) -> pm.Const:
         args = self.args
         if args is None:
-            return None
+            return pm.EmptyStruct
 
-        positional: list[morph.Const | morph.Var] = []
-        nominal: dict[str, morph.Const | morph.Var] = {}
+        positional: list[pm.Const | pm.Var] = []
+        nominal: dict[str, pm.Const | pm.Var] = {}
         for key, value in zip(args.index.keys, args.values):
-            typed = cast(morph.Const | morph.Var, value)
+            typed = cast(pm.Const | pm.Var, value)
             if key is None:
                 positional.append(typed)
             else:
                 nominal[key] = typed
-        return morph.struct(*positional, **nominal)
+        return pm.struct(*positional, **nominal)
 
     def __invariants__(self) -> None:
         pass

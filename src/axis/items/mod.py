@@ -47,17 +47,15 @@ class Mod(Item):
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
-        # contributions: list[sem.Entity.Contribution] = []
-        # contributions.append(
-        #     sem.Entity.Member(
-        #         anchor=self.anchor,
-        #         name=expr.to_name(self.path),
-        #         target=self.ref,
-        #         origin=self.path,
-        #         ctx=self,
-        #     )
-        # )
-        return frozenset()
+        return frozenset(
+            (
+                sem.Context.NamespaceContribution(
+                    anchor=self.anchor,
+                    origin=self.path,
+                    ctx=self,
+                ),
+            )
+        )
 
     @slot_cached_property
     def name(self) -> str | None:
@@ -88,15 +86,15 @@ class Mod(Item):
     #                     members_by_anchor, ref.anchor
     #                 ).items():
     #                     sym = expr.Sym(name=member_name).with_span_of(name)
-    #                     builder.define(sym, cast(dom.Val, member_ref))
+    #                     builder.define(sym, cast(std.Val, member_ref))
     #                 continue
     #             if ref is None:
     #                 continue
-    #             builder.define(cast(expr.Sym, name), cast(dom.Val, ref))
+    #             builder.define(cast(expr.Sym, name), cast(std.Val, ref))
 
     #     if self.path is not None:
     #         for name, ref in _namespace_members(members_by_anchor, self.ref).items():
-    #             builder.define(expr.Sym(name=name), cast(dom.Val, ref))
+    #             builder.define(expr.Sym(name=name), cast(std.Val, ref))
 
     #     return builder.build()
 
@@ -109,10 +107,10 @@ class Mod(Item):
 
 
 # def _namespace_members(
-#     members_by_anchor: frozendict[dom.Anchor, frozenset[dom.Anchor]],
-#     scope_ref: dom.Anchor,
-# ) -> dict[str, dom.Ref]:
-#     members: dict[str, dom.Ref] = {}
+#     members_by_anchor: frozendict[std.Anchor, frozenset[std.Anchor]],
+#     scope_ref: std.Anchor,
+# ) -> dict[str, std.Ref]:
+#     members: dict[str, std.Ref] = {}
 #     for anchor in members_by_anchor.get(scope_ref, frozenset()):
 #         name = anchor.data[-1]
 #         members.setdefault(name, anchor)

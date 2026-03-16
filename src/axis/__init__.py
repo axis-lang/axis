@@ -8,7 +8,6 @@ traceback.install()
 
 
 import axis.src
-import axis.dom
 import axis.syn
 import axis.sem
 

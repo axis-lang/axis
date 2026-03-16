@@ -6,10 +6,11 @@ from typing import Any, ClassVar, Iterable, Union
 
 from protobase import Inmutable, Consed, Missing, MissingType, frozendict, is_abstract
 
-import protomorph as morph
+import protomorph as pm
 
 __all__ = [
     "Literal",
+    "ALL_BUILTINS",
     "Builtin",
     "Data",
     "Val",
@@ -17,7 +18,7 @@ __all__ = [
 ]
 
 
-_PENDING_BUILTINS: list[type["Builtin"]] = []
+ALL_BUILTINS: set[type["Builtin"]] = set()
 
 
 type Literal = Union[
@@ -45,7 +46,17 @@ class Builtin(Consed, abstract=True):
     def __class_post_build__(cls) -> None:
         if is_abstract(cls):
             return
-        _PENDING_BUILTINS.append(cls)
+        ALL_BUILTINS.add(cls)
+        
+        # Invalidate flux cache for builtin discovery
+        # Use try/except to handle circular imports during bootstrap
+        try:
+            import protomorph as pm
+            pm.NativeRegistry.all_builtins.invalidate_for(pm.NATIVE_REGISTRY)
+        except (AttributeError, ImportError):
+            # During bootstrap, registry may not be available yet
+            # The invalidation will happen during the first registry access
+            pass
 
     @classmethod
     def _anchor_path(cls) -> str:
@@ -55,31 +66,22 @@ class Builtin(Consed, abstract=True):
         return f"{cls.__module__}.{cls.__qualname__}"
 
     @classmethod
-    def _type(cls, *args: type | morph.Type) -> morph.Type:
-        from .native import build_builtin_type
-
-        return build_builtin_type(cls, *args)
+    def _type(cls, *args: type | pm.Type) -> pm.Type:
+        return pm.build_builtin_type(cls, *args)
 
 
 class Val(Inmutable, abstract=True):
-    __type__: morph.Type
+    __type__: pm.Type
     __data__: Data
 
     def __repr__(self) -> str:
-        from .format import format_morph
-
-        return format_morph(self)
+        return pm.format_morph(self)
 
     def __getitem__(self, keyname: str | int) -> Val:
         return self.__type__._get(self.__data__, keyname)
 
     def wrap(self, data: Data) -> Val:
-        if not self.__type__.is_meta:
-            raise TypeError(
-                f"{type(self).__name__}.wrap requires a type value, got {self.__type__!r}"
-                f" with data {self.__data__!r}"
-            )
-        if not isinstance(self.__data__, morph.Type):
+        if not isinstance(self.__data__, pm.Type):
             raise TypeError(
                 f"{type(self).__name__}.wrap requires a value that resolves to protomorph.Type"
                 f" as its type, got {self.__data__!r} of type {type(self.__data__)}"
@@ -89,23 +91,19 @@ class Val(Inmutable, abstract=True):
     def encode(self, format: str | None = None) -> Data:
         return self.__type__.serialize(self.__data__, format)
 
-    def as_type(self) -> morph.Type | None:
-        from .subst import as_type
-
-        return as_type(self)
+    def as_type(self) -> pm.Type | None:
+        return pm.as_type(self)
 
     def subst(
         self,
-        env: Callable[[morph.Var], morph.Val | None],
+        env: Callable[[pm.Var], pm.Val | None],
     ) -> Val:
-        from .subst import subst_val
-
-        return subst_val(self, env)
+        return pm.subst_val(self, env)
 
     @property
-    def attrs(self) -> morph.Struct[str, Val] | None:
+    def attrs(self) -> pm.Struct[str, Val] | None:
         layout = self.__type__.layout()
-        fields = layout.fields if isinstance(layout, morph.StructLayout) else None
+        fields = layout.fields if isinstance(layout, pm.StructLayout) else None
         if fields is None:
             return None
 
@@ -113,7 +111,7 @@ class Val(Inmutable, abstract=True):
             self.__type__._get(self.__data__, key if key is not None else i)
             for i, key in enumerate(fields.index.keys)
         )
-        return morph.Struct.from_keys(fields.index.keys, values)
+        return pm.Struct.from_keys(fields.index.keys, values)
 
     @property
     def has_attrs(self) -> bool:
@@ -135,13 +133,13 @@ class Val(Inmutable, abstract=True):
 
     def dir(self) -> Iterable[str]:
         layout = self.__type__.layout()
-        fields = morph.Struct.Empty
-        if isinstance(layout, morph.StructLayout):
+        fields = pm.Struct.Empty
+        if isinstance(layout, pm.StructLayout):
             fields = layout.fields
         return fields.index._keyed_indices.keys
 
     @property
-    def type(self) -> morph.Type:
+    def type(self) -> pm.Type:
         return self.__type__
 
     @property
@@ -149,5 +147,5 @@ class Val(Inmutable, abstract=True):
         return self.__data__
 
 
-class Const[T: morph.Type = Any, D: Data = Any](Val, Consed):
+class Const[T: pm.Type = Any, D: Data = Any](Val, Consed):
     pass

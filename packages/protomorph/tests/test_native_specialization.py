@@ -24,10 +24,8 @@ class NativeSpecializationTests(unittest.TestCase):
         self.assertEqual(morph.type_from_python(object), morph.ANY_TYPE)
 
     def test_native_registry_layout_currently_leaves_nested_builtin_typevars_unspecialized(self):
-        registry = morph.NativeRegistry()
-        registry.register_native_type(str, morph.TEXT_TYPE)
-        registry.register_native_type(int, morph.INTEGER_TYPE)
-        registry.register_builtin(FancyBox)
+        # Use global registry - all builtins are auto-discovered
+        registry = morph.NATIVE_REGISTRY
 
         layout = registry.layout(cast(morph.NominalType, FancyBox._type(str)))
 
@@ -52,8 +50,8 @@ class NativeSpecializationTests(unittest.TestCase):
         self.assertEqual(repr(morph.val(morph.type_from_python(list[str]))), "std.List std.Text")
 
     def test_native_registry_construct_rejects_unknown_or_bad_arity_layouts(self):
-        registry = morph.NativeRegistry()
-        registry.register_builtin(Thing)
+        # Use global registry - all builtins are auto-discovered  
+        registry = morph.NATIVE_REGISTRY
 
         with self.assertRaises(ValueError):
             registry.construct(morph.nominal_type("test.Unknown"), ())
@@ -61,9 +59,9 @@ class NativeSpecializationTests(unittest.TestCase):
             registry.construct(cast(morph.NominalType, Thing._type()), ("x",))
 
     def test_native_backend_context_switches_active_registry_for_type_projection(self):
-        registry = morph.NativeRegistry()
-        registry.register_native_type(bytes, morph.TEXT_TYPE)
-        backend = morph.NativeBackend(registry=registry)
+        # Register bytes globally and use default backend
+        morph.register_native_type(bytes, morph.TEXT_TYPE)
+        backend = morph.NATIVE_BACKEND
 
         with backend:
             self.assertEqual(morph.type_from_python(bytes), morph.TEXT_TYPE)

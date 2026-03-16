@@ -16,7 +16,7 @@ This document covers:
 
 - the representation of qualified types such as `Map[str] T`, `Array[S] T`, or
   `Future T`
-- the interpretation of `dom.Type` as a first-class value
+- the interpretation of `std.Type` as a first-class value
 - the laws that relate value-level operations and type-level operations
 - the role of `Introspector` as the semantic interface used by DOM
 
@@ -34,10 +34,10 @@ surface needed to express them uniformly over values and over types.
 
 ### Values
 
-`dom.Val` is the canonical zipper pair:
+`std.Val` is the canonical zipper pair:
 
-- `type: dom.Type`
-- `data: dom.Data`
+- `type: std.Type`
+- `data: std.Data`
 
 All DOM values, including type values, inhabit this shape.
 
@@ -46,27 +46,27 @@ All DOM values, including type values, inhabit this shape.
 A type is a first-class value when it appears in the data position of a DOM
 value.
 
-Formally, a type value is a value `v: dom.Val` such that:
+Formally, a type value is a value `v: std.Val` such that:
 
 - `v.type.is_meta` is `True`
-- `v.data` is, or decodes to, a `dom.Type`
+- `v.data` is, or decodes to, a `std.Type`
 
 Examples:
 
-- `dom.val(int)`
-- `dom.val(Person)`
-- `dom.val(frozendict[str, str])`
+- `std.val(int)`
+- `std.val(Person)`
+- `std.val(frozendict[str, str])`
 
 The API `Val.wrap(data)` is defined precisely for this case. It interprets the
-receiver as a type value and delegates to the wrapped `dom.Type`.
+receiver as a type value and delegates to the wrapped `std.Type`.
 
 ### Qualifiers
 
 A qualifier is a type constructor of the form `Q[T]` that preserves an
 underlying type `T` while adding structure, context, or interpretation.
 
-In DOM, the canonical representation is `dom.Qualifier`, with
-`dom.NominalQualifier` as the concrete nominal form:
+In DOM, the canonical representation is `std.Qualifier`, with
+`std.NominalQualifier` as the concrete nominal form:
 
 - `spec_ref`: qualifier metadata such as `Map[K=Text]`
 - `underlying`: the wrapped type
@@ -151,7 +151,7 @@ semantic layer may decide that:
   returns another qualified type
 - `combine(Map[K] Integer, Map[K] Integer, "+")` preserves `Map[K]`
 
-The DOM contract is only that such a result can be represented as a `dom.Type`
+The DOM contract is only that such a result can be represented as a `std.Type`
 and lifted back into a value when needed.
 
 ## Value-Level and Type-Level Correspondence
@@ -254,7 +254,7 @@ may satisfy:
 - `a + b : Array[2,2] Integer`
 - `a * b : Array[2,2] Integer`
 
-However, the broadcasting rule that makes this valid is not part of DOM. The
+However, the broadcasting rule that makes this valid is not part of std. The
 semantic layer computes the resulting type. DOM only needs to represent it.
 
 ## Meta-Types and Qualifier Propagation
@@ -262,7 +262,7 @@ semantic layer computes the resulting type. DOM only needs to represent it.
 DOM supports type values through meta-types.
 
 A value is a valid type value when its outer type is meta and its data resolves
-to a `dom.Type`.
+to a `std.Type`.
 
 For qualifiers, meta-ness propagates through the underlying type:
 
@@ -272,8 +272,8 @@ is_meta(Q[T]) = is_meta(T)
 
 This allows constructions such as:
 
-- `dom.val(frozendict[str, str]).wrap(...)`
-- `dom.val(Future[Person]).wrap(...)`
+- `std.val(frozendict[str, str]).wrap(...)`
+- `std.val(Future[Person]).wrap(...)`
 
 provided that the wrapped data is a semantic inhabitant of the underlying
 qualified type.
@@ -285,7 +285,7 @@ The DOM API should expose operations that work uniformly for:
 - ordinary values
 - type values
 
-This suggests public helpers that can operate on `dom.Val` while consulting the
+This suggests public helpers that can operate on `std.Val` while consulting the
 active `Introspector` for type-level meaning.
 
 Typical examples are:
@@ -297,7 +297,7 @@ Typical examples are:
 These helpers should not encode language-specific semantics directly. Their role
 is to bridge:
 
-- `dom.Val` and `dom.Type`
+- `std.Val` and `std.Type`
 - value plane and type plane
 - DOM structure and semantic interpretation
 

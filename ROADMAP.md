@@ -104,7 +104,7 @@ Target files: `src/axis/items/defs/base.py`, `src/axis/items/defs/qual.py`,
 
 Exit criteria:
 
-- `std.core` qualifier-like definitions appear in `entities_by_anchor`.
+- `std-core` qualifier-like definitions appear in `entities_by_anchor`.
 - Inline and block binding forms produce the same semantic binding model.
 - Contributions expose bounds, defaults, and returns as semantic values with
   meaningful diagnostics.
@@ -115,7 +115,7 @@ Status:
 - Done:
   - inline/block bindings converge on one semantic binding model
   - `QualDef` emits semantic contributions
-  - qualifier-like definitions from `std.core` appear in the semantic graph
+  - qualifier-like definitions from `std-core` appear in the semantic graph
 - Still open:
   - `Type` as an explicitly usable semantic type-value in scopes
   - lowering `returns` and `underlying_expr` into semantic values

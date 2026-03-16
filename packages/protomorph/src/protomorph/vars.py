@@ -4,21 +4,21 @@ from typing import ClassVar, cast
 
 from protobase import Consed, Inmutable, _
 
-import protomorph as morph
+import protomorph as pm
 
 __all__ = ["ContextProto", "VarType", "Var", "var"]
 
 
 class ContextProto(Inmutable):
-    def lookup_bound(self, name: str) -> morph.Type | None: ...
+    def lookup_bound(self, name: str) -> pm.Type | None: ...
 
 
-class VarType[C: ContextProto](morph.Type, abstract=True):
+class VarType[C: ContextProto](pm.Type, abstract=True):
     ctx: C
 
-    ANCHOR: ClassVar[str] = "dom.Var.Type"
+    ANCHOR: ClassVar[str] = "std.Var.Type"
 
-    def _wrap(self, data: morph.Data) -> morph.Val:
+    def _wrap(self, data: pm.Data) -> pm.Val:
         if not isinstance(data, str):
             raise ValueError(
                 f"{type(self).__name__}.wrap expected variable name str, got {type(data).__name__}"
@@ -26,14 +26,14 @@ class VarType[C: ContextProto](morph.Type, abstract=True):
         return Var(self, data)
 
 
-class Var(morph.Val, morph.Type, Consed):
+class Var(pm.Val, pm.Type, Consed):
     __type__: VarType = _
     __data__: str = _
 
     def _metatype(self) -> VarType:
         return cast(VarType, self.__type__)
 
-    def _wrap(self, data: morph.Data) -> morph.Val:
+    def _wrap(self, data: pm.Data) -> pm.Val:
         if not isinstance(data, str):
             raise ValueError(
                 f"{type(self).__name__}.wrap expected variable name str, got {type(data).__name__}"

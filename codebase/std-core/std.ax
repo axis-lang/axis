@@ -1,0 +1,112 @@
+unit std
+
+def Any
+def Empty
+def Boolean
+def Natural
+def Whole
+def Integer
+def Decimal
+def Text
+def Sym
+def Type
+
+
+def Anchor(path)
+takes:
+    val path: Text
+
+
+def Spec[S](anchor, args)
+where:
+    val S: Type
+takes:
+    val anchor: Ref.Anchor
+    val args: S
+
+
+def Optional T
+where:
+    val T: Type
+
+
+def Array[..Dims] T
+where:
+    val Dims: Type
+    val T: Type
+
+
+def Struct[I] T
+where:
+    val I: Type
+    val T: Type
+
+
+def Map[K] V
+where:
+    val K: Type
+    val V: Type
+
+
+def Set V
+where:
+    val V: Type
+
+
+def List V
+where:
+    val V: Type
+
+
+mod Ref
+    def Anchor(path)
+    takes:
+        val path: Text
+
+    mod Spec
+        def Type[S](anchor, args)
+        where:
+            val S: Type@std
+        takes:
+            val anchor: Ref.Anchor
+            val args: S
+
+
+mod Struct
+    def Type[I](meta_attrs)
+    where:
+        val I: Type@std
+    takes:
+        val meta_attrs: Struct[I] Type@std
+
+
+mod Nominal
+    def Type[S](spec_ref)
+    where:
+        val S: Type@std
+    takes:
+        val spec_ref: Ref.Spec.Type[S]
+
+    def Qual[S] U
+    where:
+        val S: Type@std
+        val U: Type@std
+    takes:
+        val spec_ref: Ref.Spec.Type[S]
+        val underlying: U
+
+
+mod Union
+    def Type[T](types)
+    where:
+        val T: Type@std
+    takes:
+        val types: List T
+
+
+mod Var
+    def Type
+
+
+mod Err
+    def Type

@@ -4,6 +4,7 @@ from typing import cast
 import protomorph as pm
 
 from axis import expr, items, log, sem, syn
+from axis.expr.index import Index
 from axis.items.defs.base import build_binding_struct
 
 
@@ -75,6 +76,19 @@ takes:
             tuple(str(element) for element in node.takes[0].elements),
             ("x: Whole", "y: Text"),
         )
+
+    def test_from_src_preserves_extends_block(self):
+        node = parse_def(
+            """def Pair[T]
+extends Box[T]
+takes:
+    val value: T
+"""
+        )
+        node = cast(items.ClassDef, node)
+
+        self.assertEqual(len(node.extends), 1)
+        self.assertIsInstance(node.extends[0].expr, Index)
 
 
 class DefBuildBindingStructTest(unittest.TestCase):
@@ -222,7 +236,7 @@ where:
 
 class ContributionBoundExprTest(unittest.TestCase):
     def test_qual_contribution_exposes_underlying_bound_expr_and_bound(self):
-        pkg = items.Package.from_path("codebase/std.core")
+        pkg = items.Package.from_path("codebase/std-core")
         contrib = next(
             contrib
             for contrib in pkg.all_contributions
@@ -234,16 +248,16 @@ class ContributionBoundExprTest(unittest.TestCase):
         self.assertIsInstance(contrib.underlying_bound, pm.Var)
 
     def test_array_qual_contribution_exposes_nontrivial_underlying_bound(self):
-        pkg = items.Package.from_path("codebase/std.core")
+        pkg = items.Package.from_path("codebase/std-core")
         contrib = next(
             contrib
             for contrib in pkg.all_contributions
             if isinstance(contrib, sem.Entity.QualContribution)
             and contrib.anchor.path == "std.Array"
-            and str(contrib.underlying_bound_expr) == "dtype"
+            and str(contrib.underlying_bound_expr) == "T"
         )
 
-        self.assertEqual(str(contrib.underlying_bound_expr), "dtype")
+        self.assertEqual(str(contrib.underlying_bound_expr), "T")
         self.assertIsNotNone(contrib.underlying_bound)
 
     def test_overload_layout_resolves_spec_vars_from_args(self):
@@ -265,3 +279,35 @@ takes:
         assert isinstance(layout, pm.StructLayout)
         self.assertEqual(tuple(layout.fields.index.keys), (None,))
         self.assertEqual(layout.fields.values[0], pm.nominal_type("std.Sym"))
+
+    def test_class_contribution_exposes_extends_bound_expr_and_bound(self):
+        node = parse_def(
+            """def Pair[T](value)
+extends Box[T]
+where:
+    val T: Type
+takes:
+    val value: T
+"""
+        )
+        assert isinstance(node, items.ClassDef)
+        contrib = next(iter(node.contributions))
+        assert isinstance(contrib, sem.Entity.OverloadContribution)
+
+        self.assertIsInstance(contrib.extends_bound_expr, Index)
+        self.assertIsNotNone(contrib.extends_bound)
+
+    def test_qual_contribution_exposes_extends_bound_expr_and_bound(self):
+        node = parse_def(
+            """def Optional T
+extends Maybe[T]
+where:
+    val T: Type
+"""
+        )
+        assert isinstance(node, items.QualDef)
+        contrib = next(iter(node.contributions))
+        assert isinstance(contrib, sem.Entity.QualContribution)
+
+        self.assertIsInstance(contrib.extends_bound_expr, Index)
+        self.assertIsNotNone(contrib.extends_bound)

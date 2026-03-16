@@ -65,6 +65,23 @@ class Def(Item, syn.ClassMatcher):
 
             return super().build(kw, sep, expr=expr_node, **kwargs)
 
+    class Extends(syn.Block):
+        outline_keyword: ClassVar = "extends"
+        expr: syn.Expr = _
+
+        @classmethod
+        def build(
+            cls,
+            kw: Literal["extends"],
+            expr_node: syn.Expr,
+            *,
+            children: syn.Block.Children,
+            **kwargs,
+        ):
+            kwargs.pop("realm", None)
+            _ = children
+            return cls(expr=expr_node, **kwargs)
+
     class Returns(syn.Block):
         outline_keyword: ClassVar = "returns"
         expr: syn.Expr | None = None
@@ -85,12 +102,14 @@ class Def(Item, syn.ClassMatcher):
     outline_children: ClassVar = {
         Where: False,
         Takes: False,
+        Extends: False,
         Returns: False,
     }
 
     origin: syn.Expr = _
     where: tuple[Where, ...] = _
     takes: tuple[Takes, ...] = _
+    extends: tuple[Extends, ...] = _
     returns: tuple[Returns, ...] = _
     other_blocks: tuple[syn.Block, ...] = _
 
@@ -107,6 +126,7 @@ class Def(Item, syn.ClassMatcher):
 
         where: list[Def.Where] = []
         takes: list[Def.Takes] = []
+        extends: list[Def.Extends] = []
         returns: list[Def.Returns] = []
         others: list[syn.Block] = []
 
@@ -116,16 +136,25 @@ class Def(Item, syn.ClassMatcher):
                     where.append(w)
                 case cls.Takes() as t:
                     takes.append(t)
+                case cls.Extends() as x:
+                    extends.append(x)
                 case cls.Returns() as r:
                     returns.append(r)
                 case _:
                     others.append(child)
+
+        if len(extends) > 1:
+            report = log.error("Def cannot declare multiple extends blocks")
+            for block in extends:
+                report = report.label(block)
+            report.throw()
 
         self = cls.match(
             expr_node,
             origin=expr_node,
             where=tuple(where),
             takes=tuple(takes),
+            extends=tuple(extends),
             returns=tuple(returns),
             other_blocks=tuple(others),
             **kwargs,
@@ -166,7 +195,7 @@ class Def(Item, syn.ClassMatcher):
 #                 sym = expr.as_sym(value)
 #             case _:
 #                 continue
-#         builder.define(sym, dom.Var.from_id(sym.name))
+#         builder.define(sym, std.Var.from_id(sym.name))
 
 
 class SymDef(Def, abstract=True):

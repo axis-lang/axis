@@ -4,112 +4,107 @@ from decimal import Decimal
 from types import NoneType, UnionType as PEP604Union
 from typing import Any, Callable, TypeVar, Union, cast, get_args, get_origin
 
-from protobase import Consed, Record, attr_info_of, frozendict, mutate
+# Top-level runtime imports - needed for inheritance/descriptors
+from protobase import Consed, flux, frozendict
 
-from .base import Builtin, Const, Data, _PENDING_BUILTINS
-from .bridge import AtomicLayout, Layout, SemanticBridgeBase, StructLayout
-from .qualifiers import NominalQualifier
-from .refs import Anchor, Spec
-from .struct import Struct
-from .subst import as_type, _subst_spec, _subst_type
-from .types import NominalType, StructType, Type, UnionType
-from .vars import ContextProto, Var, VarType
+# Import protomorph for internal use and type hints
+import protomorph as pm
 
 __all__ = [
     "NativeGenericVarType",
-    "NativeRegistry",
+    "NativeRegistry", 
     "NativeBackend",
-    "DEFAULT_NATIVE_REGISTRY",
-    "DEFAULT_NATIVE_BACKEND",
     "register_native_type",
-    "register_python_type",
-    "register_builtin",
-    "drain_pending_builtins",
+    "register_python_type", 
+    "register_atomic_layout",
     "type_from_python",
-    "build_builtin_type",
+    "build_builtin_type", 
     "builtin_runtime_type_args",
 ]
 
+# Type aliases
+type PythonTransform = Callable[..., pm.Type]
 
-type PythonTransform = Callable[..., Type]
+# === Global State - Sources of Truth ===
 
+# Mutable global mappings - single source of truth
+_NATIVE_TYPES: dict[type, pm.Type] = {}
+_PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
+_ATOMIC_LAYOUTS: dict[str, pm.AtomicLayout] = {}
 
-class TypeBuildContext(ContextProto):
-    def lookup_bound(self, name: str) -> Type | None:
+# Bootstrap guard
+_BOOTSTRAPPED = False
+
+# === Context Classes ===
+
+class TypeBuildContext(pm.ContextProto):
+    def lookup_bound(self, name: str) -> pm.Type | None:
         _ = name
         return None
 
 
-class BuiltinContext(ContextProto):
-    builtin_cls: type[Builtin]
+class BuiltinContext(pm.ContextProto):
+    builtin_cls: type[pm.Builtin]
 
-    def lookup_bound(self, name: str) -> Type | None:
+    def lookup_bound(self, name: str) -> pm.Type | None:
         _ = name
         return None
 
 
-class NativeGenericVarType(VarType[ContextProto]):
-    ANCHOR = "dom.Type.Var.Generic"
+class NativeGenericVarType(pm.VarType[pm.ContextProto]):
+    ANCHOR = "std.Type.Var.Generic"
 
 
-class NativeRegistry:
-    def __init__(self) -> None:
-        self.type_by_python: dict[object, Type] = {}
-        self.python_transforms: dict[object, PythonTransform] = {}
-        self.builtin_by_anchor: dict[Anchor, type[Builtin]] = {}
-        self.atomic_layout_by_anchor: dict[Anchor, AtomicLayout] = {}
-        self._templates_by_builtin: dict[
-            type[Builtin], tuple[Struct[str, Type], frozenset[Var]]
-        ] = {}
-        self._resolved_fields_by_spec: dict[Spec, Struct[str, Type]] = {}
-        self._drained_builtin_count = 0
+# === Singleton Registry ===
 
-    def register_native_type(self, native: object, type_: Type) -> None:
-        self.type_by_python[native] = type_
-
-    def register_python_type(self, origin: object, transform: PythonTransform) -> None:
-        self.python_transforms[origin] = transform
-
-    def register_builtin(self, builtin_cls: type[Builtin]) -> None:
-        from . import api
-
-        anchor = api.anchor(builtin_cls._anchor_path())
-        self.builtin_by_anchor[anchor] = builtin_cls
-        self._templates_by_builtin.pop(builtin_cls, None)
-        self._resolved_fields_by_spec.clear()
-
-    def register_atomic_layout(self, anchor: Anchor | str, layout: AtomicLayout) -> None:
-        from . import api
-
-        if isinstance(anchor, str):
-            anchor = api.anchor(anchor)
-        self.atomic_layout_by_anchor[anchor] = layout
-
-    def drain_pending_builtins(self) -> None:
-        pending = _PENDING_BUILTINS[self._drained_builtin_count :]
-        if not pending:
-            return
-
-        self._drained_builtin_count = len(_PENDING_BUILTINS)
-        for builtin_cls in pending:
-            self.register_builtin(builtin_cls)
-
-    def template_for(self, builtin_cls: type[Builtin]) -> tuple[Struct[str, Type], frozenset[Var]]:
-        self.drain_pending_builtins()
-
-        cached = self._templates_by_builtin.get(builtin_cls)
-        if cached is not None:
-            return cached
-
+class NativeRegistry(Consed):
+    """Singleton registry for native type mappings and builtin types.
+    
+    Uses protobase.flux for automatic cache invalidation and dependency tracking.
+    All mutations happen through global register_* functions.
+    """
+    
+    # === Flux Sources of Truth ===
+    
+    @flux.property
+    def all_builtins(self) -> frozenset[type[pm.Builtin]]:
+        """All builtin classes discovered during class construction."""
+        return frozenset(pm.ALL_BUILTINS)
+    
+    @flux.property
+    def native_types(self) -> frozendict[type, pm.Type]:
+        """Native type mappings from global state"""
+        return frozendict(_NATIVE_TYPES)
+    
+    @flux.property
+    def python_transforms(self) -> frozendict[type, PythonTransform]:
+        """Python transforms from global state"""
+        return frozendict(_PYTHON_TRANSFORMS)
+    
+    @flux.property
+    def atomic_layouts(self) -> frozendict[pm.Anchor, pm.AtomicLayout]:
+        """Atomic layouts from global state"""
+        return frozendict({
+            pm.anchor(anchor_str): layout 
+            for anchor_str, layout in _ATOMIC_LAYOUTS.items()
+        })
+    
+    # === Flux Cached Queries ===
+    
+    @flux.method
+    def template_for(self, builtin_cls: type[pm.Builtin]) -> tuple[pm.Struct[str, pm.Type], frozenset[pm.Var]]:
+        """Get template for builtin class. Cached per class."""
+        # Import here to avoid circulars  
+        from protobase import attr_info_of
+        
         attrs = attr_info_of(builtin_cls)
         if not attrs:
-            template = cast(Struct[str, Type], Struct.Empty), frozenset()
-            self._templates_by_builtin[builtin_cls] = template
-            return template
+            return cast(pm.Struct[str, pm.Type], pm.Struct.Empty), frozenset()
 
-        vars: set[Var] = set()
-        field_types: dict[str, Type] = {}
+        vars: set[pm.Var] = set()
+        field_types: dict[str, pm.Type] = {}
         ctx = BuiltinContext(builtin_cls=builtin_cls)
+        
         for name, attr_info in attrs.items():
             field_types[name] = type_from_python(
                 attr_info.type,
@@ -118,41 +113,59 @@ class NativeRegistry:
                 registry=self,
             )
 
-        template = Struct.new(**field_types), frozenset(vars)
-        self._templates_by_builtin[builtin_cls] = template
-        return template
-
-    def class_for(self, type_: NominalType) -> type[Builtin] | None:
-        self.drain_pending_builtins()
-        return self.builtin_by_anchor.get(type_.spec_ref.anchor)
-
-    def layout(self, type_: NominalType) -> Layout | None:
-        atomic_layout = self.atomic_layout_by_anchor.get(type_.spec_ref.anchor)
+        return pm.Struct.new(**field_types), frozenset(vars)
+    
+    @flux.method
+    def class_for(self, type_: pm.NominalType) -> type[pm.Builtin] | None:
+        """Get builtin class for nominal type. Cached per type."""
+        anchor = type_.spec_ref.anchor
+        
+        # Look for builtin with matching anchor
+        for builtin_cls in self.all_builtins:
+            if pm.anchor(builtin_cls._anchor_path()) == anchor:
+                return builtin_cls
+        return None
+    
+    @flux.method
+    def layout_for_spec(self, spec: pm.Spec) -> pm.Layout | None:
+        """Compute layout for specific spec. Cached per spec."""
+        anchor = spec.anchor
+        
+        # Try atomic layout first
+        atomic_layout = self.atomic_layouts.get(anchor)
         if atomic_layout is not None:
             return atomic_layout
-
-        builtin_cls = self.class_for(type_)
+        
+        # Try builtin layout
+        builtin_cls = None
+        for cls in self.all_builtins:
+            if pm.anchor(cls._anchor_path()) == anchor:
+                builtin_cls = cls
+                break
+        
         if builtin_cls is None:
             return None
-
+        
         template, vars = self.template_for(builtin_cls)
         if not vars:
-            return StructLayout(fields=template, builtin_cls=builtin_cls)
-
-        spec = type_.spec_ref
-        cached = self._resolved_fields_by_spec.get(spec)
-        if cached is not None:
-            return StructLayout(fields=cached, builtin_cls=builtin_cls)
-
+            return pm.StructLayout(fields=template, builtin_cls=builtin_cls)
+        
+        # Substitute type variables
         resolved = template.map(
             lambda field_type: self._substitute_type(field_type, spec, builtin_cls)
         )
-        self._resolved_fields_by_spec[spec] = resolved
-        return StructLayout(fields=resolved, builtin_cls=builtin_cls)
-
-    def construct(self, type_: NominalType, args: tuple[Data, ...]) -> Data:
+        return pm.StructLayout(fields=resolved, builtin_cls=builtin_cls)
+    
+    # === Public Interface ===
+    
+    def layout(self, type_: pm.NominalType) -> pm.Layout | None:
+        """Public layout method for nominal types."""
+        return self.layout_for_spec(type_.spec_ref)
+    
+    def construct(self, type_: pm.NominalType, args: tuple[pm.Data, ...]) -> pm.Data:
+        """Construct instance of builtin type."""
         resolved_layout = self.layout(type_)
-        if not isinstance(resolved_layout, StructLayout):
+        if not isinstance(resolved_layout, pm.StructLayout):
             raise ValueError(f"No materializable layout for {type_!r}")
         layout = resolved_layout
         builtin_cls = layout.builtin_cls
@@ -169,9 +182,12 @@ class NativeRegistry:
             for key, value in zip(layout.fields.index.keys, args)
             if key is not None
         }
-        return cast(Data, builtin_cls(**attrs))
-
-    def _resolve_var(self, var: Var, spec: Spec, builtin_cls: type[Builtin]) -> Type:
+        return cast(pm.Data, builtin_cls(**attrs))
+    
+    # === Private Helpers ===
+    
+    def _resolve_var(self, var: pm.Var, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Type:
+        """Resolve type variable in builtin context."""
         if not isinstance(var.__type__, NativeGenericVarType):
             return var
         ctx = var.__type__.ctx
@@ -179,7 +195,7 @@ class NativeRegistry:
             return var
 
         args = spec.args
-        if args is None:
+        if args is None or args.index.is_empty:
             return _any_type()
 
         name = var.__data__
@@ -187,134 +203,80 @@ class NativeRegistry:
             return _any_type()
 
         binding = args.get(name, default=None)
-        resolved = as_type(binding)
+        # Import here to avoid circulars
+        resolved = pm.as_type(binding)
         return resolved if resolved is not None else _any_type()
 
-    def _substitute_spec(self, spec: Spec, builtin_cls: type[Builtin]) -> Spec:
-        from . import api
-        return _subst_spec(spec, lambda var: api.val(self._resolve_var(var, spec, builtin_cls)))
+    def _substitute_spec(self, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Spec:
+        """Substitute type variables in spec."""
+        # Import here to avoid circulars
+        return pm._subst_spec(spec, lambda var: pm.val(self._resolve_var(var, spec, builtin_cls)))
 
-    def _substitute_type(self, type_: Type, spec: Spec, builtin_cls: type[Builtin]) -> Type:
-        from . import api
-        return _subst_type(type_, lambda var: api.val(self._resolve_var(var, spec, builtin_cls)))
+    def _substitute_type(self, type_: pm.Type, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Type:
+        """Substitute type variables in type."""
+        # Import here to avoid circulars
+        return pm._subst_type(type_, lambda var: pm.val(self._resolve_var(var, spec, builtin_cls)))
 
 
-DEFAULT_NATIVE_REGISTRY = NativeRegistry()
+# === Singleton Backend ===
 
-
-class NativeBackend:
-    def __init__(self, *, registry: NativeRegistry | None = None):
-        self.registry = registry or DEFAULT_NATIVE_REGISTRY
-
-    def layout(self, type: Type) -> Layout | None:
-        if isinstance(type, NominalType):
+class NativeBackend(pm.SemanticBridgeBase, Consed):
+    """Singleton semantic bridge using global native registry."""
+    
+    registry: NativeRegistry
+    
+    def layout(self, type: pm.Type) -> pm.Layout | None:
+        if isinstance(type, pm.NominalType):
             return self.registry.layout(type)
-        from .bridge import StructuralBridge
-        bridge = StructuralBridge()
-        return bridge.layout(type)
+        return super().layout(type)
 
-    def project(self, type: Type, key: str | int) -> Type:
-        from .bridge import StructuralBridge
-        bridge = StructuralBridge()
-        return bridge.project(type, key)
-
-    def lift(self, qualifier, result: Type) -> Type:
-        from .bridge import StructuralBridge
-        bridge = StructuralBridge()
-        return bridge.lift(qualifier, result)
-
-    def combine(
-        self,
-        left: Type,
-        right: Type,
-        *,
-        op: str | None = None,
-    ) -> Type:
-        from .bridge import StructuralBridge
-        bridge = StructuralBridge()
-        return bridge.combine(left, right, op=op)
-
-    def construct(self, type: NominalType, args: tuple[Data, ...]) -> Data:
+    def construct(self, type: pm.NominalType, args: tuple[pm.Data, ...]) -> pm.Data:
         return self.registry.construct(type, args)
 
-    # Support context manager protocol for testing
-    def __enter__(self):
-        from .bridge import BRIDGE, DEFAULT_BRIDGE
-        self._token = BRIDGE.set(self)
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        from .bridge import BRIDGE
-        BRIDGE.reset(self._token)
+
+# === Global Registration API with Flux Invalidation ===
+
+def register_native_type(native_type: type, proto_type: pm.Type) -> None:
+    """Register native type mapping globally."""
+    _NATIVE_TYPES[native_type] = proto_type
+    # Invalidate flux property
+    NativeRegistry.native_types.invalidate_for(pm.NATIVE_REGISTRY)
 
 
-DEFAULT_NATIVE_BACKEND = NativeBackend()
+def register_python_type(origin: type, transform: PythonTransform) -> None:
+    """Register python transform globally."""  
+    _PYTHON_TRANSFORMS[origin] = transform
+    # Invalidate flux property
+    NativeRegistry.python_transforms.invalidate_for(pm.NATIVE_REGISTRY)
+
+
+def register_atomic_layout(anchor: str | pm.Anchor, layout: pm.AtomicLayout) -> None:
+    """Register atomic layout globally."""
+    if isinstance(anchor, pm.Anchor):
+        anchor = anchor.path
+    _ATOMIC_LAYOUTS[anchor] = layout
+    # Invalidate flux property
+    NativeRegistry.atomic_layouts.invalidate_for(pm.NATIVE_REGISTRY)
+
+
+# === Type Conversion Functions ===
 
 _TYPE_BUILD_CTX = TypeBuildContext()
-
-
-def _active_registry(registry: NativeRegistry | None = None) -> NativeRegistry:
-    if registry is not None:
-        return registry
-    
-    from .bridge import BRIDGE, DEFAULT_BRIDGE
-    
-    bridge = BRIDGE.get(DEFAULT_BRIDGE)
-    if isinstance(bridge, NativeBackend):
-        return bridge.registry
-    return DEFAULT_NATIVE_REGISTRY
-
-
-def register_native_type(
-    native: object,
-    type_: Type,
-    *,
-    registry: NativeRegistry | None = None,
-) -> None:
-    _active_registry(registry).register_native_type(native, type_)
-
-
-def register_python_type(
-    origin: object,
-    transform: PythonTransform,
-    *,
-    registry: NativeRegistry | None = None,
-) -> None:
-    _active_registry(registry).register_python_type(origin, transform)
-
-
-def register_builtin(
-    builtin_cls: type[Builtin],
-    *,
-    registry: NativeRegistry | None = None,
-) -> None:
-    _active_registry(registry).register_builtin(builtin_cls)
-
-
-def register_atomic_layout(
-    anchor: Anchor | str,
-    layout: AtomicLayout,
-    *,
-    registry: NativeRegistry | None = None,
-) -> None:
-    _active_registry(registry).register_atomic_layout(anchor, layout)
-
-
-def drain_pending_builtins(*, registry: NativeRegistry | None = None) -> None:
-    _active_registry(registry).drain_pending_builtins()
 
 
 def type_from_python(
     annotation: Any,
     *,
-    ctx: ContextProto | None = None,
-    vars: set[Var] | None = None,
+    ctx: pm.ContextProto | None = None,
+    vars: set[pm.Var] | None = None,
     registry: NativeRegistry | None = None,
-) -> Type:
-    registry = _active_registry(registry)
+) -> pm.Type:
+    """Convert Python type annotation to protomorph Type."""
+    # Use global registry if none specified
+    registry = registry if registry is not None else pm.NATIVE_REGISTRY
     ctx = _TYPE_BUILD_CTX if ctx is None else ctx
 
-    if isinstance(annotation, Type):
+    if isinstance(annotation, pm.Type):
         return annotation
 
     if annotation is None:
@@ -324,7 +286,7 @@ def type_from_python(
         return _any_type()
 
     if isinstance(annotation, TypeVar):
-        var = cast(Var, Var(NativeGenericVarType(ctx=ctx), annotation.__name__))
+        var = cast(pm.Var, pm.Var(NativeGenericVarType(ctx=ctx), annotation.__name__))
         if vars is not None:
             vars.add(var)
         return var
@@ -335,7 +297,8 @@ def type_from_python(
     if origin is Union or origin is PEP604Union:
         return union_type(*(type_from_python(arg, ctx=ctx, vars=vars, registry=registry) for arg in args))
 
-    scalar = registry.type_by_python.get(annotation)
+    # Check native type mappings
+    scalar = registry.native_types.get(annotation)
     if scalar is not None:
         return scalar
 
@@ -343,15 +306,40 @@ def type_from_python(
         return _transform_generic(origin, args, ctx, vars, registry)
 
     if isinstance(annotation, type):
-        if issubclass(annotation, Builtin):
+        if issubclass(annotation, pm.Builtin):
             return build_builtin_type(annotation, registry=registry)
         return _any_type()
 
     return _any_type()
 
 
-def _coerce_builtin_type_arg(arg: object | Type, registry: NativeRegistry) -> Type:
-    if isinstance(arg, Type):
+def _transform_generic(
+    origin: type,
+    args: tuple[Any, ...],
+    ctx: pm.ContextProto,
+    vars: set[pm.Var] | None,
+    registry: NativeRegistry,
+) -> pm.Type:
+    """Transform generic Python type to protomorph type."""
+    transform = registry.python_transforms.get(origin)
+    if transform is not None:
+        converted = tuple(
+            type_from_python(arg, ctx=ctx, vars=vars, registry=registry)
+            if arg is not Ellipsis
+            else arg
+            for arg in args
+        )
+        return transform(*converted)
+
+    if isinstance(origin, type) and issubclass(origin, pm.Builtin):
+        return build_builtin_type(origin, *args, registry=registry)
+
+    return _any_type()
+
+
+def _coerce_builtin_type_arg(arg: object | pm.Type, registry: NativeRegistry) -> pm.Type:
+    """Coerce builtin type argument to protomorph Type."""
+    if isinstance(arg, pm.Type):
         return arg
 
     projected = type_from_python(arg, registry=registry)
@@ -361,13 +349,16 @@ def _coerce_builtin_type_arg(arg: object | Type, registry: NativeRegistry) -> Ty
 
 
 def build_builtin_type(
-    builtin_cls: type[Builtin],
-    *args: object | Type,
+    builtin_cls: type[pm.Builtin],
+    *args: object | pm.Type,
     registry: NativeRegistry | None = None,
-) -> Type:
-    registry = _active_registry(registry)
-    registry.register_builtin(builtin_cls)
-    registry.drain_pending_builtins()
+) -> pm.Type:
+    """Build nominal type for builtin class."""
+    # Use global registry if none specified
+    registry = registry if registry is not None else pm.NATIVE_REGISTRY
+    
+    # Builtin auto-discovery ensures all builtins are registered
+    # No need to check or register - they're automatically discovered
 
     parameters = tuple(getattr(builtin_cls, "__parameters__", ()))
     expected = len(parameters)
@@ -386,7 +377,7 @@ def build_builtin_type(
 
     projected_args = tuple(_coerce_builtin_type_arg(arg, registry) for arg in args)
 
-    bindings: dict[str, Type] = {}
+    bindings: dict[str, pm.Type] = {}
     for param, projected_arg in zip(parameters, projected_args):
         name = getattr(param, "__name__", None)
         if not isinstance(name, str):
@@ -396,7 +387,8 @@ def build_builtin_type(
     return nominal_type(builtin_cls._anchor_path(), _spec_from_types(**bindings))
 
 
-def builtin_runtime_type_args(value: Builtin) -> tuple[object | Type, ...] | None:
+def builtin_runtime_type_args(value: pm.Builtin) -> tuple[object | pm.Type, ...] | None:
+    """Extract runtime type arguments from builtin instance."""
     orig_class = getattr(value, "__orig_class__", None)
     if orig_class is None:
         return None
@@ -409,9 +401,9 @@ def builtin_runtime_type_args(value: Builtin) -> tuple[object | Type, ...] | Non
     if not runtime_args:
         return ()
 
-    extracted: list[object | Type] = []
+    extracted: list[object | pm.Type] = []
     for arg in runtime_args:
-        if isinstance(arg, Type) or isinstance(arg, type) or arg is Any:
+        if isinstance(arg, pm.Type) or isinstance(arg, type) or arg is Any:
             extracted.append(arg)
             continue
 
@@ -424,139 +416,43 @@ def builtin_runtime_type_args(value: Builtin) -> tuple[object | Type, ...] | Non
     return tuple(extracted)
 
 
-def _transform_generic(
-    origin: object,
-    args: tuple[Any, ...],
-    ctx: ContextProto,
-    vars: set[Var] | None,
-    registry: NativeRegistry,
-) -> Type:
-    transform = registry.python_transforms.get(origin)
-    if transform is not None:
-        converted = tuple(
-            type_from_python(arg, ctx=ctx, vars=vars, registry=registry)
-            if arg is not Ellipsis
-            else arg
-            for arg in args
-        )
-        return transform(*converted)
+# === Helper Functions ===
 
-    if isinstance(origin, type) and issubclass(origin, Builtin):
-        return build_builtin_type(origin, *args, registry=registry)
-
-    return _any_type()
-
-
-def _spec_from_types(**bindings: Type) -> Const | None:
+def _spec_from_types(**bindings: pm.Type) -> pm.Const | None:
+    """Create spec from type bindings."""
     if not bindings:
         return None
 
-    from . import api
-
-    return api.struct(
-        **{name: cast(Const | Var, api.val(type_)) for name, type_ in bindings.items()}
-    )
+    return pm.struct(**{name: cast(pm.Const | pm.Var, pm.val(type_)) for name, type_ in bindings.items()})
 
 
-def _tuple_transform(*args: Type) -> Type:
+def _tuple_transform(*args: pm.Type) -> pm.Type:
+    """Transform tuple type annotation."""
     if len(args) == 2 and args[1] is Ellipsis:
         return nominal_qual("std.List", _spec_from_types(), underlying=args[0])
-    return StructType(meta_attrs=Struct.new(*args))
+    return pm.StructType(meta_attrs=pm.Struct.new(*args))
 
 
-def _any_type() -> Type:
-    from . import api
-
-    return api.ANY_TYPE
-
-
-def _empty_type() -> Type:
-    from . import api
-
-    return api.EMPTY_TYPE
+def _any_type() -> pm.Type:
+    """Get ANY_TYPE."""
+    return pm.ANY_TYPE
 
 
-def nominal_type(anchor: str, spec: Const | None = None) -> NominalType:
-    from . import api
-
-    return api.nominal_type(anchor, spec)
-
-
-def nominal_qual(anchor: str, spec: Const | None = None, *, underlying: Type) -> NominalQualifier:
-    from . import api
-
-    return api.nominal_qual(anchor, spec, underlying=underlying)
+def _empty_type() -> pm.Type:
+    """Get EMPTY_TYPE."""  
+    return pm.EMPTY_TYPE
 
 
-def union_type(*types: Type) -> UnionType:
-    from . import api
+def nominal_type(anchor: str, spec: pm.Const | None = None) -> pm.NominalType:
+    """Create nominal type."""
+    return pm.nominal_type(anchor, spec)
 
-    return api.union_type(*types)
+
+def nominal_qual(anchor: str, spec: pm.Const | None = None, *, underlying: pm.Type) -> pm.NominalQualifier:
+    """Create nominal qualifier."""
+    return pm.nominal_qual(anchor, spec, underlying=underlying)
 
 
-def _bootstrap_defaults() -> None:
-    from . import api
-
-    registry = DEFAULT_NATIVE_REGISTRY
-    registry.type_by_python.clear()
-    registry.python_transforms.clear()
-    registry._resolved_fields_by_spec.clear()
-    registry.atomic_layout_by_anchor.clear()
-
-    api.TYPE_BY_NATIVE.clear()
-    scalar_types = {
-        bool: api.BOOLEAN_TYPE,
-        int: api.INTEGER_TYPE,
-        float: api.DECIMAL_TYPE,
-        Decimal: api.DECIMAL_TYPE,
-        str: api.TEXT_TYPE,
-        NoneType: api.EMPTY_TYPE,
-    }
-    api.TYPE_BY_NATIVE.update(scalar_types)
-    for native, type_ in scalar_types.items():
-        registry.register_native_type(native, type_)
-
-    registry.register_atomic_layout("std.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
-    registry.register_atomic_layout("std.Boolean", AtomicLayout(valid_types=frozenset({bool})))
-    registry.register_atomic_layout(
-        "std.Natural",
-        AtomicLayout(valid_types=frozenset({int})),
-    )
-    registry.register_atomic_layout(
-        "std.Whole",
-        AtomicLayout(valid_types=frozenset({int})),
-    )
-    registry.register_atomic_layout(
-        "std.Integer",
-        AtomicLayout(valid_types=frozenset({int})),
-    )
-    registry.register_atomic_layout(
-        "std.Decimal",
-        AtomicLayout(valid_types=frozenset({int, float, Decimal})),
-    )
-    registry.register_atomic_layout("std.Text", AtomicLayout(valid_types=frozenset({str})))
-
-    set_transform = lambda value_type: nominal_qual(
-        "std.Set",
-        _spec_from_types(),
-        underlying=value_type,
-    )
-    map_transform = lambda key_type, value_type: nominal_qual(
-        "std.Map",
-        _spec_from_types(K=key_type),
-        underlying=value_type,
-    )
-    list_transform = lambda value_type: nominal_qual(
-        "std.List",
-        _spec_from_types(),
-        underlying=value_type,
-    )
-
-    registry.register_python_type(dict, map_transform)
-    registry.register_python_type(frozendict, map_transform)
-    registry.register_python_type(list, list_transform)
-    registry.register_python_type(set, set_transform)
-    registry.register_python_type(frozenset, set_transform)
-    registry.register_python_type(tuple, _tuple_transform)
-    registry.register_python_type(PEP604Union, lambda *types: union_type(*types))
-    registry.drain_pending_builtins()
+def union_type(*types: pm.Type) -> pm.UnionType:
+    """Create union type."""
+    return pm.union_type(*types)

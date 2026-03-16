@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from contextvars import ContextVar, Token
+from contextvars import Token
 from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
 from weakref import WeakKeyDictionary
 
 from protobase import Consed, Inmutable, mutate
 
-import protomorph as morph
+import protomorph as pm
 
 __all__ = [
     "Layout",
@@ -16,8 +16,6 @@ __all__ = [
     "SemanticBridge",
     "SemanticBridgeBase",
     "StructuralBridge",
-    "DEFAULT_BRIDGE",
-    "BRIDGE",
     "layout_of",
 ]
 
@@ -31,30 +29,30 @@ class AtomicLayout(Layout):
 
 
 class StructLayout(Layout):
-    fields: morph.Struct[str, morph.Type]
-    builtin_cls: type[morph.Builtin] | None = None
+    fields: pm.Struct[str, pm.Type]
+    builtin_cls: type[pm.Builtin] | None = None
 
 
 @runtime_checkable
 class SemanticBridge(Protocol):
-    def layout(self, type: morph.Type) -> Layout | None: ...
+    def layout(self, type: pm.Type) -> Layout | None: ...
 
-    def project(self, type: morph.Type, key: str | int) -> morph.Type: ...
+    def project(self, type: pm.Type, key: str | int) -> pm.Type: ...
 
-    def lift(self, qualifier: morph.Qualifier, result: morph.Type) -> morph.Type: ...
+    def lift(self, qualifier: pm.Qualifier, result: pm.Type) -> pm.Type: ...
 
     def combine(
         self,
-        left: morph.Type,
-        right: morph.Type,
+        left: pm.Type,
+        right: pm.Type,
         *,
         op: str | None = None,
-    ) -> morph.Type: ...
+    ) -> pm.Type: ...
 
 
 class SemanticBridgeBase(Inmutable, abstract=True):
-    def layout(self, type: morph.Type) -> Layout | None:
-        if isinstance(type, morph.NominalQualifier):
+    def layout(self, type: pm.Type) -> Layout | None:
+        if isinstance(type, pm.NominalQualifier):
             underlying_layout = type.underlying.layout()
             if underlying_layout is None:
                 return None
@@ -69,19 +67,19 @@ class SemanticBridgeBase(Inmutable, abstract=True):
             )
         return None
 
-    def project(self, type: morph.Type, key: str | int) -> morph.Type:
+    def project(self, type: pm.Type, key: str | int) -> pm.Type:
         return _project_type(self, type, key)
 
-    def lift(self, qualifier: morph.Qualifier, result: morph.Type) -> morph.Type:
+    def lift(self, qualifier: pm.Qualifier, result: pm.Type) -> pm.Type:
         return _lift_qualifier(qualifier, result)
 
     def combine(
         self,
-        left: morph.Type,
-        right: morph.Type,
+        left: pm.Type,
+        right: pm.Type,
         *,
         op: str | None = None,
-    ) -> morph.Type:
+    ) -> pm.Type:
         _ = (left, right, op)
         raise NotImplementedError(
             f"{type(self).__name__}.combine is reserved for semantic-layer operator rules"
@@ -89,7 +87,7 @@ class SemanticBridgeBase(Inmutable, abstract=True):
 
     def __enter__(self) -> Self:
         tokens = _BRIDGE_TOKENS.setdefault(self, [])
-        tokens.append(BRIDGE.set(self))
+        tokens.append(pm.BRIDGE.set(self))
         return self
 
     def __exit__(
@@ -108,23 +106,23 @@ class SemanticBridgeBase(Inmutable, abstract=True):
             _BRIDGE_TOKENS.pop(self, None)
 
         if token is not None:
-            BRIDGE.reset(token)
+            pm.BRIDGE.reset(token)
 
 
 class StructuralBridge(SemanticBridgeBase, Consed):
-    def project(self, type: morph.Type, key: str | int) -> morph.Type:
+    def project(self, type: pm.Type, key: str | int) -> pm.Type:
         return _project_type(self, type, key)
 
-    def lift(self, qualifier: morph.Qualifier, result: morph.Type) -> morph.Type:
+    def lift(self, qualifier: pm.Qualifier, result: pm.Type) -> pm.Type:
         return _lift_qualifier(qualifier, result)
 
     def combine(
         self,
-        left: morph.Type,
-        right: morph.Type,
+        left: pm.Type,
+        right: pm.Type,
         *,
         op: str | None = None,
-    ) -> morph.Type:
+    ) -> pm.Type:
         _ = (left, right, op)
         raise NotImplementedError(
             "StructuralBridge.combine is reserved for host semantic rules"
@@ -133,9 +131,9 @@ class StructuralBridge(SemanticBridgeBase, Consed):
 
 def _project_type(
     bridge: SemanticBridge,
-    type: morph.Type,
+    type: pm.Type,
     key: str | int,
-) -> morph.Type:
+) -> pm.Type:
     layout = type.layout()
     if not isinstance(layout, StructLayout):
         raise KeyError(f"No member {key!r} on opaque type {type!r}")
@@ -143,10 +141,10 @@ def _project_type(
 
 
 def _lift_qualifier(
-    qualifier: morph.Qualifier,
-    result: morph.Type,
-) -> morph.Type:
-    if isinstance(qualifier, morph.NominalQualifier):
+    qualifier: pm.Qualifier,
+    result: pm.Type,
+) -> pm.Type:
+    if isinstance(qualifier, pm.NominalQualifier):
         return mutate(qualifier, underlying=result)
 
     raise NotImplementedError(
@@ -155,34 +153,24 @@ def _lift_qualifier(
 
 
 def _project_fields(
-    fields: morph.Struct[str, morph.Type],
+    fields: pm.Struct[str, pm.Type],
     key: str | int,
-) -> morph.Type:
+) -> pm.Type:
     if isinstance(key, str):
         return fields.get(key)
     if isinstance(key, int):
         return fields[key]
     raise TypeError(f"Unsupported key type: {type(key)}")
 
-
-DEFAULT_BRIDGE: SemanticBridge = StructuralBridge()
-
-BRIDGE: ContextVar[SemanticBridge] = ContextVar(
-    "protomorph.bridge.BRIDGE",
-    default=DEFAULT_BRIDGE,
-)
-
 _BRIDGE_TOKENS: WeakKeyDictionary[SemanticBridgeBase, list[Token[SemanticBridge]]] = (
     WeakKeyDictionary()
 )
 
 
-def layout_of(type: morph.Type) -> Layout | None:
-    bridge = BRIDGE.get(DEFAULT_BRIDGE)
+def layout_of(type: pm.Type) -> Layout | None:
+    bridge = pm.BRIDGE.get(pm.DEFAULT_BRIDGE)
     layout = bridge.layout(type)
     if layout is not None:
         return layout
 
-    from .native import DEFAULT_NATIVE_REGISTRY
-
-    return DEFAULT_NATIVE_REGISTRY.layout(type) if isinstance(type, morph.NominalType) else None
+    return pm.NATIVE_REGISTRY.layout(type) if isinstance(type, pm.NominalType) else None

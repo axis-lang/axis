@@ -116,6 +116,15 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#defExtendsBlock.
+    def enterDefExtendsBlock(self, ctx:AxisParser.DefExtendsBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#defExtendsBlock.
+    def exitDefExtendsBlock(self, ctx:AxisParser.DefExtendsBlockContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#defReturnsBlock.
     def enterDefReturnsBlock(self, ctx:AxisParser.DefReturnsBlockContext):
         pass

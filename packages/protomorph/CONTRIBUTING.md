@@ -1,27 +1,66 @@
-# Protomorph Test Suite Guidelines
+# Protomorph Contributing Guide
 
-This package uses a path-oriented test strategy.
+This package favors a small explicit runtime, a controlled bootstrap, and minimal duplicated state.
 
-The goal is not only to assert outcomes, but to make the intended execution path obvious so future contributors can extend coverage deliberately and diagnose regressions quickly.
+## Architecture rules
 
-## Runtime Model
+- `protomorph.__init__` is the package orchestrator and public API surface.
+- Bootstrap happens in `__init__`, after package imports, in a deliberate order.
+- Do not reintroduce bootstrap helpers in side modules.
+- `NativeRegistry` is the runtime owner for native type mappings, python transforms, and atomic layouts.
+- If some runtime data already belongs to `NativeRegistry`, do not mirror it in package globals.
 
-The current Protomorph runtime is organized around a small set of core ideas:
+## Imports and dependency style
+
+- Treat a module dependency as direct only when it is needed in module global scope.
+- Type hints do not count as direct dependencies.
+- Use `import protomorph as pm` for cross-module type hints and package-level coordination.
+- Prefer `pm.Val`, `pm.Type`, `pm.Struct`, etc. in annotations.
+- Do not add imports only to satisfy annotations when `pm.*` is enough.
+- Keep first-order imports explicit when they are required for inheritance, descriptors, constants, or bootstrap-time evaluation.
+
+## Global state policy
+
+- Minimize package globals.
+- Globals are allowed only when they are:
+  - public API with real users,
+  - bootstrap state, or
+  - runtime singletons.
+- Prefer private globals over exported globals.
+- Avoid parallel sources of truth.
+- `pm._ANCHOR_TYPE` is bootstrap-owned shared state.
+
+## Flux and registry policy
+
+- Use `flux.property` for registry-backed source-of-truth views.
+- Use `flux.method` for cached derivations and queries.
+- Invalidate flux properties explicitly on mutation.
+- Avoid manual caches if the data already belongs to the registry model.
+- `NativeRegistry.native_types` is the canonical host/native mapping.
+
+## Value/type model
 
 - `type.construct(...)` is the Python-friendly entry point.
 - `type.decode(raw)` is the canonical typed deserializer.
 - `type.serialize(data)` is the low-level type serializer.
 - `value.encode()` is the public value serializer.
-- `type.layout()` describes the semantic shape of a type.
+- `type.layout()` describes semantic shape.
+- `Val.wrap()` should validate the real semantic condition directly, not through path-based metadata heuristics.
 
-Layout kinds:
+## Simplification policy
 
-- `AtomicLayout(valid_types=...)` validates raw scalar-like host values.
-- `StructLayout(fields=..., builtin_cls=...)` describes structured values and optional host materialization.
+- Prefer fewer concepts over more compatibility layers.
+- Remove dead indirection when it no longer expresses meaningful architecture.
+- Avoid path-based or magic-string classification when a structural check is enough.
+- Keep helper modules small; if a helper is only a compatibility shim and has no users, remove it.
 
-Tests should prefer these surfaces over older implementation details.
+## Testing guidelines
 
-## Core Principles
+This package uses a path-oriented test strategy.
+
+The goal is not only to assert outcomes, but to make the intended execution path obvious so future contributors can extend coverage deliberately and diagnose regressions quickly.
+
+### Core principles
 
 - Write tests by subsystem, not as one large smoke file.
 - Cover happy paths first, then branch paths, then exceptional paths.
@@ -30,7 +69,7 @@ Tests should prefer these surfaces over older implementation details.
 - Prefer small, purpose-built fixtures over shared magical setup.
 - When a behavior is surprising, preserve it with a test before changing it.
 
-## File Organization
+### File organization
 
 Group tests by runtime area so missing coverage is easy to spot:
 
@@ -42,7 +81,7 @@ Shared fixtures and helper classes live in `tests/support.py`.
 
 When adding coverage for a new subsystem, prefer a new focused file over growing an unrelated one.
 
-## Naming Pattern
+### Naming pattern
 
 Use names that describe the exact route being exercised.
 
@@ -52,41 +91,17 @@ Recommended pattern:
 - `test_<surface>_happy_paths_cover_<paths>`
 - `test_<surface>_exception_paths_cover_<failures>`
 
-Examples:
-
-- `test_struct_and_struct_type_routes_cover_value_and_schema_construction`
-- `test_construct_route_rejects_opaque_types_and_layout_mismatches`
-- `test_native_registry_routes_cover_template_layout_and_construct`
-
-The name should answer: "what path is this test trying to force?"
-
-## Test Construction Order
-
-For each API or module, add tests in this order:
-
-1. Happy path for the main public route.
-2. Alternative branches of the same route.
-3. Boundary cases.
-4. Exceptional or unsupported paths.
-5. Encoding, layout, and representation checks that make debugging easier.
-
-This keeps the suite readable and makes it easier to see what still lacks coverage.
-
-## Assertions
+### Assertions
 
 - Assert the most semantically useful property first.
 - Use `repr(...)` assertions when representation is part of the public debugging contract.
 - For unordered results, assert sets instead of string order.
 - When validating a branch-specific behavior, keep assertions narrow so failures identify the branch clearly.
 - Prefer explicit `assertRaises` around the smallest possible call.
-- Prefer the type-centric API (`type.decode(...)`, `type.construct(...)`, `value.encode()`) over legacy global helpers.
-- Prefer `spec(...)`, `struct_type(...)`, and `union_value(...)` when expressing new API examples over hand-built structural constants.
-- When testing codecs, distinguish clearly between `type.serialize(data)` and `value.encode()`.
+- Prefer the type-centric API over older internal implementation details.
 - When testing shape-dependent behavior, assert the `Layout` kind explicitly before asserting fields or atomic contracts.
 
-## Coverage Workflow
-
-Coverage is part of the intended development loop.
+### Coverage workflow
 
 Run:
 
@@ -95,37 +110,5 @@ just test
 ```
 
 `just test` is the default verification command and includes coverage reporting.
-`just coverage` is kept as an alias.
 
-Coverage is configured in `packages/protomorph/pyproject.toml` with branch coverage enabled.
-
-Use the report to choose the next tests intentionally:
-
-- fill missing happy paths first for major public modules
-- then target unvisited branches
-- then lock down exceptional behavior
-
-## When Expanding the Suite
-
-- Add tests that target one missing route at a time.
-- Avoid broad integration tests when a direct unit route is available.
-- If a new test exposes surprising current behavior, keep the test and document whether it is intentional or provisional.
-- If a bug depends on a very specific construction, encode that construction directly in the test instead of hiding it behind helpers.
-- Exercise both canonical tuple decoding and Python-friendly construction when covering structural layouts.
-
-## Fixture Policy
-
-- Keep helpers in `tests/support.py` explicit and boring.
-- Shared helpers should model reusable shapes, not hide control flow.
-- If a fixture is only needed by one file, keep it in that file.
-
-## Review Standard
-
-A good Protomorph test should make all of the following obvious:
-
-- which module or public surface it targets
-- which route or branch it intends to traverse
-- why the chosen input triggers that route
-- what observable contract must hold afterward
-
-If those four things are not obvious from the file, test name, and assertions, rewrite the test until they are.
+Use coverage to fill missing happy paths first, then branches, then exceptional behavior.

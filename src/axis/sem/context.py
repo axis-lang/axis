@@ -21,6 +21,9 @@ class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
         def check(self):
             pass
 
+    class NamespaceContribution(Contribution):
+        pass
+
     realm: sem.Realm = _
 
     @flux.property

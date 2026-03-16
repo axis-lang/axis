@@ -37,6 +37,7 @@ class ClassDef(SymDef):
                 anchor=self.anchor,
                 spec_bindings=expr.build_binding_struct(self.spec, where),
                 param_bindings=expr.build_binding_struct(self.args, takes),
+                extends_bound_expr=self.extends[0].expr if self.extends else None,
                 origin=self.origin,
                 ctx=self,
             )

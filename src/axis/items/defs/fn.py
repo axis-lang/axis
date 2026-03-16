@@ -31,6 +31,12 @@ class FnDef(SymDef):
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
+        if self.extends:
+            (
+                log.error("FnDef does not support extends blocks")
+                .label(self.extends[0])
+                .throw()
+            )
         return frozenset(
             sem.Entity.ImplContribution(
                 anchor=self.anchor,

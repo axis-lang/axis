@@ -2,46 +2,44 @@ from __future__ import annotations
 
 from typing import ClassVar, cast
 
-import protomorph as morph
+import protomorph as pm
 
-from .types import Data, Type
+from .base import Data
+from .types import _decode_struct_data, _encode_struct_data, _normalize_struct_input
+from .types import Type
 
 __all__ = ["Qualifier", "NominalQualifier"]
 
 
 class Qualifier(Type, abstract=True):
-    ANCHOR: ClassVar[str] = "dom.Qual"
+    ANCHOR: ClassVar[str] = "std.Qual"
 
     underlying: Type
 
-    @property
-    def is_meta(self) -> bool:
-        return self.underlying.is_meta
-
 
 class NominalQualifier(Qualifier):
-    ANCHOR: ClassVar[str] = "dom.Qual.Nominal"
+    ANCHOR: ClassVar[str] = "std.Nominal.Qual"
 
-    spec_ref: morph.Spec
+    spec_ref: pm.Spec
 
     def _metaspec(self):
-        spec_args = self.spec_ref._args_const()
-        return morph.struct(
-            S=cast(morph.Const, spec_args if spec_args else morph.val(None)),
-            U=cast(morph.Const, morph.val(self.underlying._metatype())),
+        spec_args = self.spec_ref.__type__._metaspec()
+        return pm.struct(
+            S=cast(pm.Const, spec_args),
+            U=cast(pm.Const, pm.val(self.underlying._metatype())),
         )
 
-    def layout(self) -> morph.Layout | None:
-        bridge = morph.BRIDGE.get(morph.DEFAULT_BRIDGE)
+    def layout(self) -> pm.Layout | None:
+        bridge = pm.BRIDGE.get(pm.DEFAULT_BRIDGE)
         return bridge.layout(self)
 
-    def decode(self, raw_data: Data) -> morph.Val:
+    def decode(self, raw_data: Data) -> pm.Val:
         resolved_layout = self.layout()
-        if not isinstance(resolved_layout, morph.StructLayout):
+        if not isinstance(resolved_layout, pm.StructLayout):
             raise TypeError(f"{type(self).__name__}.decode is not available for opaque qualified types")
         layout = resolved_layout
 
-        decoded = morph._decode_struct_data(layout.fields, raw_data)
+        decoded = _decode_struct_data(layout.fields, raw_data)
         if layout.builtin_cls is None:
             return self._wrap(decoded)
 
@@ -52,23 +50,23 @@ class NominalQualifier(Qualifier):
         }
         return self._wrap(layout.builtin_cls(**attrs))
 
-    def construct(self, *args, **kwargs) -> morph.Val:
+    def construct(self, *args, **kwargs) -> pm.Val:
         resolved_layout = self.layout()
-        if not isinstance(resolved_layout, morph.StructLayout):
+        if not isinstance(resolved_layout, pm.StructLayout):
             raise TypeError(f"{type(self).__name__}.construct is not available for opaque qualified types")
         layout = resolved_layout
-        raw = morph._normalize_struct_input(layout.fields, args, kwargs)
+        raw = _normalize_struct_input(layout.fields, args, kwargs)
         return self.decode(raw)
 
     def serialize(self, data: Data, format: str | None = None) -> Data:
         _ = format
         resolved_layout = self.layout()
-        if not isinstance(resolved_layout, morph.StructLayout):
-            raise TypeError(f"{type(self).__name__}.encode is not available for opaque qualified types")
+        if not isinstance(resolved_layout, pm.StructLayout):
+            raise TypeError(f"{type(self).__name__}.encode is not available for opaque qualified types {self}")
         layout = resolved_layout
-        return morph._encode_struct_data(layout.fields, data)
+        return _encode_struct_data(layout.fields, data)
 
-    def _get(self, data: Data, key: str | int) -> morph.Val:
+    def _get(self, data: Data, key: str | int) -> pm.Val:
         _ = (data, key)
         raise NotImplementedError(
             "NominalQualifier._get remains undefined for value projection; use SemanticBridge.project for type-level semantics"

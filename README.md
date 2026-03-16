@@ -63,7 +63,7 @@ poetry run python -m unittest discover -s tests
 ## Ejemplos de lenguaje
 
 Archivos de ejemplo en `codebase/` (por ejemplo `codebase/sandbox` y
-`codebase/std.core`).
+`codebase/std-core`).
 
 ## Estructura del repo
 

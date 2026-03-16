@@ -62,10 +62,11 @@ class StructMapFormatTests(unittest.TestCase):
         union_value = morph.union_value(int, str, active="x")
         struct_value = morph.struct_type(name=str, value=int).construct(name="a", value=1)
 
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             nominal_value = morph.val(Thing(name="a", value=1))
 
         self.assertEqual(repr(morph.anchor("std.Text")), "std.Text")
+        self.assertEqual(repr(morph.spec()), "()")
         self.assertEqual(repr(morph.spec(T=str)), "(T=std.Text)")
         self.assertEqual(repr(morph.TEXT_TYPE), "NominalType(std.Text)")
         self.assertEqual(repr(struct_value), "(name='a', value=1)")

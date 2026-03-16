@@ -21,4 +21,4 @@
 ## Ejemplos
 
 El directorio `codebase` contiene ejemplos del lenguaje (por ejemplo,
-`codebase/sandbox` y `codebase/std.core`).
+`codebase/sandbox` y `codebase/std-core`).

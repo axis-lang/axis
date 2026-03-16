@@ -2,7 +2,7 @@
 from time import sleep
 from cyclopts import App
 from protobase import flux
-from axis import items, log, src, dom, expr, syn, sem
+from axis import items, log, src, expr, syn, sem
 from IPython import embed
 from rich import print
 

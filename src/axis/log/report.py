@@ -115,7 +115,7 @@ class Report(Metadata[pm.Val]):
                 suggestion=self._suggestion,
             )
 
-        def tag[V: dom.Val](self, val: V, *args, **kwargs) -> V:
+        def tag[V: std.Val](self, val: V, *args, **kwargs) -> V:
             return self.build().tag(val, *args, **kwargs)
 
         def show(self, *args, **kwargs):

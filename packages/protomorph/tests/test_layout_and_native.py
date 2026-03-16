@@ -14,9 +14,8 @@ from support import Box, EmptyThing, PairBox, RuntimeArgsBox, StrictThing, Thing
 
 class LayoutAndNativeTests(unittest.TestCase):
     def test_native_registry_routes_cover_template_layout_and_construct(self):
-        registry = morph.NativeRegistry()
-        registry.register_builtin(Thing)
-        registry.register_builtin(EmptyThing)
+        # Use global registry - all builtins are auto-discovered
+        registry = morph.NATIVE_REGISTRY
 
         layout = registry.layout(cast(morph.NominalType, Thing._type()))
         self.assertIsNotNone(layout)
@@ -27,9 +26,8 @@ class LayoutAndNativeTests(unittest.TestCase):
         self.assertIsInstance(registry.construct(cast(morph.NominalType, EmptyThing._type()), ()), EmptyThing)
 
     def test_native_backend_routes_cover_layout_projection_and_materialization(self):
-        registry = morph.NativeRegistry()
-        registry.register_builtin(Thing)
-        backend = morph.NativeBackend(registry=registry)
+        # Use default backend which uses global registry
+        backend = morph.NATIVE_BACKEND
         type_ = cast(morph.NominalType, Thing._type())
 
         layout = backend.layout(type_)
@@ -46,12 +44,20 @@ class LayoutAndNativeTests(unittest.TestCase):
         self.assertEqual(repr(morph.val(PairBox._type(str, int))), "test.PairBox[K=std.Text, V=std.Integer]")
 
     def test_native_backend_exposes_atomic_layouts_for_scalar_nominals(self):
-        with morph.DEFAULT_NATIVE_BACKEND:
+        with morph.NATIVE_BACKEND:
             layout = morph.TEXT_TYPE.layout()
 
         self.assertIsInstance(layout, morph.AtomicLayout)
         assert isinstance(layout, morph.AtomicLayout)
         self.assertEqual(layout.valid_types, frozenset({str}))
+
+    def test_builtin_discovery_now_exposes_metatype_layouts(self):
+        layout = morph.nominal_type("std.Struct.Type").layout()
+
+        self.assertIsNotNone(layout)
+        assert isinstance(layout, morph.StructLayout)
+        self.assertIs(layout.builtin_cls, morph.StructType)
+        self.assertEqual(tuple(layout.fields.index.keys), ("meta_attrs",))
 
     def test_runtime_orig_class_route_extracts_native_type_arguments(self):
         self.assertEqual(
@@ -80,8 +86,8 @@ class LayoutAndNativeTests(unittest.TestCase):
             Bridge().lift(UnsupportedQualifier(underlying=morph.TEXT_TYPE), morph.INTEGER_TYPE)
 
     def test_registry_construct_currently_preserves_surprising_builtin_invariants(self):
-        registry = morph.NativeRegistry()
-        registry.register_builtin(StrictThing)
+        # Use global registry - all builtins are auto-discovered
+        registry = morph.NATIVE_REGISTRY
 
         self.assertEqual(repr(registry.construct(cast(morph.NominalType, StrictThing._type()), (-1,))), "StrictThing(-1)")
 
