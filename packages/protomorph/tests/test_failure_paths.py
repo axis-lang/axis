@@ -13,8 +13,15 @@ from support import Box, DummyContext, DummyVarType, Thing
 
 
 class FailurePathTests(unittest.TestCase):
+    def setUp(self):
+        self._native_bridge = morph.NATIVE_BACKEND
+        self._native_bridge.__enter__()
+
+    def tearDown(self):
+        self._native_bridge.__exit__(None, None, None)
+
     def test_construct_route_rejects_opaque_types_and_layout_mismatches(self):
-        with self.assertRaises(TypeError):
+        with self.assertRaises((TypeError, RuntimeError)):
             morph.nominal_type("test.Opaque").construct(value=1)
         with self.assertRaises(ValueError):
             morph.struct_type(int, int).construct(1)

@@ -134,6 +134,22 @@ Testing guidelines
 - Tests use unittest; keep them deterministic
 - Name tests `test_*.py` for discovery
 - Prefer focused tests over end-to-end tests for core logic
+- Organize Axis tests by theme under subdirectories of `tests/`
+  (`tests/bounds/`, `tests/defs/`, `tests/helpers_tests/`, `tests/sem/`, `tests/syn/`)
+- Prefer `tests.helpers.StdPackageTestCase` or `tests.helpers.InlinePackageTestCase`
+  for new Axis semantic tests
+- All Axis semantic tests should assume `std-core` is loaded as the base STD layer
+- Prefer string-based semantic assertions such as `assertBoundEq`, `assertTypeEq`,
+  `assertProjectEq`, and `assertAnchor` over manual `pm.nominal_type(...)` /
+  `pm.nominal_qual(...)` construction when practical
+- Use `TestPackage.with_def(...)` / `TestPackage.with_unit(...)` for inline package
+  fixtures instead of assembling filesystem fixtures unnecessarily
+- Multiline inline sources passed to test helpers are dedented automatically; write them
+  with natural indentation for readability
+- For direct def parsing in tests, use `TestPackage.parse_def(DefCls, source)`;
+  use `parse_any_def(...)` only when the exact def subclass is intentionally variable
+- If a test expects a structured report exception and the report output is just noise,
+  use `self.suppress_report_output()` around the assertion
 
 Examples and sandbox
 - Use `codebase/sandbox` for quick manual checks

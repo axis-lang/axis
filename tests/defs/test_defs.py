@@ -1,30 +1,18 @@
-import unittest
-from typing import cast
-
 import protomorph as pm
 
 from axis import expr, items, log, sem, syn
 from axis.expr.index import Index
 from axis.items.defs.base import build_binding_struct
+from tests.helpers import SemanticTestCase, StdPackageTestCase, TestPackage
 
-
-class DummyRealm(sem.Realm):
-    @property
-    def all_contexts(self) -> tuple[sem.Context, ...]:
-        return ()
-
-
-TEST_REALM = DummyRealm()
+TEST_PKG = TestPackage.with_std()
 
 
 def parse_def(source: str) -> items.Def:
-    node = items.Def.from_src(source, realm=TEST_REALM)[0]
-    assert node is not None
-    assert isinstance(node, items.Def)
-    return node
+    return TEST_PKG.parse_any_def(source)
 
 
-class DefFromSrcTest(unittest.TestCase):
+class DefFromSrcTest(SemanticTestCase):
     def test_from_src_parses_def_without_unit_wrapper(self):
         cases = (
             ("def Optional T", items.QualDef),
@@ -37,14 +25,14 @@ class DefFromSrcTest(unittest.TestCase):
                 self.assertIsInstance(node, expected_type)
 
     def test_from_src_preserves_inline_shape_information(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.QualDef,
             """def Array[..Dims, ...] T
 where:
     val Dims: Array Natural
     val T: Type = Sym
-"""
+""",
         )
-        node = cast(items.QualDef, node)
 
         self.assertIsInstance(node, items.QualDef)
         self.assertIsNotNone(node.spec)
@@ -57,7 +45,8 @@ where:
         )
 
     def test_from_src_preserves_inline_args_and_takes_blocks(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E[A, ...](x, y)
 where:
     val A: Type
@@ -65,9 +54,8 @@ where:
 takes:
     val x: Whole
     val y: Text
-"""
+""",
         )
-        node = cast(items.ClassDef, node)
 
         self.assertIsInstance(node, items.ClassDef)
         self.assertEqual(str(node.spec), "(A, Lit(Ellipsis))")
@@ -78,23 +66,22 @@ takes:
         )
 
     def test_from_src_preserves_extends_block(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def Pair[T]
 extends Box[T]
 takes:
     val value: T
-"""
+""",
         )
-        node = cast(items.ClassDef, node)
 
         self.assertEqual(len(node.extends), 1)
         self.assertIsInstance(node.extends[0].expr, Index)
 
 
-class DefBuildBindingStructTest(unittest.TestCase):
+class DefBuildBindingStructTest(SemanticTestCase):
     def test_inline_only_bindings_are_preserved(self):
-        node = parse_def("def Struct[Key: Type = Text]")
-        node = cast(items.ClassDef, node)
+        node = TEST_PKG.parse_def(items.ClassDef, "def Struct[Key: Type = Text]")
         struct = build_binding_struct(
             inline_expr=node.spec,
             block_expr=None,
@@ -108,12 +95,13 @@ class DefBuildBindingStructTest(unittest.TestCase):
         self.assertFalse(struct.open_tail)
 
     def test_block_only_bindings_remain_nominal(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E
 where:
     val A: Type
     val B: Type = Sym
-"""
+""",
         )
         struct = build_binding_struct(
             inline_expr=None,
@@ -141,16 +129,16 @@ where:
         self.assertTrue(struct.open_tail)
 
     def test_param_bindings_use_real_takes_blocks(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E[A](x, ...)
 where:
     val A: Type
 takes:
     val x: Whole
     val y: Text
-"""
+""",
         )
-        assert isinstance(node, items.ClassDef)
         struct = build_binding_struct(
             inline_expr=node.args,
             block_expr=node.takes[0],
@@ -160,14 +148,15 @@ takes:
         self.assertTrue(struct.open_tail)
 
     def test_inline_placeholder_merges_with_block_placeholder(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E[_]
 where:
     val _: Natural
-"""
+""",
         )
         struct = build_binding_struct(
-            inline_expr=cast(items.ClassDef, node).spec,
+            inline_expr=node.spec,
             block_expr=node.where[0],
         )
         self.assertEqual(struct.index.keys, (None,))
@@ -190,36 +179,38 @@ where:
         self.assertEqual(struct.values[0].binder_name, "Args")
 
     def test_closed_inline_rejects_extra_block_bindings(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E[A]
 where:
     val A: Type
     val B: Type
-"""
+""",
         )
         struct = build_binding_struct(
-            inline_expr=cast(items.ClassDef, node).spec,
+            inline_expr=node.spec,
             block_expr=node.where[0],
         )
         self.assertEqual(struct.index.keys, (None, "B"))
         self.assertEqual(tuple(binding.binder_name for binding in struct.values), ("A", "B"))
 
     def test_rejects_conflicting_bounds(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def E[A: Whole]
 where:
     val A: Text
-"""
+""",
         )
-        with self.assertRaises(log.Report.Exception):
+        with self.suppress_report_output(), self.assertRaises(log.Report.Exception):
             build_binding_struct(
-                inline_expr=cast(items.ClassDef, node).spec,
+                inline_expr=node.spec,
                 block_expr=node.where[0],
             )
 
     def test_rejects_nonfinal_ellipsis(self):
         inline_expr = expr.Tuple.from_str("(a, ..., b)")
-        with self.assertRaises(log.Report.Exception):
+        with self.suppress_report_output(), self.assertRaises(log.Report.Exception):
             build_binding_struct(
                 inline_expr=inline_expr,
                 block_expr=None,
@@ -227,41 +218,45 @@ where:
 
     def test_rejects_nonfinal_spread(self):
         inline_expr = expr.Tuple.from_str("(..rest, a)")
-        with self.assertRaises(log.Report.Exception):
+        with self.suppress_report_output(), self.assertRaises(log.Report.Exception):
             build_binding_struct(
                 inline_expr=inline_expr,
                 block_expr=None,
             )
 
 
-class ContributionBoundExprTest(unittest.TestCase):
+class ContributionBoundExprTest(StdPackageTestCase):
     def test_qual_contribution_exposes_underlying_bound_expr_and_bound(self):
-        pkg = items.Package.from_path("codebase/std-core")
-        contrib = next(
-            contrib
-            for contrib in pkg.all_contributions
-            if isinstance(contrib, sem.Entity.QualContribution)
-            and contrib.anchor.path == "std.Optional"
+        contrib = self.assertContribution(
+            "std.qualifiers.Optional",
+            sem.Entity.QualContribution,
         )
+        assert isinstance(contrib, sem.Entity.QualContribution)
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
         self.assertIsInstance(contrib.underlying_bound, pm.Var)
 
     def test_array_qual_contribution_exposes_nontrivial_underlying_bound(self):
-        pkg = items.Package.from_path("codebase/std-core")
+        qual_contribs = tuple(
+            contrib
+            for contrib in self.pkg.contributions(
+                "std.qualifiers.Array",
+                sem.Entity.QualContribution,
+            )
+            if isinstance(contrib, sem.Entity.QualContribution)
+        )
         contrib = next(
             contrib
-            for contrib in pkg.all_contributions
-            if isinstance(contrib, sem.Entity.QualContribution)
-            and contrib.anchor.path == "std.Array"
-            and str(contrib.underlying_bound_expr) == "T"
+            for contrib in qual_contribs
+            if str(contrib.underlying_bound_expr) == "T"
         )
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
         self.assertIsNotNone(contrib.underlying_bound)
 
     def test_overload_layout_resolves_spec_vars_from_args(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def Box[T](value)
 where:
     val T: Type
@@ -269,19 +264,19 @@ takes:
     val value: T
 """
         )
-        assert isinstance(node, items.ClassDef)
         contrib = next(iter(node.contributions))
         assert isinstance(contrib, sem.Entity.OverloadContribution)
 
-        layout = contrib.layout(pm.Struct.new(T=pm.val(pm.nominal_type("std.Sym"))))
+        layout = contrib.layout(pm.Struct.new(T=pm.val(self.type_bound("core.Sym"))))
 
         self.assertIsNotNone(layout)
         assert isinstance(layout, pm.StructLayout)
         self.assertEqual(tuple(layout.fields.index.keys), (None,))
-        self.assertEqual(layout.fields.values[0], pm.nominal_type("std.Sym"))
+        self.assertEqual(layout.fields.values[0], self.type_bound("core.Sym"))
 
     def test_class_contribution_exposes_extends_bound_expr_and_bound(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.ClassDef,
             """def Pair[T](value)
 extends Box[T]
 where:
@@ -290,7 +285,6 @@ takes:
     val value: T
 """
         )
-        assert isinstance(node, items.ClassDef)
         contrib = next(iter(node.contributions))
         assert isinstance(contrib, sem.Entity.OverloadContribution)
 
@@ -298,14 +292,14 @@ takes:
         self.assertIsNotNone(contrib.extends_bound)
 
     def test_qual_contribution_exposes_extends_bound_expr_and_bound(self):
-        node = parse_def(
+        node = TEST_PKG.parse_def(
+            items.QualDef,
             """def Optional T
 extends Maybe[T]
 where:
     val T: Type
 """
         )
-        assert isinstance(node, items.QualDef)
         contrib = next(iter(node.contributions))
         assert isinstance(contrib, sem.Entity.QualContribution)
 

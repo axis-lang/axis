@@ -13,6 +13,13 @@ from support import Box, DummyContext, FancyBox, PairBox, RuntimeArgsBox, Thing
 
 
 class NativeSpecializationTests(unittest.TestCase):
+    def setUp(self):
+        self._native_bridge = morph.NATIVE_BACKEND
+        self._native_bridge.__enter__()
+
+    def tearDown(self):
+        self._native_bridge.__exit__(None, None, None)
+
     def test_type_from_python_routes_cover_typevars_and_unregistered_types(self):
         T = TypeVar("T")
         vars: set[morph.Var] = set()
@@ -31,7 +38,7 @@ class NativeSpecializationTests(unittest.TestCase):
 
         self.assertIsNotNone(layout)
         assert isinstance(layout, morph.StructLayout)
-        self.assertEqual(repr(morph.val(layout.fields.get("pair"))), "test.PairBox[K=$T, V=std.Integer]")
+        self.assertEqual(repr(morph.val(layout.fields.get("pair"))), "test.PairBox[K=$T, V=std.core.Integer]")
         self.assertEqual(repr(morph.val(layout.fields.get("box"))), "test.Box[T=$T]")
 
     def test_build_builtin_type_routes_cover_defaults_and_invalid_parameter_shapes(self):
@@ -46,8 +53,8 @@ class NativeSpecializationTests(unittest.TestCase):
 
     def test_runtime_type_args_and_union_transform_cover_additional_branches(self):
         self.assertEqual(morph.builtin_runtime_type_args(RuntimeArgsBox(value="x", runtime_orig_class_repr="str")), (str,))
-        self.assertEqual(repr(morph.val(morph.type_from_python(tuple[str, ...]))), "std.List std.Text")
-        self.assertEqual(repr(morph.val(morph.type_from_python(list[str]))), "std.List std.Text")
+        self.assertEqual(repr(morph.val(morph.type_from_python(tuple[str, ...]))), "std.qualifiers.List std.core.Text")
+        self.assertEqual(repr(morph.val(morph.type_from_python(list[str]))), "std.qualifiers.List std.core.Text")
 
     def test_native_registry_construct_rejects_unknown_or_bad_arity_layouts(self):
         # Use global registry - all builtins are auto-discovered  

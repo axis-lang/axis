@@ -13,14 +13,21 @@ from support import Box, DummyContext, DummyVarType, RuntimeArgsBox, Thing
 
 
 class CoreApiTests(unittest.TestCase):
+    def setUp(self):
+        self._native_bridge = morph.NATIVE_BACKEND
+        self._native_bridge.__enter__()
+
+    def tearDown(self):
+        self._native_bridge.__exit__(None, None, None)
+
     def test_val_route_covers_literals_types_python_annotations_and_specs(self):
         ctx = DummyContext()
         type_var = morph.var(DummyVarType, ctx, "T")
         specialized = morph.nominal_type("std.MyType", morph.spec(T=type_var))
 
         self.assertEqual(repr(morph.val(42)), "42")
-        self.assertEqual(repr(morph.val(morph.INTEGER_TYPE)), "std.Integer")
-        self.assertEqual(repr(morph.val(list[int])), "std.List std.Integer")
+        self.assertEqual(repr(morph.val(morph.INTEGER_TYPE)), "std.core.Integer")
+        self.assertEqual(repr(morph.val(list[int])), "std.qualifiers.List std.core.Integer")
         self.assertEqual(repr(morph.val(specialized)), "std.MyType[T=$T]")
 
     def test_struct_and_struct_type_routes_cover_value_and_schema_construction(self):
@@ -38,7 +45,7 @@ class CoreApiTests(unittest.TestCase):
         named_metaspec = morph.struct_type(name=str, value=int)._metaspec()
         self.assertIsNotNone(named_metaspec)
         assert named_metaspec is not None
-        self.assertEqual(repr(named_metaspec), "(name=std.Nominal.Type, value=std.Nominal.Type)")
+        self.assertEqual(repr(named_metaspec), "(name=std.types.NominalType, value=std.types.NominalType)")
         self.assertEqual(
             tuple(cast(morph.StructType, named_metaspec.__type__).meta_attrs.index.keys),
             ("name", "value"),
@@ -49,7 +56,7 @@ class CoreApiTests(unittest.TestCase):
         value = morph.union_value(int, str, active="x")
         fact = morph.Fact(boxed.spec_ref.__type__, boxed.spec_ref.__data__)
 
-        self.assertEqual(repr(morph.val(boxed)), "test.Box[T=std.Text]")
+        self.assertEqual(repr(morph.val(boxed)), "test.Box[T=std.core.Text]")
         self.assertEqual(repr(value), "'x'")
         self.assertEqual(fact, boxed.spec_ref)
 
@@ -61,7 +68,7 @@ class CoreApiTests(unittest.TestCase):
 
         self.assertIs(type_value.data, morph.INTEGER_TYPE)
         self.assertEqual(type_value.as_type(), morph.INTEGER_TYPE)
-        self.assertEqual(morph.anchor("std.Text").as_type(), morph.TEXT_TYPE)
+        self.assertEqual(morph.anchor("std.core.Text").as_type(), morph.TEXT_TYPE)
         self.assertEqual(spec.as_type(), morph.nominal_type("test.Box", morph.spec(T=str)))
         self.assertIsNone(morph.literal(1).as_type())
         self.assertEqual(spec.struct_shape, spec_args.shape)
@@ -79,7 +86,7 @@ class CoreApiTests(unittest.TestCase):
 
     def test_type_route_covers_type_projection_and_nominal_qualify(self):
         self.assertEqual(morph.type_(int), morph.INTEGER_TYPE)
-        self.assertEqual(repr(morph.nominal_type("std.List").qualify(int)), "NominalQualifier(NominalType(std.Integer), std.List)")
+        self.assertEqual(repr(morph.nominal_type("std.qualifiers.List").qualify(int)), "NominalQualifier(NominalType(std.core.Integer), std.qualifiers.List)")
 
     def test_nominal_decode_and_construct_routes_materialize_with_native_layout(self):
         with morph.NATIVE_BACKEND:
@@ -114,10 +121,10 @@ class CoreApiTests(unittest.TestCase):
             value = morph.val(RuntimeArgsBox(value="x", runtime_orig_class_repr="str"))
 
         rendered = repr(value)
-        self.assertIn("test.RuntimeArgsBox[T=std.Text](value='x'", rendered)
+        self.assertIn("test.RuntimeArgsBox[T=std.core.Text](value='x'", rendered)
         self.assertIn("runtime_orig_class_repr=Const(type=", rendered)
         self.assertIn("data='str'))", rendered)
-        self.assertEqual(repr(morph.val(Box._type(str))), "test.Box[T=std.Text]")
+        self.assertEqual(repr(morph.val(Box._type(str))), "test.Box[T=std.core.Text]")
 
     def test_layout_and_projection_routes_expose_structural_information(self):
         with morph.NATIVE_BACKEND:

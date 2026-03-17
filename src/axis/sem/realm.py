@@ -112,7 +112,7 @@ class Realm(pm.SemanticBridgeBase, Consed):
                 return layout.fields[key]
             raise TypeError(f"Unsupported key type: {type(key)}")
 
-        return super().project(type, key)
+        raise RuntimeError(f"Could not project semantic key {key!r} from {type!r}")
 
     def lift(self, qualifier: pm.Qualifier, result: pm.Type) -> pm.Type:
         if isinstance(qualifier, pm.NominalQualifier):
@@ -122,7 +122,9 @@ class Realm(pm.SemanticBridgeBase, Consed):
                 underlying=result,
             )
 
-        return super().lift(qualifier, result)
+        raise RuntimeError(
+            f"Realm.lift does not support qualifier {type(qualifier).__name__}"
+        )
 
     def combine(
         self,
@@ -131,7 +133,9 @@ class Realm(pm.SemanticBridgeBase, Consed):
         *,
         op: str | None = None,
     ) -> pm.Type:
-        return super().combine(left, right, op=op)
+        raise RuntimeError(
+            f"Realm.combine has no semantic rule for {left!r} {op or '?'} {right!r}"
+        )
     
 
 

@@ -16,7 +16,7 @@ class ContextProto(Inmutable):
 class VarType[C: ContextProto](pm.Type, abstract=True):
     ctx: C
 
-    ANCHOR: ClassVar[str] = "std.Var.Type"
+    ANCHOR: ClassVar[str] = "std.types.VarType"
 
     def _wrap(self, data: pm.Data) -> pm.Val:
         if not isinstance(data, str):

@@ -41,7 +41,7 @@ class Ref(pm.Val, Consed, abstract=True):
 
 
 class AnchorType(RefType):
-    ANCHOR = "std.Ref.Anchor"
+    ANCHOR = "std.types.Anchor"
 
     def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
@@ -101,7 +101,7 @@ class Anchor(Ref):
 
 
 class SpecType(RefType):
-    ANCHOR = "std.Ref.Spec.Type"
+    ANCHOR = "std.types.Spec"
 
     meta_args: pm.StructType = _
 

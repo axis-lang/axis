@@ -1,112 +1,85 @@
 unit std
 
-def Any
-def Empty
-def Boolean
-def Natural
-def Whole
-def Integer
-def Decimal
-def Text
-def Sym
-def Type
+mod core
+    def Any
+    def Empty
+    def Boolean
+    def Natural
+    def Whole
+    def Integer
+    def Decimal
+    def Text
+    def Sym
 
 
-def Anchor(path)
-takes:
-    val path: Text
+mod types
+    def Type
 
-
-def Spec[S](anchor, args)
-where:
-    val S: Type
-takes:
-    val anchor: Ref.Anchor
-    val args: S
-
-
-def Optional T
-where:
-    val T: Type
-
-
-def Array[..Dims] T
-where:
-    val Dims: Type
-    val T: Type
-
-
-def Struct[I] T
-where:
-    val I: Type
-    val T: Type
-
-
-def Map[K] V
-where:
-    val K: Type
-    val V: Type
-
-
-def Set V
-where:
-    val V: Type
-
-
-def List V
-where:
-    val V: Type
-
-
-mod Ref
     def Anchor(path)
     takes:
-        val path: Text
+        val path: core.Text
 
-    mod Spec
-        def Type[S](anchor, args)
-        where:
-            val S: Type@std
-        takes:
-            val anchor: Ref.Anchor
-            val args: S
-
-
-mod Struct
-    def Type[I](meta_attrs)
+    def Spec[S](anchor, args)
     where:
-        val I: Type@std
+        val S: types.Type
     takes:
-        val meta_attrs: Struct[I] Type@std
+        val anchor: types.Anchor
+        val args: S
 
-
-mod Nominal
-    def Type[S](spec_ref)
+    def StructType[I](meta_attrs)
     where:
-        val S: Type@std
+        val I: types.Type
     takes:
-        val spec_ref: Ref.Spec.Type[S]
+        val meta_attrs: qualifiers.Struct[I] types.Type
 
-    def Qual[S] U
+    def NominalType[S](spec_ref)
     where:
-        val S: Type@std
-        val U: Type@std
+        val S: types.Type
     takes:
-        val spec_ref: Ref.Spec.Type[S]
+        val spec_ref: types.Spec[S]
+
+    def NominalQualifier[S] U
+    where:
+        val S: types.Type
+        val U: types.Type
+    takes:
+        val spec_ref: types.Spec[S]
         val underlying: U
 
-
-mod Union
-    def Type[T](types)
+    def UnionType[T](types)
     where:
-        val T: Type@std
+        val T: types.Type
     takes:
-        val types: List T
+        val types: qualifiers.List T
+
+    def VarType
+    def ErrType
 
 
-mod Var
-    def Type
+mod qualifiers
+    def Optional T
+    where:
+        val T: types.Type
 
+    def Array[..Dims] T
+    where:
+        val Dims: types.Type
+        val T: types.Type
 
-mod Err
-    def Type
+    def Struct[I] T
+    where:
+        val I: types.Type
+        val T: types.Type
+
+    def Map[K] V
+    where:
+        val K: types.Type
+        val V: types.Type
+
+    def Set V
+    where:
+        val V: types.Type
+
+    def List V
+    where:
+        val V: types.Type

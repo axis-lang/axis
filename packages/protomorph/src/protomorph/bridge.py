@@ -169,6 +169,7 @@ _BRIDGE_TOKENS: WeakKeyDictionary[SemanticBridgeBase, list[Token[SemanticBridge]
 
 def layout_of(type: pm.Type) -> Layout | None:
     bridge = pm.BRIDGE.get(pm.DEFAULT_BRIDGE)
+
     layout = bridge.layout(type)
     if layout is not None:
         return layout

@@ -91,8 +91,8 @@ def _format_const(value: pm.Const) -> str:
 
     if isinstance(type, pm.NominalType):
         anchor = tuple(type.spec_ref.path.split("."))
-        if len(anchor) == 2 and anchor[0] == "std":
-            return _format_std_literal(anchor[1], value.__data__)
+        if len(anchor) == 3 and anchor[:2] == ("std", "core"):
+            return _format_std_literal(anchor[2], value.__data__)
 
         if attrs is None:
             return _format_spec(type.spec_ref)

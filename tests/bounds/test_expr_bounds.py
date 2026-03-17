@@ -1,10 +1,10 @@
-import unittest
-
 import protomorph as pm
 
-from axis import expr, items, log, syn
+from axis import expr, log, sem, syn
 from axis.expr.ir import Scope
 from axis.expr.ir.bound import build_bound, build_default
+
+from tests.helpers import StdPackageTestCase
 
 
 class DummyBoundContext(pm.ContextProto):
@@ -15,13 +15,13 @@ class DummyBoundVar(pm.VarType[DummyBoundContext]):
     pass
 
 
-class ExprBoundsTest(unittest.TestCase):
+class ExprBoundsTest(StdPackageTestCase):
+    std_root_scope: sem.Scope
+
     @classmethod
     def setUpClass(cls):
-        cls.pkg = items.Package.from_path("codebase/std-core")
-        cls.std_scope = next(
-            ctx for ctx in cls.pkg.all_contexts if type(ctx).__name__ == "Unit"
-        ).scope
+        super().setUpClass()
+        cls.std_root_scope = cls.pkg.scope("std")
 
         dummy_ctx = DummyBoundContext()
         builder = Scope.Builder(name="bounds")
@@ -36,54 +36,52 @@ class ExprBoundsTest(unittest.TestCase):
         cls.bound_scope = builder.build()
 
     def test_sym_uses_scope_only(self):
-        self.assertIsInstance(build_bound(expr.Sym(name="std"), self.std_scope), pm.Err)
+        self.assertIsInstance(build_bound(expr.Sym(name="std"), self.std_root_scope), pm.Err)
         self.assertEqual(
-            build_bound(expr.Sym(name="Text"), self.std_scope),
-            pm.anchor("std.Text"),
+            build_bound(expr.Sym(name="core"), self.std_root_scope),
+            pm.anchor("std.core"),
         )
         self.assertEqual(
-            build_bound(expr.Sym(name="Ref"), self.std_scope),
-            pm.anchor("std.Ref"),
+            build_bound(expr.Sym(name="types"), self.std_root_scope),
+            pm.anchor("std.types"),
         )
 
     def test_member_requires_anchor_base(self):
         self.assertIsInstance(
-            build_bound(expr.Member(of=expr.Sym(name="std"), name="Text"), self.std_scope),
+            build_bound(expr.Member(of=expr.Sym(name="std"), name="Text"), self.std_root_scope),
             pm.Err,
         )
         self.assertEqual(
             build_bound(
-                expr.Member(of=expr.Sym(name="Text"), name="Inner"),
-                self.std_scope,
+                expr.Member(of=expr.Member(of=expr.Sym(name="core"), name="Text"), name="Inner"),
+                self.std_root_scope,
             ),
-            pm.anchor("std.Text.Inner"),
+            pm.anchor("std.core.Text.Inner"),
         )
 
     def test_index_builds_specialized_ref_from_anchor(self):
         indexed = build_bound(
-            expr.Index(origin=expr.Sym(name="Text"), indices=expr.Sym(name="Natural")),
-            self.std_scope,
+            expr.Index(origin=expr.Member(of=expr.Sym(name="core"), name="Text"), indices=expr.Member(of=expr.Sym(name="core"), name="Natural")),
+            self.std_root_scope,
         )
 
         assert isinstance(indexed, pm.Spec)
-        self.assertEqual(indexed.path, "std.Text")
+        self.assertEqual(indexed.path, "std.core.Text")
         self.assertIsNotNone(indexed.args)
 
     def test_nested_std_module_spec_anchor_resolves_from_scope(self):
-        indexed = build_bound(
-            syn.Expr.from_str("Ref.Spec.Type[Text]"),
-            self.std_scope,
-        )
+        indexed = self.bound("types.Spec[core.Text]", self.std_root_scope)
 
         assert isinstance(indexed, pm.Spec)
-        self.assertEqual(indexed.path, "std.Ref.Spec.Type")
+        self.assertEqual(indexed.path, "std.types.Spec")
         args = indexed.args
         self.assertIsNotNone(args)
         assert args is not None
-        self.assertEqual(args.values[0].data, pm.anchor("std.Text").data)
+        self.assertTypeEq("core.Text", "core.Text", scope=self.std_root_scope)
+        self.assertEqual(args.values[0].data, self.type_bound("core.Text", self.std_root_scope))
 
     def test_lit_and_tuple_build_structural_values(self):
-        self.assertEqual(build_bound(expr.Lit(value=42), self.std_scope), pm.literal(42))
+        self.assertEqual(build_bound(expr.Lit(value=42), self.std_root_scope), pm.literal(42))
 
         tuple_bound = build_bound(
             expr.Tuple(
@@ -96,7 +94,7 @@ class ExprBoundsTest(unittest.TestCase):
                     ),
                 )
             ),
-            self.std_scope,
+            self.std_root_scope,
         )
 
         self.assertEqual(tuple_bound, pm.struct(pm.literal(1), name=pm.literal("x")))
@@ -109,7 +107,7 @@ class ExprBoundsTest(unittest.TestCase):
                     elements=(expr.Tuple.Positional(value=expr.Sym(name="Natural")),)
                 ),
             ),
-            self.std_scope,
+            self.std_root_scope,
         )
 
         self.assertIsInstance(bound, pm.Err)
@@ -122,7 +120,7 @@ class ExprBoundsTest(unittest.TestCase):
             ).to_anchor(None)
 
     def test_default_construction_matches_bound_rules(self):
-        self.assertEqual(build_default(expr.Lit(value=7), self.std_scope), pm.literal(7))
+        self.assertEqual(build_default(expr.Lit(value=7), self.std_root_scope), pm.literal(7))
         self.assertEqual(
             build_default(syn.Expr.from_str("Optional Text"), self.bound_scope),
             build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope),
@@ -135,6 +133,15 @@ class ExprBoundsTest(unittest.TestCase):
         assert isinstance(bound.__data__, pm.NominalQualifier)
         self.assertEqual(bound.__data__.spec_ref.path, "Optional")
         self.assertEqual(repr(pm.val(bound.__data__.underlying)), "Text")
+
+    def test_compound_builds_nested_qualifiers_right_to_left(self):
+        self.assertTypeEq(
+            "qualifiers.Optional qualifiers.Struct[core.Text] types.Type",
+            "qualifiers.Optional qualifiers.Struct[core.Text] types.Type",
+        )
+        bound = self.type_bound("qualifiers.Optional qualifiers.Struct[core.Text] types.Type")
+        assert isinstance(bound, pm.NominalQualifier)
+        self.assertEqual(bound.underlying, self.type_bound("qualifiers.Struct[core.Text] types.Type"))
 
     # def test_compound_requires_qualifier_symbols_from_scope(self):
     #     self.assertIsInstance(
@@ -179,6 +186,25 @@ class ExprBoundsTest(unittest.TestCase):
         assert isinstance(value.__data__, pm.NominalQualifier)
         self.assertEqual(value.__data__.spec_ref.path, "Struct.Index")
 
+    def test_canonical_std_scope_builder_helper(self):
+        self.assertBoundEq("core.Text", "core.Text", scope=self.std_root_scope)
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_use_scope_imports_canonical_aliases(self):
+        scope = self.use_scope("std(core.Text, types.StructType)")
+
+        self.assertBoundEq("Text", "core.Text", scope=scope)
+        self.assertBoundEq("StructType", "types.StructType", scope=scope)
+
+    def test_use_scope_accepts_explicit_use_prefix(self):
+        scope = self.resolve_scope("use std(qualifiers.Optional, core.Text)")
+
+        self.assertBoundEq("Optional", "qualifiers.Optional", scope=scope)
+        self.assertBoundEq("Text", "core.Text", scope=scope)
+
+    def test_scope_resolver_accepts_context_instance(self):
+        types_ctx = self.pkg.context("std.types")
+
+        resolved = self.resolve_scope(types_ctx)
+
+        self.assertIsInstance(resolved, sem.Scope)
+        self.assertEqual(resolved, types_ctx.scope)

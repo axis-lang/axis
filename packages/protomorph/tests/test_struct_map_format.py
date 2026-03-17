@@ -12,6 +12,13 @@ from support import Thing
 
 
 class StructMapFormatTests(unittest.TestCase):
+    def setUp(self):
+        self._native_bridge = morph.NATIVE_BACKEND
+        self._native_bridge.__enter__()
+
+    def tearDown(self):
+        self._native_bridge.__exit__(None, None, None)
+
     def test_map_routes_cover_keys_len_iter_get_has_and_apply(self):
         mapping = morph.Map.new((("x", 1), ("y", 2)))
 
@@ -65,10 +72,10 @@ class StructMapFormatTests(unittest.TestCase):
         with morph.NATIVE_BACKEND:
             nominal_value = morph.val(Thing(name="a", value=1))
 
-        self.assertEqual(repr(morph.anchor("std.Text")), "std.Text")
+        self.assertEqual(repr(morph.anchor("std.core.Text")), "std.core.Text")
         self.assertEqual(repr(morph.spec()), "()")
-        self.assertEqual(repr(morph.spec(T=str)), "(T=std.Text)")
-        self.assertEqual(repr(morph.TEXT_TYPE), "NominalType(std.Text)")
+        self.assertEqual(repr(morph.spec(T=str)), "(T=std.core.Text)")
+        self.assertEqual(repr(morph.TEXT_TYPE), "NominalType(std.core.Text)")
         self.assertEqual(repr(struct_value), "(name='a', value=1)")
         self.assertEqual(repr(union_value), "'x'")
         self.assertEqual(repr(nominal_value), "test.Thing(name='a', value=1)")

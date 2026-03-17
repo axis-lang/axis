@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from axis import expr
 from axis import items, syn
+from tests.helpers import StdPackageTestCase
 
 # SRCBLOCK_SPEC_PATH = Path("src/axis/codebase/grammar/srcblock-spec.yaml")
 # SOURCE_UNIT_PATH = Path("src/std.base.tests.src/test.ax")
@@ -115,18 +116,16 @@ class ProjectionMatchTest(unittest.TestCase):
 # scoping.process_item(unit)
 
 
-class DatabaseSmokeTest(unittest.TestCase):
+class DatabaseSmokeTest(StdPackageTestCase):
     def test_database_build(self):
-        pkg = items.Package.from_path("codebase/std-core")
-        entities = pkg.entities_by_anchor
-        members = pkg.namespaces_by_anchor
+        entities = self.pkg.entities_by_anchor
+        members = self.pkg.namespaces_by_anchor
         self.assertGreater(len(entities), 0)
         self.assertGreater(len(members), 0)
 
     def test_database_is_cached(self):
-        pkg = items.Package.from_path("codebase/std-core")
-        entities_1 = pkg.entities_by_anchor
-        entities_2 = pkg.entities_by_anchor
+        entities_1 = self.pkg.entities_by_anchor
+        entities_2 = self.pkg.entities_by_anchor
         self.assertIs(entities_1, entities_2)
 
 

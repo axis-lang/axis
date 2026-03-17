@@ -52,7 +52,7 @@ class BuiltinContext(pm.ContextProto):
 
 
 class NativeGenericVarType(pm.VarType[pm.ContextProto]):
-    ANCHOR = "std.Type.Var.Generic"
+    ANCHOR = "std.types.NativeGenericVarType"
 
 
 # === Singleton Registry ===
@@ -429,7 +429,7 @@ def _spec_from_types(**bindings: pm.Type) -> pm.Const | None:
 def _tuple_transform(*args: pm.Type) -> pm.Type:
     """Transform tuple type annotation."""
     if len(args) == 2 and args[1] is Ellipsis:
-        return nominal_qual("std.List", _spec_from_types(), underlying=args[0])
+        return nominal_qual("std.qualifiers.List", _spec_from_types(), underlying=args[0])
     return pm.StructType(meta_attrs=pm.Struct.new(*args))
 
 

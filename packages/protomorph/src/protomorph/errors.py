@@ -8,7 +8,7 @@ __all__ = ["ErrType", "Err"]
 
 
 class ErrType(pm.Type):
-    ANCHOR = "std.Err.Type"
+    ANCHOR = "std.types.ErrType"
 
     def _wrap(self, data: pm.Data) -> pm.Val:
         return Err(self, data)

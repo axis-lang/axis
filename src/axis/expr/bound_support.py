@@ -12,51 +12,47 @@ def build_compound_bound(
     components: tuple[syn.Expr, ...],
     scope: syn.ScopeLike,
 ) -> pm.Val:
-    from axis import expr as expr_module
-
     if not components:
         return unsupported_bound(None, "empty compound expression")
 
-    *head_components, underlying_expr = components
-    if not head_components:
+    *qualifier_exprs, underlying_expr = components
+    if not qualifier_exprs:
         value = underlying_expr.to_bound(scope)
         if value is None:
             return unsupported_bound(underlying_expr, "expression did not produce a bound")
         return value
 
-    qualifier_expr = (
-        head_components[0]
-        if len(head_components) == 1
-        else expr_module.Compound(components=tuple(head_components))
-    )
-    qualifier_val = qualifier_expr.to_bound(scope)
     underlying_val = underlying_expr.to_bound(scope)
-
-    if qualifier_val is None:
-        return unsupported_bound(qualifier_expr, "qualifier expression did not produce a bound")
     if underlying_val is None:
         return unsupported_bound(underlying_expr, "underlying expression did not produce a bound")
-
-    if isinstance(qualifier_val, pm.Err):
-        return qualifier_val
     if isinstance(underlying_val, pm.Err):
         return underlying_val
-
-    qualifier_ref = as_qualifier_ref(qualifier_val, qualifier_expr)
-    if isinstance(qualifier_ref, pm.Err):
-        return qualifier_ref
 
     underlying_type = as_type_bound_val(underlying_val, underlying_expr)
     if isinstance(underlying_type, pm.Err):
         return underlying_type
-    
-    if isinstance(qualifier_ref, pm.Anchor):
-        return pm.val(pm.nominal_qual(qualifier_ref, underlying=underlying_type))
 
-    if isinstance(qualifier_ref, pm.Spec):
-        return pm.val(pm.NominalQualifier(spec_ref=qualifier_ref, underlying=underlying_type))
+    current = underlying_type
+    for qualifier_expr in reversed(qualifier_exprs):
+        qualifier_val = qualifier_expr.to_bound(scope)
+        if qualifier_val is None:
+            return unsupported_bound(
+                qualifier_expr,
+                "qualifier expression did not produce a bound",
+            )
+        if isinstance(qualifier_val, pm.Err):
+            return qualifier_val
 
-    return unsupported_bound(None, f"unsupported qualifier type {type(qualifier_ref).__name__} in compound expression")
+        qualifier_ref = as_qualifier_ref(qualifier_val, qualifier_expr)
+        if isinstance(qualifier_ref, pm.Err):
+            return qualifier_ref
+
+        if isinstance(qualifier_ref, pm.Anchor):
+            current = pm.nominal_qual(qualifier_ref, underlying=current)
+        else:
+            current = pm.NominalQualifier(spec_ref=qualifier_ref, underlying=current)
+
+    return pm.val(current)
     
 def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> pm.Const | None:
     from axis import expr as expr_module
@@ -136,6 +132,9 @@ def as_const_or_var(value: pm.Val | None, origin: syn.Expr | None) -> pm.Const |
     if isinstance(value, (pm.Const, pm.Var)):
         return value
     if isinstance(value, (pm.Anchor, pm.Spec)):
+        type_ = value.as_type()
+        if type_ is not None:
+            return cast(pm.Const | pm.Var, pm.val(type_))
         return cast(pm.Const | pm.Var, pm.val(value))
     raise unsupported_bound_exception(
         origin,

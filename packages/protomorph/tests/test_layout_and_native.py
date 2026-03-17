@@ -13,6 +13,13 @@ from support import Box, EmptyThing, PairBox, RuntimeArgsBox, StrictThing, Thing
 
 
 class LayoutAndNativeTests(unittest.TestCase):
+    def setUp(self):
+        self._native_bridge = morph.NATIVE_BACKEND
+        self._native_bridge.__enter__()
+
+    def tearDown(self):
+        self._native_bridge.__exit__(None, None, None)
+
     def test_native_registry_routes_cover_template_layout_and_construct(self):
         # Use global registry - all builtins are auto-discovered
         registry = morph.NATIVE_REGISTRY
@@ -37,11 +44,11 @@ class LayoutAndNativeTests(unittest.TestCase):
         self.assertEqual(cast(Thing, backend.construct(type_, ("x", 1))).name, "x")
 
     def test_type_from_python_routes_cover_scalars_containers_unions_and_builtins(self):
-        self.assertEqual(repr(morph.val(morph.type_(dict[str, str]))), "std.Map[K=std.Text] std.Text")
-        self.assertEqual(repr(morph.val(morph.type_(tuple[int, ...]))), "std.List std.Integer")
-        self.assertEqual(set(repr(morph.val(int | str)).split(" | ")), {"std.Integer", "std.Text"})
-        self.assertEqual(repr(morph.val(morph.type_(Box[str]))), "test.Box[T=std.Text]")
-        self.assertEqual(repr(morph.val(PairBox._type(str, int))), "test.PairBox[K=std.Text, V=std.Integer]")
+        self.assertEqual(repr(morph.val(morph.type_(dict[str, str]))), "std.qualifiers.Map[K=std.core.Text] std.core.Text")
+        self.assertEqual(repr(morph.val(morph.type_(tuple[int, ...]))), "std.qualifiers.List std.core.Integer")
+        self.assertEqual(set(repr(morph.val(int | str)).split(" | ")), {"std.core.Integer", "std.core.Text"})
+        self.assertEqual(repr(morph.val(morph.type_(Box[str]))), "test.Box[T=std.core.Text]")
+        self.assertEqual(repr(morph.val(PairBox._type(str, int))), "test.PairBox[K=std.core.Text, V=std.core.Integer]")
 
     def test_native_backend_exposes_atomic_layouts_for_scalar_nominals(self):
         with morph.NATIVE_BACKEND:
@@ -52,7 +59,7 @@ class LayoutAndNativeTests(unittest.TestCase):
         self.assertEqual(layout.valid_types, frozenset({str}))
 
     def test_builtin_discovery_now_exposes_metatype_layouts(self):
-        layout = morph.nominal_type("std.Struct.Type").layout()
+        layout = morph.nominal_type("std.types.StructType").layout()
 
         self.assertIsNotNone(layout)
         assert isinstance(layout, morph.StructLayout)
@@ -76,7 +83,7 @@ class LayoutAndNativeTests(unittest.TestCase):
         layout = bridge.layout(qualified)
         self.assertIsNotNone(layout)
         assert isinstance(layout, morph.StructLayout)
-        self.assertEqual(repr(morph.val(layout.fields.get("name"))), "test.Future std.Text")
+        self.assertEqual(repr(morph.val(layout.fields.get("name"))), "test.Future std.core.Text")
 
     def test_bridge_rejects_unsupported_qualifier_lift(self):
         class Bridge(morph.SemanticBridgeBase):

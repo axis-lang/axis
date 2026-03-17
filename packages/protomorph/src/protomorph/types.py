@@ -80,7 +80,7 @@ class Type(Builtin, abstract=True):
 
 
 class StructType(Type):
-    ANCHOR: ClassVar[str] = "std.Struct.Type"
+    ANCHOR: ClassVar[str] = "std.types.StructType"
 
     meta_attrs: pm.Struct[str, Type]
 
@@ -138,7 +138,7 @@ class StructType(Type):
 
 
 class NominalType(Type):
-    ANCHOR: ClassVar[str] = "std.Nominal.Type"
+    ANCHOR: ClassVar[str] = "std.types.NominalType"
 
     spec_ref: pm.Spec
 
@@ -197,7 +197,7 @@ class NominalType(Type):
 
 
 class UnionType(Type):
-    ANCHOR: ClassVar[str] = "std.Union.Type"
+    ANCHOR: ClassVar[str] = "std.types.UnionType"
 
     types: frozenset[Type]
 

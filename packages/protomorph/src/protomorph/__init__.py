@@ -265,12 +265,12 @@ def _bootstrap() -> None:
     DEFAULT_BRIDGE = NATIVE_BACKEND
     BRIDGE = ContextVar("protomorph.BRIDGE", default=DEFAULT_BRIDGE)
 
-    empty_type = nominal_type("std.Empty")
-    boolean_type = nominal_type("std.Boolean")
-    integer_type = nominal_type("std.Integer")
-    decimal_type = nominal_type("std.Decimal")
-    text_type = nominal_type("std.Text")
-    any_type = nominal_type("std.Any")
+    empty_type = nominal_type("std.core.Empty")
+    boolean_type = nominal_type("std.core.Boolean")
+    integer_type = nominal_type("std.core.Integer")
+    decimal_type = nominal_type("std.core.Decimal")
+    text_type = nominal_type("std.core.Text")
+    any_type = nominal_type("std.core.Any")
 
     EMPTY_TYPE = empty_type
     INTEGER_TYPE = integer_type
@@ -285,13 +285,13 @@ def _bootstrap() -> None:
     register_native_type(Decimal, decimal_type)
 
     def set_transform(value_type: Type) -> Type:
-        return nominal_qual("std.Set", native._spec_from_types(), underlying=value_type)
+        return nominal_qual("std.qualifiers.Set", native._spec_from_types(), underlying=value_type)
 
     def map_transform(key_type: Type, value_type: Type) -> Type:
-        return nominal_qual("std.Map", native._spec_from_types(K=key_type), underlying=value_type)
+        return nominal_qual("std.qualifiers.Map", native._spec_from_types(K=key_type), underlying=value_type)
 
     def list_transform(value_type: Type) -> Type:
-        return nominal_qual("std.List", native._spec_from_types(), underlying=value_type)
+        return nominal_qual("std.qualifiers.List", native._spec_from_types(), underlying=value_type)
 
     def union_transform(*types: Type) -> Type:
         return union_type(*types)
@@ -304,13 +304,13 @@ def _bootstrap() -> None:
     register_python_type(tuple, native._tuple_transform)
     register_python_type(cast(type, PEP604Union), union_transform)
 
-    register_atomic_layout("std.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
-    register_atomic_layout("std.Boolean", AtomicLayout(valid_types=frozenset({bool})))
-    register_atomic_layout("std.Natural", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.Whole", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.Integer", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.Decimal", AtomicLayout(valid_types=frozenset({int, float, Decimal})))
-    register_atomic_layout("std.Text", AtomicLayout(valid_types=frozenset({str})))
+    register_atomic_layout("std.core.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
+    register_atomic_layout("std.core.Boolean", AtomicLayout(valid_types=frozenset({bool})))
+    register_atomic_layout("std.core.Natural", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.core.Whole", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.core.Integer", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.core.Decimal", AtomicLayout(valid_types=frozenset({int, float, Decimal})))
+    register_atomic_layout("std.core.Text", AtomicLayout(valid_types=frozenset({str})))
 
     native._BOOTSTRAPPED = True
 

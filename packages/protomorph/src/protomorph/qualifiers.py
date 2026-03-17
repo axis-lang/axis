@@ -12,13 +12,13 @@ __all__ = ["Qualifier", "NominalQualifier"]
 
 
 class Qualifier(Type, abstract=True):
-    ANCHOR: ClassVar[str] = "std.Qual"
+    ANCHOR: ClassVar[str] = "std.types.Qualifier"
 
     underlying: Type
 
 
 class NominalQualifier(Qualifier):
-    ANCHOR: ClassVar[str] = "std.Nominal.Qual"
+    ANCHOR: ClassVar[str] = "std.types.NominalQualifier"
 
     spec_ref: pm.Spec
 
