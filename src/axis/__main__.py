@@ -5,13 +5,13 @@ from protobase import flux
 from axis import items, log, src, expr, syn, sem
 from IPython import embed
 from rich import print
-
+from protomorph import *
 app = App()
 
 
 @app.default
 def main(
-    package: str = "codebase/sandbox",
+    package: str = "codebase/std-core",
     repl: bool = False,
     watch: bool = False,
     tui: bool = False,
@@ -40,7 +40,8 @@ def main(
 
         try:
             if repl:
-                embed()
+                with pkg: 
+                    embed()
             else:
                 print(f"Watching {pkg.dir} for changes. Press Ctrl+C to stop.")
                 while True:

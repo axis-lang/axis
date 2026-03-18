@@ -13,6 +13,15 @@ semantic backend.
   lowering through `syn.Expr.to_bound(...)` and `sem.build_bound(...)`.
 - Inline and block binding forms now converge on one semantic binding model, and
   `QualDef` already emits semantic contributions.
+- `std-core` now follows the canonical module layout:
+  - `std.core.*`
+  - `std.types.*`
+  - `std.qualifiers.*`
+- Axis tests now have dedicated semantic helper infrastructure under
+  `tests/helpers/`, including `TestPackage`, `SemanticTestCase`,
+  `StdPackageTestCase`, and `InlinePackageTestCase`.
+- Axis tests are now organized by theme under `tests/bounds/`, `tests/defs/`,
+  `tests/helpers_tests/`, `tests/sem/`, and `tests/syn/`.
 - `packages/protomorph` has evolved significantly and now exposes a layout-based
   semantic backend centered on:
   - `Layout`
@@ -29,17 +38,38 @@ semantic backend.
   - `Realm.layout(nominal_type)` resolves entities and delegates to overload layouts
   - `OverloadContribution.layout(args)` constructs preliminary layouts from param bounds
   - Bound expressions use `bound.subst(env).as_type()` pattern
+- Declaration lowering has also progressed:
+  - qualifier declarations expose `underlying_bound_expr` / `underlying_bound`
+  - function implementations expose `result_bound_expr` / `result_bound`
+  - inline and block `returns` forms are merged before semantic contribution creation
 - What is still missing is decision-making semantics in `axis.sem`: there is no
   reusable semantic relation like `satisfies(actual, bound)`, no specialization
   resolver, and no call resolver.
-- Declaration support is still incomplete even after the binding work:
-  - `returns` remain mostly as raw `syn.Expr`
-  - `underlying_expr` remains raw syntax
+- Declaration support is still incomplete even after the binding and bridge work:
   - contribution `check()` methods mostly force lowering instead of performing
     declaration validation
+  - `Type` is not yet established as an explicitly usable semantic type-value in
+    the relevant scopes
+  - there is still no reusable declaration-validation layer for duplicate names,
+    invalid defaults, unresolved symbols, and malformed bounds
 - `just test` remains the package-level gate and `just test-all` is the
   repository-level integration gate; both must be green before moving to the
   next stage.
+
+## Parallel Track - Editor Tooling
+
+- The repository now also has an editor-only VS Code extension scaffold under
+  `ide/vscode/`.
+- This track is intentionally separate from the semantic roadmap. It currently
+  includes:
+  - `*.ax` file association
+  - syntax highlighting
+  - snippets
+  - comments, brackets, and indentation rules
+  - Markdown-style doc block highlighting for `---`
+- This editor track does not yet include semantic IDE features such as
+  diagnostics, hover, go-to-definition, or language-server integration.
+- `axis-lsp` remains a later milestone, after the editor baseline is stable.
 
 ## Design Rules
 
@@ -116,10 +146,13 @@ Status:
   - inline/block bindings converge on one semantic binding model
   - `QualDef` emits semantic contributions
   - qualifier-like definitions from `std-core` appear in the semantic graph
+  - qualifier declarations now lower `underlying_bound_expr` into semantic values
+  - function implementations now carry merged `result_bound_expr` / `result_bound`
 - Still open:
   - `Type` as an explicitly usable semantic type-value in scopes
-  - lowering `returns` and `underlying_expr` into semantic values
   - turning contribution `check()` into real declaration validation
+  - deciding whether any remaining declaration syntax still needs semantic lowering
+    before the constraint kernel lands
 
 ## Milestone 1.5 - Semantic Bridge Alignment
 
@@ -162,6 +195,20 @@ Status:
   - Updated bound expression processing to use `bound.subst(env).as_type()` pattern
   - Aligned field naming: `underlying_bound_expr`/`underlying_bound`, `result_bound_expr`/`result_bound`
   - All tests passing: 101 tests in `just test-all`
+
+## Near-Term Next Steps
+
+1. Finish Milestone 1 by turning contribution `check()` methods into real
+   declaration validation, with focused diagnostics for malformed declarations.
+2. Decide and implement how `Type` should be introduced as a usable semantic
+   type-value in the scopes that need it.
+3. Start Milestone 2 by introducing a dedicated constraint kernel in
+   `src/axis/sem/constraints.py` for argument materialization, default insertion,
+   and bound satisfaction.
+4. Add focused tests for that kernel before beginning specialization and call
+   resolution work.
+5. In parallel, manually validate `ide/vscode/` in VS Code and simplify the
+   grammar further if any freeze or performance issue remains.
 
 ## Milestone 2 - Constraint Kernel
 
@@ -265,3 +312,11 @@ Exit criteria:
 5. Implement specialization resolution.
 6. Implement call and overload resolution.
 7. Revisit result semantics and expand tests.
+
+Updated status note:
+
+- Steps 1 and 3 are complete.
+- Step 2 is partially complete.
+- Step 4 is the current primary semantic milestone.
+- VS Code editor support is now an active parallel track, but it does not change
+  the semantic implementation order above.

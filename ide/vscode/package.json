@@ -1,0 +1,48 @@
+{
+  "name": "axis-vscode",
+  "displayName": "Axis",
+  "description": "Basic VS Code editor support for the Axis language.",
+  "version": "0.0.1",
+  "publisher": "axis-lang",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "axis",
+    "dsl",
+    "language"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "axis",
+        "aliases": [
+          "Axis",
+          "axis"
+        ],
+        "extensions": [
+          ".ax"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "axis",
+        "scopeName": "source.axis",
+        "path": "./syntaxes/axis.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "axis",
+        "path": "./snippets/axis.json"
+      }
+    ]
+  }
+}

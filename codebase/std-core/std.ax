@@ -1,5 +1,11 @@
 unit std
 
+use std(
+    core(...),
+    types(...),
+    qualifiers(...),
+)
+
 mod core
     def Any
     def Empty
@@ -9,7 +15,21 @@ mod core
     def Integer
     def Decimal
     def Text
-    def Sym
+
+    def Struct[K] V
+    where:
+        val K: Type
+        val V: Type
+    takes: 
+        val index: Index K
+        val values: List V
+
+    def Index K
+    where:
+        val K: Type
+    takes: 
+        val keys: List K | Missing
+
 
 
 mod types
@@ -17,40 +37,41 @@ mod types
 
     def Anchor(path)
     takes:
-        val path: core.Text
+        val path: Text
 
-    def Spec[S](anchor, args)
+    def Spec[..S](anchor, args)
     where:
-        val S: types.Type
+        val S: Struct Type
     takes:
-        val anchor: types.Anchor
+        val anchor: Anchor
         val args: S
-
+    
     def StructType[I](meta_attrs)
     where:
-        val I: types.Type
+        val I: Type
     takes:
-        val meta_attrs: qualifiers.Struct[I] types.Type
+        val meta_attrs: Struct[I] Type
 
     def NominalType[S](spec_ref)
     where:
-        val S: types.Type
+        val S: Type
     takes:
-        val spec_ref: types.Spec[S]
+        val spec_ref: Spec[S]
 
     def NominalQualifier[S] U
     where:
-        val S: types.Type
-        val U: types.Type
+        val S: Type
+
+        val U: Type
     takes:
-        val spec_ref: types.Spec[S]
+        val spec_ref: Spec[S]
         val underlying: U
 
     def UnionType[T](types)
     where:
-        val T: types.Type
+        val T: Type
     takes:
-        val types: qualifiers.List T
+        val types: List T
 
     def VarType
     def ErrType
@@ -59,27 +80,27 @@ mod types
 mod qualifiers
     def Optional T
     where:
-        val T: types.Type
+        val T: Type
 
     def Array[..Dims] T
     where:
-        val Dims: types.Type
-        val T: types.Type
+        val Dims: Type
+        val T: Type
 
     def Struct[I] T
     where:
-        val I: types.Type
-        val T: types.Type
+        val I: Type   
+        val T: Type
 
     def Map[K] V
     where:
-        val K: types.Type
-        val V: types.Type
+        val K: Type
+        val V: Type
 
     def Set V
     where:
-        val V: types.Type
+        val V: Type
 
     def List V
     where:
-        val V: types.Type
+        val V: Type

@@ -1,0 +1,89 @@
+{
+  "unit": {
+    "prefix": "unit",
+    "body": [
+      "unit ${1:name}"
+    ],
+    "description": "Declare an Axis unit"
+  },
+  "mod": {
+    "prefix": "mod",
+    "body": [
+      "mod ${1:name}",
+      "    $0"
+    ],
+    "description": "Declare an Axis module"
+  },
+  "def": {
+    "prefix": "def",
+    "body": [
+      "def ${1:Name}${2:[T]}(${3:value})",
+      "$0"
+    ],
+    "description": "Declare an Axis def"
+  },
+  "qualdef": {
+    "prefix": "qualdef",
+    "body": [
+      "def ${1:Optional} ${2:T}",
+      "where:",
+      "    val ${2:T}: ${3:types.Type}"
+    ],
+    "description": "Declare a qualifier-like Axis def"
+  },
+  "classdef": {
+    "prefix": "classdef",
+    "body": [
+      "def ${1:Box}[${2:T}](${3:value})",
+      "where:",
+      "    val ${2:T}: ${4:types.Type}",
+      "takes:",
+      "    val ${3:value}: ${2:T}"
+    ],
+    "description": "Declare a nominal Axis def with where/takes blocks"
+  },
+  "where": {
+    "prefix": "where",
+    "body": [
+      "where:",
+      "    val ${1:T}: ${2:types.Type}"
+    ],
+    "description": "Insert a where block"
+  },
+  "takes": {
+    "prefix": "takes",
+    "body": [
+      "takes:",
+      "    val ${1:value}: ${2:T}"
+    ],
+    "description": "Insert a takes block"
+  },
+  "extends": {
+    "prefix": "extends",
+    "body": [
+      "extends ${1:Base}[${2:T}]"
+    ],
+    "description": "Insert an extends clause"
+  },
+  "returns": {
+    "prefix": "returns",
+    "body": [
+      "returns ${1:T}"
+    ],
+    "description": "Insert a returns clause"
+  },
+  "use": {
+    "prefix": "use",
+    "body": [
+      "use ${1:std(...)}"
+    ],
+    "description": "Insert a use block"
+  },
+  "val": {
+    "prefix": "val",
+    "body": [
+      "val ${1:name}: ${2:T}${3: = ${4:value}}"
+    ],
+    "description": "Insert a val binding"
+  }
+}

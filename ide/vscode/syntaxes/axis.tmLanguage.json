@@ -1,0 +1,117 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Axis",
+  "scopeName": "source.axis",
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#strings"},
+    {"include": "#docBlocks"},
+    {"include": "#keywords"},
+    {"include": "#constants"},
+    {"include": "#operators"},
+    {"include": "#punctuation"},
+    {"include": "#identifiers"}
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.axis",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.axis",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.axis",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "docBlocks": {
+      "patterns": [
+        {
+          "name": "meta.block.documentation.axis",
+          "begin": "^(\\s*)---\\s*$",
+          "beginCaptures": {
+            "0": {"name": "punctuation.definition.comment.begin.axis"}
+          },
+          "end": "^(?=\\s*(?:unit|mod|def|use|where|takes|extends|returns|suite|members|val|var|let|dyn|mut)\\b)",
+          "patterns": [
+            {
+              "include": "text.html.markdown"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.declaration.axis",
+          "match": "\\b(unit|mod|def|use)\\b"
+        },
+        {
+          "name": "keyword.block.axis",
+          "match": "\\b(where|takes|extends|returns|suite|members)\\b"
+        },
+        {
+          "name": "keyword.other.binding.axis",
+          "match": "\\b(val|var|let|dyn|mut)\\b"
+        },
+        {
+          "name": "meta.separator.doc.axis",
+          "match": "^\\s*---\\s*$"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.numeric.axis",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        },
+        {
+          "name": "constant.language.axis",
+          "match": "\\.\\.\\.|_|\\(/\\)"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.axis",
+          "match": "::|->|=>|\\.\\.=|\\.\\.<|&&|\\|\\||==|!=|<=|>=|[+\\-*/%=<>.:]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.brackets.axis",
+          "match": "[(){}\\[\\],]"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.definition.axis",
+          "match": "(?<=\\b(?:unit|mod|def)\\s)[$]?[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "variable.other.axis",
+          "match": "[$]?[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    }
+  }
+}
