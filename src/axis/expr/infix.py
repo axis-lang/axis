@@ -85,6 +85,38 @@ class Logic(Infix):
     precedence: ClassVar[int] = 4
 
 
+class Bitwise(Infix):
+    grammar_parser_names: ClassVar[tuple[str, ...]] = (
+        "bitwiseOrExpr",
+        "bitwiseXorExpr",
+        "bitwiseAndExpr",
+    )
+    grammar_context_names: ClassVar[tuple[str, ...]] = (
+        "BitwiseOrExprContext",
+        "BitwiseXorExprContext",
+        "BitwiseAndExprContext",
+    )
+
+    class Op(Infix.Op):
+        grammar_parser_names: ClassVar[tuple[str, ...]] = (
+            "bitwiseOrOp",
+            "bitwiseXorOp",
+            "bitwiseAndOp",
+        )
+        grammar_context_names: ClassVar[tuple[str, ...]] = (
+            "BitwiseOrOpContext",
+            "BitwiseXorOpContext",
+            "BitwiseAndOpContext",
+        )
+
+        class Symbol(Infix.Op.Symbol):
+            OR = "|"
+            XOR = "^"
+            AND = "&"
+
+    precedence: ClassVar[int] = 4
+
+
 class Range(Infix):
     class Op(Infix.Op):
         class Symbol(Infix.Op.Symbol):

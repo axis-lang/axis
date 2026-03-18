@@ -6,7 +6,12 @@ from protobase import flux, _
 
 from axis import expr, log, syn, sem
 
-from .base import SymDef, build_param_bindings, build_spec_bindings
+from .base import (
+    SymDef,
+    build_extends_fact_contribution,
+    build_param_bindings,
+    build_spec_bindings,
+)
 
 
 class QualDef(SymDef):
@@ -21,19 +26,32 @@ class QualDef(SymDef):
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
         try:
-            return frozenset(
-                sem.Entity.QualContribution(
-                    anchor=self.anchor,
-                    spec_bindings=build_spec_bindings(self.spec, where),
-                    param_bindings=build_param_bindings(None, takes),
-                    extends_bound_expr=self.extends[0].expr if self.extends else None,
-                    underlying_bound_expr=self.under,
-                    origin=self.origin, #takes or where or returns,
-                    ctx=self,
+            contributions: set[sem.Context.Contribution] = set()
+            for where in self.where or (None,):
+                spec_bindings = build_spec_bindings(self.spec, where)
+                for takes in self.takes or (None,):
+                    contributions.add(
+                        sem.Entity.QualContribution(
+                            anchor=self.anchor,
+                            spec_bindings=spec_bindings,
+                            param_bindings=build_param_bindings(None, takes),
+                            underlying_bound_expr=self.under,
+                            origin=self.origin,
+                            ctx=self,
+                        )
+                    )
+
+                fact_contrib = build_extends_fact_contribution(
+                    self,
+                    scope_name=self.anchor.name,
+                    bindings=spec_bindings,
+                    extends=self.extends,
+                    origin=self.origin,
                 )
-                for where in self.where or (None,)
-                for takes in self.takes or (None,)
-            )
+                if fact_contrib is not None:
+                    contributions.add(fact_contrib)
+
+            return frozenset(contributions)
         except Exception:
             log.fatal("Failed to build QualContribution").label(self.origin).show()
             raise

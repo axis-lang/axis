@@ -198,17 +198,51 @@ Status:
 
 ## Near-Term Next Steps
 
-1. Finish Milestone 1 by turning contribution `check()` methods into real
+1. Finish Milestone 1 by turning remaining `check()` methods into real
    declaration validation, with focused diagnostics for malformed declarations.
 2. Decide and implement how `Type` should be introduced as a usable semantic
    type-value in the scopes that need it.
-3. Start Milestone 2 by introducing a dedicated constraint kernel in
+3. Consolidate the new logic frontend by validating `claim` safety and keeping
+   Realm/solver integration documented and covered by tests.
+4. Resume Milestone 2 by introducing a dedicated constraint kernel in
    `src/axis/sem/constraints.py` for argument materialization, default insertion,
    and bound satisfaction.
-4. Add focused tests for that kernel before beginning specialization and call
-   resolution work.
 5. In parallel, manually validate `ide/vscode/` in VS Code and simplify the
    grammar further if any freeze or performance issue remains.
+
+## Logic Frontend and Solver
+
+Target files: `src/axis/items/claim.py`, `src/axis/expr/bound_support.py`,
+`src/axis/sem/realm.py`, `packages/protomorph/src/protomorph/logic.py`,
+`packages/protomorph/src/protomorph/solvers/`, and focused tests.
+
+- Add a first logical frontend in Axis using `claim`, `where:`, `when:`, and
+  `-` body clauses.
+- Lower empirical facts and conditional claims into semantic contributions.
+- Keep logic execution in Protomorph behind `LogicBackend` and `LogicSolver`.
+- Implement a first saturated solver using `GlobalFixedPointSolver`.
+- Enforce a conservative safety policy for conditional claims.
+
+Exit criteria:
+
+- Claims parse and lower into facts/clauses with dedicated tests.
+- `Realm` aggregates logical contributions and delegates queries to the solver.
+- Recursive logical derivations work through fixed-point saturation.
+- Unsafe conditional claims fail with focused diagnostics.
+
+Status:
+
+- Completed for v1.
+- Done:
+  - Added `claim` frontend syntax with `where:` and `when:` blocks
+  - Lowered `extends` and explicit claims into fact/clause contributions
+  - Added `LogicBackend`, `LogicSolver`, and `GlobalFixedPointSolver`
+  - Wired `SemanticBridgeBase.solve(...)` and `Realm.logic_solver`
+  - Added recursive solver coverage and first conservative claim-safety checks
+- Still open:
+  - richer safety validation beyond the current conservative checks
+  - integrating logical queries with future entity/spec match providers
+  - adding alternate solver strategies beyond global saturation
 
 ## Milestone 2 - Constraint Kernel
 
@@ -317,6 +351,7 @@ Updated status note:
 
 - Steps 1 and 3 are complete.
 - Step 2 is partially complete.
-- Step 4 is the current primary semantic milestone.
+- The logic frontend/solver milestone is complete for v1.
+- Step 4 remains the current primary semantic milestone.
 - VS Code editor support is now an active parallel track, but it does not change
   the semantic implementation order above.

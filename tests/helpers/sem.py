@@ -5,7 +5,7 @@ from typing import cast
 import protomorph as pm
 
 from axis import syn
-from axis.expr.ir.bound import build_bound, build_default
+from axis.expr.ir.bound import bound_as_type, build_bound, build_default, build_term
 
 
 def parse(source: str) -> syn.Expr:
@@ -24,13 +24,15 @@ def default(source: str, scope) -> pm.Val:
     return value
 
 
+def term(source: str, scope) -> pm.Val:
+    value = build_term(parse(source), scope)
+    assert value is not None
+    return value
+
+
 def type_bound(source: str, scope) -> pm.Type:
     value = bound(source, scope)
-    if isinstance(value, (pm.Anchor, pm.Spec)):
-        resolved = value.as_type()
-        assert resolved is not None
-        return resolved
-    resolved = value.as_type()
+    resolved = bound_as_type(value)
     if resolved is None:
         raise AssertionError(f"Expected type-like bound from {source!r}, got {value!r}")
     return resolved
@@ -45,7 +47,8 @@ def layout(type_source: str, scope, *, pkg) -> pm.Layout | None:
 
 
 def bound_type_data(source: str, scope) -> pm.Type:
-    value = bound(source, scope)
+    value = build_term(parse(source), scope)
+    assert value is not None
     if not isinstance(value, pm.Const):
         raise AssertionError(f"Expected Const from {source!r}, got {value!r}")
     if not isinstance(value.__data__, pm.Type):

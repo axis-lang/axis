@@ -10,19 +10,47 @@ from axis import syn, sem
 from .scope import Scope
 
 
-class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
+class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=True):
+
+    class LogicVar(pm.VarType["Context"]):
+        pass
 
     class Contribution(pm.ContextProto, abstract=True):
         anchor: pm.Anchor = _
         origin: syn.Node = _
         ctx: Context = _
 
+        @flux.property
+        def facts(self) -> frozenset[pm.Spec]:
+            return frozenset()
+
+        @flux.property
+        def clauses(self) -> frozenset[pm.Clause]:
+            return frozenset()
+
         @flux.method
         def check(self):
             pass
 
-    class NamespaceContribution(Contribution):
+    class EntityContribution(Contribution):
         pass
+
+    class NamespaceContribution(EntityContribution):
+        pass
+
+    class FactContribution(EntityContribution):
+        _facts: frozenset[pm.Spec] = frozenset()
+
+        @flux.property
+        def facts(self) -> frozenset[pm.Spec]:
+            return self._facts
+
+    class ClaimContribution(FactContribution):
+        _clauses: frozenset[pm.Clause] = frozenset()
+
+        @flux.property
+        def clauses(self) -> frozenset[pm.Clause]:
+            return self._clauses
 
     realm: sem.Realm = _
 

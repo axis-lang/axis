@@ -43,6 +43,11 @@ class Ref(pm.Val, Consed, abstract=True):
 class AnchorType(RefType):
     ANCHOR = "std.types.Anchor"
 
+    def _wrap(self, data: Data) -> pm.Val:
+        decoded = self.deserialize(data)
+        assert isinstance(decoded, tuple)
+        return Anchor(self, cast(AnchorSegments, decoded))
+
     def deserialize(self, raw_data: Data) -> Data:
         match raw_data:
             case tuple() as segments if all(isinstance(segment, str) for segment in segments):
@@ -104,6 +109,11 @@ class SpecType(RefType):
     ANCHOR = "std.types.Spec"
 
     meta_args: pm.StructType = _
+
+    def _wrap(self, data: Data) -> pm.Val:
+        decoded = self.deserialize(data)
+        assert isinstance(decoded, tuple)
+        return Spec(self, cast(SpecData, decoded))
 
     def _metaspec(self):
         return self.meta_args._metaspec()
@@ -198,14 +208,13 @@ class Spec(Ref):
         if args is None:
             return pm.EmptyStruct
 
-        positional: list[pm.Const | pm.Var] = []
-        nominal: dict[str, pm.Const | pm.Var] = {}
+        positional: list[pm.Val] = []
+        nominal: dict[str, pm.Val] = {}
         for key, value in zip(args.index.keys, args.values):
-            typed = cast(pm.Const | pm.Var, value)
             if key is None:
-                positional.append(typed)
+                positional.append(value)
             else:
-                nominal[key] = typed
+                nominal[key] = value
         return pm.struct(*positional, **nominal)
 
     def __invariants__(self) -> None:

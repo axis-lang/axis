@@ -10,3 +10,27 @@ def Array[..Dims] T
 where:
     val Dims: Tuple Natural
 
+mod facts
+    def Extends[X, from=Y]
+    def Implements[X, trait=T]
+    def TypeOf[V, type=T]
+    def Conforms[X, to=T]
+    def Transitive[of=R]
+
+claim facts.Transitive[of=facts.Extends]
+
+claim facts.Conforms[X, to=T]
+where:
+    val X
+    val T
+when:
+    - facts.Extends[X, from=T]
+
+claim facts.Conforms[X, to=T]
+where:
+    val X
+    val U
+    val T
+when:
+    - facts.Extends[X, from=U]
+    - facts.Conforms[U, to=T]

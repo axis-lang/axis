@@ -12,7 +12,7 @@ from .package import TestPackage
 from .sem import bound as sem_bound
 from .sem import default as sem_default
 from .sem import layout as sem_layout
-from .sem import parse, project as sem_project, type_bound as sem_type_bound
+from .sem import parse, project as sem_project, term as sem_term, type_bound as sem_type_bound
 
 
 class SemanticTestCase(unittest.TestCase):
@@ -80,6 +80,9 @@ class SemanticTestCase(unittest.TestCase):
     def bound(self, source: str, scope=None) -> pm.Val:
         return sem_bound(source, self.resolve_scope(scope))
 
+    def term(self, source: str, scope=None) -> pm.Val:
+        return sem_term(source, self.resolve_scope(scope))
+
     def default(self, source: str, scope=None) -> pm.Val:
         return sem_default(source, self.resolve_scope(scope))
 
@@ -143,14 +146,14 @@ class SemanticTestCase(unittest.TestCase):
         )
 
     def assertAnchor(self, source: str, path: str, scope=None) -> None:
-        bound = self.bound(source, scope)
+        term = self.term(source, scope)
         self.assertIsInstance(
-            bound,
+            term,
             pm.Anchor,
-            msg=f"Expected anchor from {source!r} ({self._scope_desc(scope)}), got {bound!r}",
+            msg=f"Expected anchor from {source!r} ({self._scope_desc(scope)}), got {term!r}",
         )
-        assert isinstance(bound, pm.Anchor)
-        self.assertEqual(bound.path, path)
+        assert isinstance(term, pm.Anchor)
+        self.assertEqual(term.path, path)
 
     def assertType(self, source: str, expected: pm.Type, scope=None) -> None:
         self._assert_semantic_equal(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import cast
 
 from protobase import Consed, flux, frozendict, _
 import protomorph as pm
@@ -9,7 +10,12 @@ from axis import syn, log
 
 
 from .binding import Binding, BindingShape, BindingStruct
-from .bound import build_bound, build_default
+from .bound import (
+    bound_as_type,
+    build_binding_pattern,
+    build_bound,
+    build_default,
+)
 from .context import Context
 from .scope import Scope
 
@@ -30,9 +36,8 @@ class Entity(Consed):
         def check(self):
             pass
 
-    class SpecContribution(Context.Contribution):
+    class SpecContribution(Context.EntityContribution):
         spec_bindings: BindingStruct[Binding] = _
-        extends_bound_expr: syn.Expr | None = None
 
         @flux.property
         def spec_scope(self) -> Scope:
@@ -64,12 +69,11 @@ class Entity(Consed):
             scope = self.spec_scope
             return self.spec_bindings.map(
                 lambda binding: build_bound(binding.bound_expr, scope)
-                # lambda binding: (
-                #     binding.bound_expr.to_bound(scope)
-                #     if binding.bound_expr is not None
-                #     else None
-                # )
             )
+
+        @flux.property
+        def spec_pattern(self) -> pm.Val:
+            return build_binding_pattern(self.spec_bindings, self.spec_scope)
 
         @flux.property
         def spec_defaults(self) -> BindingStruct[pm.Val | None]:
@@ -78,17 +82,13 @@ class Entity(Consed):
                 lambda binding: build_default(binding.default_expr, scope)
             )
 
-        @flux.property
-        def extends_bound(self) -> pm.Val | None:
-            return build_bound(self.extends_bound_expr, self.spec_scope)
-
         @flux.method
         def check(self):
             # Trigger scope construction and bound creation
             self.spec_scope
             self.spec_bounds
+            self.spec_pattern
             self.spec_defaults
-            self.extends_bound
 
     class SpecVar(pm.VarType[SpecContribution]): ...
 
@@ -101,8 +101,34 @@ class Entity(Consed):
         ) -> frozendict[BindingShape, Entity.OverloadBucket]:
             return _overload_by_shape_bucket(self.specs)
 
+    class PredicateContribution(SpecContribution):
+        pass
+
+    @flux.property
+    def predicate_signatures(self) -> frozenset[PredicateContribution]:
+        return frozenset(
+            contrib
+            for contrib in self.contributions
+            if isinstance(contrib, Entity.PredicateContribution)
+        )
+
+    @flux.property
+    def facts(self) -> frozenset[pm.Spec]:
+        return frozenset(
+            fact
+            for contrib in self.contributions
+            for fact in contrib.facts
+        )
+
+    @flux.property
+    def clauses(self) -> frozenset[pm.Clause]:
+        return frozenset(
+            clause
+            for contrib in self.contributions
+            for clause in contrib.clauses
+        )
+
     class QualContribution(SpecContribution):
-        extends_bound_expr: syn.Expr | None = None
         underlying_bound_expr: syn.Expr = _
         param_bindings: BindingStruct[Binding] = _
 
@@ -112,6 +138,10 @@ class Entity(Consed):
             return self.param_bindings.map(
                 lambda binding: build_bound(binding.bound_expr, scope)
             )
+
+        @flux.property
+        def param_pattern(self) -> pm.Val:
+            return build_binding_pattern(self.param_bindings, self.spec_scope)
 
         @flux.property
         def param_defaults(self) -> BindingStruct[pm.Val | None]:
@@ -137,8 +167,10 @@ class Entity(Consed):
         def check(self):
             self.spec_scope
             self.spec_bounds
+            self.spec_pattern
             self.spec_defaults
             self.param_bounds
+            self.param_pattern
             self.param_defaults
             self.underlying_bound
 
@@ -147,7 +179,6 @@ class Entity(Consed):
         return _spec_by_shape_bucket(self.contributions)
 
     class OverloadContribution(SpecContribution):
-        extends_bound_expr: syn.Expr | None = None
         param_bindings: BindingStruct[Binding] = _
 
         @flux.property
@@ -178,6 +209,10 @@ class Entity(Consed):
             )
 
         @flux.property
+        def param_pattern(self) -> pm.Val:
+            return build_binding_pattern(self.param_bindings, self.overload_scope)
+
+        @flux.property
         def param_defaults(self) -> BindingStruct[pm.Val | None]:
             scope = self.overload_scope
             return self.param_bindings.map(
@@ -198,8 +233,10 @@ class Entity(Consed):
             # Trigger scope construction and bound creation for both levels
             self.overload_scope
             self.spec_bounds
+            self.spec_pattern
             self.spec_defaults
             self.param_bounds
+            self.param_pattern
             self.param_defaults
 
     class ParamVar(pm.VarType[OverloadContribution]): ...
@@ -292,19 +329,6 @@ def _impl_by_result_bucket(
     )
 
 
-def _param_bound_type(
-    contrib: Entity.OverloadContribution,
-    bound: pm.Val | None,
-    args: pm.Struct[str, pm.Val],
-) -> pm.Type:
-    if bound is None:
-        return pm.ANY_TYPE
-
-    resolved = bound.subst(lambda var: _resolve_spec_var(contrib, var, args))
-    resolved_type = resolved.as_type()
-    return pm.ANY_TYPE if resolved_type is None else resolved_type
-
-
 def _bound_type(
     contrib: Entity.SpecContribution,
     bound: pm.Val | None,
@@ -313,8 +337,8 @@ def _bound_type(
     if bound is None:
         return pm.ANY_TYPE
 
-    resolved = bound.subst(lambda var: _resolve_spec_var(contrib, var, args))
-    resolved_type = resolved.as_type()
+    resolved = bound.subst(lambda value: _resolve_spec_var(contrib, value, args))
+    resolved_type = bound_as_type(resolved)
     return pm.ANY_TYPE if resolved_type is None else resolved_type
 
 
@@ -324,11 +348,16 @@ def _layout_field_key(binding: Binding) -> str | None:
 
 def _resolve_spec_var(
     contrib: Entity.SpecContribution,
-    var: pm.Var,
+    value: pm.Val,
     args: pm.Struct[str, pm.Val],
 ) -> pm.Val | None:
+    if not isinstance(value, pm.Var):
+        return None
+    var = value
     if not isinstance(var.__type__, Entity.SpecVar):
         return None
     if var.__type__.ctx is not contrib:
         return None
-    return args.get(var.__data__, default=None)
+    if not isinstance(var.__data__, str):
+        return None
+    return args.get(cast(str, var.__data__), default=None)

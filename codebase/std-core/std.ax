@@ -36,12 +36,19 @@ mod types
     def Type
 
     def Anchor(path)
+        ------------
+        Anchors are used to refer to items by their path. 
+        They are used in the Spec and NominalType items.
+
     takes:
         val path: Text
 
     def Spec[..S](anchor, args)
+        -----------------------
+        Specs are used to refer to items by their path and arguments. 
+        They are used in the NominalType and NominalQualifier items.
     where:
-        val S: Struct Type
+        val S: qualifiers.Struct Type
     takes:
         val anchor: Anchor
         val args: S
@@ -50,7 +57,7 @@ mod types
     where:
         val I: Type
     takes:
-        val meta_attrs: Struct[I] Type
+        val meta_attrs: qualifiers.Struct[I] Type
 
     def NominalType[S](spec_ref)
     where:
@@ -61,7 +68,6 @@ mod types
     def NominalQualifier[S] U
     where:
         val S: Type
-
         val U: Type
     takes:
         val spec_ref: Spec[S]
@@ -104,3 +110,4 @@ mod qualifiers
     def List V
     where:
         val V: Type
+    

@@ -4,6 +4,7 @@ grammar Axis;
 unitItem: 'unit' expr EOF;
 modItem: 'mod' expr EOF;
 defItem: 'def' expr EOF;
+claimItem: 'claim' expr EOF;
 valItem: 'val' expr (':' expr)? ('=' expr)? EOF;
 
 
@@ -18,6 +19,9 @@ defWhereBlock: 'where' ':' EOF;
 defTakesBlock: 'takes' expr? ':' EOF;
 defExtendsBlock: 'extends' expr EOF;
 defReturnsBlock: 'returns' expr EOF;
+claimWhereBlock: 'where' ':' EOF;
+claimWhenBlock: 'when' ':' EOF;
+claimWhenClauseBlock: '-' expr EOF;
 suiteBlock: 'suite' statement* EOF;
 
 suite: statement*;
@@ -70,10 +74,28 @@ rangeOp: '..=' | '..<'; // el operador ellipsis ... indica rango infinito y se u
 
 // Logical operators
 logicExpr
-    : comparisonExpr (logicOp comparisonExpr)*
+    : bitwiseOrExpr (logicOp bitwiseOrExpr)*
     ;
 
 logicOp: '&&' | '||';
+
+bitwiseOrExpr
+    : bitwiseXorExpr (bitwiseOrOp bitwiseXorExpr)*
+    ;
+
+bitwiseOrOp: '|';
+
+bitwiseXorExpr
+    : bitwiseAndExpr (bitwiseXorOp bitwiseAndExpr)*
+    ;
+
+bitwiseXorOp: '^';
+
+bitwiseAndExpr
+    : comparisonExpr (bitwiseAndOp comparisonExpr)*
+    ;
+
+bitwiseAndOp: '&';
 
 // Comparison operators
 comparisonExpr

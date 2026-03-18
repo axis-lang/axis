@@ -16,6 +16,8 @@ class DefFromSrcTest(SemanticTestCase):
     def test_from_src_parses_def_without_unit_wrapper(self):
         cases = (
             ("def Optional T", items.QualDef),
+            ("def Integer", items.AtomDef),
+            ("def Extends[X, from=Y]", items.FactDef),
             ("def E[A](x, y)", items.ClassDef),
         )
 
@@ -67,11 +69,9 @@ takes:
 
     def test_from_src_preserves_extends_block(self):
         node = TEST_PKG.parse_def(
-            items.ClassDef,
+            items.FactDef,
             """def Pair[T]
 extends Box[T]
-takes:
-    val value: T
 """,
         )
 
@@ -81,7 +81,7 @@ takes:
 
 class DefBuildBindingStructTest(SemanticTestCase):
     def test_inline_only_bindings_are_preserved(self):
-        node = TEST_PKG.parse_def(items.ClassDef, "def Struct[Key: Type = Text]")
+        node = TEST_PKG.parse_def(items.FactDef, "def Struct[Key: Type = Text]")
         struct = build_binding_struct(
             inline_expr=node.spec,
             block_expr=None,
@@ -96,7 +96,7 @@ class DefBuildBindingStructTest(SemanticTestCase):
 
     def test_block_only_bindings_remain_nominal(self):
         node = TEST_PKG.parse_def(
-            items.ClassDef,
+            items.AtomDef,
             """def E
 where:
     val A: Type
@@ -149,7 +149,7 @@ takes:
 
     def test_inline_placeholder_merges_with_block_placeholder(self):
         node = TEST_PKG.parse_def(
-            items.ClassDef,
+            items.FactDef,
             """def E[_]
 where:
     val _: Natural
@@ -180,7 +180,7 @@ where:
 
     def test_closed_inline_rejects_extra_block_bindings(self):
         node = TEST_PKG.parse_def(
-            items.ClassDef,
+            items.FactDef,
             """def E[A]
 where:
     val A: Type
@@ -196,7 +196,7 @@ where:
 
     def test_rejects_conflicting_bounds(self):
         node = TEST_PKG.parse_def(
-            items.ClassDef,
+            items.FactDef,
             """def E[A: Whole]
 where:
     val A: Text
@@ -226,6 +226,23 @@ where:
 
 
 class ContributionBoundExprTest(StdPackageTestCase):
+    def test_fact_def_exposes_predicate_contribution(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit demo
+
+            mod facts
+                def Extends[X, from=Y]
+            """
+        )
+
+        contrib = next(iter(pkg.contributions("demo.facts.Extends", sem.Entity.PredicateContribution)))
+        assert isinstance(contrib, sem.Entity.PredicateContribution)
+
+        entity = pkg.entity("demo.facts.Extends")
+
+        self.assertIn(contrib, entity.predicate_signatures)
+
     def test_qual_contribution_exposes_underlying_bound_expr_and_bound(self):
         contrib = self.assertContribution(
             "std.qualifiers.Optional",
@@ -234,7 +251,9 @@ class ContributionBoundExprTest(StdPackageTestCase):
         assert isinstance(contrib, sem.Entity.QualContribution)
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
-        self.assertIsInstance(contrib.underlying_bound, pm.Var)
+        self.assertIsInstance(contrib.underlying_bound, pm.Op)
+        assert isinstance(contrib.underlying_bound, pm.Op)
+        self.assertIsInstance(contrib.underlying_bound.__data__, pm.Satisfy)
 
     def test_array_qual_contribution_exposes_nontrivial_underlying_bound(self):
         qual_contribs = tuple(
@@ -274,34 +293,50 @@ takes:
         self.assertEqual(tuple(layout.fields.index.keys), (None,))
         self.assertEqual(layout.fields.values[0], self.type_bound("core.Sym"))
 
-    def test_class_contribution_exposes_extends_bound_expr_and_bound(self):
-        node = TEST_PKG.parse_def(
-            items.ClassDef,
-            """def Pair[T](value)
-extends Box[T]
-where:
-    val T: Type
-takes:
-    val value: T
-"""
+    def test_class_def_extends_emits_fact_contribution(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit test
+
+            def Box[T](value)
+            where:
+                val T: Type
+            takes:
+                val value: T
+
+            def Pair[T](value)
+            extends Box[T]
+            where:
+                val T: Type
+            takes:
+                val value: T
+            """
         )
-        contrib = next(iter(node.contributions))
-        assert isinstance(contrib, sem.Entity.OverloadContribution)
+        contrib = next(iter(pkg.contributions("std.facts.Extends", sem.Context.FactContribution)))
+        assert isinstance(contrib, sem.Context.FactContribution)
 
-        self.assertIsInstance(contrib.extends_bound_expr, Index)
-        self.assertIsNotNone(contrib.extends_bound)
+        self.assertEqual(len(contrib.facts), 1)
+        fact = next(iter(contrib.facts))
+        self.assertEqual(fact.anchor.path, "std.facts.Extends")
 
-    def test_qual_contribution_exposes_extends_bound_expr_and_bound(self):
-        node = TEST_PKG.parse_def(
-            items.QualDef,
-            """def Optional T
-extends Maybe[T]
-where:
-    val T: Type
-"""
+    def test_qual_def_extends_emits_fact_contribution(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit test
+
+            def Maybe T
+            where:
+                val T: Type
+
+            def Optional T
+            extends Maybe[T]
+            where:
+                val T: Type
+            """
         )
-        contrib = next(iter(node.contributions))
-        assert isinstance(contrib, sem.Entity.QualContribution)
+        contrib = next(iter(pkg.contributions("std.facts.Extends", sem.Context.FactContribution)))
+        assert isinstance(contrib, sem.Context.FactContribution)
 
-        self.assertIsInstance(contrib.extends_bound_expr, Index)
-        self.assertIsNotNone(contrib.extends_bound)
+        self.assertEqual(len(contrib.facts), 1)
+        fact = next(iter(contrib.facts))
+        self.assertEqual(fact.anchor.path, "std.facts.Extends")

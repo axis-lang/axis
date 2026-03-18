@@ -2,6 +2,7 @@
 
 from .binding import *
 from .bound import *
+from .constraints import *
 from .context import *
 from .entity import *
 from .realm import *

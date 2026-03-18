@@ -23,6 +23,24 @@ class GrammarTest(unittest.TestCase):
             ),
         )
 
+    def test_parse_bitwise_expr_with_conventional_precedence(self):
+        self.assertEqual(
+            syn.Expr.from_str("a | b ^ c & d"),
+            expr.Bitwise(
+                lhs=expr.Sym(name="a"),
+                rhs=expr.Bitwise(
+                    lhs=expr.Sym(name="b"),
+                    rhs=expr.Bitwise(
+                        lhs=expr.Sym(name="c"),
+                        rhs=expr.Sym(name="d"),
+                        op=expr.Bitwise.Op.build("&"),
+                    ),
+                    op=expr.Bitwise.Op.build("^"),
+                ),
+                op=expr.Bitwise.Op.build("|"),
+            ),
+        )
+
     def test_parse_tuple(self):
         e = syn.Expr.from_str(
             """(

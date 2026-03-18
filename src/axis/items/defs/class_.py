@@ -7,7 +7,12 @@ from protobase import flux, slot_cached_property, _
 
 from axis import expr, log, syn, sem
 
-from .base import SymDef, build_param_bindings, build_spec_bindings
+from .base import (
+    SymDef,
+    build_extends_fact_contribution,
+    build_param_bindings,
+    build_spec_bindings,
+)
 
 
 class ClassDef(SymDef):
@@ -16,8 +21,6 @@ class ClassDef(SymDef):
     """
 
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym"),
-        syn.Expr.from_str("$sym[..$spec]"),
         syn.Expr.from_str("$sym(..$args)"),
         syn.Expr.from_str("$sym[..$spec](..$args)"),
     )
@@ -32,17 +35,25 @@ class ClassDef(SymDef):
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
-        return frozenset(
-            sem.Entity.OverloadContribution(
-                anchor=self.anchor,
-                spec_bindings=expr.build_binding_struct(self.spec, where),
-                param_bindings=expr.build_binding_struct(self.args, takes),
-                extends_bound_expr=self.extends[0].expr if self.extends else None,
+        contributions: set[sem.Context.Contribution] = set()
+        for where, takes in product(self.where or (None,), self.takes or (None,)):
+            spec_bindings = expr.build_binding_struct(self.spec, where)
+            contributions.add(
+                sem.Entity.OverloadContribution(
+                    anchor=self.anchor,
+                    spec_bindings=spec_bindings,
+                    param_bindings=expr.build_binding_struct(self.args, takes),
+                    origin=self.origin,
+                    ctx=self,
+                )
+            )
+            fact_contrib = build_extends_fact_contribution(
+                self,
+                scope_name=self.anchor.name,
+                bindings=spec_bindings,
+                extends=self.extends,
                 origin=self.origin,
-                ctx=self,
             )
-            for where, takes in product(
-                self.where or (None,),
-                self.takes or (None,),
-            )
-        )
+            if fact_contrib is not None:
+                contributions.add(fact_contrib)
+        return frozenset(contributions)

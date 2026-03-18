@@ -210,12 +210,26 @@ class NativeRegistry(Consed):
     def _substitute_spec(self, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Spec:
         """Substitute type variables in spec."""
         # Import here to avoid circulars
-        return pm._subst_spec(spec, lambda var: pm.val(self._resolve_var(var, spec, builtin_cls)))
+        return pm._subst_spec(
+            spec,
+            lambda value: (
+                pm.val(self._resolve_var(value, spec, builtin_cls))
+                if isinstance(value, pm.Var)
+                else None
+            ),
+        )
 
     def _substitute_type(self, type_: pm.Type, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Type:
         """Substitute type variables in type."""
         # Import here to avoid circulars
-        return pm._subst_type(type_, lambda var: pm.val(self._resolve_var(var, spec, builtin_cls)))
+        return pm._subst_type(
+            type_,
+            lambda value: (
+                pm.val(self._resolve_var(value, spec, builtin_cls))
+                if isinstance(value, pm.Var)
+                else None
+            ),
+        )
 
 
 # === Singleton Backend ===

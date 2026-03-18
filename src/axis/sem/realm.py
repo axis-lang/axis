@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Iterable
+from typing import Any, Iterable, cast
 
 from protobase import Consed, flux, frozendict
 import protomorph as pm
@@ -39,10 +39,60 @@ class Realm(pm.SemanticBridgeBase, Consed):
     def all_anchors(self) -> frozenset[pm.Anchor]:
         return frozenset(self.contributions_by_anchor.keys())
 
+    @property
+    def all_context_anchors(self) -> frozenset[pm.Anchor]:
+        return frozenset(cast(Any, ctx).anchor for ctx in self.all_contexts)
+
+    @flux.property
+    def entity_contributions_by_anchor(
+        self,
+    ) -> frozendict[pm.Anchor, frozenset[Context.EntityContribution]]:
+        grouped: dict[pm.Anchor, list[Context.EntityContribution]] = {}
+        for contribution in self.all_contributions:
+            if isinstance(contribution, Context.EntityContribution):
+                grouped.setdefault(contribution.anchor, []).append(contribution)
+        return frozendict(
+            (anchor, frozenset(contribs)) for anchor, contribs in grouped.items()
+        )
+
+    @flux.property
+    def all_facts(self) -> frozenset[pm.Spec]:
+        return frozenset(
+            fact
+            for entity in self.all_entities
+            for fact in entity.facts
+        )
+
+    @flux.property
+    def facts_by_anchor(self) -> frozendict[pm.Anchor, frozenset[pm.Spec]]:
+        grouped: dict[pm.Anchor, list[pm.Spec]] = {}
+        for fact in self.all_facts:
+            grouped.setdefault(fact.anchor, []).append(fact)
+        return frozendict(
+            (anchor, frozenset(facts)) for anchor, facts in grouped.items()
+        )
+
+    @flux.property
+    def all_clauses(self) -> frozenset[pm.Clause]:
+        return frozenset(
+            clause
+            for entity in self.all_entities
+            for clause in entity.clauses
+        )
+
+    @flux.property
+    def clauses_by_anchor(self) -> frozendict[pm.Anchor, frozenset[pm.Clause]]:
+        grouped: dict[pm.Anchor, list[pm.Clause]] = {}
+        for clause in self.all_clauses:
+            grouped.setdefault(clause.head.anchor, []).append(clause)
+        return frozendict(
+            (anchor, frozenset(clauses)) for anchor, clauses in grouped.items()
+        )
+
     @flux.property
     def namespaces_by_anchor(self) -> Namespaces:
         namespaces: dict[pm.Anchor, set[pm.Anchor]] = {}
-        for anchor in self.all_anchors:
+        for anchor in self.all_context_anchors:
             if (parent := anchor.parent) is not None:
                 namespaces.setdefault(parent, set()).add(anchor)
         return frozendict(
@@ -53,8 +103,12 @@ class Realm(pm.SemanticBridgeBase, Consed):
     def entities_by_anchor(self) -> frozendict[pm.Anchor, Entity]:
         return frozendict(
             (anchor, Entity(anchor=anchor, contributions=contributions))
-            for anchor, contributions in self.contributions_by_anchor.items()
+            for anchor, contributions in self.entity_contributions_by_anchor.items()
         )
+
+    @flux.property
+    def logic_solver(self):
+        return pm.GlobalFixedPointSolver(backend=self)
 
     @property
     def all_entities(self) -> Iterable[Entity]:

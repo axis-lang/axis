@@ -171,7 +171,9 @@ class Builder(Inmutable):
 class FromStrNodeMixin(Inmutable, abstract=True):
     grammar_context_infix: ClassVar[str] = ""
     grammar_context_name: ClassVar[str]
+    grammar_context_names: ClassVar[tuple[str, ...]] = ()
     grammar_parser_name: ClassVar[str]
+    grammar_parser_names: ClassVar[tuple[str, ...]] = ()
 
     # span: src.Source.Span | None = None
 
@@ -190,16 +192,27 @@ class FromStrNodeMixin(Inmutable, abstract=True):
         if "grammar_context_name" not in cls.__dict__:
             cls.grammar_context_name = f"{name}{cls.grammar_context_infix}Context"
 
+        if "grammar_context_names" not in cls.__dict__:
+            cls.grammar_context_names = (cls.grammar_context_name,)
+
+        if "grammar_parser_names" not in cls.__dict__:
+            cls.grammar_parser_names = (cls.grammar_parser_name,)
+
         # print("Building grammar for", cls.__qualname__, cls.grammar_parser_name, cls.grammar_context_name)
 
-        ctx_class = getattr(AxisParser, cls.grammar_context_name, None)
-        if ctx_class is None:
-            # warn(f'Grammar context not found for {cls.__qualname__} ({cls.grammar_context_name})', stacklevel=4)
-            return
+        found_context = False
+        for context_name in cls.grammar_context_names:
+            ctx_class = getattr(AxisParser, context_name, None)
+            if ctx_class is None:
+                continue
+            found_context = True
 
-        @Builder.build.register(ctx_class)  # type: ignore
-        def build_ast(builder, ctx, *args, **kwargs):
-            return cls.build(*args, **kwargs)
+            @Builder.build.register(ctx_class)  # pyright: ignore[reportFunctionMemberAccess]
+            def build_ast(builder, ctx, *args, **kwargs):
+                return cls.build(*args, **kwargs)
+
+        if not found_context:
+            return
 
     @classmethod
     def build(cls, *args, **kwargs) -> Self:
@@ -213,10 +226,15 @@ class FromStrNodeMixin(Inmutable, abstract=True):
         lexer = AxisLexer(InputStream(src_span.content))
         parser = AxisParser(CommonTokenStream(lexer))
 
-        parse = getattr(parser, cls.grammar_parser_name, None)
+        parse = None
+        parser_names = cls.grammar_parser_names or (cls.grammar_parser_name,)
+        for parser_name in parser_names:
+            parse = getattr(parser, parser_name, None)
+            if parse is not None:
+                break
         if parse is None:
             raise ValueError(
-                f"Unknown parser for {cls.__qualname__} (search for {cls.grammar_parser_name})"
+                f"Unknown parser for {cls.__qualname__} (search for {parser_names})"
             )
         ast_tree = parse()
 

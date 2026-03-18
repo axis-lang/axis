@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextvars import Token
 from types import TracebackType
 from typing import Protocol, Self, runtime_checkable
@@ -37,6 +38,10 @@ class StructLayout(Layout):
 class SemanticBridge(Protocol):
     def layout(self, type: pm.Type) -> Layout | None: ...
 
+    def view(self, trait: pm.Spec, value: pm.Val) -> tuple[pm.Val, ...]: ...
+
+    def solve(self, goal: pm.Spec, state: pm.MatchState) -> Iterable[pm.MatchState]: ...
+
     def project(self, type: pm.Type, key: str | int) -> pm.Type: ...
 
     def lift(self, qualifier: pm.Qualifier, result: pm.Type) -> pm.Type: ...
@@ -66,6 +71,22 @@ class SemanticBridgeBase(Inmutable, abstract=True):
                 builtin_cls=underlying_layout.builtin_cls,
             )
         return None
+
+    def view(self, trait: pm.Spec, value: pm.Val) -> tuple[pm.Val, ...]:
+        if trait.path == "std.traits.Type":
+            resolved = value.as_type()
+            return () if resolved is None else (pm.val(resolved),)
+        return ()
+
+    def solve(
+        self,
+        goal: pm.Spec,
+        state: pm.MatchState,
+    ) -> Iterable[pm.MatchState]:
+        solver = getattr(self, "logic_solver", None)
+        if solver is None:
+            return ()
+        return solver.answers(goal, state)
 
     def project(self, type: pm.Type, key: str | int) -> pm.Type:
         return _project_type(self, type, key)

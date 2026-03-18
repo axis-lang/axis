@@ -96,7 +96,7 @@ class Val(Inmutable, abstract=True):
 
     def subst(
         self,
-        env: Callable[[pm.Var], pm.Val | None],
+        env: Callable[[pm.Val], pm.Val | None],
     ) -> Val:
         return pm.subst_val(self, env)
 

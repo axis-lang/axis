@@ -2,7 +2,7 @@ import protomorph as pm
 
 from axis import expr, log, sem, syn
 from axis.expr.ir import Scope
-from axis.expr.ir.bound import build_bound, build_default
+from axis.expr.ir.bound import build_bound, build_default, build_term
 
 from tests.helpers import StdPackageTestCase
 
@@ -51,13 +51,12 @@ class ExprBoundsTest(StdPackageTestCase):
             build_bound(expr.Member(of=expr.Sym(name="std"), name="Text"), self.std_root_scope),
             pm.Err,
         )
-        self.assertEqual(
-            build_bound(
-                expr.Member(of=expr.Member(of=expr.Sym(name="core"), name="Text"), name="Inner"),
-                self.std_root_scope,
-            ),
-            pm.anchor("std.core.Text.Inner"),
+        bound = build_bound(
+            expr.Member(of=expr.Member(of=expr.Sym(name="core"), name="Text"), name="Inner"),
+            self.std_root_scope,
         )
+        assert bound is not None
+        self.assertConformsTo(bound, self.expectedConformsTarget(pm.anchor("std.core.Text.Inner")))
 
     def test_index_builds_specialized_ref_from_anchor(self):
         indexed = build_bound(
@@ -65,20 +64,26 @@ class ExprBoundsTest(StdPackageTestCase):
             self.std_root_scope,
         )
 
-        assert isinstance(indexed, pm.Spec)
-        self.assertEqual(indexed.path, "std.core.Text")
-        self.assertIsNotNone(indexed.args)
+        assert indexed is not None
+        term = build_term(
+            expr.Index(
+                origin=expr.Member(of=expr.Sym(name="core"), name="Text"),
+                indices=expr.Member(of=expr.Sym(name="core"), name="Natural"),
+            ),
+            self.std_root_scope,
+        )
+        assert term is not None
+        self.assertConformsTo(indexed, self.expectedConformsTarget(term))
 
     def test_nested_std_module_spec_anchor_resolves_from_scope(self):
         indexed = self.bound("types.Spec[core.Text]", self.std_root_scope)
+        term = build_term(syn.Expr.from_str("types.Spec[core.Text]"), self.std_root_scope)
 
-        assert isinstance(indexed, pm.Spec)
-        self.assertEqual(indexed.path, "std.types.Spec")
-        args = indexed.args
-        self.assertIsNotNone(args)
-        assert args is not None
-        self.assertTypeEq("core.Text", "core.Text", scope=self.std_root_scope)
-        self.assertEqual(args.values[0].data, self.type_bound("core.Text", self.std_root_scope))
+        assert term is not None
+        self.assertConformsTo(
+            indexed,
+            self.expectedConformsTarget(term),
+        )
 
     def test_lit_and_tuple_build_structural_values(self):
         self.assertEqual(build_bound(expr.Lit(value=42), self.std_root_scope), pm.literal(42))
@@ -123,16 +128,25 @@ class ExprBoundsTest(StdPackageTestCase):
         self.assertEqual(build_default(expr.Lit(value=7), self.std_root_scope), pm.literal(7))
         self.assertEqual(
             build_default(syn.Expr.from_str("Optional Text"), self.bound_scope),
-            build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope),
+            build_term(syn.Expr.from_str("Optional Text"), self.bound_scope),
         )
 
-    def test_compound_builds_nominal_qualifier_type_values(self):
-        bound = build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope)
+    def test_binding_pattern_compiles_open_tail_to_variadic_struct(self):
+        bindings = expr.build_binding_struct(expr.Tuple.from_str("(x, ..rest)"), None)
 
-        assert isinstance(bound, pm.Const)
-        assert isinstance(bound.__data__, pm.NominalQualifier)
-        self.assertEqual(bound.__data__.spec_ref.path, "Optional")
-        self.assertEqual(repr(pm.val(bound.__data__.underlying)), "Text")
+        pattern = expr.build_binding_pattern(bindings, self.bound_scope)
+
+        self.assertIsInstance(pattern, pm.Op)
+        assert isinstance(pattern, pm.Op)
+        self.assertIsInstance(pattern.__data__, pm.VariadicStruct)
+
+    def test_compound_compiles_to_conforms_on_nominal_qualifier_type(self):
+        bound = build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope)
+        term = build_term(syn.Expr.from_str("Optional Text"), self.bound_scope)
+
+        assert bound is not None
+        assert term is not None
+        self.assertConformsTo(bound, self.expectedConformsTarget(term))
 
     def test_compound_builds_nested_qualifiers_right_to_left(self):
         self.assertTypeEq(
@@ -157,9 +171,12 @@ class ExprBoundsTest(StdPackageTestCase):
 
         for source, path in patterns:
             value = build_bound(syn.Expr.from_str(source), self.bound_scope)
-            assert isinstance(value, pm.Const)
-            assert isinstance(value.__data__, pm.NominalQualifier)
-            self.assertEqual(value.__data__.spec_ref.path, path)
+            term = build_term(syn.Expr.from_str(source), self.bound_scope)
+            assert isinstance(term, pm.Const)
+            assert isinstance(term.__data__, pm.NominalQualifier)
+            self.assertEqual(term.__data__.spec_ref.path, path)
+            assert value is not None
+            self.assertConformsTo(value, self.expectedConformsTarget(term))
 
     def test_nested_member_plus_index_builds_qualified_value(self):
         nested_scope = Scope.Builder(name="nested")
@@ -182,9 +199,12 @@ class ExprBoundsTest(StdPackageTestCase):
 
         value = build_bound(syn.Expr.from_str("Struct.Index[Whole] Sym"), scope)
 
-        assert isinstance(value, pm.Const)
-        assert isinstance(value.__data__, pm.NominalQualifier)
-        self.assertEqual(value.__data__.spec_ref.path, "Struct.Index")
+        term = build_term(syn.Expr.from_str("Struct.Index[Whole] Sym"), scope)
+        assert isinstance(term, pm.Const)
+        assert isinstance(term.__data__, pm.NominalQualifier)
+        self.assertEqual(term.__data__.spec_ref.path, "Struct.Index")
+        assert value is not None
+        self.assertConformsTo(value, self.expectedConformsTarget(term))
 
     def test_canonical_std_scope_builder_helper(self):
         self.assertBoundEq("core.Text", "core.Text", scope=self.std_root_scope)
@@ -208,3 +228,25 @@ class ExprBoundsTest(StdPackageTestCase):
 
         self.assertIsInstance(resolved, sem.Scope)
         self.assertEqual(resolved, types_ctx.scope)
+
+    def assertConformsTo(self, bound: pm.Val, expected_term: pm.Val) -> None:
+        self.assertIsInstance(bound, pm.Op)
+        assert isinstance(bound, pm.Op)
+        self.assertIsInstance(bound.__data__, pm.Satisfy)
+        satisfy = bound.__data__
+        assert isinstance(satisfy, pm.Satisfy)
+        goal = satisfy.goal
+        self.assertEqual(goal.anchor.path, "std.facts.Conforms")
+        args = goal.args
+        self.assertIsNotNone(args)
+        assert args is not None
+        self.assertEqual(args[0], pm.THIS)
+        self.assertEqual(args.get("to"), expected_term)
+
+    def expectedConformsTarget(self, term: pm.Val) -> pm.Val:
+        type_ = term.as_type()
+        if type_ is None:
+            return term
+        if isinstance(type_, pm.Val):
+            return type_
+        return pm.val(type_)

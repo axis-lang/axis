@@ -16,6 +16,7 @@ from .lit import *
 from .compound import *
 from .trail import *
 from .ir import *
+from .bound_support import *
 
 
 def to_sym(node: syn.Expr) -> Sym:

@@ -19,6 +19,8 @@ class Index(syn.Expr):
         if isinstance(origin_val, pm.Err):
             return origin_val
         args = build_spec_args(self.indices, scope)
+        if isinstance(args, pm.Err):
+            return args
         if isinstance(origin_val, pm.Anchor):
             return origin_val.specialize(args)
         return unsupported_bound(

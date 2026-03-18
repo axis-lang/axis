@@ -11,12 +11,16 @@ from .format import format_morph
 from .map import *
 from .struct import *
 from .base import *
-from .subst import _subst_spec, _subst_type, as_type, subst_val
 from .types import *
 from .qualifiers import *
 from .refs import *
 from .vars import *
 from .bridge import *
+from .operators import *
+from .logic import *
+from .solvers import *
+from .subst import _subst_spec, _subst_type, as_type, subst_val
+from .match import *
 from .errors import *
 
 ANY_TYPE: Type
@@ -39,14 +43,16 @@ def _empty_struct_type() -> StructType:
         return StructType(meta_attrs=Struct.Empty)
 
 
-def spec(*positional: type | Type | Const | Var, **nominal: type | Type | Const | Var) -> Const[StructType]:
+def spec(*positional: type | Type | Val, **nominal: type | Type | Val) -> Const[StructType]:
     if not positional and not nominal:
         return EmptyStruct
 
-    def as_spec_value(value: type | Type | Const | Var) -> Const | Var:
-        if isinstance(value, (Const, Var)):
+    def as_spec_value(value: type | Type | Val) -> Val:
+        if isinstance(value, Val):
             return value
-        return cast(Const | Var, val(type_(value)))
+        if isinstance(value, Type):
+            return val(value)
+        return val(type_(value))
 
     return struct(
         *[as_spec_value(item) for item in positional],
@@ -77,17 +83,17 @@ def spec_ref(anchor_: str | Anchor, spec: Const | None = None) -> Spec:
     )
 
 
-def struct(*positional: Const | Var, **nominal: Const | Var) -> Const[StructType]:
+def struct(*positional: Val, **nominal: Val) -> Const[StructType]:
     fields = Struct.new(*positional, **nominal)
     struct_type = StructType(
-        meta_attrs=fields.map(lambda x: x if isinstance(x, Var) else x.__type__),
+        meta_attrs=fields.map(lambda x: x if isinstance(x, Placeholder) else x.__type__),
     )
     return cast(
         Const[StructType], struct_type._wrap(fields.map(lambda x: x.__data__).values)
     )
 
 
-def struct_value(*positional: Const | Var, **nominal: Const | Var) -> Const[StructType]:
+def struct_value(*positional: Val, **nominal: Val) -> Const[StructType]:
     return struct(*positional, **nominal)
 
 
@@ -129,9 +135,9 @@ def union_type(*types: Type) -> UnionType:
     return UnionType(types=frozenset(flat))
 
 
-def union(types: frozenset[Type], active: Const | Var) -> Const[UnionType]:
+def union(types: frozenset[Type], active: Val) -> Const[UnionType]:
     active_union_type = union_type(*types)
-    discriminator = active if isinstance(active, Var) else active.__type__
+    discriminator = active if isinstance(active, Placeholder) else active.__type__
     if discriminator not in active_union_type.types:
         raise TypeError(
             f"Active variant type {discriminator} is not in the union types"
@@ -139,9 +145,9 @@ def union(types: frozenset[Type], active: Const | Var) -> Const[UnionType]:
     return cast(Const[UnionType], active_union_type._wrap((discriminator, active.__data__)))
 
 
-def union_value(*types: type | Type, active: type | Type | Const | Var | Literal) -> Const[UnionType]:
+def union_value(*types: type | Type, active: type | Type | Val | Literal) -> Const[UnionType]:
     union_types = frozenset(type_(item) for item in types)
-    active_value = active if isinstance(active, (Const, Var)) else cast(Const | Var, val(active))
+    active_value = active if isinstance(active, Val) else val(active)
     return union(union_types, active_value)
 
 
@@ -159,11 +165,11 @@ def nominal_qual(
 
 
 def val(*positional, **nominal) -> Val:
-    def as_const(value, where: str) -> Const | Var:
+    def as_val(value, where: str) -> Val:
         coerced = val(value)
-        if not isinstance(coerced, (Const, Var)):
+        if not isinstance(coerced, Val):
             raise ValueError(
-                f"protomorph.val expected Const/Var value for {where}, got {type(coerced).__name__}"
+                f"protomorph.val expected Val for {where}, got {type(coerced).__name__}"
             )
         return coerced
 
@@ -173,10 +179,10 @@ def val(*positional, **nominal) -> Val:
 
         if len(positional) != 1 or nominal:
             args = [
-                as_const(item, f"positional[{i}]") for i, item in enumerate(positional)
+                as_val(item, f"positional[{i}]") for i, item in enumerate(positional)
             ]
             kwargs = {
-                key: as_const(item, f"key {key!r}") for key, item in nominal.items()
+                key: as_val(item, f"key {key!r}") for key, item in nominal.items()
             }
             return struct(*args, **kwargs)
 
@@ -202,18 +208,18 @@ def val(*positional, **nominal) -> Val:
             return literal_type._wrap(value)
 
         if isinstance(value, (dict, frozendict)):
-            kwargs: dict[str, Const | Var] = {}
+            kwargs: dict[str, Val] = {}
             for key, item in value.items():
                 if not isinstance(key, str):
                     raise ValueError(
                         "protomorph.val only supports dict/frozendict with string keys"
                     )
-                kwargs[key] = as_const(item, f"key {key!r}")
+                kwargs[key] = as_val(item, f"key {key!r}")
             return struct(**kwargs)
 
         if isinstance(value, (tuple, list)):
             return struct(
-                *[as_const(item, f"sequence[{i}]") for i, item in enumerate(value)]
+                *[as_val(item, f"sequence[{i}]") for i, item in enumerate(value)]
             )
 
         if isinstance(value, Builtin):

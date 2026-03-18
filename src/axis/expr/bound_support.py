@@ -6,6 +6,10 @@ import protomorph as pm
 
 from axis import log, syn
 from axis.literals import Wildcard
+from axis.sem.binding import Binding, BindingStruct
+
+CONFORMS_FACT = "std.facts.Conforms"
+EXTENDS_FACT = "std.facts.Extends"
 
 
 def build_compound_bound(
@@ -53,8 +57,134 @@ def build_compound_bound(
             current = pm.NominalQualifier(spec_ref=qualifier_ref, underlying=current)
 
     return pm.val(current)
-    
-def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> pm.Const | None:
+
+
+def build_term(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
+    if bound_expr is None:
+        return None
+
+    try:
+        return bound_expr.to_bound(scope)
+    except syn.BoundLoweringError as exc:
+        return (
+            log.error("Unsupported bound expression")
+            .label(bound_expr, str(exc))
+            .show()
+            .tag(pm.Err())
+        )
+
+
+def build_bound(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
+    term = build_term(bound_expr, scope)
+    if term is None or isinstance(term, (pm.Err, pm.Op)):
+        return term
+    return _compile_term_bound(term)
+
+
+def build_default(default_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
+    return build_term(default_expr, scope)
+
+
+def build_extends_fact(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Spec | pm.Err | None:
+    if bound_expr is None:
+        return None
+
+    term = build_term(bound_expr, scope)
+    if term is None or isinstance(term, pm.Err):
+        return term
+
+    from axis import expr as expr_module
+
+    self_term = scope.lookup(expr_module.Sym(name="Self"), origin=bound_expr)
+    if isinstance(self_term, pm.Err):
+        return self_term
+
+    return pm.spec_ref(
+        EXTENDS_FACT,
+        pm.struct(self_term, **{"from": _fact_target_term(term)}),
+    )
+
+
+def build_fact(fact_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Spec | pm.Err | None:
+    if fact_expr is None:
+        return None
+
+    term = build_term(fact_expr, scope)
+    if term is None or isinstance(term, pm.Err):
+        return term
+    if isinstance(term, pm.Spec):
+        return term
+    if isinstance(term, pm.Anchor):
+        return pm.spec_ref(term)
+    return (
+        log.error("Claim head must be a fact-like expression")
+        .label(fact_expr)
+        .tag(pm.Err())
+    )
+
+
+def build_goal(goal_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Spec | pm.Err | None:
+    return build_fact(goal_expr, scope)
+
+
+def build_binding_pattern(bindings: BindingStruct[Binding], scope: syn.ScopeLike) -> pm.Val:
+    entries = tuple(
+        (binding.slot_key, _binding_bound(binding, scope))
+        for binding in bindings.values
+        if not binding.is_variadic
+    )
+
+    spread_offset = next(
+        (offset for offset, binding in enumerate(bindings.values) if binding.is_variadic),
+        None,
+    )
+
+    if spread_offset is None and not bindings.open_tail:
+        return pm.struct(*_positional_values(entries), **_nominal_values(entries))
+
+    if spread_offset is None:
+        prefix_entries = entries
+        suffix_entries: tuple[tuple[str | None, pm.Val], ...] = ()
+        middle = pm.ANY
+    else:
+        prefix_entries = entries[:spread_offset]
+        suffix_entries = entries[spread_offset:]
+        spread_binding = bindings.values[spread_offset]
+        middle = _binding_bound(spread_binding, scope)
+
+    return pm.variadic_struct(
+        prefix=pm.Struct.from_iter(prefix_entries),
+        middle=middle,
+        suffix=pm.Struct.from_iter(suffix_entries),
+    )
+
+
+def bound_as_type(
+    bound: pm.Val | None,
+    *,
+    bridge: pm.SemanticBridge | None = None,
+) -> pm.Type | None:
+    if bound is None or isinstance(bound, pm.Err):
+        return None
+
+    bridge = pm.BRIDGE.get(pm.DEFAULT_BRIDGE) if bridge is None else bridge
+
+    if isinstance(bound, pm.Op):
+        operator = bound.__data__
+        if isinstance(operator, pm.Satisfy):
+            return _satisfy_as_type(operator.goal, bridge=bridge)
+        if isinstance(operator, pm.ViewAs):
+            return bound_as_type(operator.pattern, bridge=bridge)
+        if isinstance(operator, pm.QualifierSuffix):
+            return bound_as_type(operator.suffix, bridge=bridge)
+
+    direct = bound.as_type()
+    if direct is not None:
+        return direct
+    return None
+
+
+def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> pm.Const | pm.Err | None:
     from axis import expr as expr_module
 
     if not isinstance(indices_expr, expr_module.Tuple):
@@ -66,6 +196,8 @@ def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> pm.Const | 
     nominal: dict[str, pm.Const | pm.Var] = {}
     for element in indices_expr.elements:
         built = build_tuple_element_bound(element, scope)
+        if isinstance(built, pm.Err):
+            return built
         if built is None:
             continue
         key, value = built
@@ -88,6 +220,8 @@ def build_tuple_bound(
     nominal: dict[str, pm.Const | pm.Var] = {}
     for element in elements:
         built = build_tuple_element_bound(element, scope)
+        if isinstance(built, pm.Err):
+            return built
         if built is None:
             continue
         key, value = built
@@ -101,17 +235,21 @@ def build_tuple_bound(
 def build_tuple_element_bound(
     element: syn.Node,
     scope: syn.ScopeLike,
-) -> tuple[str | None, pm.Const | pm.Var] | None:
+) -> tuple[str | None, pm.Const | pm.Var] | pm.Err | None:
     from axis import expr as expr_module
 
     match element:
         case expr_module.Tuple.Positional(value=value_expr):
-            value = value_expr.to_bound(scope)
+            value = build_term(value_expr, scope)
+            if isinstance(value, pm.Err):
+                return value
             return None if value is None else (None, as_const_or_var(value, value_expr))
         case expr_module.Tuple.Nominal(key=key_expr, value=value_expr):
             if value_expr is None:
                 value_expr = key_expr
-            value = value_expr.to_bound(scope)
+            value = build_term(value_expr, scope)
+            if isinstance(value, pm.Err):
+                return value
             return (
                 expr_module.to_slot_name(key_expr),
                 as_const_or_var(value, value_expr),
@@ -180,3 +318,68 @@ def unsupported_bound(bound: syn.Expr | None, message: str) -> pm.Err:
 
 def unsupported_bound_exception(bound: syn.Expr | None, message: str) -> TypeError:
     return TypeError(f"{message}: {bound!r}" if bound is not None else message)
+
+
+def _binding_bound(binding: Binding, scope: syn.ScopeLike) -> pm.Val:
+    bound = build_bound(binding.bound_expr, scope)
+    return pm.ANY if bound is None else bound
+
+
+def _compile_term_bound(term: pm.Val) -> pm.Val:
+    if _should_compile_to_conforms(term):
+        return pm.satisfy(
+            pm.spec_ref(
+                CONFORMS_FACT,
+                pm.struct(pm.THIS, to=_fact_target_term(term)),
+            )
+        )
+    return term
+
+
+def _should_compile_to_conforms(term: pm.Val) -> bool:
+    if isinstance(term, pm.Var):
+        return True
+    if isinstance(term, pm.Spec):
+        return True
+    if isinstance(term, pm.Const) and isinstance(term.__data__, pm.Type):
+        return True
+    if isinstance(term, pm.Type):
+        return True
+    if isinstance(term, pm.Anchor):
+        name = term.name or ""
+        return bool(name) and name[:1].isupper()
+    return False
+
+
+def _satisfy_as_type(
+    goal: pm.Spec,
+    *,
+    bridge: pm.SemanticBridge,
+) -> pm.Type | None:
+    if goal.anchor.path == CONFORMS_FACT:
+        args = goal.args or pm.Struct.Empty
+        target = args.get("to", default=None)
+        return bound_as_type(target, bridge=bridge)
+    _ = bridge
+    return None
+
+
+def _fact_target_term(term: pm.Val) -> pm.Val:
+    type_ = term.as_type()
+    if type_ is None:
+        return term
+    if isinstance(type_, pm.Val):
+        return type_
+    return pm.val(type_)
+
+
+def _positional_values(
+    entries: tuple[tuple[str | None, pm.Val], ...],
+) -> tuple[pm.Val, ...]:
+    return tuple(value for key, value in entries if key is None)
+
+
+def _nominal_values(
+    entries: tuple[tuple[str | None, pm.Val], ...],
+) -> dict[str, pm.Val]:
+    return {key: value for key, value in entries if key is not None}

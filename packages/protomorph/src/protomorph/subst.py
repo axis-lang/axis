@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
-from protobase import mutate
+from protobase import attrs_of, mutate
 
 import protomorph as pm
 
@@ -13,7 +14,7 @@ __all__ = [
 ]
 
 
-type SubstEnv = Callable[[pm.Var], pm.Val | None]
+type SubstEnv = Callable[[pm.Val], pm.Val | None]
 
 
 def as_type(value: pm.Val | pm.Type | None) -> pm.Type | None:
@@ -31,9 +32,12 @@ def as_type(value: pm.Val | pm.Type | None) -> pm.Type | None:
 
 
 def subst_val(value: pm.Val, env: SubstEnv) -> pm.Val:
-    if isinstance(value, pm.Var):
-        resolved = env(value)
-        return value if resolved is None else resolved
+    resolved = env(value)
+    if resolved is not None:
+        return resolved
+
+    if isinstance(value, pm.Op):
+        return _subst_op(value, env)
 
     if isinstance(value, pm.Spec):
         return _subst_spec(value, env)
@@ -41,6 +45,40 @@ def subst_val(value: pm.Val, env: SubstEnv) -> pm.Val:
     if isinstance(value, pm.Const):
         return _subst_const(value, env)
 
+    return value
+
+
+def _subst_op(value: pm.Op, env: SubstEnv) -> pm.Val:
+    operator = _subst_builtin(value.__data__, env)
+    if operator is value.__data__:
+        return value
+    assert isinstance(operator, pm.Operator)
+    return pm.op(operator)
+
+
+def _subst_builtin(value: pm.Builtin, env: SubstEnv) -> pm.Builtin:
+    updates: dict[str, object] = {}
+    for attr, attr_value in attrs_of(value).items():
+        resolved = _subst_object(attr_value, env)
+        if resolved != attr_value:
+            updates[attr] = resolved
+    return value if not updates else mutate(value, **updates)
+
+
+def _subst_object(value: object, env: SubstEnv) -> object:
+    if isinstance(value, pm.Val):
+        return subst_val(value, env)
+    if isinstance(value, pm.Type):
+        return _subst_type(value, env)
+    if isinstance(value, tuple):
+        items = tuple(_subst_object(item, env) for item in value)
+        return value if items == value else items
+    if isinstance(value, frozenset):
+        items = frozenset(_subst_object(item, env) for item in value)
+        return value if items == value else items
+    if isinstance(value, dict):
+        items = {key: _subst_object(item, env) for key, item in value.items()}
+        return value if items == value else items
     return value
 
 
@@ -52,31 +90,25 @@ def _subst_const(value: pm.Const, env: SubstEnv) -> pm.Val:
             return value
         return pm.val(resolved_type)
 
-    if isinstance(value.__type__, pm.StructType) and isinstance(data, tuple):
-        return _subst_struct_const(value, cast(tuple, data), env)
+    fields = _const_struct_fields(value)
+    if fields is not None:
+        resolved_fields = tuple(subst_val(field_value, env) for field_value in fields.values)
+        if resolved_fields == fields.values:
+            return value
+        return _struct_const(pm.Struct.from_keys(fields.index.keys, resolved_fields))
 
     return value
 
 
-def _subst_struct_const(
-    value: pm.Const,
-    data: tuple,
-    env: SubstEnv,
-) -> pm.Val:
-    struct_type = cast(pm.StructType, value.__type__)
-    keys = struct_type.meta_attrs.index.keys
-    resolved_values = tuple(
-        subst_val(field_type._wrap(field_data), env)
-        for field_type, field_data in zip(struct_type.meta_attrs.values, data)
+def _const_struct_fields(value: pm.Const) -> pm.Struct[str | None, pm.Val] | None:
+    if not isinstance(value.__type__, pm.StructType) or not isinstance(value.__data__, tuple):
+        return None
+    meta_attrs = value.__type__.meta_attrs
+    values = tuple(
+        field_type._wrap(field_data)
+        for field_type, field_data in zip(meta_attrs.values, value.__data__)
     )
-    resolved_types = tuple(rv.__type__ for rv in resolved_values)
-    resolved_data = tuple(rv.__data__ for rv in resolved_values)
-    if resolved_types == struct_type.meta_attrs.values and resolved_data == data:
-        return value
-    return pm.Const(
-        pm.StructType(meta_attrs=pm.Struct.from_keys(keys, resolved_types)),
-        resolved_data,
-    )
+    return pm.Struct.from_keys(meta_attrs.index.keys, values)
 
 
 def _subst_spec(spec: pm.Spec, env: SubstEnv) -> pm.Spec:
@@ -84,28 +116,21 @@ def _subst_spec(spec: pm.Spec, env: SubstEnv) -> pm.Spec:
     if args is None or args.index.is_empty:
         return spec
 
-    positional: list[pm.Const | pm.Var] = []
-    nominal: dict[str, pm.Const | pm.Var] = {}
-    changed = False
-    for key, value in zip(args.index.keys, args.values):
-        resolved = subst_val(value, env)
-        if resolved is not value:
-            changed = True
-        resolved_arg = _as_const_or_var(resolved)
-        if key is None:
-            positional.append(resolved_arg)
-        else:
-            nominal[key] = resolved_arg
-
-    if not changed:
+    resolved_values = tuple(subst_val(value, env) for value in args.values)
+    if resolved_values == args.values:
         return spec
-    return pm.spec_ref(spec.anchor, pm.struct(*positional, **nominal))
+
+    resolved_args = pm.Struct.from_keys(args.index.keys, resolved_values)
+    return pm.spec_ref(spec.anchor, _struct_const(resolved_args))
 
 
 def _subst_type(type_: pm.Type, env: SubstEnv) -> pm.Type:
-    if isinstance(type_, pm.Var):
-        resolved = as_type(env(type_))
-        return type_ if resolved is None else resolved
+    if isinstance(type_, pm.Val):
+        resolved = subst_val(type_, env)
+        if isinstance(resolved, pm.Type):
+            return resolved
+        resolved_type = as_type(resolved)
+        return type_ if resolved_type is None else resolved_type
 
     if isinstance(type_, pm.NominalQualifier):
         new_spec = _subst_spec(type_.spec_ref, env)
@@ -135,7 +160,12 @@ def _subst_type(type_: pm.Type, env: SubstEnv) -> pm.Type:
     return type_
 
 
-def _as_const_or_var(value: pm.Val) -> pm.Const | pm.Var:
-    if isinstance(value, (pm.Const, pm.Var)):
-        return value
-    return cast(pm.Const | pm.Var, pm.val(value))
+def _struct_const(struct: pm.Struct[str | None, pm.Val]) -> pm.Const:
+    positional: list[pm.Val] = []
+    nominal: dict[str, pm.Val] = {}
+    for key, value in zip(struct.index.keys, struct.values):
+        if key is None:
+            positional.append(value)
+        else:
+            nominal[key] = value
+    return pm.struct(*positional, **nominal)

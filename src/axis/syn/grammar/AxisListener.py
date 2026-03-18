@@ -35,6 +35,15 @@ class AxisListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by AxisParser#claimItem.
+    def enterClaimItem(self, ctx:AxisParser.ClaimItemContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#claimItem.
+    def exitClaimItem(self, ctx:AxisParser.ClaimItemContext):
+        pass
+
+
     # Enter a parse tree produced by AxisParser#valItem.
     def enterValItem(self, ctx:AxisParser.ValItemContext):
         pass
@@ -131,6 +140,33 @@ class AxisListener(ParseTreeListener):
 
     # Exit a parse tree produced by AxisParser#defReturnsBlock.
     def exitDefReturnsBlock(self, ctx:AxisParser.DefReturnsBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#claimWhereBlock.
+    def enterClaimWhereBlock(self, ctx:AxisParser.ClaimWhereBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#claimWhereBlock.
+    def exitClaimWhereBlock(self, ctx:AxisParser.ClaimWhereBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#claimWhenBlock.
+    def enterClaimWhenBlock(self, ctx:AxisParser.ClaimWhenBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#claimWhenBlock.
+    def exitClaimWhenBlock(self, ctx:AxisParser.ClaimWhenBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#claimWhenClauseBlock.
+    def enterClaimWhenClauseBlock(self, ctx:AxisParser.ClaimWhenClauseBlockContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#claimWhenClauseBlock.
+    def exitClaimWhenClauseBlock(self, ctx:AxisParser.ClaimWhenClauseBlockContext):
         pass
 
 
@@ -266,6 +302,60 @@ class AxisListener(ParseTreeListener):
 
     # Exit a parse tree produced by AxisParser#logicOp.
     def exitLogicOp(self, ctx:AxisParser.LogicOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseOrExpr.
+    def enterBitwiseOrExpr(self, ctx:AxisParser.BitwiseOrExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseOrExpr.
+    def exitBitwiseOrExpr(self, ctx:AxisParser.BitwiseOrExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseOrOp.
+    def enterBitwiseOrOp(self, ctx:AxisParser.BitwiseOrOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseOrOp.
+    def exitBitwiseOrOp(self, ctx:AxisParser.BitwiseOrOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseXorExpr.
+    def enterBitwiseXorExpr(self, ctx:AxisParser.BitwiseXorExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseXorExpr.
+    def exitBitwiseXorExpr(self, ctx:AxisParser.BitwiseXorExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseXorOp.
+    def enterBitwiseXorOp(self, ctx:AxisParser.BitwiseXorOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseXorOp.
+    def exitBitwiseXorOp(self, ctx:AxisParser.BitwiseXorOpContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseAndExpr.
+    def enterBitwiseAndExpr(self, ctx:AxisParser.BitwiseAndExprContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseAndExpr.
+    def exitBitwiseAndExpr(self, ctx:AxisParser.BitwiseAndExprContext):
+        pass
+
+
+    # Enter a parse tree produced by AxisParser#bitwiseAndOp.
+    def enterBitwiseAndOp(self, ctx:AxisParser.BitwiseAndOpContext):
+        pass
+
+    # Exit a parse tree produced by AxisParser#bitwiseAndOp.
+    def exitBitwiseAndOp(self, ctx:AxisParser.BitwiseAndOpContext):
         pass
 
 
