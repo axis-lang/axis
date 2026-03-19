@@ -65,23 +65,6 @@ Sym.ROOT = Sym("@root")
 #     at: Optional[str] = None
 # ):
 #     return Sym(name=name, at=at)
-
-
-@syn.Matcher.impl_rule(Sym)
-def match_sym(self: syn.Matcher, sym: Sym, value: syn.Expr) -> syn.MatchResult | None:
-    spec = sym.match_spec
-    if spec.match_all:
-        if sym.at and sym.at != value.__class__.__name__:
-            return None
-        return syn.MatchResult.empty()
-
-    if not isinstance(value, Sym):
-        return None
-    if sym.name != value.name or sym.at != value.at:
-        return None
-    return syn.MatchResult.empty()
-
-
 @Sym.as_impl(str)
 def _sym_as_str(self: Sym) -> str:
     return self.name

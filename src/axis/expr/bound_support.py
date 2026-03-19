@@ -6,7 +6,7 @@ import protomorph as pm
 
 from axis import log, syn
 from axis.literals import Wildcard
-from axis.sem.binding import Binding, BindingStruct
+from axis.sem.binding import BindingStruct
 
 CONFORMS_FACT = "std.facts.Conforms"
 EXTENDS_FACT = "std.facts.Extends"
@@ -127,30 +127,18 @@ def build_goal(goal_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Spec | pm
     return build_fact(goal_expr, scope)
 
 
-def build_binding_pattern(bindings: BindingStruct[Binding], scope: syn.ScopeLike) -> pm.Val:
-    entries = tuple(
-        (binding.slot_key, _binding_bound(binding, scope))
-        for binding in bindings.values
-        if not binding.is_variadic
-    )
+def build_binding_pattern(bindings: BindingStruct, scope: syn.ScopeLike) -> pm.Val:
+    prefix_entries = tuple((binding.slot_key, _binding_bound(binding, scope)) for binding in bindings.prefix)
+    suffix_entries = tuple((binding.slot_key, _binding_bound(binding, scope)) for binding in bindings.suffix)
 
-    spread_offset = next(
-        (offset for offset, binding in enumerate(bindings.values) if binding.is_variadic),
-        None,
-    )
-
-    if spread_offset is None and not bindings.open_tail:
+    if bindings.spread is None and not bindings.open_tail:
+        entries = prefix_entries + suffix_entries
         return pm.struct(*_positional_values(entries), **_nominal_values(entries))
 
-    if spread_offset is None:
-        prefix_entries = entries
-        suffix_entries: tuple[tuple[str | None, pm.Val], ...] = ()
+    if bindings.spread is None:
         middle = pm.ANY
     else:
-        prefix_entries = entries[:spread_offset]
-        suffix_entries = entries[spread_offset:]
-        spread_binding = bindings.values[spread_offset]
-        middle = _binding_bound(spread_binding, scope)
+        middle = _binding_bound(bindings.spread, scope)
 
     return pm.variadic_struct(
         prefix=pm.Struct.from_iter(prefix_entries),
@@ -320,7 +308,7 @@ def unsupported_bound_exception(bound: syn.Expr | None, message: str) -> TypeErr
     return TypeError(f"{message}: {bound!r}" if bound is not None else message)
 
 
-def _binding_bound(binding: Binding, scope: syn.ScopeLike) -> pm.Val:
+def _binding_bound(binding: BindingStruct.Field, scope: syn.ScopeLike) -> pm.Val:
     bound = build_bound(binding.bound_expr, scope)
     return pm.ANY if bound is None else bound
 

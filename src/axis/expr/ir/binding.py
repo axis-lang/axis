@@ -8,7 +8,7 @@ from protobase import Inmutable
 
 from axis import expr, log, syn
 
-from axis.sem.binding import Binding, BindingStruct
+from axis.sem.binding import BindingStruct
 
 
 class _BindingDraft(Inmutable):
@@ -32,7 +32,21 @@ class _BindingDraft(Inmutable):
 def build_binding_struct(
     inline_expr: expr.Tuple | None,
     block_expr: expr.Tuple | None,
-) -> BindingStruct[Binding]:
+) -> BindingStruct:
+    drafts, open_tail = _compile_binding_drafts(inline_expr, block_expr)
+    prefix, spread, suffix = _partition_drafts(drafts)
+    return BindingStruct(
+        prefix=tuple(_field_from_draft(draft) for draft in prefix),
+        spread=None if spread is None else _field_from_draft(spread),
+        suffix=tuple(_field_from_draft(draft) for draft in suffix),
+        open_tail=open_tail,
+    )
+
+
+def _compile_binding_drafts(
+    inline_expr: expr.Tuple | None,
+    block_expr: expr.Tuple | None,
+) -> tuple[tuple[_BindingDraft, ...], bool]:
     inline_drafts = _normalize_inline_bindings(inline_expr)
     block_drafts = _normalize_block_bindings(block_expr)
 
@@ -46,27 +60,30 @@ def build_binding_struct(
             .throw()
         )
 
-    drafts, open_tail = _merge_binding_drafts(inline_drafts, block_drafts)
-    entries = tuple(_binding_from_draft(draft) for draft in drafts)
-    struct_entries = tuple((entry.slot_key, entry) for entry in entries)
-    return BindingStruct(
-        bindings=pm.Struct.from_iter(struct_entries),
-        open_tail=open_tail,
-    )
+    return _merge_binding_drafts(inline_drafts, block_drafts)
 
 
-def _binding_from_draft(draft: _BindingDraft) -> Binding:
+def _field_from_draft(draft: _BindingDraft) -> BindingStruct.Field:
     if draft.kind == "ellipsis":
         raise ValueError("Ellipsis draft cannot be materialized as a binding")
-    return Binding(
+    return BindingStruct.Field(
         kind=draft.kind,
         origin=draft.origin,
-        key=draft.key,
+        key_expr=draft.key,
         slot_key=draft.slot_key,
         binder_name=draft.binder_name,
         bound_expr=draft.bound_expr,
         default_expr=draft.default_expr,
     )
+
+
+def _partition_drafts(
+    drafts: tuple[_BindingDraft, ...],
+) -> tuple[tuple[_BindingDraft, ...], _BindingDraft | None, tuple[_BindingDraft, ...]]:
+    spread_offset = next((i for i, draft in enumerate(drafts) if draft.kind == "spread"), None)
+    if spread_offset is None:
+        return drafts, None, ()
+    return drafts[:spread_offset], drafts[spread_offset], drafts[spread_offset + 1 :]
 
 
 def _is_ellipsis_expr(node: syn.Expr) -> bool:
@@ -173,7 +190,13 @@ def _normalize_inline_bindings(inline_expr: expr.Tuple | None) -> tuple[_Binding
                         key=key_expr,
                         bound_expr=bound_expr,
                         default_expr=default_expr,
-                        slot_key=None,
+                        slot_key=(
+                            None
+                            if _is_spread_expr(key_expr)
+                            or _is_placeholder_expr(key_expr)
+                            or _is_ellipsis_expr(key_expr)
+                            else _binding_name(key_expr)
+                        ),
                     )
                 )
             case _:

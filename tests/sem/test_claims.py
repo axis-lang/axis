@@ -141,6 +141,28 @@ class ClaimParsingSmokeTest(InlinePackageTestCase):
 
 
 class ClaimValidationTest(InlinePackageTestCase):
+    def test_empirical_claim_rejects_head_not_admitted_by_predicate_spec(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit demo
+
+            mod facts
+                def Extends[X, from=Y]
+
+            claim facts.Extends[from=Y]
+            where:
+                val Y
+            """
+        )
+
+        with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
+            pkg.check()
+
+        self.assertEqual(
+            raised.exception.report.message,
+            "Claim head is not admitted by any declared predicate spec",
+        )
+
     def test_claim_rejects_undeclared_when_variable(self):
         pkg = TestPackage.with_std().with_unit(
             """

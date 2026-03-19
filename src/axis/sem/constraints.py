@@ -4,10 +4,7 @@ from collections.abc import Callable
 
 import protomorph as pm
 
-from axis import expr, log, syn
-
-from .binding import Binding, BindingStruct
-from .scope import Scope
+from axis import expr, log, sem, syn
 
 
 def constraint_goal_for(
@@ -29,10 +26,10 @@ def constraint_goal_for(
 
 
 def binding_constraint_goals(
-    bindings: BindingStruct[Binding],
-    scope: Scope,
+    bindings: sem.BindingStruct,
+    scope: sem.Scope,
     *,
-    subject_for_binding: Callable[[Binding], pm.Val | None],
+    subject_for_binding: Callable[[sem.BindingStruct.Field], pm.Val | None],
     origin_label: str = "constraint",
 ) -> tuple[pm.Spec, ...] | pm.Err:
     goals: list[pm.Spec] = []

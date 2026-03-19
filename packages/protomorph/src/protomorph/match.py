@@ -308,29 +308,15 @@ def _normalize_struct(
     values = tuple(normalize(value, bridge=bridge) for value in struct.values)
     if values == struct.values:
         return struct
-    return pm.Struct.from_keys(struct.index.keys, values)
+    return struct.with_values(values)
 
 
 def _const_struct_fields(value: pm.Const) -> pm.Struct[str | None, pm.Val] | None:
-    if not isinstance(value.__type__, pm.StructType) or not isinstance(value.__data__, tuple):
-        return None
-    meta_attrs = value.__type__.meta_attrs
-    values = tuple(
-        field_type._wrap(field_data)
-        for field_type, field_data in zip(meta_attrs.values, value.__data__)
-    )
-    return pm.Struct.from_keys(meta_attrs.index.keys, values)
+    return pm.Struct.from_const(value)
 
 
 def _struct_const(struct: pm.Struct[str | None, pm.Val]) -> pm.Const:
-    positional: list[pm.Val] = []
-    nominal: dict[str, pm.Val] = {}
-    for key, value in zip(struct.index.keys, struct.values):
-        if key is None:
-            positional.append(value)
-        else:
-            nominal[key] = value
-    return pm.struct(*positional, **nominal)
+    return struct.as_const()
 
 
 def _intersect_structs(
@@ -348,7 +334,7 @@ def _intersect_structs(
         if result is None:
             return None
         values.append(result)
-    return pm.Struct.from_keys(left.index.keys, tuple(values))
+    return left.with_values(tuple(values))
 
 
 def _subsumes_structs(

@@ -6,6 +6,7 @@ from axis import items, log, src, expr, syn, sem
 from IPython import embed
 from rich import print
 from protomorph import *
+
 app = App()
 
 
@@ -40,7 +41,7 @@ def main(
 
         try:
             if repl:
-                with pkg: 
+                with pkg:
                     embed()
             else:
                 print(f"Watching {pkg.dir} for changes. Press Ctrl+C to stop.")

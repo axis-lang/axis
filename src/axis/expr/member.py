@@ -50,23 +50,6 @@ class Member(syn.Expr):
         for member in members:
             result = cls(of=result, name=member)
         return result
-
-
-@syn.Matcher.impl_rule(Member)
-def match_member(self: syn.Matcher, pattern: Member, value: syn.Expr) -> syn.MatchResult | None:
-    if not isinstance(value, Member):
-        return None
-
-    if not pattern.is_wildcard and pattern.name != value.name:
-        return None
-
-    result = self.match(pattern.of, value.of)
-    if result is None:
-        return None
-
-    return result
-
-
 @Member.as_impl(str)
 def _as_str(self: Member) -> str:
     return self.name

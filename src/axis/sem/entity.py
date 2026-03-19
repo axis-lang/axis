@@ -1,355 +1,266 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import cast
 
-from protobase import Consed, flux, frozendict, _
+from protobase import Consed, flux, _
+
 import protomorph as pm
 
-from axis import syn, log
+from axis import log, sem, syn
 
 
-from .binding import Binding, BindingShape, BindingStruct
-from .bound import (
-    bound_as_type,
-    build_binding_pattern,
-    build_bound,
-    build_default,
-)
-from .context import Context
-from .scope import Scope
+class Facet(Consed, abstract=True):
+    pass
+
+
+def _layout_field_key(binding: sem.BindingStruct.Field | sem.LoweredBindingStruct.Field) -> str | None:
+    return binding.slot_key if binding.slot_key is not None else binding.binder_name
 
 
 class Entity(Consed):
     anchor: pm.Anchor
-    contributions: frozenset[Context.Contribution]
+    contributions: frozenset[sem.Context.Contribution]
 
-    # @classmethod
-    # def from_contributions(
-    #     cls,
-    #     anchor: std.Anchor,
-    #     contributions: Iterable[Context.Contribution],
-    # ) -> "Entity":
-    #     return cls(anchor=anchor, contributions=frozenset(contributions))
+    class SpecContribution(sem.Context.EntityContribution, abstract=True):
+        spec_bindings: sem.BindingStruct = _
 
-    class Bucket(Consed):
-        def check(self):
-            pass
-
-    class SpecContribution(Context.EntityContribution):
-        spec_bindings: BindingStruct[Binding] = _
+        def _spec_binder(self, field: sem.BindingStruct.Field) -> pm.Var | None:
+            name = field.binder_name
+            if name is None:
+                return None
+            return pm.var(Entity.SpecVar, self, name)
 
         @flux.property
-        def spec_scope(self) -> Scope:
-            """Scope populated with SpecVars for each spec binding.
-
-            Parented to the context scope so bound expressions can build
-            bounds from names in the enclosing module/block.
-            """
-
-            builder = Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
-            builder.define(
-                "Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin
-            )
-            for binding in self.spec_bindings:
+        def spec_scope(self) -> sem.Scope:
+            builder = sem.Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
+            builder.define("Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin)
+            for binding in self.spec_bindings.nameable_fields:
                 name = binding.binder_name
                 if name is None:
                     continue
-                var = pm.var(Entity.SpecVar, self, name)
-                builder.define(name, var, origin=binding.key)
+                binder = self._spec_binder(binding)
+                assert binder is not None
+                builder.define(name, cast(pm.Var, binder), origin=binding.key_expr)
             return builder.build()
 
         @flux.property
-        def spec_bounds(self) -> BindingStruct[pm.Val | None]:
-            """Build bound values for each specialization binding.
-
-            Uses spec_scope so that SpecVars and enclosing context names
-            are available while constructing bounds.
-            """
-            scope = self.spec_scope
-            return self.spec_bindings.map(
-                lambda binding: build_bound(binding.bound_expr, scope)
+        def lowered_spec_bindings(self) -> sem.LoweredBindingStruct:
+            return sem.lower_binding_struct(
+                self.spec_bindings,
+                self.spec_scope,
+                binder_for=self._spec_binder,
             )
 
         @flux.property
-        def spec_pattern(self) -> pm.Val:
-            return build_binding_pattern(self.spec_bindings, self.spec_scope)
-
-        @flux.property
-        def spec_defaults(self) -> BindingStruct[pm.Val | None]:
-            scope = self.spec_scope
-            return self.spec_bindings.map(
-                lambda binding: build_default(binding.default_expr, scope)
-            )
+        def spec_schema(self) -> pm.StructSchema:
+            return sem.binding_schema(self.lowered_spec_bindings)
 
         @flux.method
         def check(self):
-            # Trigger scope construction and bound creation
             self.spec_scope
-            self.spec_bounds
-            self.spec_pattern
-            self.spec_defaults
+            self.lowered_spec_bindings
+            self.spec_schema
 
-    class SpecVar(pm.VarType[SpecContribution]): ...
-
-    class SpecBucket(Bucket):
-        specs: frozenset[Entity.SpecContribution]
-
-        @flux.property
-        def overload_by_shape(
-            self,
-        ) -> frozendict[BindingShape, Entity.OverloadBucket]:
-            return _overload_by_shape_bucket(self.specs)
-
-    class PredicateContribution(SpecContribution):
+    class SpecVar(pm.VarType[SpecContribution]):
         pass
 
-    @flux.property
-    def predicate_signatures(self) -> frozenset[PredicateContribution]:
-        return frozenset(
-            contrib
-            for contrib in self.contributions
-            if isinstance(contrib, Entity.PredicateContribution)
-        )
+    class PredicateFacet(Facet, SpecContribution):
+        pass
 
-    @flux.property
-    def facts(self) -> frozenset[pm.Spec]:
-        return frozenset(
-            fact
-            for contrib in self.contributions
-            for fact in contrib.facts
-        )
+    class OverloadContribution(SpecContribution, abstract=True):
+        param_bindings: sem.BindingStruct = _
 
-    @flux.property
-    def clauses(self) -> frozenset[pm.Clause]:
-        return frozenset(
-            clause
-            for contrib in self.contributions
-            for clause in contrib.clauses
-        )
+        def _param_binder(self, field: sem.BindingStruct.Field) -> pm.Var | None:
+            name = field.binder_name
+            if name is None:
+                return None
+            return pm.var(Entity.ParamVar, self, name)
 
-    class QualContribution(SpecContribution):
+        @flux.property
+        def overload_scope(self) -> sem.Scope:
+            builder = sem.Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
+            builder.define("self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin)
+            for binding in self.param_bindings.nameable_fields:
+                name = binding.binder_name
+                if name is None:
+                    continue
+                binder = self._param_binder(binding)
+                assert binder is not None
+                builder.define(name, cast(pm.Var, binder), origin=binding.key_expr)
+            return builder.build()
+
+        @flux.property
+        def lowered_param_bindings(self) -> sem.LoweredBindingStruct:
+            return sem.lower_binding_struct(
+                self.param_bindings,
+                self.overload_scope,
+                binder_for=self._param_binder,
+            )
+
+        @flux.property
+        def param_schema(self) -> pm.StructSchema:
+            return sem.binding_schema(self.lowered_param_bindings)
+
+        @flux.method
+        def layout(self, args: pm.Struct[str | None, pm.Val]) -> pm.StructLayout | None:
+            field_types = tuple(
+                _bound_type(self, field.match_expr, args)
+                for field in self.lowered_param_bindings.non_spread_fields
+            )
+            keys = tuple(field.slot_key for field in self.lowered_param_bindings.non_spread_fields)
+            return pm.StructLayout(fields=pm.Struct.from_keys(keys, field_types))
+
+        @flux.method
+        def check(self):
+            self.overload_scope
+            self.lowered_spec_bindings
+            self.spec_schema
+            self.lowered_param_bindings
+            self.param_schema
+
+    class ParamVar(pm.VarType[OverloadContribution]):
+        pass
+
+    class ClassFacet(Facet, OverloadContribution):
+        pass
+
+    class ResultContribution(OverloadContribution, abstract=True):
+        result_bound_expr: syn.Expr | None = _
+
+        @flux.property
+        def result_bound(self) -> pm.Val | None:
+            return sem.build_bound(self.result_bound_expr, self.overload_scope)
+
+        def __invariant__(self):
+            if self.result_bound_expr is None:
+                log.warn("ResultContribution without returns").label(self.origin).emit()
+
+    class FunctionFacet(Facet, ResultContribution):
+        pass
+
+    class QualifierContribution(SpecContribution):
         underlying_bound_expr: syn.Expr = _
-        param_bindings: BindingStruct[Binding] = _
+        param_bindings: sem.BindingStruct = _
 
         @flux.property
-        def param_bounds(self) -> BindingStruct[pm.Val | None]:
-            scope = self.spec_scope
-            return self.param_bindings.map(
-                lambda binding: build_bound(binding.bound_expr, scope)
+        def lowered_param_bindings(self) -> sem.LoweredBindingStruct:
+            return sem.lower_binding_struct(
+                self.param_bindings,
+                self.spec_scope,
+                binder_for=self._spec_binder,
             )
 
         @flux.property
-        def param_pattern(self) -> pm.Val:
-            return build_binding_pattern(self.param_bindings, self.spec_scope)
-
-        @flux.property
-        def param_defaults(self) -> BindingStruct[pm.Val | None]:
-            scope = self.spec_scope
-            return self.param_bindings.map(
-                lambda binding: build_default(binding.default_expr, scope)
-            )
+        def param_schema(self) -> pm.StructSchema:
+            return sem.binding_schema(self.lowered_param_bindings)
 
         @flux.property
         def underlying_bound(self) -> pm.Val | None:
-            return build_bound(self.underlying_bound_expr, self.spec_scope)
+            return sem.build_bound(self.underlying_bound_expr, self.spec_scope)
 
         @flux.method
-        def layout(self, args: pm.Struct[str, pm.Val]) -> pm.StructLayout | None:
-            field_keys = tuple(_layout_field_key(binding) for binding in self.param_bindings.values)
+        def layout(self, args: pm.Struct[str | None, pm.Val]) -> pm.StructLayout | None:
             field_types = tuple(
-                _bound_type(self, bound, args)
-                for bound in self.param_bounds.values
+                _bound_type(self, field.match_expr, args)
+                for field in self.lowered_param_bindings.non_spread_fields
             )
+            field_keys = tuple(_layout_field_key(field) for field in self.lowered_param_bindings.non_spread_fields)
             return pm.StructLayout(fields=pm.Struct.from_keys(field_keys, field_types))
 
         @flux.method
         def check(self):
             self.spec_scope
-            self.spec_bounds
-            self.spec_pattern
-            self.spec_defaults
-            self.param_bounds
-            self.param_pattern
-            self.param_defaults
+            self.lowered_spec_bindings
+            self.spec_schema
+            self.lowered_param_bindings
+            self.param_schema
             self.underlying_bound
 
     @flux.property
-    def spec_by_shape(self) -> frozendict[BindingShape, SpecBucket]:
-        return _spec_by_shape_bucket(self.contributions)
-
-    class OverloadContribution(SpecContribution):
-        param_bindings: BindingStruct[Binding] = _
-
-        @flux.property
-        def overload_scope(self) -> Scope:
-            """Scope with spec_scope as parent, populated with ParamVars."""
-            builder = Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
-            builder.define(
-                "self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin
-            )
-            for binding in self.param_bindings:
-                name = binding.binder_name
-                if name is None:
-                    continue
-                var = pm.var(Entity.ParamVar, self, name)
-                builder.define(name, var, origin=binding.key)
-            return builder.build()
-
-        @flux.property
-        def param_bounds(self) -> BindingStruct[pm.Val | None]:
-            """Build bound values for each parameter binding.
-
-            Uses overload_scope so that SpecVars, ParamVars, and enclosing
-            context names are all available while constructing bounds.
-            """
-            scope = self.overload_scope
-            return self.param_bindings.map(
-                lambda binding: build_bound(binding.bound_expr, scope)
-            )
-
-        @flux.property
-        def param_pattern(self) -> pm.Val:
-            return build_binding_pattern(self.param_bindings, self.overload_scope)
-
-        @flux.property
-        def param_defaults(self) -> BindingStruct[pm.Val | None]:
-            scope = self.overload_scope
-            return self.param_bindings.map(
-                lambda binding: build_default(binding.default_expr, scope)
-            )
-
-        @flux.method
-        def layout(self, args: pm.Struct[str, pm.Val]) -> pm.StructLayout | None:
-            keys = self.param_bindings.index.keys
-            field_types = tuple(
-                _bound_type(self, bound, args)
-                for bound in self.param_bounds.values
-            )
-            return pm.StructLayout(fields=pm.Struct.from_keys(keys, field_types))
-
-        @flux.method
-        def check(self):
-            # Trigger scope construction and bound creation for both levels
-            self.overload_scope
-            self.spec_bounds
-            self.spec_pattern
-            self.spec_defaults
-            self.param_bounds
-            self.param_pattern
-            self.param_defaults
-
-    class ParamVar(pm.VarType[OverloadContribution]): ...
-
-    class OverloadBucket(Bucket):
-        overloads: frozenset[Entity.OverloadContribution]
-
-        # @flux.property
-        # def impl_by_result(self) -> frozendict[syn.Expr | None, Entity.ImplBucket]:
-        #     return _impl_by_result_bucket(self.overloads)
+    def spec_contributions(self) -> frozenset[SpecContribution]:
+        return frozenset(
+            contrib for contrib in self.contributions if isinstance(contrib, Entity.SpecContribution)
+        )
 
     @flux.property
-    def overload_by_shape(self) -> frozendict[BindingShape, OverloadBucket]:
-        return _overload_by_shape_bucket(self.contributions)
-
-    class ImplContribution(OverloadContribution):
-        result_bound_expr: syn.Expr | None = _
-
-        @flux.property
-        def result_bound(self) -> pm.Val | None:
-            return build_bound(self.result_bound_expr, self.overload_scope)
-
-        def __invariant__(self):
-            if self.result_bound_expr is None:
-                log.warn("ImplContribution without returns").label(self.origin).emit()
-
-    class ImplBucket(Bucket):
-        impls: frozenset[Entity.ImplContribution]
+    def spec_index(self):
+        return sem.SpecIndex(contribs=self.spec_contributions)
 
     @flux.property
-    def impl_by_result(self) -> frozendict[syn.Expr | None, ImplBucket]:
-        return _impl_by_result_bucket(self.contributions)
+    def overload_contributions(self) -> frozenset[Entity.OverloadContribution]:
+        return frozenset(
+            contrib
+            for contrib in self.spec_contributions
+            if isinstance(contrib, Entity.OverloadContribution)
+        )
+
+    @flux.property
+    def overload_index(self):
+        return sem.OverloadIndex(contribs=self.overload_contributions)
+
+    @flux.method
+    def search_specs(
+        self,
+        spec_ref: pm.Spec,
+        facet_cls: type[Facet] | None = None,
+    ) -> pm.ResolveResult[Entity.SpecContribution]:
+        if spec_ref.anchor != self.anchor:
+            return pm.ResolveResult()
+        return self.spec_index.search(spec_ref.args or pm.Struct.Empty, facet_cls=facet_cls)
+
+    @flux.method
+    def match_specs(
+        self,
+        spec_ref: pm.Spec,
+        facet_cls: type[Facet] | None = None,
+    ) -> frozenset[Entity.SpecContribution]:
+        return self.search_specs(spec_ref, facet_cls=facet_cls).goals
+
+    @flux.method
+    def exists_spec(
+        self,
+        spec_ref: pm.Spec,
+        facet_cls: type[Facet] | None = None,
+    ) -> bool:
+        return bool(self.match_specs(spec_ref, facet_cls=facet_cls))
+
+    @flux.method
+    def facet(self, cls: type[sem.Context.Contribution]) -> frozenset[sem.Context.Contribution]:
+        if not issubclass(cls, sem.Context.Contribution):
+            raise TypeError(f"Expected Contribution subtype, got {cls!r}")
+        return frozenset(contrib for contrib in self.contributions if isinstance(contrib, cls))
+
+    @flux.property
+    def facts(self) -> frozenset[pm.Spec]:
+        return frozenset(fact for contrib in self.contributions for fact in contrib.facts)
+
+    @flux.property
+    def clauses(self) -> frozenset[pm.Clause]:
+        return frozenset(clause for contrib in self.contributions for clause in contrib.clauses)
 
     @flux.method
     def check(self):
-        pass
-
-
-def _spec_by_shape_bucket(
-    contributions: frozenset[Context.Contribution],
-) -> frozendict[BindingShape, Entity.SpecBucket]:
-    return _group_by_shape(
-        contributions,
-        Entity.SpecContribution,
-        lambda c: c.spec_bindings.shape,
-        lambda items: Entity.SpecBucket(specs=items),
-    )
-
-
-def _overload_by_shape_bucket(
-    contributions: frozenset[Context.Contribution],
-) -> frozendict[BindingShape, Entity.OverloadBucket]:
-    return _group_by_shape(
-        contributions,
-        Entity.OverloadContribution,
-        lambda c: c.param_bindings.shape,
-        lambda items: Entity.OverloadBucket(overloads=items),
-    )
-
-
-def _group_by_shape[C, K, B](
-    contributions: frozenset[Context.Contribution],
-    contrib_type: type[C],
-    shape_key: Callable[[C], K],
-    make_bucket: Callable[[frozenset[C]], B],
-) -> frozendict[K, B]:
-    groups: dict[K, list[C]] = {}
-    for contrib in contributions:
-        if isinstance(contrib, contrib_type):
-            groups.setdefault(shape_key(contrib), []).append(contrib)
-    return frozendict(
-        (key, make_bucket(frozenset(items))) for key, items in groups.items()
-    )
-
-
-def _impl_by_result_bucket(
-    contributions: frozenset[Context.Contribution],
-) -> frozendict[syn.Expr | None, Entity.ImplBucket]:
-    impls: dict[syn.Expr | None, list[Entity.ImplContribution]] = {}
-    for contrib in contributions:
-        if isinstance(contrib, Entity.ImplContribution):
-            if contrib.param_bindings.index.is_empty:
-                impls.setdefault(contrib.result_bound_expr, []).append(contrib)
-
-    return frozendict(
-        (
-            (returns, Entity.ImplBucket(impls=frozenset(impl)))
-            for returns, impl in impls.items()
-        )
-    )
+        self.spec_index
+        self.overload_index
 
 
 def _bound_type(
     contrib: Entity.SpecContribution,
     bound: pm.Val | None,
-    args: pm.Struct[str, pm.Val],
+    args: pm.Struct[str | None, pm.Val],
 ) -> pm.Type:
     if bound is None:
         return pm.ANY_TYPE
 
     resolved = bound.subst(lambda value: _resolve_spec_var(contrib, value, args))
-    resolved_type = bound_as_type(resolved)
+    resolved_type = sem.bound_as_type(resolved)
     return pm.ANY_TYPE if resolved_type is None else resolved_type
-
-
-def _layout_field_key(binding: Binding) -> str | None:
-    return binding.slot_key if binding.slot_key is not None else binding.binder_name
 
 
 def _resolve_spec_var(
     contrib: Entity.SpecContribution,
     value: pm.Val,
-    args: pm.Struct[str, pm.Val],
+    args: pm.Struct[str | None, pm.Val],
 ) -> pm.Val | None:
     if not isinstance(value, pm.Var):
         return None

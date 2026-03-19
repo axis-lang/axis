@@ -7,6 +7,11 @@ from tests.helpers import StdPackageTestCase
 
 
 class SemanticBridgeMigrationTest(StdPackageTestCase):
+    def assertSemanticLayoutDisabled(self, fn):
+        with self.assertRaises(RuntimeError) as cm:
+            fn()
+        self.assertIn("Semantic layout disabled", str(cm.exception))
+
     def test_realm_installs_pm_bridge_context(self):
         try:
             before = pm.BRIDGE.get()
@@ -65,11 +70,13 @@ class SemanticBridgeMigrationTest(StdPackageTestCase):
         with self.pkg:
             self.assertIsNone(self.pkg.layout(self.type_bound("qualifiers.Struct[core.Sym]")))
 
-    def test_realm_project_uses_semantic_structure_when_available(self):
-        self.assertProjectEq(
-            "types.StructType[core.Text]",
-            "meta_attrs",
-            "qualifiers.Struct[core.Text] types.Type",
+    def test_realm_project_reports_semantic_layout_disabled(self):
+        self.assertSemanticLayoutDisabled(
+            lambda: self.assertProjectEq(
+                "types.StructType[core.Text]",
+                "meta_attrs",
+                "qualifiers.Struct[core.Text] types.Type",
+            )
         )
 
     def test_realm_lift_rebuilds_nominal_qualifier_with_new_underlying(self):
@@ -83,40 +90,32 @@ class SemanticBridgeMigrationTest(StdPackageTestCase):
             self.type_bound("qualifiers.Optional core.Integer"),
         )
 
-    def test_realm_project_lifts_through_nominal_qualifiers(self):
+    def test_realm_project_lifts_through_nominal_qualifiers_is_disabled(self):
         qualifier = self.type_bound("qualifiers.Optional types.StructType[core.Text]")
 
-        projected = self.pkg.project(qualifier, "meta_attrs")
-
-        self.assertEqual(
-            projected,
-            self.type_bound("qualifiers.Optional qualifiers.Struct[core.Text] types.Type"),
+        self.assertSemanticLayoutDisabled(
+            lambda: self.pkg.project(qualifier, "meta_attrs")
         )
 
-    def test_realm_projects_nominal_metatype_spec_ref_semantically(self):
-        projected = self.pkg.project(
-            self.type_bound("types.NominalType[core.Text]"),
-            "spec_ref",
+    def test_realm_projects_nominal_metatype_spec_ref_is_disabled(self):
+        self.assertSemanticLayoutDisabled(
+            lambda: self.pkg.project(
+                self.type_bound("types.NominalType[core.Text]"),
+                "spec_ref",
+            )
         )
 
-        self.assertEqual(
-            projected,
-            self.type_bound("types.Spec[core.Text]"),
-        )
-
-    def test_realm_projects_qualifier_metatype_fields_semantically(self):
+    def test_realm_projects_qualifier_metatype_fields_are_disabled(self):
         qualifier_meta = pm.type_of(
             pm.val(self.type_bound("qualifiers.Optional core.Text"))
         ).data
         assert isinstance(qualifier_meta, pm.Type)
 
-        self.assertEqual(
-            self.pkg.project(qualifier_meta, "spec_ref"),
-            self.type_bound("types.Spec[()]"),
+        self.assertSemanticLayoutDisabled(
+            lambda: self.pkg.project(qualifier_meta, "spec_ref")
         )
-        self.assertEqual(
-            self.pkg.project(qualifier_meta, "underlying"),
-            self.type_bound("types.NominalType"),
+        self.assertSemanticLayoutDisabled(
+            lambda: self.pkg.project(qualifier_meta, "underlying")
         )
 
     # def test_contributions_expose_bound_and_default_structs(self):

@@ -140,6 +140,37 @@ class ExprBoundsTest(StdPackageTestCase):
         assert isinstance(pattern, pm.Op)
         self.assertIsInstance(pattern.__data__, pm.VariadicStruct)
 
+    def test_build_struct_schema_builds_closed_schema_from_bindings(self):
+        bindings = expr.build_binding_struct(expr.Tuple.from_str("(x: Whole, name: Text = Sym)"), None)
+        schema = sem.binding_schema(sem.lower_binding_struct(bindings, self.bound_scope))
+
+        self.assertEqual(schema.fields.index.keys, ("x", "name"))
+        self.assertIsNone(schema.varsign)
+        self.assertIsInstance(schema.fields.values[0].match_expr, pm.Op)
+        self.assertEqual(schema.fields.values[1].default, pm.anchor("Sym"))
+
+    def test_build_struct_schema_builds_variadic_schema_from_spread(self):
+        bindings = expr.build_binding_struct(expr.Tuple.from_str("(x, ..rest)"), None)
+        schema = sem.binding_schema(sem.lower_binding_struct(bindings, self.bound_scope))
+
+        self.assertIsNotNone(schema.varsign)
+        assert schema.varsign is not None
+        self.assertEqual(schema.varsign.prefix_index.keys, (None,))
+        self.assertEqual(schema.varsign.suffix_index.keys, ())
+        self.assertEqual(schema.middle, pm.ANY)
+
+    def test_build_struct_schema_marks_open_tail_from_inline_ellipsis(self):
+        bindings = expr.build_binding_struct(
+            expr.Tuple.from_str("(x, ... )"),
+            expr.Tuple.from_str("(x: Whole)"),
+        )
+        schema = sem.binding_schema(sem.lower_binding_struct(bindings, self.bound_scope))
+
+        self.assertIsNotNone(schema.varsign)
+        assert schema.varsign is not None
+        self.assertEqual(schema.varsign.prefix_index.keys, (None,))
+        self.assertEqual(schema.middle, pm.ANY)
+
     def test_compound_compiles_to_conforms_on_nominal_qualifier_type(self):
         bound = build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope)
         term = build_term(syn.Expr.from_str("Optional Text"), self.bound_scope)

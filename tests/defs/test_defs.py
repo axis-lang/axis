@@ -29,11 +29,12 @@ class DefFromSrcTest(SemanticTestCase):
     def test_from_src_preserves_inline_shape_information(self):
         node = TEST_PKG.parse_def(
             items.QualDef,
-            """def Array[..Dims, ...] T
-where:
-    val Dims: Array Natural
-    val T: Type = Sym
-""",
+            """
+            def Array[..Dims, ...] T
+            where:
+                val Dims: Array Natural
+                val T: Type = Sym
+            """,
         )
 
         self.assertIsInstance(node, items.QualDef)
@@ -49,14 +50,15 @@ where:
     def test_from_src_preserves_inline_args_and_takes_blocks(self):
         node = TEST_PKG.parse_def(
             items.ClassDef,
-            """def E[A, ...](x, y)
-where:
-    val A: Type
-    val K: Type = Sym
-takes:
-    val x: Whole
-    val y: Text
-""",
+            """
+            def E[A, ...](x, y)
+            where:
+                val A: Type
+                val K: Type = Sym
+            takes:
+                val x: Whole
+                val y: Text
+            """,
         )
 
         self.assertIsInstance(node, items.ClassDef)
@@ -70,9 +72,10 @@ takes:
     def test_from_src_preserves_extends_block(self):
         node = TEST_PKG.parse_def(
             items.FactDef,
-            """def Pair[T]
-extends Box[T]
-""",
+            """
+            def Pair[T]
+            extends Box[T]
+            """,
         )
 
         self.assertEqual(len(node.extends), 1)
@@ -86,10 +89,10 @@ class DefBuildBindingStructTest(SemanticTestCase):
             inline_expr=node.spec,
             block_expr=None,
         )
-        self.assertEqual(struct.index.keys, (None,))
+        self.assertEqual(struct.index.keys, ("Key",))
         self.assertEqual(len(struct.values), 1)
         self.assertEqual(struct.values[0].binder_name, "Key")
-        self.assertEqual(struct.values[0].slot_key, None)
+        self.assertEqual(struct.values[0].slot_key, "Key")
         self.assertEqual(str(struct.values[0].bound_expr), "Type")
         self.assertEqual(str(struct.values[0].default_expr), "Text")
         self.assertFalse(struct.open_tail)
@@ -97,11 +100,12 @@ class DefBuildBindingStructTest(SemanticTestCase):
     def test_block_only_bindings_remain_nominal(self):
         node = TEST_PKG.parse_def(
             items.AtomDef,
-            """def E
-where:
-    val A: Type
-    val B: Type = Sym
-""",
+            """
+            def E
+            where:
+                val A: Type
+                val B: Type = Sym
+            """,
         )
         struct = build_binding_struct(
             inline_expr=None,
@@ -110,13 +114,28 @@ where:
         self.assertEqual(struct.index.keys, ("A", "B"))
         self.assertEqual(tuple(binding.slot_key for binding in struct.values), ("A", "B"))
 
+    def test_closed_shapes_expand_defaults_for_closed_bindings(self):
+        node = TEST_PKG.parse_def(items.FactDef, "def Extends[X, from=Y]")
+        struct = build_binding_struct(inline_expr=node.spec, block_expr=None)
+
+        self.assertEqual(
+            struct.closed_shapes,
+            frozenset(
+                {
+                    (pm.Struct.Shape(arity=1, keys=frozenset()), False),
+                    (pm.Struct.Shape(arity=2, keys=frozenset({"from"})), False),
+                }
+            ),
+        )
+
     def test_prefix_match_with_spread(self):
         node = parse_def(
-            """def Array[..Dims, ...] T
-where:
-    val Dims: Array Natural
-    val T: Type = Sym
-"""
+            """
+            def Array[..Dims, ...] T
+            where:
+                val Dims: Array Natural
+                val T: Type = Sym
+            """
         )
         assert isinstance(node, items.QualDef)
         struct = build_binding_struct(
@@ -127,17 +146,19 @@ where:
         self.assertEqual(len(struct.values), 2)
         self.assertTrue(struct.values[0].is_variadic)
         self.assertTrue(struct.open_tail)
+        self.assertTrue(struct.variadic_signatures)
 
     def test_param_bindings_use_real_takes_blocks(self):
         node = TEST_PKG.parse_def(
             items.ClassDef,
-            """def E[A](x, ...)
-where:
-    val A: Type
-takes:
-    val x: Whole
-    val y: Text
-""",
+            """
+            def E[A](x, ...)
+            where:
+                val A: Type
+            takes:
+                val x: Whole
+                val y: Text
+            """,
         )
         struct = build_binding_struct(
             inline_expr=node.args,
@@ -150,10 +171,11 @@ takes:
     def test_inline_placeholder_merges_with_block_placeholder(self):
         node = TEST_PKG.parse_def(
             items.FactDef,
-            """def E[_]
-where:
-    val _: Natural
-""",
+            """
+            def E[_]
+            where:
+                val _: Natural
+            """,
         )
         struct = build_binding_struct(
             inline_expr=node.spec,
@@ -165,10 +187,11 @@ where:
 
     def test_block_only_spread_is_supported(self):
         node = parse_def(
-            """def E
-where:
-    val ..Args: Array Natural
-"""
+            """
+            def E
+            where:
+                val ..Args: Array Natural
+            """
         )
         struct = build_binding_struct(
             inline_expr=None,
@@ -181,11 +204,12 @@ where:
     def test_closed_inline_rejects_extra_block_bindings(self):
         node = TEST_PKG.parse_def(
             items.FactDef,
-            """def E[A]
-where:
-    val A: Type
-    val B: Type
-""",
+            """
+            def E[A]
+            where:
+                val A: Type
+                val B: Type
+            """,
         )
         struct = build_binding_struct(
             inline_expr=node.spec,
@@ -197,10 +221,11 @@ where:
     def test_rejects_conflicting_bounds(self):
         node = TEST_PKG.parse_def(
             items.FactDef,
-            """def E[A: Whole]
-where:
-    val A: Text
-""",
+            """
+            def E[A: Whole]
+            where:
+                val A: Text
+            """,
         )
         with self.suppress_report_output(), self.assertRaises(log.Report.Exception):
             build_binding_struct(
@@ -226,7 +251,7 @@ where:
 
 
 class ContributionBoundExprTest(StdPackageTestCase):
-    def test_fact_def_exposes_predicate_contribution(self):
+    def test_fact_def_exposes_predicate_facet(self):
         pkg = TestPackage.with_std().with_unit(
             """
             unit demo
@@ -236,19 +261,57 @@ class ContributionBoundExprTest(StdPackageTestCase):
             """
         )
 
-        contrib = next(iter(pkg.contributions("demo.facts.Extends", sem.Entity.PredicateContribution)))
-        assert isinstance(contrib, sem.Entity.PredicateContribution)
+        contrib = next(iter(pkg.contributions("demo.facts.Extends", sem.Entity.PredicateFacet)))
+        assert isinstance(contrib, sem.Entity.PredicateFacet)
 
         entity = pkg.entity("demo.facts.Extends")
 
-        self.assertIn(contrib, entity.predicate_signatures)
+        self.assertIn(contrib, entity.spec_index.facet(sem.Entity.PredicateFacet))
+        self.assertTrue(
+            entity.exists_spec(
+                pm.spec_ref("demo.facts.Extends", pm.struct(pm.literal(1), **{"from": pm.literal(2)})),
+                sem.Entity.PredicateFacet,
+            )
+        )
+
+    def test_entity_exposes_overload_and_result_facets(self):
+        class_contrib = next(
+            iter(
+                TEST_PKG.parse_def(
+                    items.ClassDef,
+                    """
+                    def Box[T](value)
+                    where:
+                        val T: Type
+                    takes:
+                        val value: T
+                    """,
+                ).contributions
+            )
+        )
+        fn_contrib = next(
+            iter(
+                TEST_PKG.parse_def(
+                    items.FnDef,
+                    "def parse[T](text) -> T",
+                ).contributions
+            )
+        )
+
+        box = sem.Entity(anchor=pm.anchor("demo.Box"), contributions=frozenset((class_contrib,)))
+        parse = sem.Entity(anchor=pm.anchor("demo.parse"), contributions=frozenset((fn_contrib,)))
+
+        self.assertTrue(box.facet(sem.Entity.ClassFacet))
+        self.assertFalse(box.facet(sem.Entity.FunctionFacet))
+        self.assertTrue(parse.facet(sem.Entity.FunctionFacet))
+        self.assertTrue(parse.spec_index.facet(sem.Entity.ResultContribution))
 
     def test_qual_contribution_exposes_underlying_bound_expr_and_bound(self):
         contrib = self.assertContribution(
             "std.qualifiers.Optional",
-            sem.Entity.QualContribution,
+            sem.Entity.QualifierContribution,
         )
-        assert isinstance(contrib, sem.Entity.QualContribution)
+        assert isinstance(contrib, sem.Entity.QualifierContribution)
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
         self.assertIsInstance(contrib.underlying_bound, pm.Op)
@@ -260,9 +323,9 @@ class ContributionBoundExprTest(StdPackageTestCase):
             contrib
             for contrib in self.pkg.contributions(
                 "std.qualifiers.Array",
-                sem.Entity.QualContribution,
+                sem.Entity.QualifierContribution,
             )
-            if isinstance(contrib, sem.Entity.QualContribution)
+            if isinstance(contrib, sem.Entity.QualifierContribution)
         )
         contrib = next(
             contrib
@@ -276,15 +339,16 @@ class ContributionBoundExprTest(StdPackageTestCase):
     def test_overload_layout_resolves_spec_vars_from_args(self):
         node = TEST_PKG.parse_def(
             items.ClassDef,
-            """def Box[T](value)
-where:
-    val T: Type
-takes:
-    val value: T
-"""
+            """
+            def Box[T](value)
+            where:
+                val T: Type
+            takes:
+                val value: T
+            """
         )
         contrib = next(iter(node.contributions))
-        assert isinstance(contrib, sem.Entity.OverloadContribution)
+        assert isinstance(contrib, sem.Entity.ClassFacet)
 
         layout = contrib.layout(pm.Struct.new(T=pm.val(self.type_bound("core.Sym"))))
 

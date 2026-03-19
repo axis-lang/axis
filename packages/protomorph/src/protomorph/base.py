@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from collections.abc import Callable
-from typing import Any, ClassVar, Iterable, Union
+from typing import Any, ClassVar, Iterable, Union, cast
 
 from protobase import Inmutable, Consed, Missing, MissingType, frozendict, is_abstract
 
@@ -111,7 +111,7 @@ class Val(Inmutable, abstract=True):
             self.__type__._get(self.__data__, key if key is not None else i)
             for i, key in enumerate(fields.index.keys)
         )
-        return pm.Struct.from_keys(fields.index.keys, values)
+        return cast(pm.Struct[str, Val], fields).with_values(values)
 
     @property
     def has_attrs(self) -> bool:

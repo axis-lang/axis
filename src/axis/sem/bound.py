@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import protomorph as pm
 
-from axis import syn
+from axis import sem, syn
 from axis.expr import bound_support as expr_bounds
-from axis.sem.binding import Binding, BindingStruct
 
 
 def build_term(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
@@ -27,7 +26,7 @@ def build_extends_fact(
 
 
 def build_binding_pattern(
-    bindings: BindingStruct[Binding],
+    bindings: sem.BindingStruct,
     scope: syn.ScopeLike,
 ) -> pm.Val:
     return expr_bounds.build_binding_pattern(bindings, scope)

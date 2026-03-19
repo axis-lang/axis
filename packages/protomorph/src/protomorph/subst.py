@@ -95,20 +95,13 @@ def _subst_const(value: pm.Const, env: SubstEnv) -> pm.Val:
         resolved_fields = tuple(subst_val(field_value, env) for field_value in fields.values)
         if resolved_fields == fields.values:
             return value
-        return _struct_const(pm.Struct.from_keys(fields.index.keys, resolved_fields))
+        return _struct_const(fields.with_values(resolved_fields))
 
     return value
 
 
 def _const_struct_fields(value: pm.Const) -> pm.Struct[str | None, pm.Val] | None:
-    if not isinstance(value.__type__, pm.StructType) or not isinstance(value.__data__, tuple):
-        return None
-    meta_attrs = value.__type__.meta_attrs
-    values = tuple(
-        field_type._wrap(field_data)
-        for field_type, field_data in zip(meta_attrs.values, value.__data__)
-    )
-    return pm.Struct.from_keys(meta_attrs.index.keys, values)
+    return pm.Struct.from_const(value)
 
 
 def _subst_spec(spec: pm.Spec, env: SubstEnv) -> pm.Spec:
@@ -120,7 +113,7 @@ def _subst_spec(spec: pm.Spec, env: SubstEnv) -> pm.Spec:
     if resolved_values == args.values:
         return spec
 
-    resolved_args = pm.Struct.from_keys(args.index.keys, resolved_values)
+    resolved_args = args.with_values(resolved_values)
     return pm.spec_ref(spec.anchor, _struct_const(resolved_args))
 
 
@@ -161,11 +154,4 @@ def _subst_type(type_: pm.Type, env: SubstEnv) -> pm.Type:
 
 
 def _struct_const(struct: pm.Struct[str | None, pm.Val]) -> pm.Const:
-    positional: list[pm.Val] = []
-    nominal: dict[str, pm.Val] = {}
-    for key, value in zip(struct.index.keys, struct.values):
-        if key is None:
-            positional.append(value)
-        else:
-            nominal[key] = value
-    return pm.struct(*positional, **nominal)
+    return struct.as_const()

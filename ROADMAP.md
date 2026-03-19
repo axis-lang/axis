@@ -22,8 +22,8 @@ semantic backend.
   `StdPackageTestCase`, and `InlinePackageTestCase`.
 - Axis tests are now organized by theme under `tests/bounds/`, `tests/defs/`,
   `tests/helpers_tests/`, `tests/sem/`, and `tests/syn/`.
-- `packages/protomorph` has evolved significantly and now exposes a layout-based
-  semantic backend centered on:
+- `packages/protomorph` has evolved significantly and now exposes a matching-
+  and schema-centric semantic backend centered on:
   - `Layout`
   - `AtomicLayout`
   - `StructLayout`
@@ -34,14 +34,25 @@ semantic backend.
   - **NEW**: `Val.subst(env)` for symbolic term substitution
   - **NEW**: `Val.as_type()` for type-like interpretation
   - **NEW**: `Fact = Spec` alias for logical term model
-- `axis.sem` now aligns with Protomorph's layout-based model:
-  - `Realm.layout(nominal_type)` resolves entities and delegates to overload layouts
-  - `OverloadContribution.layout(args)` constructs preliminary layouts from param bounds
+- `packages/protomorph` now also exposes a compiled matching model centered on:
+  - `StructSchema`
+  - `MatchTree`
+  - `compile(...)`
+  - structural result traces and ambiguity buckets
+- `axis.sem` now aligns with the new Protomorph matching model:
+  - semantic bindings lower to `StructSchema`
+  - `SpecIndex` is now a thin semantic facade over `pm.compile(...)`
+  - `OverloadIndex` exists as the next matching facade to complete
   - Bound expressions use `bound.subst(env).as_type()` pattern
 - Declaration lowering has also progressed:
   - qualifier declarations expose `underlying_bound_expr` / `underlying_bound`
   - function implementations expose `result_bound_expr` / `result_bound`
   - inline and block `returns` forms are merged before semantic contribution creation
+- Semantic bindings now have a stronger split between declarative and lowered forms:
+  - `BindingStruct.Field`
+  - `LoweredBindingStruct.Field`
+  - `lower_binding_struct(...)`
+  - `binding_schema(...)`
 - What is still missing is decision-making semantics in `axis.sem`: there is no
   reusable semantic relation like `satisfies(actual, bound)`, no specialization
   resolver, and no call resolver.
@@ -77,8 +88,8 @@ semantic backend.
   but it does not decide validity.
 - `axis.sem` owns validation, candidate selection, ambiguity handling, and
   diagnostics.
-- `axis.sem` should talk to `protomorph` using the current layout-centric model,
-  not older ad-hoc structural hooks.
+- `axis.sem` should talk to `protomorph` through `StructSchema`, `compile(...)`,
+  and related matching/runtime hooks, not through older Axis-local routing logic.
 - Bound construction and bound satisfaction are separate concerns.
 - The first iteration uses strict compatibility, not subtyping.
 - `Realm` and `SemanticBridgeBase` should only grow when the semantic layer
@@ -200,15 +211,225 @@ Status:
 
 1. Finish Milestone 1 by turning remaining `check()` methods into real
    declaration validation, with focused diagnostics for malformed declarations.
-2. Decide and implement how `Type` should be introduced as a usable semantic
+2. Implement the first reusable constraint kernel in `src/axis/sem/constraints.py`
+   on top of the new binding and index model.
+3. Decide and implement how `Type` should be introduced as a usable semantic
    type-value in the scopes that need it.
-3. Consolidate the new logic frontend by validating `claim` safety and keeping
+4. Consolidate the new logic frontend by validating `claim` safety and keeping
    Realm/solver integration documented and covered by tests.
-4. Resume Milestone 2 by introducing a dedicated constraint kernel in
-   `src/axis/sem/constraints.py` for argument materialization, default insertion,
-   and bound satisfaction.
 5. In parallel, manually validate `ide/vscode/` in VS Code and simplify the
    grammar further if any freeze or performance issue remains.
+
+## Immediate Action - Protomorph MatchTree Refactor
+
+Target files: `packages/protomorph/src/protomorph/index.py`,
+`packages/protomorph/src/protomorph/operators.py`,
+`packages/protomorph/src/protomorph/match.py`, `src/axis/sem/index.py`,
+`src/axis/sem/binding.py`, `src/axis/sem/entity.py`, and focused tests under
+`packages/protomorph/tests/` and `tests/sem/`.
+
+Goal:
+
+- Replace the current Axis-owned specialization/index matching model with a
+  Protomorph-owned compiled `MatchTree` model that can drive both spec
+  resolution and overload resolution through thin semantic facades.
+
+Design intent:
+
+- `MatchTree` is the compiled matching program.
+- `MatchResult` is the structural execution trace produced while descending the
+  tree.
+- `MatchLeaf` contains only terminal goals/payloads; matching semantics are
+  absorbed into the compiled nodes.
+- `StructSchema` is the Protomorph IR corresponding to the current Axis
+  `BindingStruct` model.
+- `bridge` is not part of the public matching contract; matching obtains the
+  active bridge from `pm.BRIDGE.get()` where needed.
+
+### Phase A - Stabilize the MatchTree Kernel
+
+- Keep the new tree runtime minimal and explicit:
+  - `MatchNode`
+  - `MatchTree`
+  - `MatchResult`
+  - `MatchEnv`
+  - `MatchLeaf`
+  - `MatchSwitch`
+  - `MatchStruct`
+  - `MatchVariadicStruct`
+- Clarify the role of technical nodes such as `MatchMany`; either harden them as
+  real semantics or replace them with a more intentional grouping node.
+- Keep `MatchResult` as a trace tree, not as a flattened set of captures or a
+  boolean success marker.
+
+Exit criteria:
+
+- The Protomorph test suite covers tree compilation, descent, branching, and
+  terminal goal collection.
+- `CompileResult` exposes stable terminal leaves/goals for later ambiguity
+  analysis.
+
+Status:
+
+- Completed for the first structural iteration.
+- Done:
+  - added `MatchTree`, `CompileResult`, `ResolveResult`, and structural result nodes
+  - added closed `StructSchema` support
+  - added first variadic `StructSchema` support via `MatchVariadicStruct`
+- added stronger `Struct`/`Index` slicing and helper APIs used by matching code
+- Still open:
+  - richer ambiguity diagnostics derived from `CompileResult`
+
+### Phase B - Static Discrimination and Compilation Strategy
+
+- Add first-class compile-time discrimination for:
+  - exact literal/value keys
+  - closed `Struct.Shape`
+  - variadic signatures
+  - field metatypes via `Val.__type__`
+- Revisit the current notion of `Discriminant` and split passive metadata from
+  active compile/runtime discriminators if needed.
+- Decide whether the compiler remains heuristic-first, greedy, or hybrid.
+
+Exit criteria:
+
+- `MatchTree` can prune closed and variadic candidates before structural descent.
+- Variadic candidates no longer rely solely on runtime matching after landing in
+  the same broad bucket.
+
+Status:
+
+- Partially completed.
+- Done:
+  - exact literal/value discrimination
+  - closed `Struct.Shape` discrimination
+  - first variadic signature guards
+  - first field metatype discrimination via `Val.__type__`
+- Still open:
+  - broader discriminator set
+  - policy for greedy vs heuristic compilation
+
+### Phase C - StructSchema Completeness
+
+- Finish the Protomorph-side schema model so it can absorb the current Axis
+  binding semantics.
+- Define how defaults and optional bindings are represented declaratively in
+  `StructSchema`.
+- Keep the schema declarative and let compilation expand internal routing
+  variants instead of exposing pre-expanded variants to Axis.
+- Move `VariadicSignature` ownership fully into Protomorph.
+
+Exit criteria:
+
+- `StructSchema` can represent the current `BindingStruct` semantics closely
+  enough to compile both specializations and overloads.
+- Defaults, optional named bindings, and open-tail/variadic cases are handled in
+  one compilation pipeline.
+
+Status:
+
+- Partially completed.
+- Done:
+  - closed schemas
+  - variadic schemas
+  - open-tail semantics
+  - internal expansion of closed defaults
+  - explicit `VariadicSignature` in Protomorph
+- Still open:
+  - fuller optional/default semantics
+  - richer placeholder/operator interaction
+
+### Phase D - Axis Adapter Layer
+
+- Add a translation layer from Axis semantic bindings to `pm.StructSchema`.
+- Introduce schema properties on semantic contributions in place of the old
+  pattern/index plumbing.
+- Keep declarative binding fields and lowered binding fields distinct.
+
+Exit criteria:
+
+- Axis can build `StructSchema` from semantic bindings without losing binder
+  identity, defaults, or variadic information.
+- Focused tests prove that inline/block binding forms still converge to one
+  semantic representation.
+
+Status:
+
+- Largely completed.
+- Done:
+  - matching support moved out of `expr` nodes into support modules
+  - declarative bindings and lowered bindings split in `axis.sem.binding`
+  - semantic contributions now expose `spec_schema` / `param_schema`
+  - `Entity` validates `anchor` while `Index` remains purely structural
+- Still open:
+  - further cleanup of remaining compatibility helpers in `sem.binding`
+
+### Phase E - Replace SpecIndex with MatchTree
+
+- Rewrite Axis semantic indexes as thin wrappers around `pm.compile(...)`
+  and `MatchTree.search/resolve`.
+- Preserve or improve current reporting for:
+  - no match
+  - ambiguous match
+  - inspection of terminal goal buckets
+- Reuse the compiled leaves/goals for ambiguity diagnosis instead of reconstructing
+  shape clusters inside Axis.
+
+Exit criteria:
+
+- `SpecIndex` no longer owns the core matching algorithm.
+- Specialization resolution in Axis is delegated to Protomorph's compiled tree.
+
+Status:
+
+- Partially completed.
+- Done:
+  - `SpecIndex` is now folded into `src/axis/sem/index.py`
+  - `Entity.spec_index` is a thin facade over `pm.compile(...)`
+  - old `spec_index.py`, `overload_index.py`, and `result_index.py` were removed
+- Still open:
+  - implement `OverloadIndex` behavior beyond the minimal wrapper
+  - replace remaining compatibility logic with pure compiled matching
+
+### Phase F - Rebuild Operator / Placeholder / match Semantics
+
+- Reimplement `Operator`, `Placeholder`, and the general matching runtime on top
+  of the new `MatchTree` model instead of adapting the old `MatchState`-centric
+  system.
+- Decide which semantics stay as local pattern nodes and which belong in
+  specialized operators.
+- Update or replace `packages/protomorph/src/protomorph/match.py` so the public
+  matching model is consistent with the compiled tree runtime.
+
+Exit criteria:
+
+- There is one coherent Protomorph matching model rather than a split between
+  old `pm.match(...)` semantics and the new compiled tree.
+- Operators and placeholders participate naturally in compiled matching and in
+  structural result traces.
+
+### Phase G - Overload and Call Resolution Migration
+
+- Reuse the same `StructSchema` + `MatchTree` machinery for overload resolution.
+- Retire the Axis-local overload routing logic once the Protomorph matcher can
+  handle defaults, ambiguity, and param bounds.
+- Connect call resolution to the new compiled backend after specialization
+  matching is stable.
+
+Status:
+
+- Not started semantically, but scaffolding exists.
+- Done:
+  - `OverloadIndex(Index[OverloadContribution])` now exists as a clean wrapper shell
+- Still open:
+  - overload search semantics
+  - overload ambiguity handling
+  - integration with call materialization and constraints
+
+Exit criteria:
+
+- The same compiled matching backend can drive both spec and overload matching.
+- Axis call resolution no longer depends on separate ad-hoc shape/index logic.
 
 ## Logic Frontend and Solver
 
@@ -257,6 +478,16 @@ new focused tests.
   - `validate_bindings(...)`
 - Centralize diagnostics for missing args, unknown keys, duplicate supply,
   unbound symbols, and defaults that violate bounds.
+
+Status:
+
+- Current primary milestone.
+- Prerequisites now in place:
+  - declarative `BindingStruct`
+  - `LoweredBindingStruct`
+  - `StructSchema`
+  - `Index` / `SpecIndex` facade over `pm.compile(...)`
+  - semantic layout explicitly disabled until rebuilt on top of the new model
 
 Exit criteria:
 
@@ -341,17 +572,19 @@ Exit criteria:
 
 1. Restore the green baseline under `just test`.
 2. Fix declaration integrity: inline bindings, `QualDef`, `Type`, and returns.
-3. Align `axis.sem` with the current Protomorph bridge and layout model.
+3. Replace Axis-local matching/indexing with `StructSchema` + `pm.compile(...)` facades.
 4. Add the constraint kernel in `sem`.
 5. Implement specialization resolution.
 6. Implement call and overload resolution.
-7. Revisit result semantics and expand tests.
+7. Rebuild semantic layout on top of the new matching/binding model.
+8. Revisit result semantics and expand tests.
 
 Updated status note:
 
-- Steps 1 and 3 are complete.
+- Steps 1 and 3 are complete in their current iteration.
 - Step 2 is partially complete.
 - The logic frontend/solver milestone is complete for v1.
 - Step 4 remains the current primary semantic milestone.
+- Semantic layout is intentionally disabled while the new binding/index model settles.
 - VS Code editor support is now an active parallel track, but it does not change
   the semantic implementation order above.

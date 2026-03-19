@@ -16,7 +16,7 @@ from ..item import Item
 def build_binding_struct(
     inline_expr: expr.Tuple | None,
     block_expr: blocks.TupleBlock | None,
-) -> sem.BindingStruct[sem.Binding]:
+) -> sem.BindingStruct:
     """Build the binding struct described by inline and block tuple forms."""
     return expr.build_binding_struct(inline_expr, block_expr)
 
@@ -24,7 +24,7 @@ def build_binding_struct(
 def build_spec_bindings(
     inline_expr: expr.Tuple | None,
     block_expr: Def.Where | None,
-) -> sem.BindingStruct[sem.Binding]:
+) -> sem.BindingStruct:
     """Build the specialization binding struct from `where` clauses."""
     return build_binding_struct(inline_expr, block_expr)
 
@@ -32,7 +32,7 @@ def build_spec_bindings(
 def build_param_bindings(
     inline_expr: expr.Tuple | None,
     block_expr: Def.Takes | None,
-) -> sem.BindingStruct[sem.Binding]:
+) -> sem.BindingStruct:
     """Build the parameter binding struct from `takes` clauses."""
     return build_binding_struct(inline_expr, block_expr)
 
@@ -41,7 +41,7 @@ def build_logic_scope(
     ctx: sem.Context,
     *,
     scope_name: str | None,
-    bindings: sem.BindingStruct[sem.Binding],
+    bindings: sem.BindingStruct,
     origin: syn.Node,
     include_self: bool = False,
 ) -> sem.Scope:
@@ -57,7 +57,7 @@ def build_logic_scope(
             origin=origin,
         )
 
-    for binding in bindings:
+    for binding in bindings.nameable_fields:
         name = binding.binder_name
         if name is None:
             continue
@@ -68,7 +68,7 @@ def build_logic_scope(
                 cast(pm.ContextProto, ctx),
                 name,
             ),
-            origin=binding.key,
+            origin=binding.key_expr,
         )
 
     return builder.build()
@@ -78,7 +78,7 @@ def build_extends_fact_contribution(
     ctx: sem.Context,
     *,
     scope_name: str | None,
-    bindings: sem.BindingStruct[sem.Binding],
+    bindings: sem.BindingStruct,
     extends: tuple[Def.Extends, ...],
     origin: syn.Node,
 ) -> sem.Context.FactContribution | None:

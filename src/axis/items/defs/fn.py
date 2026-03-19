@@ -13,21 +13,21 @@ from .base import SymDef, build_param_bindings, build_spec_bindings
 
 class FnDef(SymDef):
     """
-    Function definitions. Always emits ImplContribution.
+    Function definitions. Always emits FunctionFacet.
     """
 
     match_patterns: ClassVar = (
-        syn.Expr.from_str("$sym(..args) -> $ret"),
-        syn.Expr.from_str("$sym[..$spec](..args) -> $ret"),
-        syn.Expr.from_str("$self.$sym(..args) -> $ret"),
-        syn.Expr.from_str("$self.$sym[..$spec](..args) -> $ret"),
+        syn.Expr.from_str("$sym(..$args) -> $ret"),
+        syn.Expr.from_str("$sym[..$spec](..$args) -> $ret"),
+        syn.Expr.from_str("$owner.$sym(..$args) -> $ret"),
+        syn.Expr.from_str("$owner.$sym[..$spec](..$args) -> $ret"),
     )
 
     sym: expr.Sym = _
     spec: expr.Tuple | None = None
     args: expr.Tuple = _
     ret: syn.Expr = _
-    self: syn.Expr | None = None
+    owner: syn.Expr | None = None
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
@@ -38,7 +38,7 @@ class FnDef(SymDef):
                 .throw()
             )
         return frozenset(
-            sem.Entity.ImplContribution(
+            sem.Entity.FunctionFacet(
                 anchor=self.anchor,
                 spec_bindings=build_spec_bindings(self.spec, where),
                 param_bindings=build_param_bindings(self.args, takes),

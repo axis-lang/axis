@@ -257,13 +257,10 @@ class VariadicStruct(Operator):
         if len(rhs_struct.values) < prefix_len + suffix_len:
             return ()
 
-        head_keys = rhs_struct.index.keys[:prefix_len]
-        head_values = rhs_struct.values[:prefix_len]
-        tail_start = len(rhs_struct.values) - suffix_len
-        middle_keys = rhs_struct.index.keys[prefix_len:tail_start]
-        middle_values = rhs_struct.values[prefix_len:tail_start]
-        tail_keys = rhs_struct.index.keys[tail_start:]
-        tail_values = rhs_struct.values[tail_start:]
+        prefix_struct, middle_struct, suffix_struct = rhs_struct.split_variadic(
+            prefix_len,
+            suffix_len,
+        )
 
         states: tuple[pm.MatchState, ...] = (state,)
         if prefix_len:
@@ -272,7 +269,7 @@ class VariadicStruct(Operator):
                 for current in states
                 for next_state in pm.match(
                     _struct_const(self.prefix),
-                    _struct_const(pm.Struct.from_keys(head_keys, head_values)),
+                    _struct_const(prefix_struct),
                     state=current,
                     bridge=bridge,
                 )
@@ -285,7 +282,7 @@ class VariadicStruct(Operator):
             for current in states
             for next_state in pm.match(
                 self.middle,
-                _struct_const(pm.Struct.from_keys(middle_keys, middle_values)),
+                _struct_const(middle_struct),
                 state=current,
                 bridge=bridge,
             )
@@ -299,7 +296,7 @@ class VariadicStruct(Operator):
                 for current in states
                 for next_state in pm.match(
                     _struct_const(self.suffix),
-                    _struct_const(pm.Struct.from_keys(tail_keys, tail_values)),
+                    _struct_const(suffix_struct),
                     state=current,
                     bridge=bridge,
                 )
@@ -491,27 +488,13 @@ def qualifier_suffix(
 def _as_struct(value: object) -> pm.Struct[str | None, pm.Val] | None:
     if isinstance(value, pm.Struct):
         return value
-    if isinstance(value, pm.Const) and isinstance(value.__type__, pm.StructType):
-        raw_data = value.__data__
-        if not isinstance(raw_data, tuple):
-            return None
-        fields = tuple(
-            field_type._wrap(field_data)
-            for field_type, field_data in zip(value.__type__.meta_attrs.values, raw_data)
-        )
-        return pm.Struct.from_keys(value.__type__.meta_attrs.index.keys, fields)
+    if isinstance(value, pm.Const):
+        return pm.Struct.from_const(value)
     return None
 
 
 def _struct_const(struct: pm.Struct[str | None, pm.Val]) -> pm.Const:
-    positional: list[pm.Val] = []
-    nominal: dict[str, pm.Val] = {}
-    for key, value in zip(struct.index.keys, struct.values):
-        if key is None:
-            positional.append(value)
-        else:
-            nominal[key] = value
-    return pm.struct(*positional, **nominal)
+    return struct.as_const()
 
 
 def _normalize_control_struct(
@@ -522,7 +505,7 @@ def _normalize_control_struct(
     values = tuple(pm.normalize(value, bridge=bridge) for value in struct.values)
     if values == struct.values:
         return struct
-    return pm.Struct.from_keys(struct.index.keys, values)
+    return struct.with_values(values)
 
 
 def _intersect_control_struct(
@@ -539,7 +522,7 @@ def _intersect_control_struct(
         if value is None:
             return None
         values.append(value)
-    return pm.Struct.from_keys(left.index.keys, tuple(values))
+    return left.with_values(tuple(values))
 
 
 def _subsumes_control_struct(

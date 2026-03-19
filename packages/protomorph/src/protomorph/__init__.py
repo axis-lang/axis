@@ -21,6 +21,7 @@ from .logic import *
 from .solvers import *
 from .subst import _subst_spec, _subst_type, as_type, subst_val
 from .match import *
+from .index import *
 from .errors import *
 
 ANY_TYPE: Type
@@ -162,7 +163,6 @@ def nominal_qual(
     underlying: Type,
 ) -> NominalQualifier:
     return NominalQualifier(spec_ref=spec_ref(anchor_, args), underlying=underlying)
-
 
 def val(*positional, **nominal) -> Val:
     def as_val(value, where: str) -> Val:

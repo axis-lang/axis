@@ -31,7 +31,7 @@ class QualDef(SymDef):
                 spec_bindings = build_spec_bindings(self.spec, where)
                 for takes in self.takes or (None,):
                     contributions.add(
-                        sem.Entity.QualContribution(
+                        sem.Entity.QualifierContribution(
                             anchor=self.anchor,
                             spec_bindings=spec_bindings,
                             param_bindings=build_param_bindings(None, takes),
@@ -53,5 +53,5 @@ class QualDef(SymDef):
 
             return frozenset(contributions)
         except Exception:
-            log.fatal("Failed to build QualContribution").label(self.origin).show()
+            log.fatal("Failed to build QualifierContribution").label(self.origin).show()
             raise

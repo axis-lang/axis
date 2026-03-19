@@ -111,7 +111,7 @@ class Claim(Item):
         return self.anchor.name
 
     @flux.property
-    def bindings(self) -> sem.BindingStruct[sem.Binding]:
+    def bindings(self) -> sem.BindingStruct:
         where = self.where[0] if self.where else None
         return build_binding_struct(None, where)
 
@@ -127,7 +127,7 @@ class Claim(Item):
                     cast(pm.ContextProto, self),
                     name,
                 ),
-                origin=binding.key,
+                origin=binding.key_expr,
             )
 
     @flux.property
@@ -139,7 +139,7 @@ class Claim(Item):
         implicit = sem.binding_constraint_goals(
             self.bindings,
             self.scope,
-            subject_for_binding=lambda binding: self.scope.lookup(expr.to_sym(binding.key), origin=binding.key)
+            subject_for_binding=lambda binding: self.scope.lookup(expr.to_sym(binding.key_expr), origin=binding.key_expr)
             if binding.binder_name is not None
             else None,
             origin_label="where",
@@ -200,9 +200,16 @@ class Claim(Item):
         _raise_claim_error(head, origin=self.head, message="Invalid claim head")
         assert isinstance(head, pm.Spec)
 
+        entity = self.realm.entities_by_anchor[head.anchor] if head.anchor in self.realm.entities_by_anchor else None
+        if entity is None or not entity.spec_index.facet(sem.Entity.PredicateFacet):
+            log.error("Claim target must have predicate facet").label(self.head).throw()
+
         body_goals = self.body_goals
         _raise_claim_error(body_goals, origin=self.when[0] if self.when else self.head, message="Invalid claim condition")
         assert not isinstance(body_goals, pm.Err)
+
+        if not entity.exists_spec(head, sem.Entity.PredicateFacet):
+            log.error("Claim head is not admitted by any declared predicate spec").label(self.head).throw()
 
         if not body_goals:
             return
