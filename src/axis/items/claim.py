@@ -135,17 +135,21 @@ class Claim(Item):
         return _build_claim_spec(self.head, self.scope)
 
     @flux.property
-    def body_goals(self) -> tuple[pm.Spec, ...] | pm.Err:
-        implicit = sem.binding_constraint_goals(
+    def where_constraints(self) -> tuple[sem.Constraint, ...] | pm.Err:
+        return sem.binding_constraints(
             self.bindings,
             self.scope,
-            subject_for_binding=lambda binding: self.scope.lookup(expr.to_sym(binding.key_expr), origin=binding.key_expr)
-            if binding.binder_name is not None
-            else None,
+            subject_for_binding=self._subject_for_binding,
             origin_label="where",
         )
-        if isinstance(implicit, pm.Err):
-            return implicit
+
+    @flux.property
+    def body_goals(self) -> tuple[pm.Spec, ...] | pm.Err:
+        implicit_constraints = self.where_constraints
+        if isinstance(implicit_constraints, pm.Err):
+            return implicit_constraints
+
+        implicit = tuple(constraint.goal for constraint in implicit_constraints)
 
         if not self.when:
             return implicit
@@ -226,6 +230,11 @@ class Claim(Item):
         for clause in self.when[0].clauses:
             report = report.label(clause, "when body grounds claim variables")
         report.throw()
+
+    def _subject_for_binding(self, binding: sem.BindingStruct.Field) -> pm.Val | None:
+        if binding.binder_name is None:
+            return None
+        return self.scope.lookup(expr.to_sym(binding.key_expr), origin=binding.key_expr)
 
 
 def _build_claim_spec(expr_node: syn.Expr, scope: sem.Scope) -> pm.Spec | pm.Err | None:

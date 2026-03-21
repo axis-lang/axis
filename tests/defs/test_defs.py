@@ -314,9 +314,11 @@ class ContributionBoundExprTest(StdPackageTestCase):
         assert isinstance(contrib, sem.Entity.QualifierContribution)
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
-        self.assertIsInstance(contrib.underlying_bound, pm.Op)
-        assert isinstance(contrib.underlying_bound, pm.Op)
-        self.assertIsInstance(contrib.underlying_bound.__data__, pm.Satisfy)
+        self.assertIsInstance(contrib.underlying_bound, pm.Var)
+        self.assertIsNotNone(contrib.underlying_constraint)
+        assert contrib.underlying_bound is not None
+        assert contrib.underlying_constraint is not None
+        self.assertEqual(contrib.underlying_constraint.target, contrib.underlying_bound)
 
     def test_array_qual_contribution_exposes_nontrivial_underlying_bound(self):
         qual_contribs = tuple(
@@ -335,6 +337,17 @@ class ContributionBoundExprTest(StdPackageTestCase):
 
         self.assertEqual(str(contrib.underlying_bound_expr), "T")
         self.assertIsNotNone(contrib.underlying_bound)
+
+    def test_function_contribution_exposes_result_constraint(self):
+        node = TEST_PKG.parse_def(
+            items.FnDef,
+            "def parse[T](text) -> T",
+        )
+        contrib = next(iter(node.contributions))
+        assert isinstance(contrib, sem.Entity.FunctionFacet)
+
+        self.assertIsNotNone(contrib.result_bound)
+        self.assertIsNotNone(contrib.result_constraint)
 
     def test_overload_layout_resolves_spec_vars_from_args(self):
         node = TEST_PKG.parse_def(
@@ -356,6 +369,56 @@ class ContributionBoundExprTest(StdPackageTestCase):
         assert isinstance(layout, pm.StructLayout)
         self.assertEqual(tuple(layout.fields.index.keys), (None,))
         self.assertEqual(layout.fields.values[0], self.type_bound("core.Sym"))
+
+    def test_entity_search_overloads_filters_candidates_by_constraints(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit demo
+
+            use std(core.Text, core.Natural)
+
+            def parse(text)
+            takes:
+                val text: Text
+
+            def parse(text)
+            takes:
+                val text: Natural
+            """
+        )
+
+        entity = pkg.entity("demo.parse")
+
+        text_result = entity.search_overloads(
+            pm.struct(pm.anchor("std.core.Text")),
+        )
+        natural_result = entity.search_overloads(
+            pm.struct(pm.anchor("std.core.Natural")),
+        )
+
+        self.assertEqual(len(text_result.goals), 1)
+        self.assertEqual(len(natural_result.goals), 1)
+        self.assertNotEqual(next(iter(text_result.goals)), next(iter(natural_result.goals)))
+
+    def test_entity_search_overloads_rejects_non_matching_constraint(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit demo
+
+            use std(core.Text, core.Natural)
+
+            def parse(text)
+            takes:
+                val text: Text
+            """
+        )
+
+        entity = pkg.entity("demo.parse")
+        result = entity.search_overloads(
+            pm.struct(pm.anchor("std.core.Natural")),
+        )
+
+        self.assertFalse(result.goals)
 
     def test_class_def_extends_emits_fact_contribution(self):
         pkg = TestPackage.with_std().with_unit(

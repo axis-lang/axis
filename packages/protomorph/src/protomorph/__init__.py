@@ -22,6 +22,7 @@ from .solvers import *
 from .subst import _subst_spec, _subst_type, as_type, subst_val
 from .match import *
 from .index import *
+from .algebra import *
 from .errors import *
 
 ANY_TYPE: Type

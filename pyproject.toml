@@ -13,6 +13,7 @@ from = "src"
 python = "^3.13"
 protobase = { path = "packages/protobase", develop = true }
 protomorph = { path = "packages/protomorph", develop = true }
+protosolver = { path = "packages/protosolver", develop = true }
 antlr4-tools = "^0.2.1"
 antlr4-python3-runtime = "^4.13.2"
 interegular = "^0.3.3"

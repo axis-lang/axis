@@ -84,11 +84,39 @@ class ClaimFrontendTest(InlinePackageTestCase):
         )
 
         contrib = next(iter(pkg.contributions("demo.facts.Uses", sem.Context.ClaimContribution)))
+        claim = next(item for item in pkg.items if isinstance(item, items.Claim))
         clause = next(iter(contrib.clauses))
 
+        self.assertEqual(len(claim.where_constraints), 1)
         self.assertEqual(clause.head.anchor.path, "demo.facts.Uses")
         self.assertEqual(len(clause.body), 1)
         self.assertEqual(clause.body[0].anchor.path, "std.facts.Conforms")
+
+    def test_where_constraints_expose_algebraic_constraint_metadata(self):
+        pkg = TestPackage.with_std().with_unit(
+            """
+            unit demo
+
+            mod facts
+                def Uses[T]
+
+            def Integer
+
+            claim facts.Uses[T]
+            where:
+                val T: Integer
+            """
+        )
+
+        claim = next(item for item in pkg.items if isinstance(item, items.Claim))
+        constraints = claim.where_constraints
+
+        assert not isinstance(constraints, pm.Err)
+        self.assertEqual(len(constraints), 1)
+        constraint = constraints[0]
+        self.assertEqual(constraint.goal.anchor.path, "std.facts.Conforms")
+        self.assertIsNotNone(constraint.target_type)
+        self.assertTrue(constraint.satisfies(pm.val(pm.nominal_type("demo.Integer"))))
 
     def test_realm_aggregates_claim_facts_and_clauses(self):
         fact_anchors = {fact.anchor.path for fact in self.pkg.all_facts}
@@ -114,7 +142,8 @@ class ClaimFrontendTest(InlinePackageTestCase):
 
         answers = self.pkg.logic_solver.answers(goal)
 
-        self.assertEqual(answers, (pm.MatchState(),))
+        self.assertEqual(len(answers), 1)
+        self.assertEqual(answers[0].bindings, pm.frozendict())
 
 
 class ClaimParsingSmokeTest(InlinePackageTestCase):

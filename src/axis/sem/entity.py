@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from protobase import Consed, flux, _
+from protobase import Consed, flux, frozendict, _
 
 import protomorph as pm
 
@@ -101,6 +101,66 @@ class Entity(Consed):
         def param_schema(self) -> pm.StructSchema:
             return sem.binding_schema(self.lowered_param_bindings)
 
+        @flux.property
+        def param_match_schema(self) -> pm.StructSchema:
+            fields = pm.Struct.from_iter(
+                (
+                    field.slot_key,
+                    pm.StructSchema.Field(
+                        match_expr=field.match_expr if field.binder is None else field.binder,
+                        default=field.default,
+                    ),
+                )
+                for field in self.lowered_param_bindings.non_spread_fields
+            )
+            middle = pm.ANY
+            if self.lowered_param_bindings.spread is not None:
+                spread = self.lowered_param_bindings.spread
+                middle = spread.match_expr if spread.binder is None else spread.binder
+            return pm.StructSchema(
+                fields=fields,
+                varsign=self.lowered_param_bindings.variadic_signature,
+                middle=middle,
+            )
+
+        @flux.property
+        def param_constraints(self) -> tuple[sem.Constraint, ...] | pm.Err:
+            return sem.binding_constraints(
+                self.param_bindings,
+                self.overload_scope,
+                subject_for_binding=lambda field: self._param_binder(field),
+                origin_label="parameter",
+                allow_defaults=True,
+            )
+
+        @flux.property
+        def lowered_param_fields_by_binder(self) -> frozendict[pm.Var, sem.LoweredBindingStruct.Field]:
+            return frozendict(
+                (field.binder, field)
+                for field in self.lowered_param_bindings.fields
+                if field.binder is not None
+            )
+
+        @flux.method
+        def admits_env(self, env: pm.MatchEnv) -> bool:
+            constraints = self.param_constraints
+            if isinstance(constraints, pm.Err):
+                return False
+
+            for constraint in constraints:
+                subject = constraint.subject
+                if not isinstance(subject, pm.Var):
+                    continue
+                value = env.bindings.get(subject)
+                if value is None:
+                    field = self.lowered_param_fields_by_binder.get(subject)
+                    if field is not None and field.default is not None:
+                        continue
+                    return False
+                if not constraint.satisfies(value):
+                    return False
+            return True
+
         @flux.method
         def layout(self, args: pm.Struct[str | None, pm.Val]) -> pm.StructLayout | None:
             field_types = tuple(
@@ -117,6 +177,8 @@ class Entity(Consed):
             self.spec_schema
             self.lowered_param_bindings
             self.param_schema
+            self.param_match_schema
+            self.param_constraints
 
     class ParamVar(pm.VarType[OverloadContribution]):
         pass
@@ -130,6 +192,11 @@ class Entity(Consed):
         @flux.property
         def result_bound(self) -> pm.Val | None:
             return sem.build_bound(self.result_bound_expr, self.overload_scope)
+
+        @flux.property
+        def result_constraint(self) -> sem.Constraint | None:
+            bound = self.result_bound
+            return None if bound is None else sem.constraint_from_term(pm.THIS, bound)
 
         def __invariant__(self):
             if self.result_bound_expr is None:
@@ -158,6 +225,11 @@ class Entity(Consed):
         def underlying_bound(self) -> pm.Val | None:
             return sem.build_bound(self.underlying_bound_expr, self.spec_scope)
 
+        @flux.property
+        def underlying_constraint(self) -> sem.Constraint | None:
+            bound = self.underlying_bound
+            return None if bound is None else sem.constraint_from_term(pm.THIS, bound)
+
         @flux.method
         def layout(self, args: pm.Struct[str | None, pm.Val]) -> pm.StructLayout | None:
             field_types = tuple(
@@ -175,6 +247,7 @@ class Entity(Consed):
             self.lowered_param_bindings
             self.param_schema
             self.underlying_bound
+            self.underlying_constraint
 
     @flux.property
     def spec_contributions(self) -> frozenset[SpecContribution]:
@@ -199,6 +272,26 @@ class Entity(Consed):
         return sem.OverloadIndex(contribs=self.overload_contributions)
 
     @flux.method
+    def search_overloads(
+        self,
+        args: pm.Struct[str | None, pm.Val] | pm.Const,
+        facet_cls: type[Facet] | None = None,
+    ) -> pm.ResolveResult[Entity.OverloadContribution]:
+        facet_filter = cast(type[sem.Context.Contribution] | None, facet_cls)
+        return self.overload_index.search(
+            args,
+            facet_cls=facet_filter,
+        )
+
+    @flux.method
+    def match_overloads(
+        self,
+        args: pm.Struct[str | None, pm.Val] | pm.Const,
+        facet_cls: type[Facet] | None = None,
+    ) -> frozenset[Entity.OverloadContribution]:
+        return self.search_overloads(args, facet_cls=facet_cls).goals
+
+    @flux.method
     def search_specs(
         self,
         spec_ref: pm.Spec,
@@ -206,7 +299,11 @@ class Entity(Consed):
     ) -> pm.ResolveResult[Entity.SpecContribution]:
         if spec_ref.anchor != self.anchor:
             return pm.ResolveResult()
-        return self.spec_index.search(spec_ref.args or pm.Struct.Empty, facet_cls=facet_cls)
+        facet_filter = cast(type[sem.Context.Contribution] | None, facet_cls)
+        return self.spec_index.search(
+            spec_ref.args or pm.Struct.Empty,
+            facet_cls=facet_filter,
+        )
 
     @flux.method
     def match_specs(
@@ -253,7 +350,7 @@ def _bound_type(
         return pm.ANY_TYPE
 
     resolved = bound.subst(lambda value: _resolve_spec_var(contrib, value, args))
-    resolved_type = sem.bound_as_type(resolved)
+    resolved_type = sem.constraint_from_term(pm.THIS, resolved).target_type
     return pm.ANY_TYPE if resolved_type is None else resolved_type
 
 

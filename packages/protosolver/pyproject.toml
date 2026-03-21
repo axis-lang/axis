@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "protosolver"
+version = "0.1.0"
+description = "Constraint solver library"
+authors = ["jdluque <jdluque@leitat.org>"]
+
+[[tool.poetry.packages]]
+include = "protosolver"
+from = "src"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+[tool.poetry-monoranger-plugin]
+enabled = true
+monorepo-root = "../.."
+version-pinning-rule = "=="
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pyright (>=1.1.408,<2.0.0)"
+]

@@ -79,6 +79,7 @@ def impl_new_method(cls):
         "def __new__(cls, *args, **kwargs):",
         "    self = _object_new__(cls)",
         "    self.__init__(*args, **kwargs)",
+        "    self.__invariants__()",
         f"    _osetattr__(self, '__hash_cache__', hash({key_expr}))",
         "    return self",
         globals={
@@ -143,6 +144,7 @@ def impl_consed_new_method(cls):
         f"    self = _object_new__(cls)",
         f"    _osetattr__(self, '__hash_cache__', hash(_key__))",
         f"    self.__init__({init_call_args})",
+        f"    self.__invariants__()",
         f"    cls.__consign__[_key__] = self",
         f"    return self",
         globals={
@@ -194,6 +196,8 @@ class Record(Object, metaclass=RecordMeta, abstract=True):
     Base class for all mutable objects in the protobase class system.
     eq, hash, order,
     """
+
+    def __invariants__(self) -> None: ...
 
     if not TYPE_CHECKING:
 

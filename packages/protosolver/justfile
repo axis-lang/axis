@@ -1,0 +1,8 @@
+help:
+    @just --list
+
+test:
+    @poetry run python -m unittest discover -s tests
+
+pyright:
+    @poetry run pyright

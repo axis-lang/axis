@@ -100,7 +100,7 @@ class GlobalFixedPointSolverTest(unittest.TestCase):
 
         answers = backend.logic_solver.answers(goal)
 
-        self.assertEqual(answers, (morph.MatchState(),))
+        self.assertEqual(answers, (morph.Subst(),))
 
 
 if __name__ == "__main__":

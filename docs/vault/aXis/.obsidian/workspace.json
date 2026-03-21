@@ -1,0 +1,226 @@
+{
+  "main": {
+    "id": "737b519fc93bc4e2",
+    "type": "split",
+    "children": [
+      {
+        "id": "97fa7ebffb835ddb",
+        "type": "tabs",
+        "dimension": 71.63705583756345,
+        "children": [
+          {
+            "id": "7ddb2940bd8e15a3",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "protoSolver/protoSolver.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "protoSolver"
+            }
+          },
+          {
+            "id": "8da2714d9b851ed9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "protoMorph/Meta data duality.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Meta data duality"
+            }
+          }
+        ],
+        "currentTab": 1
+      },
+      {
+        "id": "de13c8dce911160c",
+        "type": "tabs",
+        "dimension": 28.36294416243655,
+        "children": [
+          {
+            "id": "dfce437a0f2a3a56",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Vista gráfica"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "edc0d62cbc8852ea",
+    "type": "split",
+    "children": [
+      {
+        "id": "9e839e40b52fa43d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ec30cba9dd30d1e5",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "b09ede53c7e04b02",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "62879ae26f49d6d7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a5fe73fd92aa4633",
+    "type": "split",
+    "children": [
+      {
+        "id": "b254ad498878bf22",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fdc3a28bbe7a0817",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "protoMorph/Meta data duality.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes de Meta data duality"
+            }
+          },
+          {
+            "id": "10347d9ff48bd9c0",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "protoMorph/Meta data duality.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes de Meta data duality"
+            }
+          },
+          {
+            "id": "fe3324548bb2aaba",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "cd8310a3e8ac4299",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "55479ae968f3a2eb",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "protoMorph/Meta data duality.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema de Meta data duality"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "8da2714d9b851ed9",
+  "lastOpenFiles": [
+    "protoSolver/protoSolver.md",
+    "protoMorph/Meta data duality.md",
+    "protoMorph",
+    "protoSolver"
+  ]
+}

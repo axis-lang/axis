@@ -36,8 +36,8 @@ class LogicSolver(Protocol):
     def answers(
         self,
         goal: pm.Spec,
-        state: pm.MatchState | None = None,
-    ) -> tuple[pm.MatchState, ...]: ...
+        state: pm.Subst | None = None,
+    ) -> tuple[pm.Subst, ...]: ...
 
 
 class GlobalFixedPointSolver(Consed):
@@ -102,9 +102,9 @@ class GlobalFixedPointSolver(Consed):
     def answers(
         self,
         goal: pm.Spec,
-        state: pm.MatchState | None = None,
-    ) -> tuple[pm.MatchState, ...]:
-        state = pm.MatchState() if state is None else state
+        state: pm.Subst | None = None,
+    ) -> tuple[pm.Subst, ...]:
+        state = pm.Subst() if state is None else state
         bridge = self._match_bridge()
         return _solve_goal_against_facts(
             goal,
@@ -123,9 +123,9 @@ def _apply_clause(
     *,
     bridge: pm.SemanticBridge,
 ) -> tuple[pm.Spec, ...]:
-    states: tuple[pm.MatchState, ...] = (pm.MatchState(),)
+    states: tuple[pm.Subst, ...] = (pm.Subst(),)
     for goal in clause.body:
-        next_states: set[pm.MatchState] = set()
+        next_states: set[pm.Subst] = set()
         for state in states:
             instantiated = _instantiate_goal(goal, state)
             if not isinstance(instantiated, pm.Spec):
@@ -154,8 +154,13 @@ def _apply_clause(
     return tuple(sorted(derived, key=repr))
 
 
-def _instantiate_goal(goal: pm.Spec, state: pm.MatchState) -> pm.Val:
-    return goal.subst(lambda value: state.bindings.get(value))
+def _instantiate_goal(goal: pm.Spec, state: pm.Subst) -> pm.Val:
+    def resolve(value: pm.Val) -> pm.Val | None:
+        if not isinstance(value, pm.Var):
+            return None
+        return state.bindings.get(value)
+
+    return goal.subst(resolve)
 
 
 def _freeze_known(
@@ -174,35 +179,31 @@ def _solve_goal_against_facts(
     goal: pm.Spec,
     facts: frozenset[pm.Spec],
     *,
-    state: pm.MatchState,
+    state: pm.Subst,
     bridge: pm.SemanticBridge,
-) -> tuple[pm.MatchState, ...]:
-    states: set[pm.MatchState] = set()
+) -> tuple[pm.Subst, ...]:
+    states: set[pm.Subst] = set()
     visible_vars = frozenset((*state.bindings.keys(), *_goal_vars(goal)))
     for fact in facts:
-        primary = tuple(pm.match(goal, fact, state=state, bridge=bridge))
-        if primary:
-            states.update(_visible_state(item, visible_vars) for item in primary)
-            continue
         states.update(
-            _visible_state(item, visible_vars)
-            for item in pm.match(fact, goal, state=state, bridge=bridge)
+            _visible_state(result.subst, visible_vars)
+            for result in pm.unify(goal, fact, subst=state, bridge=bridge)
         )
     return tuple(sorted(states, key=repr))
 
 
 def _visible_state(
-    state: pm.MatchState,
+    state: pm.Subst,
     visible_vars: frozenset[pm.Val],
-) -> pm.MatchState:
+) -> pm.Subst:
     if not visible_vars:
-        return pm.MatchState()
+        return pm.Subst()
     bindings = frozendict(
         (key, value)
         for key, value in state.bindings.items()
         if key in visible_vars
     )
-    return pm.MatchState(bindings=bindings)
+    return pm.Subst(bindings=bindings)
 
 
 def _goal_vars(goal: pm.Spec) -> tuple[pm.Var, ...]:

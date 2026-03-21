@@ -75,10 +75,7 @@ def build_term(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | No
 
 
 def build_bound(bound_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
-    term = build_term(bound_expr, scope)
-    if term is None or isinstance(term, (pm.Err, pm.Op)):
-        return term
-    return _compile_term_bound(term)
+    return build_term(bound_expr, scope)
 
 
 def build_default(default_expr: syn.Expr | None, scope: syn.ScopeLike) -> pm.Val | None:
@@ -311,32 +308,6 @@ def unsupported_bound_exception(bound: syn.Expr | None, message: str) -> TypeErr
 def _binding_bound(binding: BindingStruct.Field, scope: syn.ScopeLike) -> pm.Val:
     bound = build_bound(binding.bound_expr, scope)
     return pm.ANY if bound is None else bound
-
-
-def _compile_term_bound(term: pm.Val) -> pm.Val:
-    if _should_compile_to_conforms(term):
-        return pm.satisfy(
-            pm.spec_ref(
-                CONFORMS_FACT,
-                pm.struct(pm.THIS, to=_fact_target_term(term)),
-            )
-        )
-    return term
-
-
-def _should_compile_to_conforms(term: pm.Val) -> bool:
-    if isinstance(term, pm.Var):
-        return True
-    if isinstance(term, pm.Spec):
-        return True
-    if isinstance(term, pm.Const) and isinstance(term.__data__, pm.Type):
-        return True
-    if isinstance(term, pm.Type):
-        return True
-    if isinstance(term, pm.Anchor):
-        name = term.name or ""
-        return bool(name) and name[:1].isupper()
-    return False
 
 
 def _satisfy_as_type(

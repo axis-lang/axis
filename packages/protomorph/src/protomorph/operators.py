@@ -61,10 +61,6 @@ class Operator(pm.Builtin, abstract=True):
         _ = bridge
         return isinstance(right, pm.Op) and right.__data__ == self
 
-    def discriminants(self, bridge: pm.SemanticBridge) -> tuple[pm.Discriminant, ...]:
-        _ = bridge
-        return (pm.Discriminant(key="operator", value=self.ref_spec.path),)
-
 
 class OperatorType(pm.Type):
     ANCHOR = "std.types.Operator"
@@ -148,15 +144,6 @@ class ViewAs(Operator):
 
         return self.intersect(right, bridge=bridge) == right
 
-    def discriminants(self, bridge: pm.SemanticBridge) -> tuple[pm.Discriminant, ...]:
-        _ = bridge
-        return (
-            pm.Discriminant(key="operator", value="ViewAs"),
-            pm.Discriminant(key="trait", value=self.trait.path),
-            pm.Discriminant(key="pattern_type", value=repr(self.pattern.__type__)),
-        )
-
-
 class Satisfy(Operator):
     ANCHOR = "std.operators.Satisfy"
 
@@ -176,9 +163,14 @@ class Satisfy(Operator):
         bridge: pm.SemanticBridge,
     ) -> Iterable[pm.MatchState]:
         subject = _as_bridge_subject(rhs)
-        goal = self.goal.subst(
-            lambda value: subject if value == pm.THIS else state.bindings.get(value)
-        )
+        def resolve(value: pm.Val) -> pm.Val | None:
+            if value == pm.THIS:
+                return subject
+            if not isinstance(value, pm.Var):
+                return None
+            return state.bindings.get(cast(pm.Var, value))
+
+        goal = self.goal.subst(resolve)
         if not isinstance(goal, pm.Spec):
             return ()
         return bridge.solve(goal, state)
@@ -210,15 +202,6 @@ class Satisfy(Operator):
         if isinstance(right, pm.Placeholder):
             return False
         return self.intersect(right, bridge=bridge) == right
-
-    def discriminants(self, bridge: pm.SemanticBridge) -> tuple[pm.Discriminant, ...]:
-        _ = bridge
-        return (
-            pm.Discriminant(key="operator", value="Satisfy"),
-            pm.Discriminant(key="head", value=self.goal.anchor.path),
-            pm.Discriminant(key="shape", value=repr(self.goal.struct_shape)),
-        )
-
 
 class VariadicStruct(Operator):
     ANCHOR = "std.operators.VariadicStruct"
@@ -345,17 +328,6 @@ class VariadicStruct(Operator):
             return False
         return self.intersect(right, bridge=bridge) == right
 
-    def discriminants(self, bridge: pm.SemanticBridge) -> tuple[pm.Discriminant, ...]:
-        _ = bridge
-        return (
-            pm.Discriminant(key="operator", value="VariadicStruct"),
-            pm.Discriminant(key="prefix_len", value=self.prefix.arity),
-            pm.Discriminant(key="suffix_len", value=self.suffix.arity),
-            pm.Discriminant(key="prefix_index", value=repr(self.prefix.index)),
-            pm.Discriminant(key="suffix_index", value=repr(self.suffix.index)),
-        )
-
-
 class QualifierSuffix(Operator):
     ANCHOR = "std.operators.QualifierSuffix"
 
@@ -439,16 +411,6 @@ class QualifierSuffix(Operator):
             return False
         return self.intersect(right, bridge=bridge) == right
 
-    def discriminants(self, bridge: pm.SemanticBridge) -> tuple[pm.Discriminant, ...]:
-        _ = bridge
-        return (
-            pm.Discriminant(key="operator", value="QualifierSuffix"),
-            pm.Discriminant(key="suffix_type", value=repr(_pattern_type(self.suffix))),
-            pm.Discriminant(key="skip_type", value=repr(_pattern_type(self.skip_if))),
-            pm.Discriminant(key="include_terminal", value=self.include_terminal),
-        )
-
-
 def op(operator: Operator) -> Op:
     return Op(OperatorType(ref_spec=operator.ref_spec), operator)
 
@@ -502,7 +464,10 @@ def _normalize_control_struct(
     *,
     bridge: pm.SemanticBridge,
 ) -> pm.Struct[str | None, pm.Val]:
-    values = tuple(pm.normalize(value, bridge=bridge) for value in struct.values)
+    values = cast(
+        tuple[pm.Val, ...],
+        tuple(pm.normalize(value, bridge=bridge) for value in struct.values),
+    )
     if values == struct.values:
         return struct
     return struct.with_values(values)

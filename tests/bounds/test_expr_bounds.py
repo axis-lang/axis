@@ -56,7 +56,7 @@ class ExprBoundsTest(StdPackageTestCase):
             self.std_root_scope,
         )
         assert bound is not None
-        self.assertConformsTo(bound, self.expectedConformsTarget(pm.anchor("std.core.Text.Inner")))
+        self.assertEqual(bound, pm.anchor("std.core.Text.Inner"))
 
     def test_index_builds_specialized_ref_from_anchor(self):
         indexed = build_bound(
@@ -73,17 +73,14 @@ class ExprBoundsTest(StdPackageTestCase):
             self.std_root_scope,
         )
         assert term is not None
-        self.assertConformsTo(indexed, self.expectedConformsTarget(term))
+        self.assertEqual(indexed, term)
 
     def test_nested_std_module_spec_anchor_resolves_from_scope(self):
         indexed = self.bound("types.Spec[core.Text]", self.std_root_scope)
         term = build_term(syn.Expr.from_str("types.Spec[core.Text]"), self.std_root_scope)
 
         assert term is not None
-        self.assertConformsTo(
-            indexed,
-            self.expectedConformsTarget(term),
-        )
+        self.assertEqual(indexed, term)
 
     def test_lit_and_tuple_build_structural_values(self):
         self.assertEqual(build_bound(expr.Lit(value=42), self.std_root_scope), pm.literal(42))
@@ -146,7 +143,7 @@ class ExprBoundsTest(StdPackageTestCase):
 
         self.assertEqual(schema.fields.index.keys, ("x", "name"))
         self.assertIsNone(schema.varsign)
-        self.assertIsInstance(schema.fields.values[0].match_expr, pm.Op)
+        self.assertEqual(schema.fields.values[0].match_expr, pm.anchor("Whole"))
         self.assertEqual(schema.fields.values[1].default, pm.anchor("Sym"))
 
     def test_build_struct_schema_builds_variadic_schema_from_spread(self):
@@ -171,13 +168,13 @@ class ExprBoundsTest(StdPackageTestCase):
         self.assertEqual(schema.varsign.prefix_index.keys, (None,))
         self.assertEqual(schema.middle, pm.ANY)
 
-    def test_compound_compiles_to_conforms_on_nominal_qualifier_type(self):
+    def test_compound_bound_returns_nominal_qualifier_term(self):
         bound = build_bound(syn.Expr.from_str("Optional Text"), self.bound_scope)
         term = build_term(syn.Expr.from_str("Optional Text"), self.bound_scope)
 
         assert bound is not None
         assert term is not None
-        self.assertConformsTo(bound, self.expectedConformsTarget(term))
+        self.assertEqual(bound, term)
 
     def test_compound_builds_nested_qualifiers_right_to_left(self):
         self.assertTypeEq(
@@ -207,7 +204,7 @@ class ExprBoundsTest(StdPackageTestCase):
             assert isinstance(term.__data__, pm.NominalQualifier)
             self.assertEqual(term.__data__.spec_ref.path, path)
             assert value is not None
-            self.assertConformsTo(value, self.expectedConformsTarget(term))
+            self.assertEqual(value, term)
 
     def test_nested_member_plus_index_builds_qualified_value(self):
         nested_scope = Scope.Builder(name="nested")
@@ -235,7 +232,7 @@ class ExprBoundsTest(StdPackageTestCase):
         assert isinstance(term.__data__, pm.NominalQualifier)
         self.assertEqual(term.__data__.spec_ref.path, "Struct.Index")
         assert value is not None
-        self.assertConformsTo(value, self.expectedConformsTarget(term))
+        self.assertEqual(value, term)
 
     def test_canonical_std_scope_builder_helper(self):
         self.assertBoundEq("core.Text", "core.Text", scope=self.std_root_scope)
@@ -259,25 +256,3 @@ class ExprBoundsTest(StdPackageTestCase):
 
         self.assertIsInstance(resolved, sem.Scope)
         self.assertEqual(resolved, types_ctx.scope)
-
-    def assertConformsTo(self, bound: pm.Val, expected_term: pm.Val) -> None:
-        self.assertIsInstance(bound, pm.Op)
-        assert isinstance(bound, pm.Op)
-        self.assertIsInstance(bound.__data__, pm.Satisfy)
-        satisfy = bound.__data__
-        assert isinstance(satisfy, pm.Satisfy)
-        goal = satisfy.goal
-        self.assertEqual(goal.anchor.path, "std.facts.Conforms")
-        args = goal.args
-        self.assertIsNotNone(args)
-        assert args is not None
-        self.assertEqual(args[0], pm.THIS)
-        self.assertEqual(args.get("to"), expected_term)
-
-    def expectedConformsTarget(self, term: pm.Val) -> pm.Val:
-        type_ = term.as_type()
-        if type_ is None:
-            return term
-        if isinstance(type_, pm.Val):
-            return type_
-        return pm.val(type_)

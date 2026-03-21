@@ -1107,6 +1107,20 @@ type = "directory"
 url = "packages/protomorph"
 
 [[package]]
+name = "protosolver"
+version = "0.1.0"
+description = "Constraint solver library"
+optional = false
+python-versions = "^3.13"
+groups = ["main"]
+files = []
+develop = true
+
+[package.source]
+type = "directory"
+url = "packages/protosolver"
+
+[[package]]
 name = "psutil"
 version = "7.0.0"
 description = "Cross-platform lib for process and system monitoring in Python.  NOTE: the syntax of this script MUST be kept compatible with Python 2.7."
@@ -1884,4 +1898,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "37d3c8e492983115e5672617cd01b9b1d460db5f71396edb703fff4e56adcd0d"
+content-hash = "62a7671735f5a0ce2f6e578f164e807813908c41e5c8baf99ef0d73a49bde823"

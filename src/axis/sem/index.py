@@ -114,4 +114,37 @@ class OverloadIndex(Index[sem.Entity.OverloadContribution]):
     contribs: frozenset[sem.Entity.OverloadContribution] = _
 
     def _schema_of(self, contrib: sem.Entity.OverloadContribution) -> pm.StructSchema:
-        return contrib.param_schema
+        return contrib.param_match_schema
+
+    @flux.method
+    def search(
+        self,
+        args: pm.Struct[str | None, pm.Val] | pm.Const,
+        facet_cls: type[sem.Context.Contribution] | None = None,
+    ) -> pm.ResolveResult[sem.Entity.OverloadContribution]:
+        result = super().search(args, facet_cls=facet_cls)
+        if result.is_empty:
+            return result
+
+        filtered_envs = frozendict(
+            (goal, tuple(env for env in envs if goal.admits_env(env)))
+            for goal, envs in result.envs_by_goal.items()
+            if tuple(env for env in envs if goal.admits_env(env))
+        )
+        filtered_goals = frozenset(filtered_envs.keys())
+        filtered_buckets = frozenset(
+            bucket
+            for bucket in (
+                frozenset(goal for goal in bucket if goal in filtered_goals)
+                for bucket in result.goal_buckets
+            )
+            if bucket
+        )
+        return pm.ResolveResult(
+            goals=filtered_goals,
+            goal_buckets=filtered_buckets,
+            leaves=tuple(
+                leaf for leaf in result.leaves if any(goal in filtered_goals for goal in leaf.goals)
+            ),
+            envs_by_goal=filtered_envs,
+        )
