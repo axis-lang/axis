@@ -1,5 +1,12 @@
 #%%
 from protomorph.core import *
+from protomorph.core.native import meta_from_native
 
-m = Tuple.of(Integer.wrap(5))
-print(m)
+
+
+print(meta_from_native(dict[int, set[str]]))
+
+
+
+
+# %%

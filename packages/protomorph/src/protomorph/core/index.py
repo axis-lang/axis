@@ -4,11 +4,15 @@ from typing import Any, Sequence
 
 from protobase import frozendict, slot_cached_property
 
-from .foundation import Data, Val, Meta, Omega, OMEGA, ground, Ground
+from . import display
+from .foundation import Data, Val, Meta, ground, Ground
 from .. import core
 
 
 class IndexKeyMeta(Meta[Ground, Meta]):
+    def __repr__(self) -> str:
+        return display.repr_value(self)
+
     @property
     def index_key_meta(self) -> Meta:
         return self.__data__
@@ -18,6 +22,9 @@ INDEX_GROUND = ground(IndexKeyMeta)
 
 
 class Index[K: Data](Meta[IndexKeyMeta, tuple[K, ...]]):
+
+    def __repr__(self) -> str:
+        return display.repr_index(self)
 
     def wrap(self, data: Data) -> Val:
         if isinstance(data, tuple):
@@ -93,6 +100,6 @@ class Index[K: Data](Meta[IndexKeyMeta, tuple[K, ...]]):
             key_meta = next(iter(meta))
             data = tuple(val.__data__ for val in vals)
         else:
-            key_meta = core.Union(OMEGA, meta)
+            key_meta = core.Union(core.Union.Ground, meta)
             data = tuple(key_meta.inject(val).__data__ for val in vals)
         return cls(IndexKeyMeta(INDEX_GROUND, key_meta), data)

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Iterator, cast, ClassVar
 
-from .foundation import Data, Val, Meta, OMEGA, Omega, Ground, ground
+from . import display
+from .foundation import Data, Val, Meta, Ground, ground
 from .index import Index  # , IndexGround
 
 
@@ -30,6 +31,9 @@ class Schema[K: Data, D: Data](Meta[Index[K] | Ground, D]):
 
 
 class UniformSchema[K: Data](Schema[K, Meta]):
+    def __repr__(self) -> str:
+        return display.repr_uniform_schema(self)
+
     @property
     def arity(self) -> int | None:
         index = self.index
@@ -68,6 +72,9 @@ class UniformSchema[K: Data](Schema[K, Meta]):
 
 
 class VaryingSchema[K: Data](Schema[K, tuple[Meta, ...]]):
+    def __repr__(self) -> str:
+        return display.repr_varying_schema(self)
+
     @property
     def arity(self) -> int:
         return len(self.__data__)
@@ -78,6 +85,36 @@ class VaryingSchema[K: Data](Schema[K, tuple[Meta, ...]]):
     @property
     def fields(self) -> Iterator[Meta]:
         return iter(self.__data__)
+
+    @property
+    def names(self) -> tuple[K, ...] | None:
+        index = self.index
+        if index is None:
+            return None
+        return cast(tuple[K, ...], index.__data__)
+
+    def items(self) -> Iterator[tuple[K | None, Meta]]:
+        names = self.names
+        if names is None:
+            for meta in self.__data__:
+                yield None, meta
+            return
+        for name, meta in zip(names, self.__data__):
+            yield name, meta
+
+    def wrap_named(self, data: Data) -> tuple[Val, ...]:
+        return tuple(
+            field_meta.wrap(getattr(data, cast(str, name)))
+            for name, field_meta in self.items()
+            if name is not None
+        )
+
+    def attrs_from_children(self, children: tuple[Val, ...]) -> dict[str, Data]:
+        return {
+            cast(str, name): child.__data__
+            for (name, _), child in zip(self.items(), children)
+            if name is not None
+        }
 
     # ── Structural algebra ──────────────────────────────────────────
 

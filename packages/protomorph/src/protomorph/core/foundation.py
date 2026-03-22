@@ -5,6 +5,8 @@ from typing import Any, Iterator, Self
 from protobase import Consed, frozendict
 from protomorph import core
 
+from . import display
+
 ITERATIVE_TRAVERSAL = True
 _RECONSTRUCT = object()
 _default_is_leaf = lambda v: v.is_leaf
@@ -73,6 +75,9 @@ class Val[M: Meta = Any, D: Data = Any](Pure[M, D], abstract=True):
     @property
     def is_leaf(self) -> bool:
         return True
+
+    def compatible(self, other: Val) -> bool:
+        return type(self) is type(other) and self.__meta__ == other.__meta__
 
     def children(self) -> tuple[Val, ...]:
         return ()
@@ -184,7 +189,7 @@ class Meta[M: Meta = Any, D: Data = Any](Val[M, D], abstract=True):
 
 class Omega(Meta["Omega", None]):
     def __repr__(self) -> str:
-        return "<Omega>"
+        return display.repr_value(self)
 
     def wrap(self, data: Data) -> Val:
         return Ground(self, data)
@@ -225,6 +230,9 @@ def _unwrap_pure(data: Data, caller: str) -> Data:
 
 
 class Ground(Meta[Omega, type[Meta]]):
+    def __repr__(self) -> str:
+        return display.repr_ground(self)
+
     def wrap(self, data: Data) -> Val:
         data = _unwrap_pure(data, "Ground.wrap")
         return self.__data__(self, data)

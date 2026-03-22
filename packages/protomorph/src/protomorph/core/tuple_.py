@@ -1,23 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Iterator, cast, ClassVar
+from typing import Any, Iterator, Sequence, cast, ClassVar
 
-from .foundation import (
-    Data,
-    Val,
-    Meta,
-    OMEGA,
-    Omega,
-    Ground,
-    ground,
-    Builtin,
-)
+from . import display
+from .foundation import Data, Val, Meta
 from .variant import Union
 from .index import Index  # , IndexGround
 from .schema import Schema, UniformSchema, VaryingSchema
 
 
 class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
+
+    def __repr__(self) -> str:
+        return display.repr_tuple(self)
 
     @property
     def schema(self) -> Schema[K, V]:
@@ -37,7 +32,10 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
             assert schema.arity == self.arity
 
     def at(self, offset: int):
-        return self.schema.at(offset).wrap(self.__data__[offset])
+        raw = self.__data__[offset]
+        if isinstance(raw, Val):
+            return raw
+        return self.schema.at(offset).wrap(raw)
 
     def get(self, key: Val):
         index = self.index
@@ -52,8 +50,8 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         return len(self.__data__)
 
     def __iter__(self):
-        for i, d in enumerate(self.__data__):
-            yield self.schema.at(i).wrap(d)
+        for i in range(len(self.__data__)):
+            yield self.at(i)
 
     def items(self):
         index = self.index
@@ -61,7 +59,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
             raise KeyError(f"Schema {self.schema!r} has no index for key lookup")
         key_meta = index.key_meta
         for i, key_data in enumerate(index):
-            yield key_meta.wrap(key_data), self.schema.at(i).wrap(self.__data__[i])
+            yield key_meta.wrap(key_data), self.at(i)
 
     def to_dict(self) -> dict:
         return dict(self.items())
@@ -77,22 +75,22 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
 
     def reconstruct(self, children: tuple[Val, ...]) -> Tuple:
         new_metas = tuple(c.__meta__ for c in children)
-        new_data = tuple(c.__data__ for c in children)
-        ground = self.index or OMEGA
+        new_data = tuple(c if isinstance(c, Meta) else c.__data__ for c in children)
         meta_set = frozenset(new_metas)
         if len(meta_set) == 1:
-            schema = UniformSchema(self.index or UniformSchema.Ground, next(iter(meta_set)))
+            schema = UniformSchema(
+                self.index or UniformSchema.Ground, next(iter(meta_set))
+            )
         else:
             schema = VaryingSchema(self.index or VaryingSchema.Ground, new_metas)
-        return Tuple(schema, new_data)
+        return Tuple(cast(Schema[K, V], schema), new_data)
 
     def map(self, f) -> Tuple:
         return self.reconstruct(tuple(f(v) for v in self))
 
     def replace(self, offset: int, val: Val) -> Tuple:
-        new_data = (
-            self.__data__[:offset] + (val.__data__,) + self.__data__[offset + 1 :]
-        )
+        raw = val if isinstance(val, Meta) else val.__data__
+        new_data = self.__data__[:offset] + (raw,) + self.__data__[offset + 1 :]
         schema = self.schema
         if isinstance(schema, VaryingSchema):
             new_metas = (
@@ -100,7 +98,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
                 + (val.__meta__,)
                 + schema.__data__[offset + 1 :]
             )
-            new_schema = VaryingSchema(VaryingSchema.Ground, new_metas)
+            new_schema = VaryingSchema(self.index or VaryingSchema.Ground, new_metas)
         elif isinstance(schema, UniformSchema):
             if val.__meta__ == schema.__data__:
                 new_schema = schema
@@ -109,10 +107,12 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
                     schema.at(i) if i != offset else val.__meta__
                     for i in range(len(self.__data__))
                 )
-                new_schema = VaryingSchema(VaryingSchema.Ground, new_metas)
+                new_schema = VaryingSchema(
+                    self.index or VaryingSchema.Ground, new_metas
+                )
         else:
             new_schema = schema
-        return Tuple(new_schema, new_data)
+        return Tuple(cast(Schema[K, V], new_schema), new_data)
 
     def replace_key(self, key: Val, val: Val) -> Tuple:
         index = self.index
@@ -139,7 +139,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
             )
         else:
             new_schema = schema
-        return Tuple(new_schema, new_data)
+        return Tuple(cast(Schema[K, V], new_schema), new_data)
 
     @classmethod
     def from_dict(cls, index: Index, d: dict) -> Tuple:
@@ -149,14 +149,16 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         for key_data in index:
             key_val = key_meta.wrap(key_data)
             field_val = d[key_val]
-            data.append(field_val.__data__)
+            data.append(
+                field_val if isinstance(field_val, Meta) else field_val.__data__
+            )
             metas.append(field_val.__meta__)
         meta_set = frozenset(metas)
         if len(meta_set) == 1:
             schema = UniformSchema(index, next(iter(meta_set)))
         else:
             schema = VaryingSchema(index, tuple(metas))
-        return cls(schema, tuple(data))
+        return cls(cast(Schema[K, V], schema), tuple(data))
 
     @classmethod
     def empty(cls) -> Tuple[Any, Any]:
@@ -168,24 +170,25 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
 
         if len(meta) == 1:
             meta = next(iter(meta))
-            data = tuple(val.__data__ for val in vals)
+            data = tuple(val if isinstance(val, Meta) else val.__data__ for val in vals)
         else:
-            meta = Union(OMEGA, meta)
-            data = tuple(meta.inject(val).__data__ for val in vals)
+            meta = Union(Union.Ground, meta)
+            data = tuple(val for val in vals)
 
         return Tuple(UniformSchema(with_index or UniformSchema.Ground, meta), data)
 
     @staticmethod
     def varying_of(vals: Sequence[Val], with_index: Index | None = None):
         meta = tuple(val.__meta__ for val in vals)
-        data = tuple(val.__data__ for val in vals)
+        data = tuple(val if isinstance(val, Meta) else val.__data__ for val in vals)
         return Tuple(VaryingSchema(with_index or VaryingSchema.Ground, meta), data)
 
     @staticmethod
     def of(*args: Val, **kwargs: Val) -> Tuple:
-        from .index import Index, IndexKeyMeta, INDEX_GROUND
-        from .hosted import Id
         if kwargs and not args:
+            from .index import Index, IndexKeyMeta, INDEX_GROUND
+            from .hosted import Id
+
             key_meta = IndexKeyMeta(INDEX_GROUND, Id)
             index = Index(key_meta, tuple(kwargs.keys()))
             return Tuple.varying_of(list(kwargs.values()), with_index=index)
@@ -193,9 +196,14 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
             return Tuple.varying_of(list(args))
         else:
             # positional (None key) then keyword
+            from .index import Index, IndexKeyMeta, INDEX_GROUND
+            from .hosted import Id
+
             key_meta = IndexKeyMeta(INDEX_GROUND, Id)
             index = Index(key_meta, (None,) * len(args) + tuple(kwargs.keys()))
-            return Tuple.varying_of(list(args) + list(kwargs.values()), with_index=index)
+            return Tuple.varying_of(
+                list(args) + list(kwargs.values()), with_index=index
+            )
 
     Empty: ClassVar[Tuple[Any, Any]]
 

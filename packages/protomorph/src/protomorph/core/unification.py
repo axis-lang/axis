@@ -35,6 +35,8 @@ def _capture(
         elif left.is_leaf != right.is_leaf:
             return None
         else:
+            if not left.compatible(right):
+                return None
             # both non-leaf, non-var: deep_zip descends if arities match
             if len(left.children()) != len(right.children()):
                 return None

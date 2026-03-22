@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from protobase import Inmutable
 
-from .foundation import Data, Val, Meta, Ground, ground
+from . import display
+from .foundation import Data, Val, Meta, Omega, Ground, ground
 from .tuple_ import Tuple
 from .. import core
 
@@ -52,6 +53,9 @@ class Host(Inmutable):
 class Spec(Meta[Ground, tuple[str, Tuple[str | None, Val]]]):
     Ground: ClassVar[Ground]
 
+    def __repr__(self) -> str:
+        return display.repr_spec(self)
+
     @property
     def path(self) -> str:
         return self.__data__[0]
@@ -74,15 +78,21 @@ class Spec(Meta[Ground, tuple[str, Tuple[str | None, Val]]]):
         if not children:
             return self
         (new_args,) = children
-        return Spec(self.__meta__, (self.path, new_args))
+        return Spec(self.__meta__, (self.path, cast(Tuple, new_args)))
+
+    def compatible(self, other: Val) -> bool:
+        return super().compatible(other) and isinstance(other, Spec) and self.path == other.path
 
     @staticmethod
-    def of(path: str, *args: Val, **kwargs: Val) -> Spec:
-        return Spec(Spec.Ground, (path, Tuple.Empty))
+    def of(identifier: str, *args: Val, **kwargs: Val) -> Spec:
+        return Spec(Spec.Ground, (identifier, Tuple.of(*args, **kwargs)))
 
-class Qual(Meta[Ground, Tuple[str | None, Any]]):
+class Qual(Meta[Omega | Ground, Tuple[str | None, Any]]):
 
     Ground: ClassVar[Ground]
+
+    def __repr__(self) -> str:
+        return display.repr_qual(self)
 
     def wrap(self, data: Data) -> Val:
         return Hosted(self, data)
@@ -98,24 +108,31 @@ class Qual(Meta[Ground, Tuple[str | None, Any]]):
         if not children:
             return self
         (new_data,) = children
-        return Qual(self.__meta__, new_data)
+        return Qual(self.__meta__, cast(Tuple, new_data))
 
     @property
     def underlying(self) -> core.Meta:
         """The base type — first element of the Qual's Tuple."""
-        return self.__data__.at(0)
+        return cast(core.Meta, self.__data__.at(0))
 
     @property
     def qualifiers(self) -> core.Tuple:
         """The qualifier Specs — all elements after the base type."""
-        return self.__data__.slice(1)
+        return cast(core.Tuple, self.__data__.slice(1))
 
+
+    @staticmethod
+    def of(*args: Val, **kwargs: Val) -> Qual:
+        return Qual(Qual.Ground, Tuple.of(*args, **kwargs))
 
 # ── Hosted ─────────────────────────────────────────────────────────────
 
 
 class Hosted(Val[Ground | Spec | Qual, core.Data]):
     """Val whose structural algebra is delegated to the active HOST."""
+
+    def __repr__(self) -> str:
+        return display.repr_hosted(self)
 
     @property
     def is_leaf(self) -> bool:
@@ -137,3 +154,4 @@ Id = Spec.of("std.Id")
 Text = Spec.of("std.Text")
 Float = Spec.of("std.Float")
 Bool = Spec.of("std.Bool")
+List = Spec.of('std.List')
