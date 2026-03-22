@@ -65,14 +65,17 @@ class Spec(Meta[Ground, tuple[str, Tuple[str | None, Val]]]):
 
     @property
     def is_leaf(self) -> bool:
-        return core.HOST.get().spec_is_leaf(self.__meta__, self.__data__)
+        return self.args.arity == 0
 
     def children(self) -> tuple[Val, ...]:
-        return core.HOST.get().spec_children(self.__meta__, self.__data__)
+        return (self.args,) if self.args.arity > 0 else ()
 
-    def reconstruct(self, children: tuple[Val, ...]) -> Val:
-        return core.HOST.get().spec_reconstruct(self.__meta__, children)
-    
+    def reconstruct(self, children: tuple[Val, ...]) -> Spec:
+        if not children:
+            return self
+        (new_args,) = children
+        return Spec(self.__meta__, (self.path, new_args))
+
     @staticmethod
     def of(path: str, *args: Val, **kwargs: Val) -> Spec:
         return Spec(Spec.Ground, (path, Tuple.Empty))
@@ -86,13 +89,16 @@ class Qual(Meta[Ground, Tuple[str | None, Any]]):
 
     @property
     def is_leaf(self) -> bool:
-        return core.HOST.get().qual_is_leaf(self.__meta__, self.__data__)
+        return self.__data__.arity == 0
 
     def children(self) -> tuple[Val, ...]:
-        return core.HOST.get().qual_children(self.__meta__, self.__data__)
+        return (self.__data__,) if self.__data__.arity > 0 else ()
 
-    def reconstruct(self, children: tuple[Val, ...]) -> Val:
-        return core.HOST.get().qual_reconstruct(self.__meta__, children)
+    def reconstruct(self, children: tuple[Val, ...]) -> Qual:
+        if not children:
+            return self
+        (new_data,) = children
+        return Qual(self.__meta__, new_data)
 
     @property
     def underlying(self) -> core.Meta:

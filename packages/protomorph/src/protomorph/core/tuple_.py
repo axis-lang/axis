@@ -81,9 +81,9 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         ground = self.index or OMEGA
         meta_set = frozenset(new_metas)
         if len(meta_set) == 1:
-            schema = UniformSchema(UniformSchema.Ground, next(iter(meta_set)))
+            schema = UniformSchema(self.index or UniformSchema.Ground, next(iter(meta_set)))
         else:
-            schema = VaryingSchema(VaryingSchema.Ground, new_metas)
+            schema = VaryingSchema(self.index or VaryingSchema.Ground, new_metas)
         return Tuple(schema, new_data)
 
     def map(self, f) -> Tuple:
@@ -126,18 +126,15 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         new_data = self.__data__[start:stop]
         schema = self.schema
         index = self.index
-        new_index = None
-        if index is not None:
-            new_index = Index(index.__meta__, index.__data__[start:stop])
-        ground = new_index or OMEGA
+        new_index = index.slice(start, stop) if index is not None else None
         if isinstance(schema, UniformSchema):
             new_schema = UniformSchema(
-                UniformSchema.Ground,
+                new_index or UniformSchema.Ground,
                 schema.__data__,
             )
         elif isinstance(schema, VaryingSchema):
             new_schema = VaryingSchema(
-                VaryingSchema.Ground,
+                new_index or VaryingSchema.Ground,
                 schema.__data__[start:stop],
             )
         else:
@@ -184,11 +181,21 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         data = tuple(val.__data__ for val in vals)
         return Tuple(VaryingSchema(with_index or VaryingSchema.Ground, meta), data)
 
-    # @staticmethod
-    # def of(*args: Val, **kwargs: Val) -> Tuple[str, Any]:
-    #     vals = (*args, *kwargs.values())
-    #     keys = (None,) * len(args) + tuple(kwargs.keys())
-    #     return Tuple.varying_of(vals, with_index=Index.from_vals(kwargs.values()))
+    @staticmethod
+    def of(*args: Val, **kwargs: Val) -> Tuple:
+        from .index import Index, IndexKeyMeta, INDEX_GROUND
+        from .hosted import Id
+        if kwargs and not args:
+            key_meta = IndexKeyMeta(INDEX_GROUND, Id)
+            index = Index(key_meta, tuple(kwargs.keys()))
+            return Tuple.varying_of(list(kwargs.values()), with_index=index)
+        elif not kwargs:
+            return Tuple.varying_of(list(args))
+        else:
+            # positional (None key) then keyword
+            key_meta = IndexKeyMeta(INDEX_GROUND, Id)
+            index = Index(key_meta, (None,) * len(args) + tuple(kwargs.keys()))
+            return Tuple.varying_of(list(args) + list(kwargs.values()), with_index=index)
 
     Empty: ClassVar[Tuple[Any, Any]]
 

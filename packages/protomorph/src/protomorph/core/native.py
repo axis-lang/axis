@@ -174,18 +174,18 @@ def meta_from_native(
 
     # Generic Builtin  (e.g. Box[T])
     if origin is not None and isinstance(origin, type) and issubclass(origin, Builtin):
-        anch = Ground(OMEGA, _ground_for(origin))
+        path = _ground_for(origin)
         if args:
             param_metas = [meta_from_native(a, template=template) for a in args]
-            params_tuple = core.varying_tuple_of(param_metas)
+            params_tuple = core.Tuple.varying_of(param_metas)
         else:
-            params_tuple = core.Tuple.empty()
-        return Spec(anch, params_tuple)
+            params_tuple = core.Tuple.Empty
+        return Spec(Spec.Ground, (path, params_tuple))
 
     # Non-generic Builtin subclass
     if isinstance(annotation, type) and issubclass(annotation, Builtin):
-        anch = Ground(OMEGA, _ground_for(annotation))
-        return Spec(anch, core.Tuple.empty())
+        path = _ground_for(annotation)
+        return Spec(Spec.Ground, (path, core.Tuple.Empty))
 
     # Fallback
     return OMEGA
@@ -209,13 +209,13 @@ class NativeHost(Host):
     def val_is_leaf(self, meta: Meta, data: Data) -> bool:
         if not isinstance(meta, Spec):
             return True
-        template = self.type_by_ground.get(meta.ground)
+        template = self.type_by_ground.get(meta.path)
         return template is None or len(template.fields) == 0
 
     def val_children(self, meta: Meta, data: Data) -> tuple[Val, ...]:
         if not isinstance(meta, Spec):
             return ()
-        template = self.type_by_ground.get(meta.ground)
+        template = self.type_by_ground.get(meta.path)
         if template is None:
             return ()
         fields = template.fields
@@ -227,7 +227,7 @@ class NativeHost(Host):
     def val_reconstruct(self, meta: Meta, children: tuple[Val, ...]) -> Val:
         if not isinstance(meta, Spec):
             raise NotImplementedError
-        template = self.type_by_ground[meta.ground]
+        template = self.type_by_ground[meta.path]
         fields = template.fields
         attrs = {
             name: child.__data__
@@ -235,32 +235,5 @@ class NativeHost(Host):
         }
         instance = template.builtin_cls(**attrs)
         return Hosted(meta, instance)
-
-    # ── Spec metas ────────────────────────────────────────────────────
-
-    def spec_is_leaf(self, meta: Meta, data: Data) -> bool:
-        return not isinstance(data, core.Tuple) or data.arity == 0
-
-    def spec_children(self, meta: Meta, data: Data) -> tuple[Val, ...]:
-        # Expose the params Tuple as a single child; Tuple's own algebra
-        # handles further descent into individual params.
-        return (data,)
-
-    def spec_reconstruct(self, meta: Meta, children: tuple[Val, ...]) -> Val:
-        (new_tuple,) = children
-        return Spec(meta, new_tuple)
-
-    # ── Qual metas ────────────────────────────────────────────────────
-
-    def qual_is_leaf(self, meta: Meta, data: Data) -> bool:
-        return not isinstance(data, core.Tuple) or data.arity == 0
-
-    def qual_children(self, meta: Meta, data: Data) -> tuple[Val, ...]:
-        return (data,)
-
-    def qual_reconstruct(self, meta: Meta, children: tuple[Val, ...]) -> Val:
-        (new_tuple,) = children
-        return Qual(meta, new_tuple)
-
 
 NATIVE_HOST = NativeHost()

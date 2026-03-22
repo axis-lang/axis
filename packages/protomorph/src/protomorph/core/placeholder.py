@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .foundation import Val, Meta, Data, Omega, OMEGA
+from .foundation import Val, Meta, Data, Omega, OMEGA, _unwrap_pure
 
 
 class Var(Meta[Omega, Data]):
@@ -14,6 +14,7 @@ class Var(Meta[Omega, Data]):
     """
 
     def wrap(self, data: Data) -> Placeholder:
+        data = _unwrap_pure(data, "Var.wrap")
         return Placeholder(self, data)
 
 

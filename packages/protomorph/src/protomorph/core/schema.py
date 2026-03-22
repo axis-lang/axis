@@ -24,6 +24,10 @@ class Schema[K: Data, D: Data](Meta[Index[K] | Ground, D]):
     def fields(self) -> Iterator[Meta]:
         raise NotImplementedError
 
+    def wrap(self, data):
+        from .tuple_ import Tuple
+        return Tuple(self, data)
+
 
 class UniformSchema[K: Data](Schema[K, Meta]):
     @property

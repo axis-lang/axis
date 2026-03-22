@@ -74,6 +74,10 @@ class Index[K: Data](Meta[IndexKeyMeta, tuple[K, ...]]):
         data = tuple(c.__data__ for c in children)
         return Index(self.__meta__, data)
 
+    def slice(self, start: int, stop: int | None = None) -> Index:
+        stop = stop if stop is not None else self.arity
+        return Index(self.__meta__, self.__data__[start:stop])
+
     def concat(self, other: Index) -> Index:
         if self.__meta__ != other.__meta__:
             raise ValueError(

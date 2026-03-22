@@ -1,7 +1,5 @@
 #%%
 from protomorph.core import *
 
-m = Tuple.varying_of([Integer])
-
+m = Tuple.of(Integer.wrap(5))
 print(m)
-print(m.slice(0))

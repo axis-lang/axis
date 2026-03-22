@@ -196,11 +196,37 @@ object.__setattr__(OMEGA, "__data__", None)
 object.__setattr__(OMEGA, "__hash_cache__", hash((id(OMEGA), None)))
 OMEGA.__consign__[(OMEGA, None)] = OMEGA
 
+# ── Wrap helper ────────────────────────────────────────────────────────
+
+
+import warnings as _warnings
+
+
+def _unwrap_pure(data: Data, caller: str) -> Data:
+    """If *data* is a Pure, unwrap its __data__ and emit a UserWarning.
+
+    Pass ``caller`` as the name that will appear in the warning message
+    (e.g. ``"Ground.wrap"``).  The warning is always attributed to the
+    frame that called *this* helper's caller, so ``stacklevel`` is fixed
+    at 3 (helper → wrap method → user code).
+    """
+    if isinstance(data, Pure):
+        _warnings.warn(
+            f"{caller} received a Pure ({type(data).__name__}); unwrapping __data__. "
+            "This is likely a bug in the caller.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return data.__data__
+    return data
+
+
 # ── Ground ─────────────────────────────────────────────────────────────
 
 
 class Ground(Meta[Omega, type[Meta]]):
     def wrap(self, data: Data) -> Val:
+        data = _unwrap_pure(data, "Ground.wrap")
         return self.__data__(self, data)
 
 
