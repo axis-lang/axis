@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Self, Iterator, NamedTuple
 
-from .. import draft as mp
+from .. import core as mp
 from .foundation import Builtin, Id
 
 

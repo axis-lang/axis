@@ -1,102 +1,99 @@
 from __future__ import annotations
 
-from typing import Any, Sequence, ClassVar, cast
+from typing import Iterator
 
-from protobase import frozendict, slot_cached_property
-
-from . import display
-from .foundation import Data, Val, Meta, ground, Ground
-from .. import core
+from .. import core as mp
+from .foundation import Builtin, Id
 
 
-class IndexMeta(Meta[Ground, Meta]):
-    Ground: ClassVar[Ground]
+class Index[K](Builtin):
 
-    def __repr__(self) -> str:
-        return display.repr_value(self)
+    keys: tuple[K, ...]
 
-    @property
-    def index_key_meta(self) -> Meta:
-        return self.__data__
+    def __len__(self) -> int:
+        return len(self.keys)
 
-IndexMeta.Ground = ground(IndexMeta)
+    def __getitem__(self, offset: int) -> K:
+        return self.keys[offset]
 
-class Index[K: Data](Meta[IndexMeta, tuple[K, ...]]):
+    def __iter__(self) -> Iterator[K]:
+        return iter(self.keys)
 
-    def __repr__(self) -> str:
-        return display.repr_index(self)
+    def __contains__(self, id: K) -> bool:
+        return id in self.keys
 
-    def wrap(self, data: Data) -> Val:
-        if isinstance(data, tuple):
-            return core.VaryingSchema(self, cast(tuple[Meta, ...], data))
-        return core.UniformSchema(self, cast(Meta, data))
-
-    @property
-    def arity(self) -> int:
-        return len(self.__data__)
-
-    @slot_cached_property
-    def keys(self) -> tuple[K, ...]:
-        return tuple(data for data in self.__data__ if data is not None)
-
-    @slot_cached_property
-    def key_offsets(self) -> frozendict[K, int]:
-        return frozendict(
-            {data: i for i, data in enumerate(self.__data__) if data is not None}
-        )
-
-    def __invariants__(self) -> None:
-        if len(self.keys) != len(self.key_offsets):
-            raise AssertionError(f"Index keys must be unique: {self.__data__!r}")
-
-    def __iter__(self):
-        return iter(self.__data__)
-
-    @property
-    def key_meta(self) -> Meta:
-        return self.__meta__.__data__
-
-    def _offset_of(self, key: K) -> int:
-        return self.key_offsets[key]
-
-    def offset_of(self, k: Val[Meta, K]) -> int:
-        if k.__meta__ != self.__meta__.index_key_meta:
-            raise KeyError(
-                f"Key meta {k.__meta__!r} does not match index key meta {self.__meta__.index_key_meta!r}"
-            )
-        return self._offset_of(k.__data__)
-
-    # ── Structural algebra ──────────────────────────────────────────
-
-    @property
-    def is_leaf(self) -> bool:
-        return False
-
-    def children(self) -> tuple[Val, ...]:
-        km = self.key_meta
-        return tuple(km.wrap(k) for k in self.__data__)
-
-    def reconstruct(self, children: tuple[Val, ...]) -> Index:
-        data = tuple(c.__data__ for c in children)
-        return Index(self.__meta__, data)
-
-    def slice(self, start: int, stop: int | None = None) -> Index:
-        stop = stop if stop is not None else self.arity
-        return Index(self.__meta__, self.__data__[start:stop])
-
-    def concat(self, other: Index) -> Index:
-        if self.__meta__ != other.__meta__:
-            raise ValueError(
-                f"Cannot concat indices with different key metas: "
-                f"{self.key_meta!r} vs {other.key_meta!r}"
-            )
-        return Index(self.__meta__, self.__data__ + other.__data__)
+    def offset_of(self, id: K) -> int:
+        return self.keys.index(id)
 
     @classmethod
-    def from_vals(cls, vals: Sequence[Val]) -> Index:
-        meta = frozenset(val.__meta__ for val in vals)
-        if len(meta) != 1:
-            raise TypeError(f"Index.from_vals requires a single key meta, got {meta!r}")
-        key_meta = next(iter(meta))
-        data = tuple(val.__data__ for val in vals)
-        return cls(IndexMeta(IndexMeta.Ground, key_meta), data)
+    def make(cls, *keys: K) -> Index[K]:
+        return cls(keys)
+
+
+EMPTY_INDEX: Index = Index(())
+
+
+class Spread[V](Builtin):
+    """Sentinel: wraps a tuple of values to be spliced into a parent Tuple.
+
+    Like Python's *iterable unpacking — the parent Tuple's splice() method
+    flattens Spread entries into its own values sequence.
+    """
+
+    values: tuple[V, ...]
+
+
+class Tuple[K, V](Builtin):
+
+    index: Index[K]
+    values: tuple[V, ...]
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+    def __getitem__(self, key: int | K) -> V:
+        if isinstance(key, int):
+            return self.values[key]
+        return self.values[self.index.offset_of(key)]
+
+    def __iter__(self) -> Iterator[V]:
+        return iter(self.values)
+
+    def __contains__(self, value: V) -> bool:
+        return value in self.values
+
+    def items(self) -> Iterator[tuple[K, V]]:
+        for k, v in zip(self.index, self.values):
+            yield k, v
+
+    def splice(self) -> Tuple[K, V]:
+        """Flatten any Spread entries in values, expanding them in-place.
+
+        (a, Spread(x, y), b) → (a, x, y, b)
+        Index keys for spread positions are dropped; surrounding keys are preserved.
+        """
+        has_spread = any(isinstance(v, Spread) for v in self.values)
+        if not has_spread:
+            return self
+        new_keys: list[K] = []
+        new_values: list[V] = []
+        keys = self.index.keys if self.index is not EMPTY_INDEX else (None,) * len(self.values)
+        for key, val in zip(keys, self.values):
+            if isinstance(val, Spread):
+                for sv in val.values:
+                    new_values.append(sv)
+                    new_keys.append(None)
+            else:
+                new_values.append(val)
+                new_keys.append(key)
+        has_keys = any(k is not None for k in new_keys)
+        idx = Index(tuple(new_keys)) if has_keys else EMPTY_INDEX
+        return type(self)(idx, tuple(new_values))
+
+    @classmethod
+    def make[T](cls, *args: T, **kwargs: T) -> Tuple[Id, T]:
+        keys = [None] * len(args) + [Id(k) for k in kwargs]
+        values = args + tuple(kwargs.values())
+        has_keys = any(k is not None for k in keys)
+        idx = Index(tuple(keys)) if has_keys else EMPTY_INDEX
+        return cls(idx, values)

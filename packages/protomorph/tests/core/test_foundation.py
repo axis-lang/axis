@@ -1,142 +1,114 @@
-"""Tests for protomorph.core.foundation — OMEGA, Ground, Val, Meta."""
 from __future__ import annotations
 
-import sys
 import unittest
-import warnings
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+from protomorph.core import (
+    Builtin, Id, OMEGA, Omega,
+    Placeholder, placeholder,
+    Field, Type,
+)
 
-from protomorph.core import OMEGA, Integer, Text, Spec, Tuple, ground
-from protomorph.core.hosted import Float
-from protomorph.core.foundation import Ground
-from protomorph.core.variant import Union
 
-from support import int_val, str_val
+class TestBuiltin(unittest.TestCase):
+    """Hash-consed identity for Builtin."""
+
+    def test_consing(self):
+        """Same args → same object."""
+        class Pt(Builtin):
+            x: int
+            y: int
+
+        a = Pt(1, 2)
+        b = Pt(1, 2)
+        self.assertIs(a, b)
+
+    def test_different_args(self):
+        class Pt(Builtin):
+            x: int
+            y: int
+
+        self.assertIsNot(Pt(1, 2), Pt(3, 4))
+
+    def test_immutability(self):
+        class Pt(Builtin):
+            x: int
+
+        p = Pt(1)
+        with self.assertRaises(AttributeError):
+            p.x = 2  # type: ignore
 
 
 class TestOmega(unittest.TestCase):
+    """Omega is a fixed point: metatype() → itself."""
 
-    def test_is_self_referential(self):
-        self.assertIs(OMEGA.__meta__, OMEGA)
-        self.assertIsNone(OMEGA.__data__)
+    def test_fixed_point(self):
+        self.assertIs(OMEGA.metatype(), OMEGA)
 
     def test_is_singleton(self):
-        from protomorph.core import OMEGA as again
-        self.assertIs(OMEGA, again)
+        self.assertIs(Omega(), OMEGA)
 
-    def test_meta_chain_yields_only_itself(self):
-        self.assertEqual(list(OMEGA.meta_chain()), [OMEGA])
-
-    def test_is_leaf(self):
-        self.assertTrue(OMEGA.is_leaf)
+    def test_arity_zero(self):
+        self.assertEqual(OMEGA.arity, 0)
 
 
-class TestGround(unittest.TestCase):
+class TestPlaceholder(unittest.TestCase):
+    """Placeholder: universal stand-in, hash-consed by (context, id)."""
 
-    def test_spec_ground_carries_spec_class(self):
-        self.assertIs(Spec.Ground.__data__, Spec)
+    def test_identity(self):
+        a = placeholder("T")
+        b = placeholder("T")
+        self.assertIs(a, b)
 
-    def test_ground_meta_is_omega(self):
-        self.assertIs(Spec.Ground.__meta__, OMEGA)
+    def test_different_id(self):
+        self.assertIsNot(placeholder("T"), placeholder("U"))
 
-    def test_ground_wrap_constructs_spec(self):
-        result = Spec.Ground.wrap(("test.X", Tuple.Empty))
-        self.assertIsInstance(result, Spec)
-        self.assertEqual(result.path, "test.X")
+    def test_different_context(self):
+        class C(Builtin):
+            x: int
+        ctx = C(1)
+        self.assertIsNot(placeholder("T"), placeholder("T", context=ctx))
 
-    def test_ground_wrap_with_pure_emits_warning_and_unwraps(self):
-        existing = Spec(Spec.Ground, ("test.Y", Tuple.Empty))
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            result = Spec.Ground.wrap(existing)
-        self.assertTrue(any("unwrapping __data__" in str(w.message) for w in caught))
-        self.assertIs(result, existing)
+    def test_metatype_is_omega(self):
+        self.assertIs(placeholder("T").metatype(), OMEGA)
 
-    def test_ground_factory_function(self):
-        from protomorph.core.schema import UniformSchema
-        g = ground(UniformSchema)
-        self.assertIs(g.__data__, UniformSchema)
-        self.assertIsInstance(g, Ground)
+    def test_arity_zero(self):
+        self.assertEqual(placeholder("T").arity, 0)
 
-
-class TestHashConsing(unittest.TestCase):
-
-    def test_same_data_returns_same_object(self):
-        self.assertIs(int_val(42), int_val(42))
-
-    def test_different_data_returns_different_objects(self):
-        self.assertIsNot(int_val(1), int_val(2))
-
-    def test_same_data_different_meta_returns_different_objects(self):
-        self.assertIsNot(Integer.wrap(99), Text.wrap(99))
-
-    def test_spec_hash_consing(self):
-        s1 = Spec(Spec.Ground, ("test.Foo", Tuple.Empty))
-        s2 = Spec(Spec.Ground, ("test.Foo", Tuple.Empty))
-        self.assertIs(s1, s2)
-
-    def test_spec_different_paths_are_different_objects(self):
-        s1 = Spec(Spec.Ground, ("test.Foo", Tuple.Empty))
-        s2 = Spec(Spec.Ground, ("test.Bar", Tuple.Empty))
-        self.assertIsNot(s1, s2)
+    def test_spread_placeholder(self):
+        p = placeholder("*T")
+        self.assertEqual(p.id, "*T")
 
 
-class TestMetaChain(unittest.TestCase):
+class TestField(unittest.TestCase):
+    """Field is a NamedTuple(offset, key, type)."""
 
-    def test_scalar_val_chain(self):
-        # Hosted.__meta__ = Integer (Spec)
-        # Integer.__meta__ = Spec.Ground (Ground)
-        # Spec.Ground.__meta__ = OMEGA
-        chain = list(int_val(5).meta_chain())
-        self.assertIs(chain[0], Integer)
-        self.assertIs(chain[-1], OMEGA)
+    def test_creation(self):
+        f = Field(0, Id("x"), OMEGA)
+        self.assertEqual(f.offset, 0)
+        self.assertEqual(f.key, Id("x"))
+        self.assertIs(f.type, OMEGA)
 
-    def test_spec_chain(self):
-        chain = list(Integer.meta_chain())
-        self.assertIs(chain[0], Spec.Ground)
-        self.assertIs(chain[-1], OMEGA)
+    def test_no_key(self):
+        f = Field(1, None, OMEGA)
+        self.assertIsNone(f.key)
 
 
-class TestIsLeaf(unittest.TestCase):
+class TestTypeDefaults(unittest.TestCase):
+    """Type base class defaults: arity=0, field_at raises, field raises."""
 
-    def test_scalar_is_leaf(self):
-        self.assertTrue(int_val(1).is_leaf)
-        self.assertTrue(str_val("hi").is_leaf)
+    def test_default_arity(self):
+        self.assertEqual(OMEGA.arity, 0)
 
-    def test_tuple_is_not_leaf(self):
-        t = Tuple.of(int_val(1), int_val(2))
-        self.assertFalse(t.is_leaf)
+    def test_field_at_raises(self):
+        with self.assertRaises(IndexError):
+            OMEGA.field_at(0)
 
-    def test_empty_tuple_is_not_leaf(self):
-        # Tuple structural contract: always non-leaf even when empty
-        self.assertFalse(Tuple.Empty.is_leaf)
+    def test_field_raises(self):
+        with self.assertRaises(KeyError):
+            OMEGA.field(Id("x"))
 
-
-class TestIsSubtype(unittest.TestCase):
-
-    def test_meta_is_subtype_of_itself(self):
-        self.assertTrue(Integer.is_subtype(Integer))
-
-    def test_meta_is_subtype_of_union_containing_it(self):
-        u = Union.of(Integer, Text)
-        self.assertTrue(Integer.is_subtype(u))
-        self.assertTrue(Text.is_subtype(u))
-
-    def test_meta_not_subtype_of_disjoint_union(self):
-        u = Union.of(Integer, Text)
-        self.assertFalse(Float.is_subtype(u))
-
-    def test_union_is_subtype_of_wider_union(self):
-        narrow = Union.of(Integer, Text)
-        wide = Union.of(Integer, Text, Float)
-        self.assertTrue(narrow.is_subtype(wide))
-
-    def test_wider_union_not_subtype_of_narrower(self):
-        narrow = Union.of(Integer, Text)
-        wide = Union.of(Integer, Text, Float)
-        self.assertFalse(wide.is_subtype(narrow))
+    def test_iter_fields_empty(self):
+        self.assertEqual(list(OMEGA.iter_fields()), [])
 
 
 if __name__ == "__main__":

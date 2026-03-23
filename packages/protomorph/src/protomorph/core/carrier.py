@@ -4,7 +4,7 @@ from typing import Any, Self, Iterator
 
 from protobase import Consed
 
-from .. import draft as mp
+from .. import core as mp
 from .foundation import _RECONSTRUCT, Id
 
 

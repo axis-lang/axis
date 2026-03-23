@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import UnionType as PEP604Union
 from typing import Any, TypeVar, TypeVarTuple, Union, Unpack, get_args, get_origin
 
-from .. import draft as mp
+from .. import core as mp
 
 
 def type_from_annotation(

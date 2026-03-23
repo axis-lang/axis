@@ -1,92 +1,67 @@
-from contextvars import ContextVar
+from __future__ import annotations
 
+# ── Layer 0: Foundation ──────────────────────────────────────────
 from .foundation import (
+    Id,
+    Anchor,
+    _RECONSTRUCT,
     Builtin,
-    Data,
-    Discriminant,
-    Pure,
-    Val,
-    Meta,
+)
+
+# ── Layer 1: Type ────────────────────────────────────────────────
+from .type_ import (
+    Field,
+    Type,
     Omega,
     OMEGA,
-    Ground,
-    ground,
+    Placeholder,
+    placeholder,
 )
-from .variant import Union, UnionGround, Variant
-from .index import IndexMeta, Index
-from .schema import (
-    Schema,
-    UniformSchema,
-    VaryingSchema,
+
+# ── Layer 2: Carrier ─────────────────────────────────────────────
+from .carrier import (
+    Carrier,
+    NativeObjectCarrier,
+    LeafCarrier,
+    TupleCarrier,
 )
-from .tuple_ import Tuple
-from .native import NativeType, NativeHost, NATIVE_HOST, Id, Integer, Text, Bool
-from .hosted import Host, Spec, Qual, Hosted, Empty
-from .placeholder import Var, Placeholder
-from .traversal import deep_zip, ZipWalker
-from .unification import unify
-# from .constructors import (
-#     union_of,
-#     index_of,
-#     uniform_tuple_of,
-#     varying_tuple_of,
-# )
 
-HOST: ContextVar[Host] = ContextVar("BACKEND", default=NATIVE_HOST)
+# ── Layer 3: Index & Tuple ───────────────────────────────────────
+from .index import (
+    Index,
+    EMPTY_INDEX,
+    Spread,
+    Tuple,
+)
 
-__all__ = [
-    # Foundation
-    "Builtin",
-    "Data",
-    "Discriminant",
-    "Pure",
-    "Val",
-    "Meta",
-    "Omega",
-    "OMEGA",
-    # Ground
-    "Ground",
-    # Variant
-    "Union",
-    "UnionGround",
-    "Variant",
-    # Index
-    "IndexMeta",
-    "Index",
-    # Schema
-    "Schema",
-    "Tuple",
-    "UniformSchema",
-    "VaryingSchema",
-    # Native
-    "NativeType",
-    "NativeHost",
-    "NATIVE_HOST",
-    "Id",
-    "Integer",
-    "Empty",
-    "Text",
-    "Bool",
-    
-    # Hosted
-    "Host",
-    "NativeHost",
-    "HOST",
-    "Spec",
-    "Qual",
-    "Hosted",
-    # Placeholder
-    "Var",
-    "Placeholder",
-    # Traversal
-    "deep_zip",
-    "ZipWalker",
-    # Unification
-    "unify",
-    # Constructors
-    "ground",
-    # "union_of",
-    # "index_of",
-    # "uniform_tuple_of",
-    # "varying_tuple_of",
-]
+# ── Layer 4: Concrete types ──────────────────────────────────────
+from .concrete import (
+    ScalarType,
+    INT_TYPE,
+    STR_TYPE,
+    FLOAT_TYPE,
+    BOOL_TYPE,
+    NONE_TYPE,
+    _SCALAR_TYPES,
+    UniformType,
+    UnionType,
+    VaryingType,
+    NativeType,
+)
+
+# ── Layer 5: Native bridge ───────────────────────────────────────
+from .bridge import (
+    type_from_annotation,
+    native_type,
+    wrap,
+)
+
+# ── Layer 6: Traversal & Unification ─────────────────────────────
+from .traversal import (
+    deep_zip,
+    ZipWalker,
+)
+
+from .unification import (
+    unify,
+)
