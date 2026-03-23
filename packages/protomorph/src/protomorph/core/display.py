@@ -12,7 +12,7 @@ SPEC_PATH_PREFIXES: list[str] = [
 def repr_value(value: Any) -> str:
     from .foundation import Ground, OMEGA, Val
     from .hosted import Hosted, Qual, Spec
-    from .index import Index, IndexKeyMeta
+    from .index import Index, IndexMeta
     from .placeholder import Placeholder, Var
     from .schema import UniformSchema, VaryingSchema
     from .tuple_ import Tuple
@@ -28,7 +28,7 @@ def repr_value(value: Any) -> str:
         return repr_tuple(value)
     if isinstance(value, Index):
         return repr_index(value)
-    if isinstance(value, IndexKeyMeta):
+    if isinstance(value, IndexMeta):
         return f"IndexKey[{repr_value(value.index_key_meta)}]"
     if isinstance(value, UniformSchema):
         return repr_uniform_schema(value)
@@ -69,10 +69,13 @@ def repr_spec(value) -> str:
 
 
 def repr_qual(value) -> str:
-    raw_items = value.__data__.__data__
-    if not raw_items:
+    if value.__data__.arity == 0:
         return "Qual()"
-    return " ".join(repr_value(item) for item in reversed(raw_items))
+    items = tuple(value.__data__)
+    if len(items) >= 2:
+        qualifiers = tuple(reversed(items[1:]))
+        return " ".join(repr_value(item) for item in qualifiers + (items[0],))
+    return repr_value(items[0])
 
 
 def repr_index(value) -> str:
@@ -147,11 +150,8 @@ def trim_spec_path(path: str) -> str:
 
 
 def _tuple_entries(value) -> list[tuple[Any, Any]]:
-    from .foundation import Val
-
     entries: list[tuple[Any, Any]] = []
     raw_keys = value.index.__data__ if value.index is not None else (None,) * value.arity
-    for i, raw in enumerate(value.__data__):
-        item = raw if isinstance(raw, Val) else value.schema.at(i).wrap(raw)
-        entries.append((raw_keys[i], item))
+    for i in range(value.arity):
+        entries.append((raw_keys[i], value.at(i)))
     return entries

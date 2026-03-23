@@ -23,7 +23,11 @@ def _capture(
     for left, right in (walker := deep_zip(a, b)):
         l_var = is_var(left)
         r_var = is_var(right)
-        if l_var:
+        if l_var and r_var:
+            bindings.setdefault(left, set()).add(right)
+            bindings.setdefault(right, set()).add(left)
+            walker.skip()
+        elif l_var:
             bindings.setdefault(left, set()).add(right)
             walker.skip()
         elif r_var:

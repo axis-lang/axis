@@ -234,7 +234,6 @@ class Ground(Meta[Omega, type[Meta]]):
         return display.repr_ground(self)
 
     def wrap(self, data: Data) -> Val:
-        data = _unwrap_pure(data, "Ground.wrap")
         return self.__data__(self, data)
 
 

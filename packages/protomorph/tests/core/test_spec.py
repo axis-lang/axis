@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import sys
 import unittest
-import warnings
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from protomorph.core import OMEGA, Integer, Text, Tuple
-from protomorph.core.hosted import Float, Spec, Qual
+from protomorph.core import Empty, Integer, Text, Tuple
+from protomorph.core.hosted import Float, Id, Spec, Qual
 
 from support import int_val, bare_spec
 
@@ -111,13 +110,6 @@ class TestSpecWrap(unittest.TestCase):
 
 
 class TestQual(unittest.TestCase):
-    """
-    Qual is built via _raw_meta_tuple which stores Meta objects as raw __data__.
-    Accessing .underlying and .qualifiers triggers Ground.wrap(meta) → unwrap Pure
-    → reconstructs the same Spec via hash-consing.  This emits a UserWarning
-    (known design issue with _raw_meta_tuple).
-    """
-
     def _list_qual(self, elem):
         from protomorph.core.native import _list_qual
         return _list_qual(elem)
@@ -128,55 +120,36 @@ class TestQual(unittest.TestCase):
 
     def test_list_qual_underlying_is_elem_meta(self):
         q = self._list_qual(Integer)
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            underlying = q.underlying
+        underlying = q.underlying
         self.assertIs(underlying, Integer)
 
     def test_list_qual_qualifier_spec_path(self):
         q = self._list_qual(Integer)
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            qual_spec = q.qualifiers[0]
+        qual_spec = q.qualifiers[0]
         self.assertIsInstance(qual_spec, Spec)
         self.assertEqual(qual_spec.path, "std.qualifiers.List")
 
-    def test_dict_qual_underlying_is_key_meta(self):
+    def test_dict_qual_underlying_is_value_meta(self):
         q = self._dict_qual(Text, Integer)
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            underlying = q.underlying
-        self.assertIs(underlying, Text)
+        self.assertIs(q.underlying, Integer)
 
     def test_dict_qual_qualifier_encodes_value_type(self):
         q = self._dict_qual(Text, Integer)
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            qual_spec = q.qualifiers[0]
+        qual_spec = q.qualifiers[0]
         self.assertIsInstance(qual_spec, Spec)
         self.assertEqual(qual_spec.path, "std.qualifiers.Dict")
+        self.assertIs(qual_spec.args.get(Id.wrap("K")), Text)
 
     def test_qual_is_leaf_when_empty(self):
-        q = Qual(OMEGA, Tuple.Empty)
+        q = Qual(Qual.Ground, Tuple.Empty)
         self.assertTrue(q.is_leaf)
 
     def test_qual_not_leaf_when_has_data(self):
         q = self._list_qual(Integer)
         self.assertFalse(q.is_leaf)
 
-    def test_underlying_access_emits_warning(self):
-        """
-        API note: accessing Qual.underlying triggers Ground.wrap(Pure) warning.
-        This is a known consequence of _raw_meta_tuple storing Metas as raw data.
-        """
-        q = self._list_qual(Integer)
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            _ = q.underlying
-        self.assertTrue(
-            any("unwrapping __data__" in str(w.message) for w in caught),
-            "Expected UserWarning about unwrapping Pure from Qual.underlying",
-        )
+    def test_empty_spec_exists(self):
+        self.assertEqual(Empty.path, "std.Empty")
 
 
 if __name__ == "__main__":

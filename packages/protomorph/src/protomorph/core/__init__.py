@@ -13,7 +13,7 @@ from .foundation import (
     ground,
 )
 from .variant import Union, UnionGround, Variant
-from .index import IndexKeyMeta, Index
+from .index import IndexMeta, Index
 from .schema import (
     Schema,
     UniformSchema,
@@ -21,7 +21,7 @@ from .schema import (
 )
 from .tuple_ import Tuple
 from .native import NativeType, NativeHost, NATIVE_HOST, Id, Integer, Text, Bool
-from .hosted import Host, Spec, Qual, Hosted
+from .hosted import Host, Spec, Qual, Hosted, Empty
 from .placeholder import Var, Placeholder
 from .traversal import deep_zip, ZipWalker
 from .unification import unify
@@ -51,7 +51,7 @@ __all__ = [
     "UnionGround",
     "Variant",
     # Index
-    "IndexKeyMeta",
+    "IndexMeta",
     "Index",
     # Schema
     "Schema",
@@ -64,6 +64,7 @@ __all__ = [
     "NATIVE_HOST",
     "Id",
     "Integer",
+    "Empty",
     "Text",
     "Bool",
     

@@ -7,10 +7,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from protomorph.core import OMEGA, Integer, Text, Spec, Tuple
+from protomorph.core import OMEGA, Integer, Text, Spec, Tuple, Val
 from protomorph.core.hosted import Id, Float
 from protomorph.core.schema import UniformSchema, VaryingSchema
-from protomorph.core.index import Index, IndexKeyMeta, INDEX_GROUND
+from protomorph.core.index import Index, IndexMeta
 from protomorph.core.variant import Union
 
 from support import int_val, str_val, float_val
@@ -25,7 +25,7 @@ def str_key(s: str):
 
 
 def keyed_index(*names: str) -> Index:
-    key_meta = IndexKeyMeta(INDEX_GROUND, Id)
+    key_meta = IndexMeta(IndexMeta.Ground, Id)
     return Index(key_meta, tuple(names))
 
 
@@ -129,14 +129,17 @@ class TestTupleFactories(unittest.TestCase):
 
     def test_uniform_of_mixed_metas_wraps_in_union(self):
         t = Tuple.uniform_of([int_val(1), str_val("a")])
-        self.assertIsInstance(t.schema, UniformSchema)
-        self.assertIsInstance(t.schema.__data__, Union)
+        self.assertIsInstance(t.schema, VaryingSchema)
 
     def test_varying_of(self):
         t = Tuple.varying_of([int_val(1), str_val("b")])
         self.assertIsInstance(t.schema, VaryingSchema)
         self.assertIs(t[0], int_val(1))
         self.assertIs(t[1], str_val("b"))
+
+    def test_tuple_data_stores_only_raw_payloads(self):
+        t = Tuple.of(Integer, str_val("b"))
+        self.assertTrue(all(not isinstance(item, Val) for item in t.__data__))
 
 
 # ── replace / replace_key ────────────────────────────────────────────────────

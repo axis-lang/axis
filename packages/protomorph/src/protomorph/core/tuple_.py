@@ -4,7 +4,6 @@ from typing import Any, Iterator, Sequence, cast, ClassVar
 
 from . import display
 from .foundation import Data, Val, Meta
-from .variant import Union
 from .index import Index  # , IndexGround
 from .schema import Schema, UniformSchema, VaryingSchema
 
@@ -32,10 +31,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
             assert schema.arity == self.arity
 
     def at(self, offset: int):
-        raw = self.__data__[offset]
-        if isinstance(raw, Val):
-            return raw
-        return self.schema.at(offset).wrap(raw)
+        return self.schema.at(offset).wrap(self.__data__[offset])
 
     def get(self, key: Val):
         index = self.index
@@ -75,7 +71,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
 
     def reconstruct(self, children: tuple[Val, ...]) -> Tuple:
         new_metas = tuple(c.__meta__ for c in children)
-        new_data = tuple(c if isinstance(c, Meta) else c.__data__ for c in children)
+        new_data = tuple(c.__data__ for c in children)
         meta_set = frozenset(new_metas)
         if len(meta_set) == 1:
             schema = UniformSchema(
@@ -89,8 +85,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         return self.reconstruct(tuple(f(v) for v in self))
 
     def replace(self, offset: int, val: Val) -> Tuple:
-        raw = val if isinstance(val, Meta) else val.__data__
-        new_data = self.__data__[:offset] + (raw,) + self.__data__[offset + 1 :]
+        new_data = self.__data__[:offset] + (val.__data__,) + self.__data__[offset + 1 :]
         schema = self.schema
         if isinstance(schema, VaryingSchema):
             new_metas = (
@@ -149,9 +144,7 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
         for key_data in index:
             key_val = key_meta.wrap(key_data)
             field_val = d[key_val]
-            data.append(
-                field_val if isinstance(field_val, Meta) else field_val.__data__
-            )
+            data.append(field_val.__data__)
             metas.append(field_val.__meta__)
         meta_set = frozenset(metas)
         if len(meta_set) == 1:
@@ -166,40 +159,40 @@ class Tuple[K: Data, V: Data](Val[Schema[K, V], tuple[V, ...]]):
 
     @staticmethod
     def uniform_of(vals: Sequence[Val], with_index: Index | None = None):
-        meta = frozenset(val.__meta__ for val in vals)
+        metas = tuple(val.__meta__ for val in vals)
+        data = tuple(val.__data__ for val in vals)
+        meta_set = frozenset(metas)
 
-        if len(meta) == 1:
-            meta = next(iter(meta))
-            data = tuple(val if isinstance(val, Meta) else val.__data__ for val in vals)
+        if len(meta_set) == 1:
+            schema = UniformSchema(with_index or UniformSchema.Ground, next(iter(meta_set)))
         else:
-            meta = Union(Union.Ground, meta)
-            data = tuple(val for val in vals)
+            schema = VaryingSchema(with_index or VaryingSchema.Ground, metas)
 
-        return Tuple(UniformSchema(with_index or UniformSchema.Ground, meta), data)
+        return Tuple(cast(Schema[K, V], schema), data)
 
     @staticmethod
     def varying_of(vals: Sequence[Val], with_index: Index | None = None):
         meta = tuple(val.__meta__ for val in vals)
-        data = tuple(val if isinstance(val, Meta) else val.__data__ for val in vals)
+        data = tuple(val.__data__ for val in vals)
         return Tuple(VaryingSchema(with_index or VaryingSchema.Ground, meta), data)
 
     @staticmethod
     def of(*args: Val, **kwargs: Val) -> Tuple:
         if kwargs and not args:
-            from .index import Index, IndexKeyMeta, INDEX_GROUND
+            from .index import Index, IndexMeta
             from .hosted import Id
 
-            key_meta = IndexKeyMeta(INDEX_GROUND, Id)
+            key_meta = IndexMeta(IndexMeta.Ground, Id)
             index = Index(key_meta, tuple(kwargs.keys()))
             return Tuple.varying_of(list(kwargs.values()), with_index=index)
         elif not kwargs:
             return Tuple.varying_of(list(args))
         else:
             # positional (None key) then keyword
-            from .index import Index, IndexKeyMeta, INDEX_GROUND
+            from .index import Index, IndexMeta
             from .hosted import Id
 
-            key_meta = IndexKeyMeta(INDEX_GROUND, Id)
+            key_meta = IndexMeta(IndexMeta.Ground, Id)
             index = Index(key_meta, (None,) * len(args) + tuple(kwargs.keys()))
             return Tuple.varying_of(
                 list(args) + list(kwargs.values()), with_index=index

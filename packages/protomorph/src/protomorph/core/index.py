@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Sequence, ClassVar, cast
 
 from protobase import frozendict, slot_cached_property
 
@@ -9,7 +9,9 @@ from .foundation import Data, Val, Meta, ground, Ground
 from .. import core
 
 
-class IndexKeyMeta(Meta[Ground, Meta]):
+class IndexMeta(Meta[Ground, Meta]):
+    Ground: ClassVar[Ground]
+
     def __repr__(self) -> str:
         return display.repr_value(self)
 
@@ -17,20 +19,17 @@ class IndexKeyMeta(Meta[Ground, Meta]):
     def index_key_meta(self) -> Meta:
         return self.__data__
 
+IndexMeta.Ground = ground(IndexMeta)
 
-INDEX_GROUND = ground(IndexKeyMeta)
-
-
-class Index[K: Data](Meta[IndexKeyMeta, tuple[K, ...]]):
+class Index[K: Data](Meta[IndexMeta, tuple[K, ...]]):
 
     def __repr__(self) -> str:
         return display.repr_index(self)
 
     def wrap(self, data: Data) -> Val:
         if isinstance(data, tuple):
-            return core.VaryingSchema(self, data)
-        else:
-            return core.UniformSchema(self, data)
+            return core.VaryingSchema(self, cast(tuple[Meta, ...], data))
+        return core.UniformSchema(self, cast(Meta, data))
 
     @property
     def arity(self) -> int:
@@ -96,10 +95,8 @@ class Index[K: Data](Meta[IndexKeyMeta, tuple[K, ...]]):
     @classmethod
     def from_vals(cls, vals: Sequence[Val]) -> Index:
         meta = frozenset(val.__meta__ for val in vals)
-        if len(meta) == 1:
-            key_meta = next(iter(meta))
-            data = tuple(val.__data__ for val in vals)
-        else:
-            key_meta = core.Union(core.Union.Ground, meta)
-            data = tuple(key_meta.inject(val).__data__ for val in vals)
-        return cls(IndexKeyMeta(INDEX_GROUND, key_meta), data)
+        if len(meta) != 1:
+            raise TypeError(f"Index.from_vals requires a single key meta, got {meta!r}")
+        key_meta = next(iter(meta))
+        data = tuple(val.__data__ for val in vals)
+        return cls(IndexMeta(IndexMeta.Ground, key_meta), data)

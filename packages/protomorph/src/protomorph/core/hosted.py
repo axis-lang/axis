@@ -11,6 +11,49 @@ from .. import core
 
 
 
+
+# ── Anchor ───────────────────────────────────────────────────────────────
+
+
+class Anchor(Meta[Ground, str]):
+    Ground: ClassVar[Ground]
+
+    def __repr__(self) -> str:
+        return display.repr_spec(self)
+
+    @property
+    def path(self) -> str:
+        return self.__data__[0]
+
+    @property
+    def args(self) -> Tuple:
+        return self.__data__[1]
+
+    def wrap(self, data: Data) -> Val:
+        return Hosted(self, data)
+
+    @property
+    def is_leaf(self) -> bool:
+        return self.args.arity == 0
+
+    def children(self) -> tuple[Val, ...]:
+        return (self.args,) if self.args.arity > 0 else ()
+
+    def reconstruct(self, children: tuple[Val, ...]) -> Spec:
+        if not children:
+            return self
+        (new_args,) = children
+        return Spec(self.__meta__, (self.path, cast(Tuple, new_args)))
+
+    def compatible(self, other: Val) -> bool:
+        return super().compatible(other) and isinstance(other, Spec) and self.path == other.path
+
+    @staticmethod
+    def of(identifier: str, *args: Val, **kwargs: Val) -> Spec:
+        return Spec(Spec.Ground, (identifier, Tuple.of(*args, **kwargs)))
+
+
+
 # ── Host ───────────────────────────────────────────────────────────────
 
 
@@ -150,6 +193,7 @@ Qual.Ground = ground(Qual)
 
 
 Integer = Spec.of("std.Integer")
+Empty = Spec.of("std.Empty")
 Id = Spec.of("std.Id")
 Text = Spec.of("std.Text")
 Float = Spec.of("std.Float")

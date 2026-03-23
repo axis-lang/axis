@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import ClassVar
 from . import display
-from .foundation import Val, Meta, Data, Ground, ground, _unwrap_pure
+from .foundation import Val, Meta, Val, Data, Ground, ground, _unwrap_pure
 
 
 class Var(Meta[Ground, Data]):
@@ -16,11 +16,12 @@ class Var(Meta[Ground, Data]):
     Ground : ClassVar[Ground]
 
     def wrap(self, data: Data) -> Placeholder:
-        data = _unwrap_pure(data, "Var.wrap")
         return Placeholder(self, data)
 
     def __repr__(self) -> str:
         return display.repr_var(self)
+    
+    
 
 Var.Ground = ground(Var)
 

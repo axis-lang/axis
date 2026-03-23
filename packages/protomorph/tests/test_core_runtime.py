@@ -52,6 +52,7 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertIs(tuple_value.at(0), core.Integer)
         self.assertIs(tuple_value.at(1), union)
         self.assertEqual(repr(tuple_value), "(Integer, Integer | Text)")
+        self.assertTrue(all(not isinstance(item, core.Val) for item in tuple_value.__data__))
 
     def test_spec_of_preserves_positional_and_keyword_args(self):
         spec = core.Spec.of("test.Box", core.Integer, name=core.Text)

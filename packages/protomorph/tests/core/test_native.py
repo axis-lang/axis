@@ -8,9 +8,14 @@ from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from protomorph.core import OMEGA, Integer, Text, Tuple, Var, Placeholder, VaryingSchema
+from protomorph.core import OMEGA, Empty, Integer, Text, Tuple, Var, Placeholder, VaryingSchema
 from protomorph.core.hosted import Float, Bool, Id, Spec, Qual, Hosted
-from protomorph.core.native import meta_from_native, NativeHost, NATIVE_HOST
+from protomorph.core.native import (
+    NativeHost,
+    NativeProjectionError,
+    NATIVE_HOST,
+    meta_from_native,
+)
 from protomorph.core.variant import Union
 
 from support import (
@@ -58,8 +63,8 @@ class TestMetaFromNativeScalars(unittest.TestCase):
         self.assertIs(meta_from_native(bool), Bool)
 
     def test_none_maps_to_omega(self):
-        self.assertIs(meta_from_native(None), OMEGA)
-        self.assertIs(meta_from_native(type(None)), OMEGA)
+        self.assertIs(meta_from_native(None), Empty)
+        self.assertIs(meta_from_native(type(None)), Empty)
 
     def test_meta_passthrough(self):
         # If already a Meta, return it unchanged
@@ -83,12 +88,11 @@ class TestMetaFromNativeUnions(unittest.TestCase):
         self.assertIs(m, Integer)
 
     def test_optional_int(self):
-        # int | None → Union(Integer, OMEGA) or just Integer if deduplicated
+        # int | None -> Union(Integer, Empty)
         m = meta_from_native(int | None)
-        # OMEGA is one of the variants
         self.assertIsInstance(m, Union)
         self.assertIn(Integer, m.variants)
-        self.assertIn(OMEGA, m.variants)
+        self.assertIn(Empty, m.variants)
 
 
 # ── meta_from_native: containers → Qual ──────────────────────────────────────
@@ -101,35 +105,23 @@ class TestMetaFromNativeContainers(unittest.TestCase):
         self.assertIsInstance(m, Qual)
 
     def test_list_int_underlying_is_integer(self):
-        import warnings
         m = meta_from_native(list[int])
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            self.assertIs(m.underlying, Integer)
+        self.assertIs(m.underlying, Integer)
 
     def test_list_qualifier_spec_is_list(self):
-        import warnings
         m = meta_from_native(list[int])
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            q = m.qualifiers[0]
+        q = m.qualifiers[0]
         self.assertIsInstance(q, Spec)
         self.assertEqual(q.path, "std.qualifiers.List")
 
     def test_set_qualifier_spec_is_set(self):
-        import warnings
         m = meta_from_native(set[str])
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            q = m.qualifiers[0]
+        q = m.qualifiers[0]
         self.assertEqual(q.path, "std.qualifiers.Set")
 
     def test_frozenset_qualifier_spec(self):
-        import warnings
         m = meta_from_native(frozenset[int])
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            q = m.qualifiers[0]
+        q = m.qualifiers[0]
         self.assertEqual(q.path, "std.qualifiers.FrozenSet")
 
     def test_dict_qualifier_spec_is_dict(self):
@@ -147,11 +139,8 @@ class TestMetaFromNativeContainers(unittest.TestCase):
         self.assertIs(q.args.get(Id.wrap("K")), Text)
 
     def test_tuple_homogeneous_treated_as_list(self):
-        import warnings
         m = meta_from_native(tuple[int, ...])
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            q = m.qualifiers[0]
+        q = m.qualifiers[0]
         self.assertEqual(q.path, "std.qualifiers.List")
 
     def test_tuple_heterogeneous_becomes_tuple_spec(self):
@@ -161,8 +150,15 @@ class TestMetaFromNativeContainers(unittest.TestCase):
         self.assertIs(m.args[0], Integer)
         self.assertIs(m.args[1], Text)
 
-    def test_unknown_type_falls_back_to_omega(self):
-        self.assertIs(meta_from_native(object), OMEGA)
+    def test_unknown_type_raises_projection_error(self):
+        with self.assertRaises(NativeProjectionError):
+            meta_from_native(object)
+
+    def test_any_raises_projection_error(self):
+        from typing import Any
+
+        with self.assertRaises(NativeProjectionError):
+            meta_from_native(Any)
 
 
 # ── meta_from_native: Builtin types ──────────────────────────────────────────
@@ -264,8 +260,8 @@ class TestFieldsForSpec(unittest.TestCase):
     def test_fields_for_unknown_spec_returns_empty(self):
         from support import bare_spec
         unknown = bare_spec("test.core.Unknown")
-        fields = NATIVE_HOST.fields_for_spec(unknown)
-        self.assertEqual(fields.arity, 0)
+        with self.assertRaises(NativeProjectionError):
+            NATIVE_HOST.fields_for_spec(unknown)
 
     def test_fields_for_marker_returns_empty(self):
         spec = meta_from_native(Marker)

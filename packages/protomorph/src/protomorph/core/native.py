@@ -6,7 +6,7 @@ from typing import Any, Callable, TypeVar, Union, cast, get_args, get_origin
 from protobase import Consed, attr_info_of, flux, frozendict
 
 from .foundation import Builtin, Data, Meta, OMEGA, _ALL_BUILTINS
-from .hosted import Host, Hosted, Qual, Spec, Bool, Float, Id, Integer, Text
+from .hosted import Host, Hosted, Qual, Spec, Bool, Empty, Float, Id, Integer, Text
 from .placeholder import Placeholder, Var
 from .schema import VaryingSchema
 from .variant import Union as CoreUnion
@@ -16,6 +16,7 @@ __all__ = [
     "NativeType",
     "NativeHost",
     "NATIVE_HOST",
+    "NativeProjectionError",
     "register_native_meta",
     "register_python_transform",
     "meta_from_native",
@@ -28,9 +29,13 @@ _NATIVE_METAS: dict[type, Meta] = {
     str: Text,
     float: Float,
     bool: Bool,
-    type(None): OMEGA,
+    type(None): Empty,
 }
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
+
+
+class NativeProjectionError(TypeError):
+    pass
 
 
 class NativeVarContext(Builtin):
@@ -111,13 +116,13 @@ class NativeHost(Host, Consed):
             return annotation
 
         if annotation is None:
-            return OMEGA
+            return Empty
 
         if isinstance(annotation, TypeVar):
             return _meta_from_typevar(annotation, template=template)
 
         if annotation is Any:
-            return OMEGA
+            raise NativeProjectionError("Cannot project typing.Any to a core Meta")
 
         scalar = self.native_metas.get(annotation)
         if scalar is not None:
@@ -149,17 +154,21 @@ class NativeHost(Host, Consed):
         if isinstance(annotation, type) and issubclass(annotation, Builtin):
             return Spec.of(_spec_name(annotation))
 
-        return OMEGA
+        raise NativeProjectionError(
+            f"Cannot project native annotation {annotation!r} to a core Meta"
+        )
 
     @flux.method
     def fields_for_spec(self, spec: Spec) -> VaryingSchema[str]:
         template = self.template_by_spec_name.get(spec.path)
         if template is None:
-            return VaryingSchema.of(index=_field_index())
+            raise NativeProjectionError(f"Unknown native spec {spec.path!r}")
         if not template.params:
             return template.fields
         if spec.args.arity != len(template.params):
-            return VaryingSchema.of(index=_field_index())
+            raise NativeProjectionError(
+                f"Spec {spec.path!r} expects {len(template.params)} args, got {spec.args.arity}"
+            )
 
         bindings = frozendict(
             {
@@ -176,10 +185,14 @@ class NativeHost(Host, Consed):
     def val_is_leaf(self, meta: Meta, data: Data) -> bool:
         if not isinstance(meta, Spec):
             return True
+        if meta.path not in self.type_by_spec_name:
+            return True
         return self.fields_for_spec(meta).arity == 0
 
     def val_children(self, meta: Meta, data: Data) -> tuple:
         if not isinstance(meta, Spec):
+            return ()
+        if meta.path not in self.type_by_spec_name:
             return ()
         fields = self.fields_for_spec(meta)
         return fields.wrap_named(data)
@@ -255,30 +268,46 @@ def _list_transform(elem: Meta) -> Meta:
     return Qual.of(elem, Spec.of("std.qualifiers.List"))
 
 
+def _list_qual(elem: Meta) -> Qual:
+    return cast(Qual, _list_transform(elem))
+
+
 def _set_transform(elem: Meta) -> Meta:
     return Qual.of(elem, Spec.of("std.qualifiers.Set"))
+
+
+def _set_qual(elem: Meta) -> Qual:
+    return cast(Qual, _set_transform(elem))
 
 
 def _frozenset_transform(elem: Meta) -> Meta:
     return Qual.of(elem, Spec.of("std.qualifiers.FrozenSet"))
 
 
+def _frozenset_qual(elem: Meta) -> Qual:
+    return cast(Qual, _frozenset_transform(elem))
+
+
 def _dict_transform(key: Meta, val: Meta) -> Meta:
     return Qual.of(val, Spec.of("std.qualifiers.Dict", K=key))
+
+
+def _dict_qual(key: Meta, val: Meta) -> Qual:
+    return cast(Qual, _dict_transform(key, val))
 
 
 def _tuple_transform(*args: Meta | object) -> Meta:
     if len(args) == 2 and args[1] is Ellipsis:
         return Qual.of(cast(Meta, args[0]), Spec.of("std.qualifiers.List"))
     if any(arg is Ellipsis for arg in args):
-        return OMEGA
+        raise NativeProjectionError("Only tuple[T, ...] homogeneous tuples are supported")
     return Spec.of("std.core.Tuple", *cast(tuple[Meta, ...], args))
 
 
 def _field_index(*names: str):
-    from .index import INDEX_GROUND, Index, IndexKeyMeta
+    from .index import Index, IndexMeta
 
-    return Index(IndexKeyMeta(INDEX_GROUND, Id), names)
+    return Index(IndexMeta(IndexMeta.Ground, Id), names)
 
 
 NATIVE_HOST = NativeHost()

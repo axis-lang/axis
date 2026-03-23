@@ -19,6 +19,7 @@ from typing import (
     Union,
     TypeAliasType,
     TypeVar,
+    Unpack,
     TYPE_CHECKING,
 )
 
@@ -98,6 +99,9 @@ def is_inmutable(cls: type) -> bool:
     return False
 
 
+_ALLOWED = (type(Unpack[...]),)
+
+
 def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None):
     if _seen_aliases is None:
         _seen_aliases = set()
@@ -118,6 +122,9 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
         return  # a priori lo damos por bueno
 
     if tp is type:
+        return True
+
+    if isinstance(tp, _ALLOWED):
         return True
 
     if isinstance(tp, TypeVar):
@@ -214,7 +221,12 @@ def _frozen_setattr(self, name, value):
     )
 
 
-@dataclass_transform(eq_default=True, order_default=True, frozen_default=True, field_specifiers=(MissingType,))
+@dataclass_transform(
+    eq_default=True,
+    order_default=True,
+    frozen_default=True,
+    field_specifiers=(MissingType,),
+)
 class Inmutable(Record, abstract=True):
     @staticmethod
     def __class_build__(bld: Type.Builder):
@@ -264,10 +276,11 @@ class Inmutable(Record, abstract=True):
                 # Slot unset: compute structural hash, cache it, return it.
                 # This path covers classes whose __init__ calls hash(self)
                 # before __new__ finishes (e.g. via flux.input registration).
-                h = hash(tuple(
-                    object.__getattribute__(self, nm)
-                    for nm in attr_info_of(self)
-                ))
+                h = hash(
+                    tuple(
+                        object.__getattribute__(self, nm) for nm in attr_info_of(self)
+                    )
+                )
                 object.__setattr__(self, "__hash_cache__", h)
                 return h
 
