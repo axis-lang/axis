@@ -1,20 +1,23 @@
 from __future__ import annotations
 
+from typing import cast
+
 from . import (
     Builtin,
     VaryingType,
     NativeType,
+    Type,
     UnionType,
     LeafCarrier,
     Placeholder,
-    INT_TYPE,
-    STR_TYPE,
-    FLOAT_TYPE,
-    NONE_TYPE,
     placeholder,
     native_type,
     wrap,
 )
+
+INT_TYPE = wrap(int)
+STR_TYPE = wrap(str)
+FLOAT_TYPE = wrap(float)
 
 print(VaryingType.make(INT_TYPE, STR_TYPE, FLOAT_TYPE))
 
@@ -36,8 +39,8 @@ print("A_type:", A_type)
 print("arity:", A_type.arity)
 
 for i in range(A_type.arity):
-    f = A_type.field_at(i)
-    print(f"  field[{i}]: key={f.key}, type={f.type}")
+    f = A_type.item_at(i)
+    print(f"  field[{i}]: key={f.key}, type={f.value}")
 
 # Specialize A[T] → A[int]
 T_ph = placeholder("T")
@@ -45,8 +48,8 @@ A_int = A_type.specialize({T_ph: INT_TYPE})
 print("\n=== A specialized to int ===")
 print("A_int:", A_int)
 for i in range(A_int.arity):
-    f = A_int.field_at(i)
-    print(f"  field[{i}]: key={f.key}, type={f.type}")
+    f = A_int.item_at(i)
+    print(f"  field[{i}]: key={f.key}, type={f.value}")
 
 # ── Generic NativeType: B[*T] ─────────────────────────────
 
@@ -56,18 +59,20 @@ print("B_type:", B_type)
 print("arity:", B_type.arity)
 
 for i in range(B_type.arity):
-    f = B_type.field_at(i)
-    print(f"  field[{i}]: key={f.key}, type={f.type}")
+    f = B_type.item_at(i)
+    print(f"  field[{i}]: key={f.key}, type={f.value}")
 
 # Specialize B[*T] → B[int, str, float]
 T_star = placeholder("*T")
-B_concrete = B_type.specialize({T_star: VaryingType.make(INT_TYPE, STR_TYPE, FLOAT_TYPE)})
+B_concrete = B_type.specialize({
+    T_star: cast(Type, VaryingType.make(INT_TYPE, STR_TYPE, FLOAT_TYPE)),
+})
 print("\n=== B specialized to (int, str, float) ===")
 print("B_concrete:", B_concrete)
 print("arity:", B_concrete.arity)
 for i in range(B_concrete.arity):
-    f = B_concrete.field_at(i)
-    print(f"  field[{i}]: key={f.key}, type={f.type}")
+    f = B_concrete.item_at(i)
+    print(f"  field[{i}]: key={f.key}, type={f.value}")
 
 # ── Substitution example ─────────────────────────────────────
 
@@ -102,7 +107,7 @@ print("placeholder in leaves:", ph_carrier in leaves)
 
 # Substitute: replace the leaf carrying T with one carrying FLOAT_TYPE
 target = ph_carrier
-replacement = LeafCarrier(ph_carrier.__type__, FLOAT_TYPE)
+replacement = LeafCarrier(ph_carrier.descriptor, FLOAT_TYPE)
 result_carrier = vt_carrier.subst({target: replacement})
 result = result_carrier.fetch()
 print("after subst:", result)

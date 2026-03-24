@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Iterator, ClassVar, Any, cast
 
-from .. import core as mp
+from ..abstract.contract import Item
+
 from .foundation import Builtin, Id
 
 
 class Index[K](Builtin):
+    Empty: ClassVar[Index[Any]]  # type: ignore[assignment]
 
     keys: tuple[K, ...]
 
@@ -29,8 +31,7 @@ class Index[K](Builtin):
     def make(cls, *keys: K) -> Index[K]:
         return cls(keys)
 
-
-EMPTY_INDEX: Index = Index(())
+Index.Empty = Index(())
 
 
 class Spread[V](Builtin):
@@ -62,9 +63,39 @@ class Tuple[K, V](Builtin):
     def __contains__(self, value: V) -> bool:
         return value in self.values
 
-    def items(self) -> Iterator[tuple[K, V]]:
-        for k, v in zip(self.index, self.values):
-            yield k, v
+    # ── Structural protocol ───────────────────────────────────────
+
+    def item_at(self, offset: int) -> Item[K, V]:
+        key = self.index[offset] if self.index is not Index.Empty else None
+        return Item(offset, key, self.values[offset])
+
+    def item(self, id: K) -> Item[K, V]:
+        offset = self.index.offset_of(id)
+        return Item(offset, id, self.values[offset])
+
+    def items(self) -> Iterator[Item[K, V]]:
+        keys = self.index.keys if self.index is not Index.Empty else (None,) * len(self.values)
+        for i, (k, v) in enumerate(zip(keys, self.values)):
+            yield Item(i, k, v)
+
+    # ── Head / Tail ───────────────────────────────────────────────
+
+    @property
+    def head(self) -> V:
+        return self.values[0]
+
+    @property
+    def tail(self) -> Tuple[K, V]:
+        if len(self.values) <= 1:
+            return type(self)(Index.Empty, ())
+        new_values = self.values[1:]
+        if self.index is not Index.Empty:
+            new_keys = self.index.keys[1:]
+            has_keys = any(k is not None for k in new_keys)
+            new_idx = Index(new_keys) if has_keys else Index.Empty
+        else:
+            new_idx = Index.Empty
+        return type(self)(new_idx, new_values)
 
     def splice(self) -> Tuple[K, V]:
         """Flatten any Spread entries in values, expanding them in-place.
@@ -75,9 +106,13 @@ class Tuple[K, V](Builtin):
         has_spread = any(isinstance(v, Spread) for v in self.values)
         if not has_spread:
             return self
-        new_keys: list[K] = []
+        new_keys: list[K | None] = []
         new_values: list[V] = []
-        keys = self.index.keys if self.index is not EMPTY_INDEX else (None,) * len(self.values)
+        keys: tuple[K | None, ...] = (
+            cast(tuple[K | None, ...], self.index.keys)
+            if self.index is not Index.Empty
+            else (None,) * len(self.values)
+        )
         for key, val in zip(keys, self.values):
             if isinstance(val, Spread):
                 for sv in val.values:
@@ -87,13 +122,16 @@ class Tuple[K, V](Builtin):
                 new_values.append(val)
                 new_keys.append(key)
         has_keys = any(k is not None for k in new_keys)
-        idx = Index(tuple(new_keys)) if has_keys else EMPTY_INDEX
-        return type(self)(idx, tuple(new_values))
+        idx = Index(tuple(new_keys)) if has_keys else Index.Empty
+        return type(self)(cast(Index[K], idx), tuple(new_values))
 
     @classmethod
     def make[T](cls, *args: T, **kwargs: T) -> Tuple[Id, T]:
-        keys = [None] * len(args) + [Id(k) for k in kwargs]
+        keys: list[Id | None] = [None] * len(args) + [Id(k) for k in kwargs]
         values = args + tuple(kwargs.values())
         has_keys = any(k is not None for k in keys)
-        idx = Index(tuple(keys)) if has_keys else EMPTY_INDEX
-        return cls(idx, values)
+        idx = Index(tuple(keys)) if has_keys else Index.Empty
+        return cast(
+            Tuple[Id, T],
+            cls(cast(Index[K], idx), cast(tuple[V, ...], values)),
+        )

@@ -1,22 +1,25 @@
 from __future__ import annotations
 
-from typing import Any, Self, Iterator, NamedTuple
+from typing import Any, Iterator
+
+from ..abstract.contract import Item
 
 from .. import core as mp
 from .foundation import Builtin, Id
 
-
-class Field(NamedTuple):
-    offset: int
-    key: Id | None
-    type: mp.Type
+Field = Item
 
 
 class Type[T](Builtin, abstract=True):
 
+    def __getattribute__(self, name: str):
+        if name == "make":
+            return object.__getattribute__(self, "carrier")
+        return super().__getattribute__(name)
+
     # ── Classification ────────────────────────────────────────────
 
-    def metatype(self) -> Type[Self]:
+    def metatype(self) -> Type:
         raise NotImplementedError(f"Metatype not implemented for {self!r}")
 
     def carrier(self, data: T) -> mp.Carrier[T]:
@@ -31,31 +34,28 @@ class Type[T](Builtin, abstract=True):
     def arity(self) -> int | None:
         return 0
 
-    def field_at(self, offset: int) -> Field:
+    def item_at(self, offset: int) -> Item:
         raise IndexError(offset)
 
-    def field(self, id: Id) -> Field:
+    def item(self, id: Id) -> Item:
         raise KeyError(id)
 
-    def iter_fields(self) -> Iterator[Field]:
+    def items(self) -> Iterator[Item]:
         a = self.arity
         if a is None:
             return
         for i in range(a):
-            yield self.field_at(i)
+            yield self.item_at(i)
 
+    # ── Foundation protocol ───────────────────────────────────────
 
-class Omega(Type["Omega"]):
-    """OMEGA.metatype() is OMEGA — terminates the meta chain."""
+    def __len__(self) -> int:
+        a = self.arity
+        return a if a is not None else 0
 
-    def metatype(self) -> Omega:
-        return OMEGA
-
-    def carrier(self, data) -> mp.LeafCarrier:
-        return mp.LeafCarrier(self, data)
-
-
-OMEGA = Omega()
+    def __iter__(self) -> Iterator:
+        for item in self.items():
+            yield item.value
 
 
 class Placeholder(Type):
@@ -69,7 +69,7 @@ class Placeholder(Type):
     id: str
 
     def metatype(self) -> Type:
-        return OMEGA
+        return mp.Spec.of("std.metas.Placeholder")
 
     def carrier(self, data) -> mp.LeafCarrier:
         return mp.LeafCarrier(self, data)

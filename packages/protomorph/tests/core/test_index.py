@@ -3,15 +3,15 @@ from __future__ import annotations
 import unittest
 
 from protomorph.core import (
-    Id, Index, EMPTY_INDEX, Spread, Tuple,
+    Id, Index, Spread, Tuple, Item,
 )
 
 
 class TestIndex(unittest.TestCase):
 
     def test_empty(self):
-        self.assertEqual(len(EMPTY_INDEX), 0)
-        self.assertEqual(list(EMPTY_INDEX), [])
+        self.assertEqual(len(Index.Empty), 0)
+        self.assertEqual(list(Index.Empty), [])
 
     def test_make(self):
         idx = Index.make("a", "b", "c")
@@ -42,7 +42,7 @@ class TestTuple(unittest.TestCase):
         self.assertEqual(t[0], 10)
         self.assertEqual(t[1], 20)
         self.assertEqual(t[2], 30)
-        self.assertIs(t.index, EMPTY_INDEX)
+        self.assertIs(t.index, Index.Empty)
 
     def test_make_keyword(self):
         t = Tuple.make(x=1, y=2)
@@ -69,7 +69,7 @@ class TestTuple(unittest.TestCase):
     def test_items(self):
         t = Tuple.make(x=1, y=2)
         items = list(t.items())
-        self.assertEqual(items, [(Id("x"), 1), (Id("y"), 2)])
+        self.assertEqual(items, [Item(0, Id("x"), 1), Item(1, Id("y"), 2)])
 
     def test_consing(self):
         a = Tuple.make(1, 2, 3)
@@ -94,7 +94,7 @@ class TestSplice(unittest.TestCase):
         self.assertIs(t.splice(), t)
 
     def test_splice_middle(self):
-        t = Tuple(EMPTY_INDEX, (10, Spread((20, 30)), 40))
+        t = Tuple(Index.Empty, (10, Spread((20, 30)), 40))
         result = t.splice()
         self.assertEqual(list(result), [10, 20, 30, 40])
 
@@ -110,7 +110,7 @@ class TestSplice(unittest.TestCase):
         self.assertEqual(result.index.keys[3], Id("c"))
 
     def test_splice_empty_spread(self):
-        t = Tuple(EMPTY_INDEX, (1, Spread(()), 2))
+        t = Tuple(Index.Empty, (1, Spread(()), 2))
         result = t.splice()
         self.assertEqual(list(result), [1, 2])
 

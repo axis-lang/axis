@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from protomorph.core import (
-    Builtin, Id, OMEGA, Omega,
+    Builtin, Id, Spec,
     Placeholder, placeholder,
     Field, Type,
 )
@@ -38,19 +38,6 @@ class TestBuiltin(unittest.TestCase):
             p.x = 2  # type: ignore
 
 
-class TestOmega(unittest.TestCase):
-    """Omega is a fixed point: metatype() → itself."""
-
-    def test_fixed_point(self):
-        self.assertIs(OMEGA.metatype(), OMEGA)
-
-    def test_is_singleton(self):
-        self.assertIs(Omega(), OMEGA)
-
-    def test_arity_zero(self):
-        self.assertEqual(OMEGA.arity, 0)
-
-
 class TestPlaceholder(unittest.TestCase):
     """Placeholder: universal stand-in, hash-consed by (context, id)."""
 
@@ -68,8 +55,8 @@ class TestPlaceholder(unittest.TestCase):
         ctx = C(1)
         self.assertIsNot(placeholder("T"), placeholder("T", context=ctx))
 
-    def test_metatype_is_omega(self):
-        self.assertIs(placeholder("T").metatype(), OMEGA)
+    def test_metatype_is_metadata_spec(self):
+        self.assertEqual(placeholder("T").metatype(), Spec.of("std.metas.Placeholder"))
 
     def test_arity_zero(self):
         self.assertEqual(placeholder("T").arity, 0)
@@ -83,32 +70,32 @@ class TestField(unittest.TestCase):
     """Field is a NamedTuple(offset, key, type)."""
 
     def test_creation(self):
-        f = Field(0, Id("x"), OMEGA)
+        f = Field(0, Id("x"), Spec.of("std.core.Any"))
         self.assertEqual(f.offset, 0)
         self.assertEqual(f.key, Id("x"))
-        self.assertIs(f.type, OMEGA)
+        self.assertEqual(f.value, Spec.of("std.core.Any"))
 
     def test_no_key(self):
-        f = Field(1, None, OMEGA)
+        f = Field(1, None, Spec.of("std.core.Any"))
         self.assertIsNone(f.key)
 
 
 class TestTypeDefaults(unittest.TestCase):
-    """Type base class defaults: arity=0, field_at raises, field raises."""
+    """Type base class defaults: arity=0, item_at raises, item raises."""
 
     def test_default_arity(self):
-        self.assertEqual(OMEGA.arity, 0)
+        self.assertEqual(Spec.of("std.core.Any").arity, 0)
 
-    def test_field_at_raises(self):
+    def test_item_at_raises(self):
         with self.assertRaises(IndexError):
-            OMEGA.field_at(0)
+            Spec.of("std.core.Any").item_at(0)
 
-    def test_field_raises(self):
+    def test_item_raises(self):
         with self.assertRaises(KeyError):
-            OMEGA.field(Id("x"))
+            Spec.of("std.core.Any").item(Id("x"))
 
-    def test_iter_fields_empty(self):
-        self.assertEqual(list(OMEGA.iter_fields()), [])
+    def test_items_empty(self):
+        self.assertEqual(list(Spec.of("std.core.Any").items()), [])
 
 
 if __name__ == "__main__":

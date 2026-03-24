@@ -1,57 +1,39 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+from ..abstract.contract import Item
 
 from .. import core as mp
 from .foundation import Builtin, Id
-from .type_ import Type, OMEGA, Placeholder
-from .index import Tuple, Spread
-
-
-class ScalarType(Type):
-    """Leaf type for Python scalars.  arity=0 (inherited default)."""
-
-    python_type: type
-
-    def metatype(self) -> Type:
-        return OMEGA
-
-    def carrier(self, data) -> mp.LeafCarrier:
-        return mp.LeafCarrier(self, data)
-
-
-INT_TYPE = ScalarType(int)
-STR_TYPE = ScalarType(str)
-FLOAT_TYPE = ScalarType(float)
-BOOL_TYPE = ScalarType(bool)
-NONE_TYPE = ScalarType(type(None))
-
-_SCALAR_TYPES: dict[type, ScalarType] = {
-    int: INT_TYPE,
-    str: STR_TYPE,
-    float: FLOAT_TYPE,
-    bool: BOOL_TYPE,
-    type(None): NONE_TYPE,
-}
+from .type_ import Type, Placeholder
+from .index import Index, Tuple, Spread
 
 
 class UniformType[T](Type[tuple[T, ...]]):
-    """Homogeneous collection — arity and index come from __data__."""
+    """Homogeneous collection — arity from index if present, else from data."""
 
     element_type: mp.Type[T]
+    index: Index
 
     def metatype(self) -> Type:
-        return OMEGA
+        return mp.Spec.of("std.metas.Uniform", self.element_type.metatype())
 
     @property
     def arity(self) -> int | None:
-        return None  # unknown until we see data
+        if self.index is not Index.Empty:
+            return len(self.index)
+        return None  # carrier infers from data
 
-    def field_at(self, offset: int) -> mp.Field:
-        return mp.Field(offset, None, self.element_type)
+    def item_at(self, offset: int) -> Item:
+        key = self.index[offset] if self.index is not Index.Empty else None
+        return Item(offset, key, self.element_type)
 
-    def field(self, id: Id) -> mp.Field:
-        raise KeyError(id)  # no index at the type level
+    def item(self, id: Id) -> Item:
+        if self.index is Index.Empty:
+            raise KeyError(id)
+        offset = self.index.offset_of(id)
+        return Item(offset, id, self.element_type)
 
     def carrier(self, data) -> mp.TupleCarrier:
         return mp.TupleCarrier(self, data)
@@ -63,7 +45,7 @@ class UnionType(Type):
     variants: frozenset[mp.Type]
 
     def metatype(self) -> Type:
-        return OMEGA
+        return mp.Spec.of("std.metas.Union")
 
     def carrier(self, data) -> mp.LeafCarrier:
         return mp.LeafCarrier(self, data)
@@ -82,29 +64,19 @@ class UnionType(Type):
         return cls(frozenset(flat))
 
 
-class VaryingType(Type[tuple], Tuple[Id, Type]):
+class VaryingType(Tuple[Id, Type], Type[tuple]):
     """Heterogeneous tuple type — IS a Tuple[Id, Type].
 
-    Inherits index and values from Tuple.
-    values = the field types, index = the field keys.
+    Inherits structural protocol from Tuple (item_at, item, items,
+    __len__, __iter__).  values = the field types, index = the field keys.
     """
 
     def metatype(self) -> Type:
-        return OMEGA
+        return VaryingType(self.index, tuple(t.metatype() for t in self.values))
 
     @property
     def arity(self) -> int:
         return len(self.values)
-
-    def field_at(self, offset: int) -> mp.Field:
-        key = self.index.keys[offset] if self.index else None
-        return mp.Field(offset, key, self.values[offset])
-
-    def field(self, id: Id) -> mp.Field:
-        if not self.index:
-            raise KeyError(id)
-        offset = self.index.offset_of(id)
-        return mp.Field(offset, id, self.values[offset])
 
     def carrier(self, data) -> mp.TupleCarrier:
         return mp.TupleCarrier(self, data)
@@ -123,17 +95,17 @@ class NativeType(Type):
     schema: VaryingType
 
     def metatype(self) -> Type:
-        return OMEGA
+        return mp.Spec.of("std.metas.Native", self.schema)
 
     @property
     def arity(self) -> int:
         return self.schema.arity
 
-    def field_at(self, offset: int) -> mp.Field:
-        return self.schema.field_at(offset)
+    def item_at(self, offset: int) -> Item:
+        return self.schema.item_at(offset)
 
-    def field(self, id: Id) -> mp.Field:
-        return self.schema.field(id)
+    def item(self, id: Id) -> Item:
+        return self.schema.item(id)
 
     def carrier(self, data) -> mp.NativeObjectCarrier:
         return mp.NativeObjectCarrier(self, data)
@@ -144,6 +116,7 @@ class NativeType(Type):
         Spread placeholders (*T) are replaced with Spread(...) sentinels
         inside the carrier subst, then splice() flattens them.
         """
+
         def _make_replacement(ph: Placeholder) -> Any:
             """Build the replacement data for a placeholder."""
             replacement = mapping[ph]
@@ -157,6 +130,31 @@ class NativeType(Type):
             if isinstance(ft, Placeholder) and ft in mapping:
                 new_types.append(_make_replacement(ft))
                 continue
+            if isinstance(ft, UniformType):
+                element_type = ft.element_type
+                if isinstance(element_type, Placeholder) and element_type in mapping:
+                    replacement = mapping[element_type]
+                    if isinstance(replacement, VaryingType):
+                        new_types.append(replacement)
+                    else:
+                        new_types.append(UniformType(replacement, ft.index))
+                    continue
+            if isinstance(ft, VaryingType):
+                replaced_values = []
+                changed = False
+                for item_type in ft.values:
+                    if isinstance(item_type, Placeholder) and item_type in mapping:
+                        replacement = mapping[item_type]
+                        if isinstance(replacement, VaryingType):
+                            replaced_values.extend(replacement.values)
+                        else:
+                            replaced_values.append(replacement)
+                        changed = True
+                    else:
+                        replaced_values.append(item_type)
+                if changed:
+                    new_types.append(cast(mp.Type, VaryingType(ft.index, tuple(replaced_values)).splice()))
+                    continue
             # Traverse field type, substitute leaves (including nested spreads)
             ft_carrier = mp.wrap(ft)
             carrier_mapping = {}
@@ -164,14 +162,17 @@ class NativeType(Type):
                 data = leaf.fetch()
                 if data in mapping:
                     repl = _make_replacement(data)
-                    carrier_mapping[leaf] = mp.LeafCarrier(leaf.__type__, repl)
+                    carrier_mapping[leaf] = mp.LeafCarrier(leaf.descriptor, repl)
             if carrier_mapping:
                 result = ft_carrier.subst(carrier_mapping).fetch()
                 # If result is a Tuple-like with Spreads, splice them
                 if isinstance(result, Tuple):
                     result = result.splice()
-                new_types.append(result)
+                new_types.append(cast(mp.Type, result))
             else:
                 new_types.append(ft)
-        new_schema = VaryingType(self.schema.index, tuple(new_types)).splice()
+        new_schema = cast(
+            VaryingType,
+            VaryingType(self.schema.index, tuple(new_types)).splice(),
+        )
         return NativeType(self.builtin_cls, new_schema)

@@ -11,33 +11,43 @@ from .foundation import _RECONSTRUCT, Id
 class Carrier[T](Consed, abstract=True):
     """Cursor over typed data.
 
-    Pairs a Type (classifier) with data (payload) and exposes both
+    Pairs a descriptor (Type) with data (payload) and exposes both
     targeted access (attr / item) and generic structural iteration.
     Traversal algorithms operate exclusively through this API.
     """
 
-    __type__: mp.Type[T]
-    __data__: T
+    descriptor: mp.Type[T]
+    content: T
+
+    def __repr__(self) -> str:
+        from .display import repr_any
+
+        return repr_any(self)
 
     # ── Factory ───────────────────────────────────────────────────
 
-    def child(self, meta: mp.Type, data: Any) -> Carrier:
+    def child(self, tp: mp.Type, dt: Any) -> Carrier:
         """Produce a child carrier — the Type decides which carrier to use.
         Exception: if data is a Placeholder, always wrap as leaf."""
-        if isinstance(data, mp.Placeholder):
-            return LeafCarrier(meta, data)
-        return meta.carrier(data)
+        if isinstance(dt, mp.Placeholder):
+            return LeafCarrier(tp, dt)
+        provider = mp._CARRIER_FACTORIES.get(type(tp), None)
+        if provider is None:
+            raise NotImplementedError(
+                f"Custom carrier provider not implemented for {type(tp).__name__}"
+            )
+        return provider(tp, dt)
 
     # ── Meta navigation ───────────────────────────────────────────
 
     @property
     def type(self) -> Carrier[mp.Type[T]]:
         """Carrier wrapping this value's type."""
-        return NativeObjectCarrier(self.__type__.metatype(), self.__type__)
+        return NativeObjectCarrier(self.descriptor.metatype(), self.descriptor)
 
     def fetch(self) -> T:
         """Extract the raw data payload."""
-        return self.__data__
+        return self.content
 
     # ── Targeted access ───────────────────────────────────────────
 
@@ -55,10 +65,10 @@ class Carrier[T](Consed, abstract=True):
 
     @property
     def is_leaf(self) -> bool:
-        return self.__type__.arity == 0
+        return self.descriptor.arity == 0
 
     def __len__(self) -> int:
-        a = self.__type__.arity
+        a = self.descriptor.arity
         if a is not None:
             return a
         raise NotImplementedError(
@@ -80,18 +90,19 @@ class Carrier[T](Consed, abstract=True):
     def deep_iter(self, is_leaf=None) -> Iterator[Carrier]:
         """Depth-first iteration over leaf carriers."""
         _is_leaf = is_leaf or (lambda c: c.is_leaf)
-        stack = [self]
+        stack: list[Carrier] = [self]
         while stack:
             node = stack.pop()
             if _is_leaf(node):
                 yield node
             else:
-                stack.extend(reversed(list(node)))
+                children = list(node)
+                stack.extend(reversed(children))
 
     def deep_map(self, f, is_leaf=None) -> Carrier:
         """Bottom-up map: apply *f* to leaves, reconstruct upward."""
         _is_leaf = is_leaf or (lambda c: c.is_leaf)
-        stack: list = [self]
+        stack: list[Any] = [self]
         results: list[Carrier] = []
         while stack:
             item = stack.pop()
@@ -103,7 +114,7 @@ class Carrier[T](Consed, abstract=True):
             elif _is_leaf(item):
                 results.append(f(item))
             else:
-                children = list(item)
+                children: list[Carrier] = list(item)
                 stack.append((item, len(children)))
                 stack.append(_RECONSTRUCT)
                 stack.extend(reversed(children))
@@ -119,13 +130,13 @@ class Carrier[T](Consed, abstract=True):
 
     def search(self, target: Carrier) -> bool:
         """Return True if *target* appears anywhere in this structure."""
-        stack = [self]
+        stack: list[Carrier] = [self]
         while stack:
             node = stack.pop()
             if node == target:
                 return True
             if not node.is_leaf:
-                stack.extend(node)
+                stack.extend(list(node))
         return False
 
 
@@ -133,24 +144,28 @@ class NativeObjectCarrier[T](Carrier[T]):
     """Carrier for Builtin / native Python objects with named fields."""
 
     def attr(self, id: Id) -> Carrier:
-        field = self.__type__.field(id)
-        return self.child(field.type, getattr(self.__data__, id))
+        field = self.descriptor.item(id)
+        return self.child(field.value, getattr(self.content, id))
 
     def __getitem__(self, offset: int) -> Carrier:
-        field = self.__type__.field_at(offset)
+        field = self.descriptor.item_at(offset)
         assert (
             field.key is not None
         ), f"NativeObjectCarrier requires named fields (offset {offset})"
-        return self.child(field.type, getattr(self.__data__, field.key))
+        return self.child(field.value, getattr(self.content, field.key))
 
     def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
-        new_data = type(self.__data__)(*(c.fetch() for c in children))
-        return type(self)(self.__type__, new_data)
+        new_data = type(self.content)(*(c.fetch() for c in children))
+        return type(self)(self.descriptor, new_data)
 
 
 class LeafCarrier[T](Carrier[T]):
     """Carrier for leaf values — scalars, placeholders, etc.
     Always a leaf (arity=0), never traversed into."""
+
+    @property
+    def is_leaf(self) -> bool:
+        return True
 
     def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
         assert not children
@@ -161,16 +176,24 @@ class TupleCarrier(Carrier[tuple]):
     """Carrier for raw Python tuples (both uniform and varying)."""
 
     def __getitem__(self, offset: int) -> Carrier:
-        field = self.__type__.field_at(offset)
-        return self.child(field.type, self.__data__[offset])
+        field = self.descriptor.item_at(offset)
+        return self.child(field.value, self.content[offset])
 
     def attr(self, id: Id) -> Carrier:
-        field = self.__type__.field(id)
-        return self.child(field.type, self.__data__[field.offset])
+        field = self.descriptor.item(id)
+        return self.child(field.value, self.content[field.offset])
 
     def __len__(self) -> int:
-        a = self.__type__.arity
-        return a if a is not None else len(self.__data__)
+        a = self.descriptor.arity
+        return a if a is not None else len(self.content)
 
     def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
-        return type(self)(self.__type__, tuple(c.fetch() for c in children))
+        values = []
+        for child in children:
+            value = child.fetch()
+            if isinstance(value, tuple) and isinstance(child.descriptor, mp.NativeType):
+                values.append(child.descriptor.make(value).fetch())
+            else:
+                values.append(value)
+        return type(self)(self.descriptor, tuple(values))
+

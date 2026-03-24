@@ -38,7 +38,7 @@ def _capture(
             return None
         else:
             # Both non-leaf, non-var: deep_zip descends if arities match
-            if len(list(left)) != len(list(right)):
+            if len(left) != len(right):
                 return None
     return {k: frozenset(v) for k, v in bindings.items()}
 

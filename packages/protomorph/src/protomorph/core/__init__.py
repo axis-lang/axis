@@ -1,4 +1,7 @@
 from __future__ import annotations
+from typing import Any, Callable, cast
+
+from contextvars import ContextVar
 
 # ── Layer 0: Foundation ──────────────────────────────────────────
 from .foundation import (
@@ -9,11 +12,11 @@ from .foundation import (
 )
 
 # ── Layer 1: Type ────────────────────────────────────────────────
+from ..abstract.contract import Item
+
 from .type_ import (
     Field,
     Type,
-    Omega,
-    OMEGA,
     Placeholder,
     placeholder,
 )
@@ -29,34 +32,19 @@ from .carrier import (
 # ── Layer 3: Index & Tuple ───────────────────────────────────────
 from .index import (
     Index,
-    EMPTY_INDEX,
     Spread,
     Tuple,
 )
 
 # ── Layer 4: Concrete types ──────────────────────────────────────
-from .concrete import (
-    ScalarType,
-    INT_TYPE,
-    STR_TYPE,
-    FLOAT_TYPE,
-    BOOL_TYPE,
-    NONE_TYPE,
-    _SCALAR_TYPES,
+from .domain import (
     UniformType,
     UnionType,
     VaryingType,
     NativeType,
 )
 
-# ── Layer 5: Native bridge ───────────────────────────────────────
-from .bridge import (
-    type_from_annotation,
-    native_type,
-    wrap,
-)
-
-# ── Layer 6: Traversal & Unification ─────────────────────────────
+# ── Layer 5: Traversal & Unification ─────────────────────────────
 from .traversal import (
     deep_zip,
     ZipWalker,
@@ -65,3 +53,49 @@ from .traversal import (
 from .unification import (
     unify,
 )
+
+# ── Layer 6: Hosted types ────────────────────────────────────────
+from .hosted import (
+    Host,
+    AnchorType,
+    Spec,
+    Qual,
+    ANCHOR_TYPE,
+)
+
+# ── Layer 7: Native host ───────────────────────────────────────
+from .native import (
+    spec_name,
+    NativeHost,
+    register,
+    register_native_spec,
+    register_python_transform,
+    type_from_annotation,
+    native_type,
+    wrap,
+    _bootstrap_defaults,
+)
+
+NATIVE_HOST = NativeHost()
+HOST: ContextVar[Host] = ContextVar("HOST", default=NATIVE_HOST)
+
+
+def _spec_carrier(tp: Type, dt: Any) -> Carrier:
+    spec = cast(Spec, tp)
+    if HOST.get().schema_for(spec) is None:
+        return LeafCarrier(tp, dt)
+    return NativeObjectCarrier(tp, dt)
+
+
+_CARRIER_FACTORIES: dict[type[Type], Callable[[Type, Any], Carrier]] = {
+    AnchorType: LeafCarrier,
+    Placeholder: LeafCarrier,
+    UnionType: LeafCarrier,
+    VaryingType: TupleCarrier,
+    UniformType: TupleCarrier,
+    NativeType: NativeObjectCarrier,
+    Spec: _spec_carrier,
+    Qual: lambda tp, dt: tp.underlying.carrier(dt),
+}
+
+_bootstrap_defaults()
