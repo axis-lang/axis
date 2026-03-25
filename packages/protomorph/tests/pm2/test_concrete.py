@@ -3,14 +3,14 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph.core import (
+from pm import (
     Builtin, Id, Index,
     Placeholder, placeholder,
     LeafCarrier, TupleCarrier, NativeObjectCarrier,
     UniformType, UnionType, VaryingType, NativeType, Spec,
     native_type, wrap,
 )
-from protomorph.core.domain import VaryingType as ConcreteVaryingType
+
 
 
 INT = wrap(int)
@@ -78,24 +78,24 @@ class TestUnionType(unittest.TestCase):
 
 class TestVaryingType(unittest.TestCase):
     def test_make_positional(self):
-        vt = cast(ConcreteVaryingType, VaryingType.make(INT, STR, FLOAT))
+        vt = cast(VaryingType, VaryingType.of(INT, STR, FLOAT))
         self.assertEqual(vt.arity, 3)
         self.assertEqual(vt.values, (INT, STR, FLOAT))
 
     def test_make_keyword(self):
-        vt = cast(ConcreteVaryingType, VaryingType.make(x=INT, y=STR))
+        vt = cast(VaryingType, VaryingType.of(x=INT, y=STR))
         self.assertEqual(vt.arity, 2)
         f = vt.item(Id("x"))
         self.assertIs(f.value, INT)
 
     def test_make_mixed(self):
-        vt = cast(ConcreteVaryingType, VaryingType.make(INT, z=STR))
+        vt = cast(VaryingType, VaryingType.of(INT, z=STR))
         self.assertEqual(vt.arity, 2)
         self.assertIs(vt.item_at(0).value, INT)
         self.assertIs(vt.item(Id("z")).value, STR)
 
     def test_carrier(self):
-        vt = VaryingType.make(INT)
+        vt = VaryingType.of(INT)
         c = vt.make((42,))
         self.assertIsInstance(c, TupleCarrier)
 
@@ -155,7 +155,7 @@ class TestNativeType(unittest.TestCase):
 
         st = native_type(S)
         concrete = st.specialize({
-            placeholder("*T"): cast(ConcreteVaryingType, VaryingType.make(STR, BOOL)),
+            placeholder("*T"): cast(VaryingType, VaryingType.of(STR, BOOL)),
         })
         ft = concrete.item_at(0).value
         self.assertIsInstance(ft, VaryingType)

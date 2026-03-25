@@ -4,7 +4,7 @@ from typing import Any, Self, Iterator
 
 from protobase import Consed
 
-from .. import core as mp
+import pm
 from .foundation import _RECONSTRUCT, Id
 
 
@@ -16,7 +16,7 @@ class Carrier[T](Consed, abstract=True):
     Traversal algorithms operate exclusively through this API.
     """
 
-    descriptor: mp.Type[T]
+    descriptor: pm.Type[T]
     content: T
 
     def __repr__(self) -> str:
@@ -26,12 +26,12 @@ class Carrier[T](Consed, abstract=True):
 
     # ── Factory ───────────────────────────────────────────────────
 
-    def child(self, tp: mp.Type, dt: Any) -> Carrier:
+    def child(self, tp: pm.Type, dt: Any) -> Carrier:
         """Produce a child carrier — the Type decides which carrier to use.
         Exception: if data is a Placeholder, always wrap as leaf."""
-        if isinstance(dt, mp.Placeholder):
+        if isinstance(dt, pm.Placeholder):
             return LeafCarrier(tp, dt)
-        provider = mp._CARRIER_FACTORIES.get(type(tp), None)
+        provider = pm._CARRIER_FACTORIES.get(type(tp), None)
         if provider is None:
             raise NotImplementedError(
                 f"Custom carrier provider not implemented for {type(tp).__name__}"
@@ -41,8 +41,8 @@ class Carrier[T](Consed, abstract=True):
     # ── Meta navigation ───────────────────────────────────────────
 
     @property
-    def type(self) -> Carrier[mp.Type[T]]:
-        """Carrier wrapping this value's type."""
+    def type(self) -> Carrier[pm.Type[T]]:
+        """Val wrapping this value's type."""
         return NativeObjectCarrier(self.descriptor.metatype(), self.descriptor)
 
     def fetch(self) -> T:
@@ -141,7 +141,7 @@ class Carrier[T](Consed, abstract=True):
 
 
 class NativeObjectCarrier[T](Carrier[T]):
-    """Carrier for Builtin / native Python objects with named fields."""
+    """Val for Builtin / native Python objects with named fields."""
 
     def attr(self, id: Id) -> Carrier:
         field = self.descriptor.item(id)
@@ -160,7 +160,7 @@ class NativeObjectCarrier[T](Carrier[T]):
 
 
 class LeafCarrier[T](Carrier[T]):
-    """Carrier for leaf values — scalars, placeholders, etc.
+    """Val for leaf values — scalars, placeholders, etc.
     Always a leaf (arity=0), never traversed into."""
 
     @property
@@ -173,7 +173,7 @@ class LeafCarrier[T](Carrier[T]):
 
 
 class TupleCarrier(Carrier[tuple]):
-    """Carrier for raw Python tuples (both uniform and varying)."""
+    """Val for raw Python tuples (both uniform and varying)."""
 
     def __getitem__(self, offset: int) -> Carrier:
         field = self.descriptor.item_at(offset)
@@ -191,9 +191,9 @@ class TupleCarrier(Carrier[tuple]):
         values = []
         for child in children:
             value = child.fetch()
-            if isinstance(value, tuple) and isinstance(child.descriptor, mp.NativeType):
-                values.append(child.descriptor.make(value).fetch())
-            else:
-                values.append(value)
+            values.append(value)
         return type(self)(self.descriptor, tuple(values))
 
+    def __invariants__(self):
+        assert isinstance(self.descriptor, (pm.UniformType, pm.VaryingType)), "TupleCarrier requires uniform or varying type"
+        assert isinstance(self.content, tuple), "TupleCarrier content must be a tuple"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from protomorph.core import (
+from pm import (
     Anchor, 
     Placeholder, placeholder,
     LeafCarrier,
@@ -140,7 +140,7 @@ class TestQualAsType(unittest.TestCase):
 
 class TestTupleHeadTail(unittest.TestCase):
     def test_varying_type_tail(self):
-        vt = VaryingType.make(INT, STR, FLOAT)
+        vt = VaryingType.of(INT, STR, FLOAT)
         tail = vt.tail
         self.assertEqual(tail.values, (STR, FLOAT))
 

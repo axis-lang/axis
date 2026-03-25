@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Iterator
 
-from ..abstract.contract import Item
+from .abstract.contract import Item
 
-from .. import core as mp
+import pm
 from .foundation import Builtin, Id
 
 Field = Item
@@ -12,21 +12,27 @@ Field = Item
 
 class Type[T](Builtin, abstract=True):
 
-    def __getattribute__(self, name: str):
-        if name == "make":
-            return object.__getattribute__(self, "carrier")
-        return super().__getattribute__(name)
+    # def __getattribute__(self, name: str):
+    #     if name == "make":
+    #         return object.__getattribute__(self, "carrier")
+    #     return super().__getattribute__(name)
 
     # ── Classification ────────────────────────────────────────────
 
     def metatype(self) -> Type:
         raise NotImplementedError(f"Metatype not implemented for {self!r}")
 
-    def carrier(self, data: T) -> mp.Carrier[T]:
-        """Create the appropriate carrier for data of this type."""
-        raise NotImplementedError(
-            f"carrier() not implemented for {type(self).__name__}"
-        )
+    def make(self, data: T):
+        carrier_fact = pm._CARRIER_FACTORIES.get(type(self), None)
+        if carrier_fact is None:
+            raise NotImplementedError(f"No carrier factory for type {type(self).__name__}")
+        return carrier_fact(self, data)
+
+    # def carrier(self, data: T) -> pm.Carrier[T]:
+    #     """Create the appropriate carrier for data of this type."""
+    #     raise NotImplementedError(
+    #         f"carrier() not implemented for {type(self).__name__}"
+    #     )
 
     # ── Structure (defaults: leaf / no children) ──────────────────
 
@@ -69,10 +75,11 @@ class Placeholder(Type):
     id: str
 
     def metatype(self) -> Type:
-        return mp.Spec.of("std.metas.Placeholder")
+        return self
+        #return pm.Spec.of("std.metas.Placeholder")
 
-    def carrier(self, data) -> mp.LeafCarrier:
-        return mp.LeafCarrier(self, data)
+    def carrier(self, data) -> pm.LeafCarrier:
+        return pm.LeafCarrier(self, data)
 
 
 def placeholder(id: str, context: Any = None) -> Placeholder:

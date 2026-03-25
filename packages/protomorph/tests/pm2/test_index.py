@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from protomorph.core import (
+from pm import (
     Id, Index, Spread, Tuple, Item,
 )
 
@@ -14,18 +14,18 @@ class TestIndex(unittest.TestCase):
         self.assertEqual(list(Index.Empty), [])
 
     def test_make(self):
-        idx = Index.make("a", "b", "c")
+        idx = Index.of("a", "b", "c")
         self.assertEqual(len(idx), 3)
         self.assertEqual(idx[0], "a")
         self.assertEqual(idx[2], "c")
 
     def test_contains(self):
-        idx = Index.make("a", "b")
+        idx = Index.of("a", "b")
         self.assertIn("a", idx)
         self.assertNotIn("z", idx)
 
     def test_offset_of(self):
-        idx = Index.make("x", "y", "z")
+        idx = Index.of("x", "y", "z")
         self.assertEqual(idx.offset_of("y"), 1)
 
     def test_consing(self):
@@ -37,7 +37,7 @@ class TestIndex(unittest.TestCase):
 class TestTuple(unittest.TestCase):
 
     def test_make_positional(self):
-        t = Tuple.make(10, 20, 30)
+        t = Tuple.of(10, 20, 30)
         self.assertEqual(len(t), 3)
         self.assertEqual(t[0], 10)
         self.assertEqual(t[1], 20)
@@ -45,35 +45,35 @@ class TestTuple(unittest.TestCase):
         self.assertIs(t.index, Index.Empty)
 
     def test_make_keyword(self):
-        t = Tuple.make(x=1, y=2)
+        t = Tuple.of(x=1, y=2)
         self.assertEqual(len(t), 2)
         self.assertEqual(t[Id("x")], 1)
         self.assertEqual(t[Id("y")], 2)
 
     def test_make_mixed(self):
-        t = Tuple.make(1, 2, z=3)
+        t = Tuple.of(1, 2, z=3)
         self.assertEqual(len(t), 3)
         self.assertEqual(t[0], 1)
         self.assertEqual(t[1], 2)
         self.assertEqual(t[Id("z")], 3)
 
     def test_iter(self):
-        t = Tuple.make(10, 20)
+        t = Tuple.of(10, 20)
         self.assertEqual(list(t), [10, 20])
 
     def test_contains(self):
-        t = Tuple.make(10, 20)
+        t = Tuple.of(10, 20)
         self.assertIn(10, t)
         self.assertNotIn(99, t)
 
     def test_items(self):
-        t = Tuple.make(x=1, y=2)
+        t = Tuple.of(x=1, y=2)
         items = list(t.items())
         self.assertEqual(items, [Item(0, Id("x"), 1), Item(1, Id("y"), 2)])
 
     def test_consing(self):
-        a = Tuple.make(1, 2, 3)
-        b = Tuple.make(1, 2, 3)
+        a = Tuple.of(1, 2, 3)
+        b = Tuple.of(1, 2, 3)
         self.assertIs(a, b)
 
 
@@ -90,7 +90,7 @@ class TestSpread(unittest.TestCase):
 class TestSplice(unittest.TestCase):
 
     def test_no_spread_returns_self(self):
-        t = Tuple.make(1, 2, 3)
+        t = Tuple.of(1, 2, 3)
         self.assertIs(t.splice(), t)
 
     def test_splice_middle(self):

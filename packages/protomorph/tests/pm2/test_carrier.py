@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph.core import (
+from pm import(
     Builtin, Id, Index,
     Placeholder, placeholder,
     NativeObjectCarrier, LeafCarrier, TupleCarrier, Spec,
@@ -38,7 +38,7 @@ class TestTupleCarrier(unittest.TestCase):
         self.assertEqual([child.fetch() for child in c], [10, 20, 30])
 
     def test_varying_iteration(self):
-        vt = cast(VaryingType, VaryingType.make(INT, STR))
+        vt = cast(VaryingType, VaryingType.of(INT, STR))
         c = TupleCarrier(vt, (42, "hello"))
         self.assertEqual([child.fetch() for child in c], [42, "hello"])
 

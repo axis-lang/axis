@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph.core import (
+from pm import (
     Builtin,
     HOST,
     NativeHost,
@@ -18,7 +18,7 @@ from protomorph.core import (
     spec_name,
     wrap,
 )
-from protomorph.core.domain import VaryingType as ConcreteVaryingType
+
 
 
 INT = wrap(int)
@@ -70,7 +70,7 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 
     def test_simple_class_schema(self):
         spec = Spec.of(spec_name(Point))
-        schema = cast(ConcreteVaryingType, self.host.schema_for(spec))
+        schema = cast(VaryingType, self.host.schema_for(spec))
         self.assertIsNotNone(schema)
         self.assertIsInstance(schema, VaryingType)
         self.assertEqual(schema.arity, 2)
@@ -79,7 +79,7 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 
     def test_generic_unspecialized(self):
         spec = Spec.of(spec_name(Container))
-        schema = cast(ConcreteVaryingType, self.host.schema_for(spec))
+        schema = cast(VaryingType, self.host.schema_for(spec))
         self.assertIsNotNone(schema)
         self.assertEqual(schema.arity, 1)
         ft = schema.item_at(0).value
@@ -87,13 +87,13 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 
     def test_generic_specialized(self):
         spec = Spec.of(spec_name(Container), INT)
-        schema = cast(ConcreteVaryingType, self.host.schema_for(spec))
+        schema = cast(VaryingType, self.host.schema_for(spec))
         self.assertIsNotNone(schema)
         self.assertEqual(schema.item_at(0).value, INT)
 
     def test_pair_specialized(self):
         spec = Spec.of(spec_name(Pair), INT, STR)
-        schema = cast(ConcreteVaryingType, self.host.schema_for(spec))
+        schema = cast(VaryingType, self.host.schema_for(spec))
         self.assertIsNotNone(schema)
         self.assertEqual(schema.item_at(0).value, INT)
         self.assertEqual(schema.item_at(1).value, STR)

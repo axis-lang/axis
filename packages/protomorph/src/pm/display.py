@@ -21,14 +21,14 @@ _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 
 
 def repr_any(obj: Any) -> str:
-    """Single dispatch repr for any core object (Type, Carrier, Builtin)."""
+    """Single dispatch repr for any core object (Type, Val, Builtin)."""
     from .type_ import Placeholder
     from .domain import UniformType, UnionType, VaryingType, NativeType
     from .index import Index, Spread, Tuple
     from .hosted import Spec, Qual
     from .carrier import Carrier, LeafCarrier, TupleCarrier, NativeObjectCarrier
 
-    # ── Hosted (check before Carrier and Type) ──
+    # ── Hosted (check before Val and Type) ──
     if isinstance(obj, Qual):
         return _repr_qual(obj)
     if isinstance(obj, Spec):
@@ -164,7 +164,7 @@ def _repr_index(idx) -> str:
     return f"Index({', '.join(parts)})"
 
 
-# ── Carrier reprs ──────────────────────────────────────────────────
+# ── Val reprs ──────────────────────────────────────────────────
 
 
 def _repr_leaf(carrier) -> str:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from protomorph.core import (
+from pm import (
     Builtin,
     Placeholder, Spec,
     NativeObjectCarrier,

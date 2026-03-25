@@ -19,7 +19,7 @@ INT_TYPE = wrap(int)
 STR_TYPE = wrap(str)
 FLOAT_TYPE = wrap(float)
 
-print(VaryingType.make(INT_TYPE, STR_TYPE, FLOAT_TYPE))
+print(VaryingType.of(INT_TYPE, STR_TYPE, FLOAT_TYPE))
 
 
 class A[T](Builtin):
@@ -65,7 +65,7 @@ for i in range(B_type.arity):
 # Specialize B[*T] → B[int, str, float]
 T_star = placeholder("*T")
 B_concrete = B_type.specialize({
-    T_star: cast(Type, VaryingType.make(INT_TYPE, STR_TYPE, FLOAT_TYPE)),
+    T_star: cast(Type, VaryingType.of(INT_TYPE, STR_TYPE, FLOAT_TYPE)),
 })
 print("\n=== B specialized to (int, str, float) ===")
 print("B_concrete:", B_concrete)
@@ -79,10 +79,10 @@ for i in range(B_concrete.arity):
 T = placeholder("T")
 
 # VaryingType(int, <T>, str) — a heterogeneous tuple with a hole
-vt = VaryingType.make(INT_TYPE, T, z=STR_TYPE)
+vt = VaryingType.of(INT_TYPE, T, z=STR_TYPE)
 print("\noriginal:", vt)
 
-# Wrap in a Carrier for type-level traversal
+# Wrap in a Val for type-level traversal
 vt_carrier = wrap(vt)
 print("carrier:", vt_carrier)
 print("is_leaf:", vt_carrier.is_leaf)
@@ -113,5 +113,5 @@ result = result_carrier.fetch()
 print("after subst:", result)
 
 # Verify: should be VaryingType(int, float, str)
-expected = VaryingType.make(INT_TYPE, FLOAT_TYPE, z=STR_TYPE)
+expected = VaryingType.of(INT_TYPE, FLOAT_TYPE, z=STR_TYPE)
 print("matches expected:", result == expected)

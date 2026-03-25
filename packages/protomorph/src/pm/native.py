@@ -6,11 +6,11 @@ from typing import Any, Callable, TypeVar, TypeVarTuple, Union, Unpack, cast, ge
 
 from protobase import Consed, attr_info_of, flux, frozendict
 
-from .. import core as mp
+import pm
 from .foundation import _ALL_BUILTINS
 from .hosted import Host, Spec
 
-type PythonTransform = Callable[..., mp.Type]
+type PythonTransform = Callable[..., pm.Type]
 
 _NATIVE_SPECS: dict[type, Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
@@ -18,12 +18,12 @@ _BOOTSTRAPPED = False
 
 
 def _host_singleton() -> NativeHost:
+    return pm.NATIVE_HOST
     import protomorph.core as core_pkg  # type: ignore[import-not-found]
-
     return cast(NativeHost, getattr(core_pkg, "NATIVE_HOST"))
 
 
-def spec_name(cls: type[mp.Builtin]) -> str:
+def spec_name(cls: type[pm.Builtin]) -> str:
     """Canonical anchor string for a Builtin class."""
     name = getattr(cls, "SPEC_NAME", None)
     if isinstance(name, str):
@@ -33,7 +33,7 @@ def spec_name(cls: type[mp.Builtin]) -> str:
 
 class NativeHost(Host, Consed):
     @flux.property
-    def all_builtins(self) -> frozenset[type[mp.Builtin]]:
+    def all_builtins(self) -> frozenset[type[pm.Builtin]]:
         return frozenset(_ALL_BUILTINS)
 
     @flux.property
@@ -45,25 +45,25 @@ class NativeHost(Host, Consed):
         return frozendict(_PYTHON_TRANSFORMS)
 
     @flux.method
-    def template_for(self, builtin_cls: type[mp.Builtin]) -> mp.NativeType:
+    def template_for(self, builtin_cls: type[pm.Builtin]) -> pm.NativeType:
         attrs = attr_info_of(builtin_cls)
         if not attrs:
-            return mp.NativeType(builtin_cls, mp.VaryingType(mp.Index.Empty, ()))
+            return pm.NativeType(builtin_cls, pm.VaryingType(pm.Index.Empty, ()))
 
         names = list(attrs.keys())
         types = tuple(
             self.type_from_annotation(info.type)
             for info in attrs.values()
         )
-        schema = mp.VaryingType(
-            mp.Index(tuple(mp.Id(n) for n in names)),
+        schema = pm.VaryingType(
+            pm.Index(tuple(pm.Id(n) for n in names)),
             types,
         )
-        return mp.NativeType(builtin_cls, schema)
+        return pm.NativeType(builtin_cls, schema)
 
     @flux.property
-    def template_by_spec_name(self) -> frozendict[str, mp.NativeType]:
-        def _is_reflectable(cls: type[mp.Builtin]) -> bool:
+    def template_by_spec_name(self) -> frozendict[str, pm.NativeType]:
+        def _is_reflectable(cls: type[pm.Builtin]) -> bool:
             return not cls.__module__.startswith("protomorph.core")
 
         return frozendict(
@@ -79,19 +79,19 @@ class NativeHost(Host, Consed):
         self,
         annotation: Any,
         *,
-        template: mp.NativeType | None = None,
-    ) -> mp.Type:
-        if isinstance(annotation, mp.Type):
+        template: pm.NativeType | None = None,
+    ) -> pm.Type:
+        if isinstance(annotation, pm.Type):
             return annotation
 
-        if annotation is mp.Type:
-            return mp.Spec.of("std.metas.Type")
+        if annotation is pm.Type:
+            return pm.Spec.of("std.metas.Type")
 
         if isinstance(annotation, TypeVar):
-            return mp.Placeholder(template, annotation.__name__)
+            return pm.Placeholder(template, annotation.__name__)
 
         if isinstance(annotation, TypeVarTuple):
-            return mp.Placeholder(template, f"*{annotation.__name__}")
+            return pm.Placeholder(template, f"*{annotation.__name__}")
 
         scalar_spec = self.native_specs.get(annotation)
         if scalar_spec is not None:
@@ -101,7 +101,7 @@ class NativeHost(Host, Consed):
         args = get_args(annotation)
 
         if origin is Union or isinstance(annotation, PEP604Union):
-            return mp.UnionType.of(
+            return pm.UnionType.of(
                 *(self.type_from_annotation(arg, template=template) for arg in args)
             )
 
@@ -109,9 +109,9 @@ class NativeHost(Host, Consed):
             return self.type_from_annotation(args[0], template=template)
 
         if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
-            return mp.UniformType(
+            return pm.UniformType(
                 self.type_from_annotation(args[0], template=template),
-                mp.Index.Empty,
+                pm.Index.Empty,
             )
 
         if origin is tuple and args:
@@ -120,11 +120,11 @@ class NativeHost(Host, Consed):
             )
             if (
                 len(converted) == 1
-                and isinstance(converted[0], mp.Placeholder)
+                and isinstance(converted[0], pm.Placeholder)
                 and converted[0].id.startswith("*")
             ):
                 return converted[0]
-            return cast(mp.Type, mp.VaryingType(mp.Index.Empty, converted))
+            return cast(pm.Type, pm.VaryingType(pm.Index.Empty, converted))
 
         if isinstance(origin, type):
             typed_origin = cast(type, origin)
@@ -138,35 +138,35 @@ class NativeHost(Host, Consed):
                 )
                 return transform(*converted)
 
-            if isinstance(typed_origin, type) and issubclass(typed_origin, mp.Builtin):
+            if isinstance(typed_origin, type) and issubclass(typed_origin, pm.Builtin):
                 base = self.template_for(typed_origin)
                 param_types = tuple(
                     self.type_from_annotation(arg, template=template) for arg in args
                 )
                 cls_params = getattr(typed_origin, "__type_params__", ())
-                mapping: dict[mp.Placeholder, mp.Type] = {}
+                mapping: dict[pm.Placeholder, pm.Type] = {}
                 for param, concrete in zip(cls_params, param_types):
                     if isinstance(param, TypeVarTuple):
-                        mapping[mp.Placeholder(template, f"*{param.__name__}")] = (
+                        mapping[pm.Placeholder(template, f"*{param.__name__}")] = (
                             cast(
-                                mp.Type,
-                                mp.VaryingType(mp.Index.Empty, param_types[len(mapping):]),
+                                pm.Type,
+                                pm.VaryingType(pm.Index.Empty, param_types[len(mapping):]),
                             )
                         )
                         break
-                    mapping[mp.Placeholder(template, param.__name__)] = concrete
+                    mapping[pm.Placeholder(template, param.__name__)] = concrete
                 return base.specialize(mapping)
 
-        if isinstance(annotation, type) and issubclass(annotation, mp.Builtin):
+        if isinstance(annotation, type) and issubclass(annotation, pm.Builtin):
             return self.template_for(annotation)
 
-        return mp.Spec.of("std.types.Any")
+        return pm.Spec.of("std.types.Any")
 
-    def schema_for(self, spec: Spec) -> mp.VaryingType | None:
+    def schema_for(self, spec: Spec) -> pm.VaryingType | None:
         return self._schema_for_cached(spec)
 
     @flux.method
-    def _schema_for_cached(self, spec: Spec) -> mp.VaryingType | None:
+    def _schema_for_cached(self, spec: Spec) -> pm.VaryingType | None:
         template = self.template_by_spec_name.get(str(spec.anchor))
         if template is None:
             return None
@@ -180,27 +180,27 @@ class NativeHost(Host, Consed):
             return template.schema
 
         arg_types = tuple(c.fetch() for c in args)
-        mapping: dict[mp.Placeholder, mp.Type] = {}
+        mapping: dict[pm.Placeholder, pm.Type] = {}
         for param, arg_type in zip(cls_params, arg_types):
             if isinstance(param, TypeVarTuple):
-                ph = mp.Placeholder(None, f"*{param.__name__}")
+                ph = pm.Placeholder(None, f"*{param.__name__}")
                 remaining = arg_types[len(mapping):]
-                mapping[ph] = cast(mp.Type, mp.VaryingType(mp.Index.Empty, remaining))
+                mapping[ph] = cast(pm.Type, pm.VaryingType(pm.Index.Empty, remaining))
                 break
-            ph = mp.Placeholder(None, param.__name__)
+            ph = pm.Placeholder(None, param.__name__)
             mapping[ph] = arg_type
 
         return template.specialize(mapping).schema
 
 
-def register(cls: type[mp.Builtin]) -> Spec:
+def register(cls: type[pm.Builtin]) -> Spec:
     return Spec.of(spec_name(cls))
 
 
 def register_native_spec(python_type: type, spec: Spec) -> None:
     _NATIVE_SPECS[python_type] = spec
     try:
-        NativeHost.native_specs.invalidate_for(mp.NATIVE_HOST)
+        NativeHost.native_specs.invalidate_for(pm.NATIVE_HOST)
     except AttributeError:
         pass
 
@@ -208,7 +208,7 @@ def register_native_spec(python_type: type, spec: Spec) -> None:
 def register_python_transform(origin: type, transform: PythonTransform) -> None:
     _PYTHON_TRANSFORMS[origin] = transform
     try:
-        NativeHost.python_transforms.invalidate_for(mp.NATIVE_HOST)
+        NativeHost.python_transforms.invalidate_for(pm.NATIVE_HOST)
     except AttributeError:
         pass
 
@@ -216,12 +216,12 @@ def register_python_transform(origin: type, transform: PythonTransform) -> None:
 def type_from_annotation(
     annotation: Any,
     *,
-    template: mp.NativeType | None = None,
-) -> mp.Type:
-    return mp.NATIVE_HOST.type_from_annotation(annotation, template=template)
+    template: pm.NativeType | None = None,
+) -> pm.Type:
+    return pm.NATIVE_HOST.type_from_annotation(annotation, template=template)
 
 
-def native_type(cls: type[mp.Builtin]) -> mp.NativeType:
+def native_type(cls: type[pm.Builtin]) -> pm.NativeType:
     return _host_singleton().template_for(cls)
 
 
@@ -231,51 +231,51 @@ def wrap(obj: Any):
     - wrap(annotation/type) -> projected core descriptor
     - wrap(value) -> carrier built from the projected descriptor
     """
-    if isinstance(obj, mp.Type):
+    if isinstance(obj, pm.Type):
         return native_type(type(obj)).make(obj)
 
     if isinstance(obj, type):
-        if issubclass(obj, mp.Builtin):
-            return native_type(cast(type[mp.Builtin], obj))
+        if issubclass(obj, pm.Builtin):
+            return native_type(cast(type[pm.Builtin], obj))
         return type_from_annotation(obj)
 
     if get_origin(obj) is not None or isinstance(obj, PEP604Union):
         return type_from_annotation(obj)
 
-    if isinstance(obj, mp.Builtin):
+    if isinstance(obj, pm.Builtin):
         return native_type(type(obj)).make(obj)
 
     descriptor = wrap(type(obj))
-    if isinstance(descriptor, mp.Type):
+    if isinstance(descriptor, pm.Type):
         return descriptor.make(obj)
     raise TypeError(f"Cannot wrap value {obj!r} with inferred descriptor")
 
 
-def _set_transform(value_type: mp.Type) -> mp.Type:
-    return cast(mp.Type, mp.Qual.of(value_type, Spec.of("std.qualifiers.Set")))
+def _set_transform(value_type: pm.Type) -> pm.Type:
+    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.Set")))
 
 
-def _map_transform(key_type: mp.Type, value_type: mp.Type) -> mp.Type:
-    return cast(mp.Type, mp.Qual.of(value_type, Spec.of("std.qualifiers.Map", key_type)))
+def _map_transform(key_type: pm.Type, value_type: pm.Type) -> pm.Type:
+    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.Map", key_type)))
 
 
-def _list_transform(value_type: mp.Type) -> mp.Type:
-    return cast(mp.Type, mp.Qual.of(value_type, Spec.of("std.qualifiers.List")))
+def _list_transform(value_type: pm.Type) -> pm.Type:
+    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.List")))
 
 
-def _frozenset_transform(value_type: mp.Type) -> mp.Type:
-    return cast(mp.Type, mp.Qual.of(value_type, Spec.of("std.qualifiers.FrozenSet")))
+def _frozenset_transform(value_type: pm.Type) -> pm.Type:
+    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.FrozenSet")))
 
 
-def _tuple_transform(*types: mp.Type | object) -> mp.Type:
+def _tuple_transform(*types: pm.Type | object) -> pm.Type:
     if len(types) == 2 and types[1] is Ellipsis:
         return cast(
-            mp.Type,
-            mp.Qual.of(cast(mp.Type, types[0]), Spec.of("std.qualifiers.List")),
+            pm.Type,
+            pm.Qual.of(cast(pm.Type, types[0]), Spec.of("std.qualifiers.List")),
         )
     if any(type_ is Ellipsis for type_ in types):
         raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
-    return cast(mp.Type, Spec.of("std.types.Tuple", *cast(tuple[mp.Type, ...], types)))
+    return cast(pm.Type, Spec.of("std.types.Tuple", *cast(tuple[pm.Type, ...], types)))
 
 
 def _bootstrap_defaults() -> None:

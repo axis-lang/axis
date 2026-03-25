@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph.core import (
+from pm import (
     Placeholder, placeholder,
     LeafCarrier, TupleCarrier,
     VaryingType, Spec,
@@ -42,7 +42,7 @@ class TestUnify(unittest.TestCase):
         self.assertIs(result.fetch(), INT)
 
     def test_tuple_unification(self):
-        vt = cast(VaryingType, VaryingType.make(ANY, ANY))
+        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
         T = placeholder("T")
         a = TupleCarrier(vt, (T, STR))
         b = TupleCarrier(vt, (INT, STR))
@@ -51,7 +51,7 @@ class TestUnify(unittest.TestCase):
         self.assertEqual(result.fetch(), (INT, STR))
 
     def test_tuple_mismatch_fails(self):
-        vt = cast(VaryingType, VaryingType.make(ANY, ANY))
+        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
         a = TupleCarrier(vt, (INT, STR))
         b = TupleCarrier(vt, (INT, FLOAT))
         self.assertIsNone(unify(a, b, is_var=is_var))

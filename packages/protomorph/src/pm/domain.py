@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from itertools import chain
+from typing import Any, cast, Self
 
-from ..abstract.contract import Item
+from .abstract.contract import Item
 
-from .. import core as mp
+import pm
 from .foundation import Builtin, Id
 from .type_ import Type, Placeholder
 from .index import Index, Tuple, Spread
@@ -13,11 +14,11 @@ from .index import Index, Tuple, Spread
 class UniformType[T](Type[tuple[T, ...]]):
     """Homogeneous collection — arity from index if present, else from data."""
 
-    element_type: mp.Type[T]
+    element_type: pm.Type[T]
     index: Index
 
     def metatype(self) -> Type:
-        return mp.Spec.of("std.metas.Uniform", self.element_type.metatype())
+        return pm.Spec.of("std.metas.Uniform", self.element_type.metatype())
 
     @property
     def arity(self) -> int | None:
@@ -35,25 +36,25 @@ class UniformType[T](Type[tuple[T, ...]]):
         offset = self.index.offset_of(id)
         return Item(offset, id, self.element_type)
 
-    def carrier(self, data) -> mp.TupleCarrier:
-        return mp.TupleCarrier(self, data)
+    def carrier(self, data) -> pm.TupleCarrier:
+        return pm.TupleCarrier(self, data)
 
 
-class UnionType(Type):
+class UnionType[T: tuple[Any, ...]](Type[T]):
     """Union of types — leaf in structure, carrier dispatches at runtime."""
 
-    variants: frozenset[mp.Type]
+    variants: frozenset[pm.Type]
 
     def metatype(self) -> Type:
-        return mp.Spec.of("std.metas.Union")
+        return pm.Spec.of("std.metas.Union")
 
-    def carrier(self, data) -> mp.LeafCarrier:
-        return mp.LeafCarrier(self, data)
+    def carrier(self, data) -> pm.LeafCarrier:
+        return pm.LeafCarrier(self, data)
 
     @classmethod
-    def of(cls, *types: mp.Type) -> mp.Type:
+    def of(cls, *types: pm.Type) -> pm.Type:
         """Build a union, flattening nested unions. Returns single type if only one."""
-        flat: set[mp.Type] = set()
+        flat: set[pm.Type] = set()
         for t in types:
             if isinstance(t, UnionType):
                 flat.update(t.variants)
@@ -64,7 +65,7 @@ class UnionType(Type):
         return cls(frozenset(flat))
 
 
-class VaryingType(Tuple[Id, Type], Type[tuple]):
+class VaryingType[T: tuple[Any, ...]](Tuple[Id | None, Type], Type[tuple]):
     """Heterogeneous tuple type — IS a Tuple[Id, Type].
 
     Inherits structural protocol from Tuple (item_at, item, items,
@@ -78,8 +79,12 @@ class VaryingType(Tuple[Id, Type], Type[tuple]):
     def arity(self) -> int:
         return len(self.values)
 
-    def carrier(self, data) -> mp.TupleCarrier:
-        return mp.TupleCarrier(self, data)
+    @classmethod
+    def new(cls, *vals: pm.Carrier, **kwvals: pm.Carrier) -> pm.Carrier:
+        return cls.of(
+            *(val.descriptor for val in vals),
+            **{k: v.descriptor for k, v in kwvals.items()},
+        ).make(tuple(chain(vals, kwvals.values())))
 
 
 class NativeType(Type):
@@ -88,14 +93,14 @@ class NativeType(Type):
     Structure delegates to `schema` — a VaryingType that holds
     the field names and types as traversable data.
     This means Placeholders from TypeVars are stored in the schema
-    and visible to Carrier traversal / subst.
+    and visible to Val traversal / subst.
     """
 
     builtin_cls: type[Builtin]
     schema: VaryingType
 
     def metatype(self) -> Type:
-        return mp.Spec.of("std.metas.Native", self.schema)
+        return pm.Spec.of("std.metas.Native", self.schema)
 
     @property
     def arity(self) -> int:
@@ -107,10 +112,10 @@ class NativeType(Type):
     def item(self, id: Id) -> Item:
         return self.schema.item(id)
 
-    def carrier(self, data) -> mp.NativeObjectCarrier:
-        return mp.NativeObjectCarrier(self, data)
+    def carrier(self, data) -> pm.NativeObjectCarrier:
+        return pm.NativeObjectCarrier(self, data)
 
-    def specialize(self, mapping: dict[Placeholder, mp.Type]) -> NativeType:
+    def specialize(self, mapping: dict[Placeholder, pm.Type]) -> NativeType:
         """Substitute Placeholders in field types, returning a new NativeType.
 
         Spread placeholders (*T) are replaced with Spread(...) sentinels
@@ -124,7 +129,7 @@ class NativeType(Type):
                 return Spread(replacement.values)
             return replacement
 
-        new_types: list[mp.Type] = []
+        new_types: list[pm.Type] = []
         for ft in self.schema.values:
             # Direct placeholder at schema level
             if isinstance(ft, Placeholder) and ft in mapping:
@@ -153,22 +158,27 @@ class NativeType(Type):
                     else:
                         replaced_values.append(item_type)
                 if changed:
-                    new_types.append(cast(mp.Type, VaryingType(ft.index, tuple(replaced_values)).splice()))
+                    new_types.append(
+                        cast(
+                            pm.Type,
+                            VaryingType(ft.index, tuple(replaced_values)).splice(),
+                        )
+                    )
                     continue
             # Traverse field type, substitute leaves (including nested spreads)
-            ft_carrier = mp.wrap(ft)
+            ft_carrier = pm.wrap(ft)
             carrier_mapping = {}
             for leaf in ft_carrier.deep_iter():
                 data = leaf.fetch()
                 if data in mapping:
                     repl = _make_replacement(data)
-                    carrier_mapping[leaf] = mp.LeafCarrier(leaf.descriptor, repl)
+                    carrier_mapping[leaf] = pm.LeafCarrier(leaf.descriptor, repl)
             if carrier_mapping:
                 result = ft_carrier.subst(carrier_mapping).fetch()
                 # If result is a Tuple-like with Spreads, splice them
                 if isinstance(result, Tuple):
                     result = result.splice()
-                new_types.append(cast(mp.Type, result))
+                new_types.append(cast(pm.Type, result))
             else:
                 new_types.append(ft)
         new_schema = cast(

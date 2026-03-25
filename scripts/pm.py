@@ -1,5 +1,15 @@
 #%%
-from protomorph.core import *
+from pm import *
 
-t = wrap(dict[str, int])
+class B[T: int = int]() :...
 
+wrap(int)
+
+
+
+
+
+
+
+
+# %%

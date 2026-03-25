@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Generator
 
-from .. import core as mp
+import pm
 
 _SKIP = object()
 
 
 def _deep_zip_gen(
-    master: mp.Carrier, slave: mp.Carrier,
-) -> Generator[tuple[mp.Carrier, mp.Carrier], object, None]:
+    master: pm.Carrier, slave: pm.Carrier,
+) -> Generator[tuple[pm.Carrier, pm.Carrier], object, None]:
     stack = [(master, slave)]
     while stack:
         left, right = stack.pop()
@@ -28,14 +28,14 @@ def _deep_zip_gen(
 class ZipWalker:
     __slots__ = ("_gen", "_ctrl")
 
-    def __init__(self, master: mp.Carrier, slave: mp.Carrier):
+    def __init__(self, master: pm.Carrier, slave: pm.Carrier):
         self._gen = _deep_zip_gen(master, slave)
         self._ctrl = None
 
     def __iter__(self):
         return self
 
-    def __next__(self) -> tuple[mp.Carrier, mp.Carrier]:
+    def __next__(self) -> tuple[pm.Carrier, pm.Carrier]:
         try:
             return self._gen.send(self._ctrl)
         finally:
@@ -45,7 +45,7 @@ class ZipWalker:
         self._ctrl = _SKIP
 
 
-def deep_zip(master: mp.Carrier, slave: mp.Carrier) -> ZipWalker:
+def deep_zip(master: pm.Carrier, slave: pm.Carrier) -> ZipWalker:
     """Paired depth-first traversal of two carrier trees.
 
     Yields (left, right) pairs. Call walker.skip() to prevent

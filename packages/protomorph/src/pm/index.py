@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Iterator, ClassVar, Any, cast
+from typing import Iterator, ClassVar, Any, cast, Self
 
-from ..abstract.contract import Item
+from .abstract.contract import Item
 
 from .foundation import Builtin, Id
 
@@ -28,11 +28,8 @@ class Index[K](Builtin):
         return self.keys.index(id)
 
     @classmethod
-    def make(cls, *keys: K) -> Index[K]:
+    def of(cls, *keys: K) -> Index[K]:
         return cls(keys)
-
-Index.Empty = Index(())
-
 
 class Spread[V](Builtin):
     """Sentinel: wraps a tuple of values to be spliced into a parent Tuple.
@@ -45,6 +42,7 @@ class Spread[V](Builtin):
 
 
 class Tuple[K, V](Builtin):
+    Empty: ClassVar[Tuple[Any, Any]]  # type: ignore[assignment]
 
     index: Index[K]
     values: tuple[V, ...]
@@ -87,7 +85,7 @@ class Tuple[K, V](Builtin):
     @property
     def tail(self) -> Tuple[K, V]:
         if len(self.values) <= 1:
-            return type(self)(Index.Empty, ())
+            return Tuple.Empty
         new_values = self.values[1:]
         if self.index is not Index.Empty:
             new_keys = self.index.keys[1:]
@@ -126,12 +124,15 @@ class Tuple[K, V](Builtin):
         return type(self)(cast(Index[K], idx), tuple(new_values))
 
     @classmethod
-    def make[T](cls, *args: T, **kwargs: T) -> Tuple[Id, T]:
+    def of[T](cls, *args: T, **kwargs: T) -> Self:
         keys: list[Id | None] = [None] * len(args) + [Id(k) for k in kwargs]
         values = args + tuple(kwargs.values())
         has_keys = any(k is not None for k in keys)
         idx = Index(tuple(keys)) if has_keys else Index.Empty
-        return cast(
-            Tuple[Id, T],
-            cls(cast(Index[K], idx), cast(tuple[V, ...], values)),
-        )
+        return cls(cast(Index[K], idx), cast(tuple[V, ...], values))
+
+
+
+Index.Empty = Index(())
+Tuple.Empty = Tuple(Index.Empty, ())
+

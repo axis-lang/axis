@@ -3,6 +3,8 @@ from typing import Any, Callable, cast
 
 from contextvars import ContextVar
 
+from .abstract import contract
+
 # ── Layer 0: Foundation ──────────────────────────────────────────
 from .foundation import (
     Id,
@@ -12,7 +14,7 @@ from .foundation import (
 )
 
 # ── Layer 1: Type ────────────────────────────────────────────────
-from ..abstract.contract import Item
+from .abstract.contract import Item
 
 from .type_ import (
     Field,
@@ -21,7 +23,7 @@ from .type_ import (
     placeholder,
 )
 
-# ── Layer 2: Carrier ─────────────────────────────────────────────
+# ── Layer 2: Val ─────────────────────────────────────────────
 from .carrier import (
     Carrier,
     NativeObjectCarrier,
@@ -75,6 +77,11 @@ from .native import (
     wrap,
     _bootstrap_defaults,
 )
+
+assert issubclass(Type, contract.Descriptor)
+#assert issubclass(Val, contract.Carrier)
+
+
 
 NATIVE_HOST = NativeHost()
 HOST: ContextVar[Host] = ContextVar("HOST", default=NATIVE_HOST)

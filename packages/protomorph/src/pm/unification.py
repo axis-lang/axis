@@ -2,22 +2,22 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .. import core as mp
+import pm
 from .traversal import deep_zip
 
 
-def _default_op(vals: frozenset[mp.Carrier]) -> mp.Carrier | None:
+def _default_op(vals: frozenset[pm.Carrier]) -> pm.Carrier | None:
     if len(vals) == 1:
         return next(iter(vals))
     return None
 
 
 def _capture(
-    a: mp.Carrier,
-    b: mp.Carrier,
-    is_var: Callable[[mp.Carrier], bool],
-) -> dict[mp.Carrier, frozenset[mp.Carrier]] | None:
-    bindings: dict[mp.Carrier, set[mp.Carrier]] = {}
+    a: pm.Carrier,
+    b: pm.Carrier,
+    is_var: Callable[[pm.Carrier], bool],
+) -> dict[pm.Carrier, frozenset[pm.Carrier]] | None:
+    bindings: dict[pm.Carrier, set[pm.Carrier]] = {}
     for left, right in (walker := deep_zip(a, b)):
         l_var = is_var(left)
         r_var = is_var(right)
@@ -44,12 +44,12 @@ def _capture(
 
 
 def unify(
-    a: mp.Carrier,
-    b: mp.Carrier,
+    a: pm.Carrier,
+    b: pm.Carrier,
     *,
-    is_var: Callable[[mp.Carrier], bool],
-    op: Callable[[frozenset[mp.Carrier]], mp.Carrier | None] = _default_op,
-) -> mp.Carrier | None:
+    is_var: Callable[[pm.Carrier], bool],
+    op: Callable[[frozenset[pm.Carrier]], pm.Carrier | None] = _default_op,
+) -> pm.Carrier | None:
     """Unify two carrier trees.
 
     1. Capture: walk both trees in parallel, collect bindings for variables
