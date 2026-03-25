@@ -7,8 +7,6 @@ from protobase import Consed
 Id = NewType("Id", str)
 Anchor = NewType("Anchor", str)
 
-_RECONSTRUCT = object()
-
 
 _ALL_BUILTINS: set[type["Builtin"]] = set()
 
@@ -26,7 +24,7 @@ class Builtin(Consed, abstract=True):
         _ALL_BUILTINS.add(cls)
 
         try:
-            import protomorph.core as pm_core
+            import pm as pm_core  # type: ignore[import-not-found]
 
             pm_core.NativeHost.all_builtins.invalidate_for(pm_core.NATIVE_HOST)
         except (AttributeError, ImportError):

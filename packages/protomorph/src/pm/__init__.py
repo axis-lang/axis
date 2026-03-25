@@ -9,7 +9,6 @@ from .abstract import contract
 from .foundation import (
     Id,
     Anchor,
-    _RECONSTRUCT,
     Builtin,
 )
 
@@ -20,7 +19,21 @@ from .type_ import (
     Field,
     Type,
     Placeholder,
+    Var,
+    SimpleVar,
     placeholder,
+)
+
+# ── Layer 4: Concrete types ──────────────────────────────────────
+from .domain import (
+    TupleLikeType,
+    UniformType,
+    UnionType,
+    VaryingType,
+    IndexedType,
+    Spread,    
+    Spec,
+    Qual,    
 )
 
 # ── Layer 2: Val ─────────────────────────────────────────────
@@ -28,23 +41,13 @@ from .carrier import (
     Carrier,
     NativeObjectCarrier,
     LeafCarrier,
-    TupleCarrier,
-)
-
-# ── Layer 3: Index & Tuple ───────────────────────────────────────
-from .index import (
-    Index,
-    Spread,
     Tuple,
+    Index,
+
 )
 
-# ── Layer 4: Concrete types ──────────────────────────────────────
-from .domain import (
-    UniformType,
-    UnionType,
-    VaryingType,
-    NativeType,
-)
+# ── Layer 3: Spreads ──────────────────────────────────────────────
+
 
 # ── Layer 5: Traversal & Unification ─────────────────────────────
 from .traversal import (
@@ -53,38 +56,55 @@ from .traversal import (
 )
 
 from .unification import (
+    UnionFind,
     unify,
 )
 
 # ── Layer 6: Hosted types ────────────────────────────────────────
 from .hosted import (
     Host,
-    AnchorType,
-    Spec,
-    Qual,
-    ANCHOR_TYPE,
+    current_host,
 )
 
 # ── Layer 7: Native host ───────────────────────────────────────
 from .native import (
     spec_name,
+    NativeVar,
     NativeHost,
-    register,
     register_native_spec,
     register_python_transform,
-    type_from_annotation,
-    native_type,
+    _project_type,
     wrap,
     _bootstrap_defaults,
 )
 
+# ── Layer 8: Solver ───────────────────────────────────────────
+from .solver import (
+    Rule,
+    Solver,
+    freshen_rule,
+    Resolved,
+    NewGoals,
+    Deferred,
+    Failed,
+)
+
 assert issubclass(Type, contract.Descriptor)
-#assert issubclass(Val, contract.Carrier)
+
+
 
 
 
 NATIVE_HOST = NativeHost()
 HOST: ContextVar[Host] = ContextVar("HOST", default=NATIVE_HOST)
+
+
+def carrier_factory_for(tp: Type) -> Callable[[Type, Any], Carrier] | None:
+    for cls in type(tp).__mro__:
+        provider = _CARRIER_FACTORIES.get(cast(type[Type], cls), None)
+        if provider is not None:
+            return provider
+    return None
 
 
 def _spec_carrier(tp: Type, dt: Any) -> Carrier:
@@ -94,15 +114,27 @@ def _spec_carrier(tp: Type, dt: Any) -> Carrier:
     return NativeObjectCarrier(tp, dt)
 
 
+def _tuple_carrier(tp: Type, dt: Any) -> Carrier:
+    return Tuple(cast(TupleLikeType, tp), dt)
+
+
+def _index_carrier(tp: Type, dt: Any) -> Carrier:
+    return Index(cast(UniformType, tp), dt)
+
+
+def _qual_carrier(tp: Type, dt: Any) -> Carrier:
+    qual = cast(Qual, tp)
+    return qual.underlying.make(dt)
+
+
 _CARRIER_FACTORIES: dict[type[Type], Callable[[Type, Any], Carrier]] = {
-    AnchorType: LeafCarrier,
     Placeholder: LeafCarrier,
     UnionType: LeafCarrier,
-    VaryingType: TupleCarrier,
-    UniformType: TupleCarrier,
-    NativeType: NativeObjectCarrier,
+    VaryingType: _tuple_carrier,
+    UniformType: lambda tp, dt: _index_carrier(tp, dt) if cast(UniformType, tp).unique else _tuple_carrier(tp, dt),
+    IndexedType: _tuple_carrier,
     Spec: _spec_carrier,
-    Qual: lambda tp, dt: tp.underlying.carrier(dt),
+    Qual: _qual_carrier,
 }
 
 _bootstrap_defaults()

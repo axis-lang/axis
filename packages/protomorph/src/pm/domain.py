@@ -1,43 +1,49 @@
 from __future__ import annotations
 
 from itertools import chain
-from typing import Any, cast, Self
-
-from .abstract.contract import Item
+from typing import Any, ClassVar, cast
 
 import pm
+
+from .abstract.contract import Item
 from .foundation import Builtin, Id
-from .type_ import Type, Placeholder
-from .index import Index, Tuple, Spread
+from .type_ import Type
+from .hosted import Host, current_host
 
 
-class UniformType[T](Type[tuple[T, ...]]):
-    """Homogeneous collection — arity from index if present, else from data."""
+class Spread[V](Builtin):
+    """Sentinel: wraps values to be spliced into a tuple-like parent.
+
+    Like Python's *iterable unpacking — the parent splice() method
+    flattens Spread entries into its own values sequence.
+    """
+
+    values: tuple[V, ...]
+
+
+class TupleLikeType(Type[tuple], abstract=True):
+    def splice(self) -> TupleLikeType:
+        return self
+
+
+class UniformType[T](TupleLikeType):
+    """Homogeneous positional collection."""
 
     element_type: pm.Type[T]
-    index: Index
+    unique: bool = False
 
     def metatype(self) -> Type:
         return pm.Spec.of("std.metas.Uniform", self.element_type.metatype())
 
     @property
     def arity(self) -> int | None:
-        if self.index is not Index.Empty:
-            return len(self.index)
-        return None  # carrier infers from data
+        return None
 
     def item_at(self, offset: int) -> Item:
-        key = self.index[offset] if self.index is not Index.Empty else None
-        return Item(offset, key, self.element_type)
+        return Item(offset, None, self.element_type)
 
-    def item(self, id: Id) -> Item:
-        if self.index is Index.Empty:
-            raise KeyError(id)
-        offset = self.index.offset_of(id)
-        return Item(offset, id, self.element_type)
-
-    def carrier(self, data) -> pm.TupleCarrier:
-        return pm.TupleCarrier(self, data)
+    def splice(self) -> TupleLikeType:
+        return self
 
 
 class UnionType[T: tuple[Any, ...]](Type[T]):
@@ -47,9 +53,6 @@ class UnionType[T: tuple[Any, ...]](Type[T]):
 
     def metatype(self) -> Type:
         return pm.Spec.of("std.metas.Union")
-
-    def carrier(self, data) -> pm.LeafCarrier:
-        return pm.LeafCarrier(self, data)
 
     @classmethod
     def of(cls, *types: pm.Type) -> pm.Type:
@@ -65,124 +68,211 @@ class UnionType[T: tuple[Any, ...]](Type[T]):
         return cls(frozenset(flat))
 
 
-class VaryingType[T: tuple[Any, ...]](Tuple[Id | None, Type], Type[tuple]):
-    """Heterogeneous tuple type — IS a Tuple[Id, Type].
+class VaryingType[T: tuple[Any, ...]](TupleLikeType):
+    """Heterogeneous positional tuple type."""
 
-    Inherits structural protocol from Tuple (item_at, item, items,
-    __len__, __iter__).  values = the field types, index = the field keys.
-    """
+    Empty: ClassVar[VaryingType]
+
+    values: tuple[pm.Type, ...]
 
     def metatype(self) -> Type:
-        return VaryingType(self.index, tuple(t.metatype() for t in self.values))
+        return VaryingType(tuple(t.metatype() for t in self.values))
 
     @property
     def arity(self) -> int:
         return len(self.values)
 
+    def item_at(self, offset: int) -> Item:
+        return Item(offset, None, self.values[offset])
+
+    def splice(self) -> TupleLikeType:
+        has_spread = any(isinstance(value, Spread) for value in self.values)
+        if not has_spread:
+            return self
+        new_values: list[pm.Type] = []
+        for value in self.values:
+            if isinstance(value, Spread):
+                for spread_value in value.values:
+                    new_values.append(cast(pm.Type, spread_value))
+                continue
+            new_values.append(value)
+        return type(self)(tuple(new_values))
+
     @classmethod
-    def new(cls, *vals: pm.Carrier, **kwvals: pm.Carrier) -> pm.Carrier:
-        return cls.of(
-            *(val.descriptor for val in vals),
-            **{k: v.descriptor for k, v in kwvals.items()},
-        ).make(tuple(chain(vals, kwvals.values())))
+    def of(cls, *args: pm.Type) -> VaryingType:
+        normalized = tuple(
+            cast(pm.Type, arg.fetch()) if isinstance(arg, pm.Carrier) else arg
+            for arg in args
+        )
+        return cls(normalized)
+
+    @classmethod
+    def new(cls, *vals: pm.Carrier, **kwvals: pm.Carrier) -> pm.Tuple:
+        if kwvals:
+            indexed_type = getattr(pm, "IndexedType")
+            return pm.Tuple(
+                indexed_type.of(
+                    *(val.descriptor for val in vals),
+                    **{k: v.descriptor for k, v in kwvals.items()},
+                ),
+                tuple(chain(vals, kwvals.values())),
+            )
+        return pm.Tuple(cls.of(*(val.descriptor for val in vals)), tuple(vals))
 
 
-class NativeType(Type):
-    """Type derived from a Builtin class's field annotations.
-
-    Structure delegates to `schema` — a VaryingType that holds
-    the field names and types as traversable data.
-    This means Placeholders from TypeVars are stored in the schema
-    and visible to Val traversal / subst.
-    """
-
-    builtin_cls: type[Builtin]
-    schema: VaryingType
+class IndexedType[T](TupleLikeType):
+    inner: pm.Type[T]
+    index: pm.Index
 
     def metatype(self) -> Type:
-        return pm.Spec.of("std.metas.Native", self.schema)
+        return pm.Spec.of("std.metas.Indexed", self.inner.metatype())
 
     @property
     def arity(self) -> int:
-        return self.schema.arity
+        return self.index.arity
 
     def item_at(self, offset: int) -> Item:
-        return self.schema.item_at(offset)
+        item = self.inner.item_at(offset)
+        return Item(offset, self.index.key_at(offset), item.value)
 
     def item(self, id: Id) -> Item:
-        return self.schema.item(id)
+        offset = self.index.offset_of(id)
+        item = self.inner.item_at(offset)
+        return Item(offset, id, item.value)
 
-    def carrier(self, data) -> pm.NativeObjectCarrier:
-        return pm.NativeObjectCarrier(self, data)
-
-    def specialize(self, mapping: dict[Placeholder, pm.Type]) -> NativeType:
-        """Substitute Placeholders in field types, returning a new NativeType.
-
-        Spread placeholders (*T) are replaced with Spread(...) sentinels
-        inside the carrier subst, then splice() flattens them.
-        """
-
-        def _make_replacement(ph: Placeholder) -> Any:
-            """Build the replacement data for a placeholder."""
-            replacement = mapping[ph]
-            if ph.id.startswith("*") and isinstance(replacement, VaryingType):
-                return Spread(replacement.values)
-            return replacement
-
-        new_types: list[pm.Type] = []
-        for ft in self.schema.values:
-            # Direct placeholder at schema level
-            if isinstance(ft, Placeholder) and ft in mapping:
-                new_types.append(_make_replacement(ft))
-                continue
-            if isinstance(ft, UniformType):
-                element_type = ft.element_type
-                if isinstance(element_type, Placeholder) and element_type in mapping:
-                    replacement = mapping[element_type]
-                    if isinstance(replacement, VaryingType):
-                        new_types.append(replacement)
-                    else:
-                        new_types.append(UniformType(replacement, ft.index))
-                    continue
-            if isinstance(ft, VaryingType):
-                replaced_values = []
-                changed = False
-                for item_type in ft.values:
-                    if isinstance(item_type, Placeholder) and item_type in mapping:
-                        replacement = mapping[item_type]
-                        if isinstance(replacement, VaryingType):
-                            replaced_values.extend(replacement.values)
-                        else:
-                            replaced_values.append(replacement)
-                        changed = True
-                    else:
-                        replaced_values.append(item_type)
-                if changed:
-                    new_types.append(
-                        cast(
-                            pm.Type,
-                            VaryingType(ft.index, tuple(replaced_values)).splice(),
-                        )
-                    )
-                    continue
-            # Traverse field type, substitute leaves (including nested spreads)
-            ft_carrier = pm.wrap(ft)
-            carrier_mapping = {}
-            for leaf in ft_carrier.deep_iter():
-                data = leaf.fetch()
-                if data in mapping:
-                    repl = _make_replacement(data)
-                    carrier_mapping[leaf] = pm.LeafCarrier(leaf.descriptor, repl)
-            if carrier_mapping:
-                result = ft_carrier.subst(carrier_mapping).fetch()
-                # If result is a Tuple-like with Spreads, splice them
-                if isinstance(result, Tuple):
-                    result = result.splice()
-                new_types.append(cast(pm.Type, result))
+    def splice(self) -> TupleLikeType:
+        inner = cast(pm.TupleLikeType, self.inner).splice()
+        index_values: list[object] = []
+        for item in cast(pm.VaryingType, self.inner).values:
+            if isinstance(item, Spread):
+                spread_len = len(item.values)
+                index_values.append(Spread((None,) * spread_len))
             else:
-                new_types.append(ft)
-        new_schema = cast(
-            VaryingType,
-            VaryingType(self.schema.index, tuple(new_types)).splice(),
+                index_values.append(None)
+        keyed = list(self.index.content)
+        for offset, key in enumerate(keyed):
+            if key is not None:
+                index_values[offset] = key
+        index = pm.Index.of(*cast(tuple[Id | None, ...], tuple(index_values))).splice()
+        if inner.arity is not None and inner.arity != index.arity:
+            raise ValueError("IndexedType splice produced mismatched arity")
+        return type(self)(cast(pm.Type, inner), index)
+
+    @classmethod
+    def of(cls, *args: pm.Type, **kwargs: pm.Type) -> IndexedType:
+        positional = tuple(
+            cast(pm.Type, arg.fetch()) if isinstance(arg, pm.Carrier) else arg
+            for arg in args
         )
-        return NativeType(self.builtin_cls, new_schema)
+        nominal = {
+            key: (
+                cast(pm.Type, value.fetch()) if isinstance(value, pm.Carrier) else value
+            )
+            for key, value in kwargs.items()
+        }
+        values = positional + tuple(nominal.values())
+        keys = (None,) * len(positional) + tuple(Id(key) for key in nominal)
+        return cast(
+            IndexedType, cls(cast(pm.Type, VaryingType(values)), pm.Index.of(*keys))
+        )
+
+
+VaryingType.Empty = VaryingType(())
+
+
+class Spec(Type):
+    anchor: str
+    args: pm.Tuple
+
+    def metatype(self) -> pm.Type:
+        return Spec.of("std.metas.Specialization")
+
+    @property
+    def arity(self) -> int | None:
+        schema = current_host().schema_for(self)
+        return schema.arity if schema is not None else 0
+
+    def item_at(self, offset: int) -> Item:
+        schema = current_host().schema_for(self)
+        if schema is None:
+            raise IndexError(offset)
+        return schema.item_at(offset)
+
+    def item(self, id: pm.Id) -> Item:
+        schema = current_host().schema_for(self)
+        if schema is None:
+            raise KeyError(id)
+        return schema.item(id)
+
+    @classmethod
+    def of(cls, anchor: str, *args: object, **kwargs: object) -> Spec:
+        values = args + tuple(kwargs.values())
+        descriptors = tuple(_value_descriptor(value) for value in values)
+        indexed_type = cast(Any, getattr(pm, "IndexedType"))
+        descriptor = (
+            indexed_type.of(
+                *descriptors[: len(args)],
+                **{k: descriptors[len(args) + i] for i, k in enumerate(kwargs)},
+            )
+            if kwargs
+            else pm.VaryingType(descriptors)
+        )
+        tuple_args = cast(pm.Tuple, pm.Tuple(cast(pm.Type[tuple], descriptor), values))
+        return cast(Spec, cls(anchor, tuple_args))
+
+    @classmethod
+    def new(
+        cls,
+        anchor: str,
+        *vals: pm.Carrier,
+        **kwvals: pm.Carrier,
+    ) -> Spec:
+        return cast(Spec, cls(anchor, pm.VaryingType.new(*vals, **kwvals)))
+
+
+class Qual(Type):
+    underlying: pm.Type
+    qualifiers: pm.Tuple
+
+    def metatype(self) -> pm.Type:
+        return Spec.of("std.metas.Qualifier")
+
+    @property
+    def arity(self) -> int | None:
+        return self.underlying.arity
+
+    def item_at(self, offset: int) -> Item:
+        return self.underlying.item_at(offset)
+
+    def item(self, id: pm.Id) -> Item:
+        return self.underlying.item(id)
+
+    @classmethod
+    def of(cls, underlying: pm.Type, *qualifiers: Spec) -> Qual:
+        if isinstance(underlying, Qual):
+            nested = cast(Qual, underlying)
+            return cast(
+                Qual,
+                cls(
+                    nested.underlying,
+                    pm.Tuple.extends(nested.qualifiers, _normalize_tuple_values(tuple(qualifiers))),
+                ),
+            )
+        return cast(Qual, cls(underlying, _normalize_tuple_values(tuple(qualifiers))))
+
+
+def _value_descriptor(value: object) -> pm.Type:
+    if isinstance(value, pm.Carrier):
+        return value.descriptor
+    if isinstance(value, pm.Type):
+        return value.metatype()
+    return _project_runtime_type(value)
+
+
+def _project_runtime_type(value: object) -> pm.Type:
+    return cast(pm.Type, pm.wrap(type(value)).fetch())
+
+
+def _normalize_tuple_values(values: tuple[object, ...]) -> pm.Tuple:
+    descriptors = tuple(_value_descriptor(value) for value in values)
+    return cast(pm.Tuple, pm.Tuple(pm.VaryingType(descriptors), values))

@@ -20,6 +20,7 @@ from typing import (
     TypeAliasType,
     TypeVar,
     Unpack,
+    NewType,
     TYPE_CHECKING,
 )
 
@@ -126,6 +127,10 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
 
     if isinstance(tp, _ALLOWED):
         return True
+
+    if isinstance(tp, NewType):
+        check_inmutable(tp.__supertype__, _seen_aliases)
+        return
 
     if isinstance(tp, TypeVar):
         if tp.__bound__ is not None:

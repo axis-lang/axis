@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from typing import cast
 
 from pm import (
     Builtin, Id, Spec,
-    Placeholder, placeholder,
+    Placeholder, Var, placeholder,
     Field, Type,
 )
 
@@ -63,7 +64,10 @@ class TestPlaceholder(unittest.TestCase):
 
     def test_spread_placeholder(self):
         p = placeholder("*T")
-        self.assertEqual(p.id, "*T")
+        self.assertEqual(cast(Var, p).id, "*T")
+
+    def test_placeholder_is_var(self):
+        self.assertIsInstance(placeholder("T"), Var)
 
 
 class TestField(unittest.TestCase):

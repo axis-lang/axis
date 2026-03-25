@@ -3,60 +3,45 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from pm import (
-    Builtin,
-    HOST,
-    NativeHost,
-    NativeObjectCarrier,
-    LeafCarrier,
-    Spec,
-    Qual,
-    VaryingType,
-    Placeholder,
-    placeholder,
-    register,
-    spec_name,
-    wrap,
-)
+from pm import Builtin, HOST, Id, IndexedType, NativeHost, NativeObjectCarrier, NativeVar, Qual, Placeholder, Spec, wrap, spec_name
 
 
-
-INT = wrap(int)
-STR = wrap(str)
+INT = cast(Spec, wrap(int).fetch())
+STR = cast(Spec, wrap(str).fetch())
 
 
 class Point(Builtin):
+    SPEC_NAME = "test.Point"
     x: int
     y: int
 
 
 class Container[T](Builtin):
+    SPEC_NAME = "test.Container"
     value: T
 
 
 class Pair[A, B](Builtin):
+    SPEC_NAME = "test.Pair"
     first: A
     second: B
 
 
-class TestSpecName(unittest.TestCase):
-    def test_default_name(self):
-        name = spec_name(Point)
-        self.assertIn("Point", name)
-        self.assertIn(".", name)
+class TestWrap(unittest.TestCase):
+    def test_wrap_builtin_class_returns_type_carrier(self):
+        carrier = wrap(Point)
+        self.assertIsInstance(carrier.fetch(), Spec)
+        self.assertEqual(carrier.fetch(), Spec.of(spec_name(Point)))
 
-    def test_explicit_name(self):
-        class Custom(Builtin):
-            SPEC_NAME = "my.Custom"
+    def test_wrap_scalar_annotation_returns_type_carrier(self):
+        carrier = wrap(int)
+        self.assertEqual(carrier.fetch(), Spec.of("std.types.Integer"))
 
-        self.assertEqual(spec_name(Custom), "my.Custom")
-
-
-class TestRegister(unittest.TestCase):
-    def test_register_returns_spec(self):
-        spec = register(Point)
-        self.assertIsInstance(spec, Spec)
-        self.assertEqual(spec.anchor, spec_name(Point))
+    def test_wrap_runtime_builtin_returns_native_carrier(self):
+        carrier = wrap(Point(1, 2))
+        self.assertIsInstance(carrier, NativeObjectCarrier)
+        self.assertEqual(carrier.attr(Id("x")).fetch(), 1)
+        self.assertEqual(carrier.attr(Id("y")).fetch(), 2)
 
 
 class TestNativeHostSchemaFor(unittest.TestCase):
@@ -65,91 +50,46 @@ class TestNativeHostSchemaFor(unittest.TestCase):
         cls.host = NativeHost()
 
     def test_unknown_spec_returns_none(self):
-        spec = Spec.of("unknown.Thing")
-        self.assertIsNone(self.host.schema_for(spec))
+        self.assertIsNone(self.host.schema_for(Spec.of("unknown.Thing")))
 
     def test_simple_class_schema(self):
-        spec = Spec.of(spec_name(Point))
-        schema = cast(VaryingType, self.host.schema_for(spec))
-        self.assertIsNotNone(schema)
-        self.assertIsInstance(schema, VaryingType)
-        self.assertEqual(schema.arity, 2)
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Point))))
         self.assertEqual(schema.item_at(0).value, INT)
         self.assertEqual(schema.item_at(1).value, INT)
 
     def test_generic_unspecialized(self):
-        spec = Spec.of(spec_name(Container))
-        schema = cast(VaryingType, self.host.schema_for(spec))
-        self.assertIsNotNone(schema)
-        self.assertEqual(schema.arity, 1)
-        ft = schema.item_at(0).value
-        self.assertIsInstance(ft, Placeholder)
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container))))
+        self.assertIsInstance(schema.item_at(0).value, Placeholder)
+        self.assertIsInstance(schema.item_at(0).value, NativeVar)
 
     def test_generic_specialized(self):
-        spec = Spec.of(spec_name(Container), INT)
-        schema = cast(VaryingType, self.host.schema_for(spec))
-        self.assertIsNotNone(schema)
-        self.assertEqual(schema.item_at(0).value, INT)
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container), INT)))
+        self.assertIs(schema.item_at(0).value, INT)
 
     def test_pair_specialized(self):
-        spec = Spec.of(spec_name(Pair), INT, STR)
-        schema = cast(VaryingType, self.host.schema_for(spec))
-        self.assertIsNotNone(schema)
-        self.assertEqual(schema.item_at(0).value, INT)
-        self.assertEqual(schema.item_at(1).value, STR)
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Pair), INT, STR)))
+        self.assertIs(schema.item_at(0).value, INT)
+        self.assertIs(schema.item_at(1).value, STR)
 
 
-class TestSpecDelegation(unittest.TestCase):
+class TestDelegation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._token = HOST.set(NativeHost())
+        cls.token = HOST.set(NativeHost())
 
     @classmethod
     def tearDownClass(cls):
-        HOST.reset(cls._token)
+        HOST.reset(cls.token)
 
-    def test_arity(self):
+    def test_spec_item_access_delegates_to_host(self):
         spec = Spec.of(spec_name(Point))
-        self.assertEqual(spec.arity, 2)
+        self.assertEqual(spec.item_at(0).key, "x")
+        self.assertEqual(spec.item(Id("y")).value, INT)
 
-    def test_item_at(self):
+    def test_qual_item_access_delegates_to_underlying(self):
         spec = Spec.of(spec_name(Point))
-        f = spec.item_at(0)
-        self.assertEqual(f.key, "x")
-        self.assertEqual(f.value, INT)
-
-    def test_carrier_produces_native_object(self):
-        spec = Spec.of(spec_name(Point))
-        c = spec.make(Point(x=10, y=20))
-        self.assertIsInstance(c, NativeObjectCarrier)
-
-    def test_unknown_spec_is_leaf(self):
-        spec = Spec.of("unknown.Thing")
-        c = spec.make(42)
-        self.assertIsInstance(c, LeafCarrier)
-
-
-class TestQualDelegation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls._token = HOST.set(NativeHost())
-
-    @classmethod
-    def tearDownClass(cls):
-        HOST.reset(cls._token)
-
-    def test_qual_delegates_to_underlying(self):
-        spec = Spec.of(spec_name(Point))
-        qual = Qual.of(spec, Spec.of("some.qualifier"))
-        self.assertEqual(qual.arity, 2)
-        f = qual.item_at(0)
-        self.assertEqual(f.key, "x")
-
-    def test_qual_carrier(self):
-        spec = Spec.of(spec_name(Point))
-        qual = Qual.of(spec, Spec.of("some.qualifier"))
-        c = qual.make(Point(x=1, y=2))
-        self.assertIsInstance(c, NativeObjectCarrier)
+        qual = Qual.of(spec, Spec.of("std.qualifiers.List"))
+        self.assertEqual(qual.item_at(0).key, "x")
 
 
 if __name__ == "__main__":

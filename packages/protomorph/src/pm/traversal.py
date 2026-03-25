@@ -7,6 +7,10 @@ import pm
 _SKIP = object()
 
 
+class _ZipMismatch(Exception):
+    pass
+
+
 def _deep_zip_gen(
     master: pm.Carrier, slave: pm.Carrier,
 ) -> Generator[tuple[pm.Carrier, pm.Carrier], object, None]:
@@ -18,10 +22,12 @@ def _deep_zip_gen(
             continue
         if left.is_leaf or right.is_leaf:
             continue
+        if left.descriptor != right.descriptor:
+            raise _ZipMismatch
         l_ch = list(left)
         r_ch = list(right)
         if len(l_ch) != len(r_ch):
-            continue
+            raise _ZipMismatch
         stack.extend(reversed(list(zip(l_ch, r_ch))))
 
 

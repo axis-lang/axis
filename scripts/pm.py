@@ -1,15 +1,10 @@
-#%%
+# %%
 from pm import *
 
-class B[T: int = int]() :...
 
-wrap(int)
-
+class B[T: int = int](): ...
 
 
+wrap(1, 2, 3)
 
 
-
-
-
-# %%

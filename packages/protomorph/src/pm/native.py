@@ -2,33 +2,53 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import NoneType, UnionType as PEP604Union
-from typing import Any, Callable, TypeVar, TypeVarTuple, Union, Unpack, cast, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    TypeVar,
+    TypeVarTuple,
+    Union,
+    Unpack,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from protobase import Consed, attr_info_of, flux, frozendict
 
 import pm
 from .foundation import _ALL_BUILTINS
-from .hosted import Host, Spec
+from .hosted import Host
 
 type PythonTransform = Callable[..., pm.Type]
 
-_NATIVE_SPECS: dict[type, Spec] = {}
+_NATIVE_SPECS: dict[type, pm.Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
 _BOOTSTRAPPED = False
 
 
-def _host_singleton() -> NativeHost:
-    return pm.NATIVE_HOST
-    import protomorph.core as core_pkg  # type: ignore[import-not-found]
-    return cast(NativeHost, getattr(core_pkg, "NATIVE_HOST"))
-
-
 def spec_name(cls: type[pm.Builtin]) -> str:
-    """Canonical anchor string for a Builtin class."""
     name = getattr(cls, "SPEC_NAME", None)
     if isinstance(name, str):
         return name
     return f"{cls.__module__}.{cls.__qualname__}"
+
+
+class NativeVar(pm.Var[str | None, str]):
+    ctx: str | None
+    id: str
+
+
+def _native_ctx(template: object | None) -> str | None:
+    if template is None:
+        return None
+    if isinstance(template, str):
+        return template
+    if isinstance(template, type) and issubclass(template, pm.Builtin):
+        return spec_name(template)
+    if isinstance(template, pm.Spec):
+        return str(template.anchor)
+    return str(template)
 
 
 class NativeHost(Host, Consed):
@@ -37,7 +57,7 @@ class NativeHost(Host, Consed):
         return frozenset(_ALL_BUILTINS)
 
     @flux.property
-    def native_specs(self) -> frozendict[type, Spec]:
+    def native_specs(self) -> frozendict[type, pm.Spec]:
         return frozendict(_NATIVE_SPECS)
 
     @flux.property
@@ -45,41 +65,28 @@ class NativeHost(Host, Consed):
         return frozendict(_PYTHON_TRANSFORMS)
 
     @flux.method
-    def template_for(self, builtin_cls: type[pm.Builtin]) -> pm.NativeType:
+    def schema_template_for(self, builtin_cls: type[pm.Builtin]) -> pm.TupleLikeType:
         attrs = attr_info_of(builtin_cls)
         if not attrs:
-            return pm.NativeType(builtin_cls, pm.VaryingType(pm.Index.Empty, ()))
+            return pm.VaryingType(())
 
         names = list(attrs.keys())
-        types = tuple(
-            self.type_from_annotation(info.type)
-            for info in attrs.values()
+        types = tuple(self.project_type(info.type, template=builtin_cls) for info in attrs.values())
+        indexed_type = cast(Any, getattr(pm, "IndexedType"))
+        return indexed_type(
+            pm.VaryingType(types), pm.Index.of(*(pm.Id(name) for name in names))
         )
-        schema = pm.VaryingType(
-            pm.Index(tuple(pm.Id(n) for n in names)),
-            types,
-        )
-        return pm.NativeType(builtin_cls, schema)
 
     @flux.property
-    def template_by_spec_name(self) -> frozendict[str, pm.NativeType]:
-        def _is_reflectable(cls: type[pm.Builtin]) -> bool:
-            return not cls.__module__.startswith("protomorph.core")
-
-        return frozendict(
-            {
-                spec_name(cls): self.template_for(cls)
-                for cls in self.all_builtins
-                if _is_reflectable(cls)
-            }
-        )
+    def builtin_by_spec_name(self) -> frozendict[str, type[pm.Builtin]]:
+        return frozendict({spec_name(cls): cls for cls in self.all_builtins})
 
     @flux.method
-    def type_from_annotation(
+    def project_type(
         self,
         annotation: Any,
         *,
-        template: pm.NativeType | None = None,
+        template: object | None = None,
     ) -> pm.Type:
         if isinstance(annotation, pm.Type):
             return annotation
@@ -87,117 +94,202 @@ class NativeHost(Host, Consed):
         if annotation is pm.Type:
             return pm.Spec.of("std.metas.Type")
 
+        if annotation is pm.Tuple:
+            return pm.Spec.of("std.types.Tuple")
+
+        if annotation is pm.Index:
+            return pm.Spec.of("std.types.Tuple")
+
         if isinstance(annotation, TypeVar):
-            return pm.Placeholder(template, annotation.__name__)
+            return NativeVar(_native_ctx(template), annotation.__name__)
 
         if isinstance(annotation, TypeVarTuple):
-            return pm.Placeholder(template, f"*{annotation.__name__}")
+            return NativeVar(_native_ctx(template), f"*{annotation.__name__}")
 
         scalar_spec = self.native_specs.get(annotation)
         if scalar_spec is not None:
             return scalar_spec
+
+        if annotation is str:
+            return pm.Spec.of("std.types.Anchor")
 
         origin = get_origin(annotation)
         args = get_args(annotation)
 
         if origin is Union or isinstance(annotation, PEP604Union):
             return pm.UnionType.of(
-                *(self.type_from_annotation(arg, template=template) for arg in args)
+                *(self.project_type(arg, template=template) for arg in args)
             )
 
         if origin is Unpack and args:
-            return self.type_from_annotation(args[0], template=template)
+            return self.project_type(args[0], template=template)
 
         if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
-            return pm.UniformType(
-                self.type_from_annotation(args[0], template=template),
-                pm.Index.Empty,
-            )
+            return pm.UniformType(self.project_type(args[0], template=template))
 
         if origin is tuple and args:
-            converted = tuple(
-                self.type_from_annotation(arg, template=template) for arg in args
-            )
+            converted = tuple(self.project_type(arg, template=template) for arg in args)
             if (
                 len(converted) == 1
                 and isinstance(converted[0], pm.Placeholder)
-                and converted[0].id.startswith("*")
+                and cast(pm.Var, converted[0]).id.startswith("*")
             ):
                 return converted[0]
-            return cast(pm.Type, pm.VaryingType(pm.Index.Empty, converted))
+            return cast(pm.Type, pm.VaryingType(converted))
 
         if isinstance(origin, type):
             typed_origin = cast(type, origin)
             transform = self.python_transforms.get(typed_origin)
             if transform is not None:
                 converted = tuple(
-                    self.type_from_annotation(arg, template=template)
-                    if arg is not Ellipsis
-                    else arg
+                    (
+                        self.project_type(arg, template=template)
+                        if arg is not Ellipsis
+                        else arg
+                    )
                     for arg in args
                 )
                 return transform(*converted)
 
-            if isinstance(typed_origin, type) and issubclass(typed_origin, pm.Builtin):
-                base = self.template_for(typed_origin)
-                param_types = tuple(
-                    self.type_from_annotation(arg, template=template) for arg in args
+            if issubclass(typed_origin, pm.Builtin):
+                arg_types = tuple(
+                    self.project_type(arg, template=template) for arg in args
                 )
-                cls_params = getattr(typed_origin, "__type_params__", ())
-                mapping: dict[pm.Placeholder, pm.Type] = {}
-                for param, concrete in zip(cls_params, param_types):
-                    if isinstance(param, TypeVarTuple):
-                        mapping[pm.Placeholder(template, f"*{param.__name__}")] = (
-                            cast(
-                                pm.Type,
-                                pm.VaryingType(pm.Index.Empty, param_types[len(mapping):]),
-                            )
-                        )
-                        break
-                    mapping[pm.Placeholder(template, param.__name__)] = concrete
-                return base.specialize(mapping)
+                return self._spec_for_builtin(typed_origin, arg_types)
 
         if isinstance(annotation, type) and issubclass(annotation, pm.Builtin):
-            return self.template_for(annotation)
+            return self._spec_for_builtin(annotation, ())
 
-        return pm.Spec.of("std.types.Any")
+        if isinstance(annotation, type) and issubclass(annotation, pm.Tuple):
+            return pm.Spec.of("std.types.Tuple")
 
-    def schema_for(self, spec: Spec) -> pm.VaryingType | None:
+        raise ValueError(f"Unsupported annotation: {annotation!r}")
+
+    def schema_for(self, spec: pm.Spec) -> pm.TupleLikeType | None:
         return self._schema_for_cached(spec)
 
     @flux.method
-    def _schema_for_cached(self, spec: Spec) -> pm.VaryingType | None:
-        template = self.template_by_spec_name.get(str(spec.anchor))
-        if template is None:
+    def _schema_for_cached(self, spec: pm.Spec) -> pm.TupleLikeType | None:
+        builtin_cls = self.builtin_by_spec_name.get(str(spec.anchor))
+        if builtin_cls is None:
             return None
 
-        cls_params = getattr(template.builtin_cls, "__type_params__", ())
-        if not cls_params:
-            return template.schema
+        schema = self.schema_template_for(builtin_cls)
+        cls_params = getattr(builtin_cls, "__type_params__", ())
+        if not cls_params or len(spec.args) == 0:
+            return schema
 
-        args = spec.args
-        if len(args) == 0:
-            return template.schema
+        mapping = self._mapping_for_spec(spec, cls_params, builtin_cls)
+        return self._specialize_schema(schema, mapping)
 
-        arg_types = tuple(c.fetch() for c in args)
+    def _spec_for_builtin(
+        self,
+        builtin_cls: type[pm.Builtin],
+        arg_types: tuple[pm.Type, ...],
+    ) -> pm.Spec:
+        return pm.Spec.of(spec_name(builtin_cls), *arg_types)
+
+    def _mapping_for_spec(
+        self,
+        spec: pm.Spec,
+        cls_params: tuple[object, ...],
+        builtin_cls: type[pm.Builtin],
+    ) -> dict[pm.Placeholder, pm.Type]:
+        arg_types = tuple(cast(pm.Type, child.fetch()) for child in spec.args)
         mapping: dict[pm.Placeholder, pm.Type] = {}
-        for param, arg_type in zip(cls_params, arg_types):
+        for index, (param, arg_type) in enumerate(zip(cls_params, arg_types)):
             if isinstance(param, TypeVarTuple):
-                ph = pm.Placeholder(None, f"*{param.__name__}")
-                remaining = arg_types[len(mapping):]
-                mapping[ph] = cast(pm.Type, pm.VaryingType(pm.Index.Empty, remaining))
+                remaining = arg_types[index:]
+                mapping[NativeVar(spec_name(builtin_cls), f"*{param.__name__}")] = cast(
+                    pm.Type,
+                    pm.VaryingType(remaining),
+                )
                 break
-            ph = pm.Placeholder(None, param.__name__)
-            mapping[ph] = arg_type
+            mapping[NativeVar(spec_name(builtin_cls), cast(TypeVar, param).__name__)] = arg_type
+        return mapping
 
-        return template.specialize(mapping).schema
+    def _specialize_schema(
+        self,
+        schema: pm.TupleLikeType,
+        mapping: dict[pm.Placeholder, pm.Type],
+    ) -> pm.TupleLikeType:
+        indexed_type = getattr(pm, "IndexedType", None)
+        if indexed_type is not None and isinstance(schema, indexed_type):
+            indexed_schema = cast(Any, schema)
+            inner = cast(
+                pm.TupleLikeType,
+                self._specialize_schema(
+                    cast(pm.TupleLikeType, indexed_schema.inner), mapping
+                ),
+            )
+            index = indexed_schema.index.splice()
+            return indexed_type(cast(pm.Type, inner), index)
+
+        def _make_replacement(ph: pm.Placeholder) -> object:
+            replacement = mapping[ph]
+            if cast(pm.Var, ph).id.startswith("*") and isinstance(replacement, pm.VaryingType):
+                return pm.Spread(replacement.values)
+            return replacement
+
+        new_types: list[pm.Type] = []
+        varying_schema = cast(pm.VaryingType, schema)
+        for field_type in varying_schema.values:
+            if isinstance(field_type, pm.Placeholder) and field_type in mapping:
+                new_types.append(cast(pm.Type, _make_replacement(field_type)))
+                continue
+            if isinstance(field_type, pm.UniformType):
+                element_type = field_type.element_type
+                if isinstance(element_type, pm.Placeholder) and element_type in mapping:
+                    replacement = mapping[element_type]
+                    if isinstance(replacement, pm.VaryingType):
+                        new_types.append(replacement)
+                    else:
+                        new_types.append(pm.UniformType(replacement))
+                    continue
+            if isinstance(field_type, pm.VaryingType):
+                replaced_values = []
+                changed = False
+                for item_type in field_type.values:
+                    if isinstance(item_type, pm.Placeholder) and item_type in mapping:
+                        replacement = mapping[item_type]
+                        if isinstance(replacement, pm.VaryingType):
+                            replaced_values.extend(replacement.values)
+                        else:
+                            replaced_values.append(replacement)
+                        changed = True
+                    else:
+                        replaced_values.append(item_type)
+                if changed:
+                    new_types.append(
+                        cast(
+                            pm.Type,
+                            pm.VaryingType(tuple(replaced_values)).splice(),
+                        )
+                    )
+                    continue
+            field_carrier = wrap(field_type)
+            carrier_mapping: dict[pm.Carrier, pm.Carrier] = {}
+            for leaf in field_carrier.deep_iter():
+                data = leaf.fetch()
+                if data in mapping:
+                    carrier_mapping[leaf] = pm.LeafCarrier(
+                        leaf.descriptor,
+                        _make_replacement(cast(pm.Placeholder, data)),
+                    )
+            if carrier_mapping:
+                result = field_carrier.subst(carrier_mapping).fetch()
+                if isinstance(result, pm.TupleLikeType):
+                    result = result.splice()
+                new_types.append(cast(pm.Type, result))
+            else:
+                new_types.append(field_type)
+        return cast(
+            pm.TupleLikeType,
+            pm.VaryingType(tuple(new_types)).splice(),
+        )
 
 
-def register(cls: type[pm.Builtin]) -> Spec:
-    return Spec.of(spec_name(cls))
-
-
-def register_native_spec(python_type: type, spec: Spec) -> None:
+def register_native_spec(python_type: type, spec: pm.Spec) -> None:
     _NATIVE_SPECS[python_type] = spec
     try:
         NativeHost.native_specs.invalidate_for(pm.NATIVE_HOST)
@@ -213,69 +305,79 @@ def register_python_transform(origin: type, transform: PythonTransform) -> None:
         pass
 
 
-def type_from_annotation(
+def _project_type(
     annotation: Any,
     *,
-    template: pm.NativeType | None = None,
+    template: object | None = None,
 ) -> pm.Type:
-    return pm.NATIVE_HOST.type_from_annotation(annotation, template=template)
+    return pm.NATIVE_HOST.project_type(annotation, template=template)
 
 
-def native_type(cls: type[pm.Builtin]) -> pm.NativeType:
-    return _host_singleton().template_for(cls)
+def wrap(*args, **kwargs) -> pm.Carrier:
 
+    if not args and not kwargs:
+        raise TypeError("wrap() requires at least one argument")
 
-def wrap(obj: Any):
-    """Canonical core entry point.
+    if len(args) > 1 or kwargs:
+        return pm.VaryingType.new(
+            *(wrap(arg) for arg in args),
+            **{key: wrap(value) for key, value in kwargs.items()},
+        )
 
-    - wrap(annotation/type) -> projected core descriptor
-    - wrap(value) -> carrier built from the projected descriptor
-    """
+    obj = args[0] # type: ignore
+
+    if isinstance(obj, pm.Carrier):
+        return obj
+
     if isinstance(obj, pm.Type):
-        return native_type(type(obj)).make(obj)
+        if isinstance(obj, (pm.Spec, pm.Qual, pm.VaryingType)):
+            return pm.NativeObjectCarrier(_project_type(type(obj)), obj)
+        return obj.metatype().make(obj)
 
     if isinstance(obj, type):
-        if issubclass(obj, pm.Builtin):
-            return native_type(cast(type[pm.Builtin], obj))
-        return type_from_annotation(obj)
+        return _project_type(obj).metatype().make(_project_type(obj))
 
     if get_origin(obj) is not None or isinstance(obj, PEP604Union):
-        return type_from_annotation(obj)
+        descriptor = _project_type(obj)
+        return descriptor.metatype().make(descriptor)
 
     if isinstance(obj, pm.Builtin):
-        return native_type(type(obj)).make(obj)
-
-    descriptor = wrap(type(obj))
-    if isinstance(descriptor, pm.Type):
+        descriptor = _project_type(type(obj))
         return descriptor.make(obj)
-    raise TypeError(f"Cannot wrap value {obj!r} with inferred descriptor")
+
+    descriptor = cast(pm.Type, wrap(type(obj)).fetch())
+    return descriptor.make(obj)
 
 
 def _set_transform(value_type: pm.Type) -> pm.Type:
-    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.Set")))
+    return cast(pm.Type, pm.Qual.of(value_type, pm.Spec.of("std.qualifiers.Set")))
 
 
 def _map_transform(key_type: pm.Type, value_type: pm.Type) -> pm.Type:
-    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.Map", key_type)))
+    return cast(
+        pm.Type, pm.Qual.of(value_type, pm.Spec.of("std.qualifiers.Map", key_type))
+    )
 
 
 def _list_transform(value_type: pm.Type) -> pm.Type:
-    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.List")))
+    return cast(pm.Type, pm.Qual.of(value_type, pm.Spec.of("std.qualifiers.List")))
 
 
 def _frozenset_transform(value_type: pm.Type) -> pm.Type:
-    return cast(pm.Type, pm.Qual.of(value_type, Spec.of("std.qualifiers.FrozenSet")))
+    return cast(pm.Type, pm.Qual.of(value_type, pm.Spec.of("std.qualifiers.FrozenSet")))
 
 
 def _tuple_transform(*types: pm.Type | object) -> pm.Type:
     if len(types) == 2 and types[1] is Ellipsis:
         return cast(
             pm.Type,
-            pm.Qual.of(cast(pm.Type, types[0]), Spec.of("std.qualifiers.List")),
+            pm.Qual.of(cast(pm.Type, types[0]), pm.Spec.of("std.qualifiers.List")),
         )
     if any(type_ is Ellipsis for type_ in types):
         raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
-    return cast(pm.Type, Spec.of("std.types.Tuple", *cast(tuple[pm.Type, ...], types)))
+    return cast(
+        pm.Type, pm.Spec.of("std.types.Tuple", *cast(tuple[pm.Type, ...], types))
+    )
 
 
 def _bootstrap_defaults() -> None:
@@ -283,13 +385,13 @@ def _bootstrap_defaults() -> None:
     if _BOOTSTRAPPED:
         return
 
-    register_native_spec(int, Spec.of("std.types.Integer"))
-    register_native_spec(str, Spec.of("std.types.Text"))
-    register_native_spec(float, Spec.of("std.types.Decimal"))
-    register_native_spec(Decimal, Spec.of("std.types.Decimal"))
-    register_native_spec(bool, Spec.of("std.types.Boolean"))
-    register_native_spec(NoneType, Spec.of("std.types.Empty"))
-
+    register_native_spec(int, pm.Spec.of("std.types.Integer"))
+    register_native_spec(str, pm.Spec.of("std.types.Text"))
+    register_native_spec(float, pm.Spec.of("std.types.Decimal"))
+    register_native_spec(Decimal, pm.Spec.of("std.types.Decimal"))
+    register_native_spec(bool, pm.Spec.of("std.types.Boolean"))
+    register_native_spec(NoneType, pm.Spec.of("std.types.Empty"))
+    register_native_spec(type(pm.Id("x")), pm.Spec.of("std.types.Id"))
     register_python_transform(dict, _map_transform)
     register_python_transform(list, _list_transform)
     register_python_transform(set, _set_transform)

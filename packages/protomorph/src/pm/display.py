@@ -2,7 +2,7 @@
 
 Convention:
 - Type tuple-like (whose carriers are tuples) → square brackets [A, B]
-- Tuple data values → parentheses (1, 'hello')
+- Tuple carriers → parentheses (1, 'hello')
 - Spec → trimmed anchor + args: List[int], Integer
 - Qual → qualifiers then underlying: List Integer
 - Placeholder → $T, $*T
@@ -11,7 +11,7 @@ Convention:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
@@ -23,10 +23,9 @@ _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 def repr_any(obj: Any) -> str:
     """Single dispatch repr for any core object (Type, Val, Builtin)."""
     from .type_ import Placeholder
-    from .domain import UniformType, UnionType, VaryingType, NativeType
-    from .index import Index, Spread, Tuple
-    from .hosted import Spec, Qual
-    from .carrier import Carrier, LeafCarrier, TupleCarrier, NativeObjectCarrier
+    from .domain import UniformType, UnionType, VaryingType, IndexedType
+    from .domain import Spread, Spec, Qual
+    from .carrier import Carrier, LeafCarrier, Tuple, NativeObjectCarrier, Index
 
     # ── Hosted (check before Val and Type) ──
     if isinstance(obj, Qual):
@@ -39,30 +38,28 @@ def repr_any(obj: Any) -> str:
         return f"${obj.id}"
     if isinstance(obj, VaryingType):
         return _repr_varying(obj)
+    if isinstance(obj, IndexedType):
+        return _repr_indexed(obj)
     if isinstance(obj, UniformType):
         return _repr_uniform(obj)
     if isinstance(obj, UnionType):
         return _repr_union(obj)
-    if isinstance(obj, NativeType):
-        return _repr_native_type(obj)
 
     # ── Carriers (check before generic fallback) ──
     if isinstance(obj, LeafCarrier):
         return _repr_leaf(obj)
     if isinstance(obj, NativeObjectCarrier):
         return _repr_native_carrier(obj)
-    if isinstance(obj, TupleCarrier):
+    if isinstance(obj, Index):
+        return _repr_index(obj)
+    if isinstance(obj, Tuple):
         return _repr_tuple_carrier(obj)
     if isinstance(obj, Carrier):
         return f"{type(obj).__name__}(...)"
 
-    # ── Index / Tuple ──
-    if isinstance(obj, Index):
-        return _repr_index(obj)
+    # ── Spread ──
     if isinstance(obj, Spread):
-        return f"*({', '.join(_format(v) for v in obj.values)})"
-    if isinstance(obj, Tuple):
-        return _repr_tuple_data(obj)
+        return f"..({', '.join(_format(v) for v in obj.values)})"
 
     # ── Fallback: Consed default ──
     from protobase import Consed
@@ -97,28 +94,31 @@ def _trim_anchor(anchor: str) -> str:
 
 def _repr_spec(spec) -> str:
     anchor = _trim_anchor(str(spec.anchor))
-    args = spec.content[1:]
-    if not args:
+    if len(spec.args) == 0:
         return anchor
-    parts = ", ".join(_format(a) for a in args)
+    parts = ", ".join(repr_any(child) for child in spec.args)
     return f"{anchor}[{parts}]"
 
 
 def _repr_qual(qual) -> str:
-    specs = qual.content
-    if not specs:
-        return "Qual()"
-    if len(specs) == 1:
-        return repr_any(specs[0])
-    # qualifiers (reversed) then underlying
-    parts = [repr_any(q) for q in reversed(specs[1:])]
-    parts.append(repr_any(specs[0]))
+    from .domain import Spec
+    
+    qualifiers = tuple(cast(Spec, child.fetch()) for child in qual.qualifiers)
+    if not qualifiers:
+        return repr_any(qual.underlying)
+    parts = [repr_any(q) for q in reversed(qualifiers)]
+    parts.append(repr_any(qual.underlying))
     return " ".join(parts)
 
 
 def _repr_varying(vt) -> str:
+    return f"[{', '.join(_format(value) for value in vt.values)}]"
+
+
+def _repr_indexed(it) -> str:
     parts = []
-    for item in vt.items():
+    for offset in range(it.arity):
+        item = it.item_at(offset)
         formatted = _format(item.value)
         if item.key is not None:
             parts.append(f"{item.key}: {formatted}")
@@ -128,43 +128,17 @@ def _repr_varying(vt) -> str:
 
 
 def _repr_uniform(ut) -> str:
-    from .index import Index
-
     elem = _format(ut.element_type)
-    if ut.index is Index.Empty:
-        return f"[...: {elem}]"
-    keys = ", ".join("_" if k is None else str(k) for k in ut.index)
-    return f"[..({keys}): {elem}]"
+    return f"[...: {elem}]"
 
 
 def _repr_union(ut) -> str:
     return " | ".join(sorted(_format(v) for v in ut.variants))
 
 
-def _repr_native_type(nt) -> str:
-    name = nt.builtin_cls.__name__
-    if nt.schema.arity == 0:
-        return name
-    parts = []
-    for item in nt.schema.items():
-        formatted = _format(item.value)
-        if item.key is not None:
-            parts.append(f"{item.key}: {formatted}")
-        else:
-            parts.append(formatted)
-    return f"{name}[{', '.join(parts)}]"
-
-
 def _repr_index(idx) -> str:
-    from .index import Index
-
-    if idx is Index.Empty:
-        return "Index()"
     parts = ["_" if k is None else repr(k) for k in idx.keys]
     return f"Index({', '.join(parts)})"
-
-
-# ── Val reprs ──────────────────────────────────────────────────
 
 
 def _repr_leaf(carrier) -> str:
@@ -194,17 +168,3 @@ def _repr_native_carrier(carrier) -> str:
         item = carrier.descriptor.item_at(i)
         parts.append(f"{item.key}={repr_any(child)}")
     return f"{cls_name}({', '.join(parts)})"
-
-
-# ── Tuple data repr (parentheses) ──────────────────────────────────
-
-
-def _repr_tuple_data(t) -> str:
-    parts = []
-    for item in t.items():
-        formatted = _format(item.value)
-        if item.key is not None:
-            parts.append(f"{item.key}={formatted}")
-        else:
-            parts.append(formatted)
-    return f"({', '.join(parts)})"

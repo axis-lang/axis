@@ -3,71 +3,200 @@ from __future__ import annotations
 from typing import Callable
 
 import pm
-from .traversal import deep_zip
 
 
-def _default_op(vals: frozenset[pm.Carrier]) -> pm.Carrier | None:
-    if len(vals) == 1:
-        return next(iter(vals))
-    return None
+class UnionFind:
+    """Substitution environment with path compression, occurs check, and rollback.
+
+    Operates on pm.Carrier instances. Variables are identified by the
+    ``is_var`` predicate supplied at construction time.
+
+    Designed to be shared across multiple ``unify`` calls so that bindings
+    accumulate — enabling bidirectional type resolution and multi-step
+    constraint solving.
+    """
+
+    __slots__ = ("_parent", "_rank", "_trail", "is_var")
+
+    def __init__(self, is_var: Callable[[pm.Carrier], bool]):
+        self._parent: dict[pm.Carrier, pm.Carrier] = {}
+        self._rank: dict[pm.Carrier, int] = {}
+        self._trail: list[tuple] = []
+        self.is_var = is_var
+
+    # ── core operations ───────────────────────────────────────────
+
+    def find(self, x: pm.Carrier) -> pm.Carrier:
+        """Follow parent chain to canonical representative (with path compression)."""
+        if x not in self._parent:
+            return x
+        root = x
+        while root in self._parent:
+            root = self._parent[root]
+        curr = x
+        while curr is not root:
+            nxt = self._parent[curr]
+            if nxt is not root:
+                self._trail.append(("c", curr, nxt))
+                self._parent[curr] = root
+            curr = nxt
+        return root
+
+    def bind(self, var: pm.Carrier, term: pm.Carrier, *, occurs_check: bool = True) -> bool:
+        """Bind *var* to *term*. Returns False if occurs check fails."""
+        rv = self.find(var)
+        rt = self.find(term)
+        if rv is rt:
+            return True
+        if occurs_check and not self.is_var(rt) and not rt.is_leaf:
+            if self._occurs(rv, rt):
+                return False
+        self._link(rv, rt)
+        return True
+
+    def _link(self, a: pm.Carrier, b: pm.Carrier) -> None:
+        """Make *a* point to *b*, preferring non-vars as root."""
+        if self.is_var(b) and not self.is_var(a):
+            a, b = b, a
+        elif self.is_var(a) == self.is_var(b):
+            ra, rb = self._rank.get(a, 0), self._rank.get(b, 0)
+            if ra > rb:
+                a, b = b, a
+        self._trail.append(("b", a, self._parent.get(a)))
+        self._parent[a] = b
+        ra, rb = self._rank.get(a, 0), self._rank.get(b, 0)
+        if ra == rb:
+            self._trail.append(("r", b, rb))
+            self._rank[b] = rb + 1
+
+    def _occurs(self, var: pm.Carrier, term: pm.Carrier) -> bool:
+        """Return True if *var* appears anywhere inside *term*."""
+        term = self.find(term)
+        if var is term:
+            return True
+        if term.is_leaf:
+            return False
+        return any(self._occurs(var, child) for child in term)
+
+    # ── snapshot / rollback ───────────────────────────────────────
+
+    def snapshot(self) -> int:
+        """Return an opaque mark for later rollback."""
+        return len(self._trail)
+
+    def rollback(self, mark: int) -> None:
+        """Undo all operations since *mark*."""
+        while len(self._trail) > mark:
+            tag, node, old = self._trail.pop()
+            if tag == "r":
+                self._rank[node] = old
+            else:  # "b" or "c"
+                if old is None:
+                    self._parent.pop(node, None)
+                else:
+                    self._parent[node] = old
+
+    # ── reification ───────────────────────────────────────────────
+
+    def reify(self, carrier: pm.Carrier, _seen: set | None = None) -> pm.Carrier:
+        """Deep-substitute all bound variables in *carrier*."""
+        if self.is_var(carrier):
+            root = self.find(carrier)
+            if root is carrier:
+                return carrier  # unbound variable
+            if _seen is not None and id(carrier) in _seen:
+                return carrier  # cycle detected
+            seen = _seen or set()
+            seen.add(id(carrier))
+            return self.reify(root, seen)
+        if carrier.is_leaf:
+            return carrier
+        changed = False
+        children: list[pm.Carrier] = []
+        for child in carrier:
+            reified = self.reify(child, _seen)
+            if reified is not child:
+                changed = True
+            children.append(reified)
+        if not changed:
+            return carrier
+        return carrier.reconstruct(tuple(children))
 
 
-def _capture(
+# ── walk ──────────────────────────────────────────────────────────
+
+
+def _walk(
     a: pm.Carrier,
     b: pm.Carrier,
-    is_var: Callable[[pm.Carrier], bool],
-) -> dict[pm.Carrier, frozenset[pm.Carrier]] | None:
-    bindings: dict[pm.Carrier, set[pm.Carrier]] = {}
-    for left, right in (walker := deep_zip(a, b)):
-        l_var = is_var(left)
-        r_var = is_var(right)
-        if l_var and r_var:
-            bindings.setdefault(left, set()).add(right)
-            bindings.setdefault(right, set()).add(left)
-            walker.skip()
-        elif l_var:
-            bindings.setdefault(left, set()).add(right)
-            walker.skip()
-        elif r_var:
-            bindings.setdefault(right, set()).add(left)
-            walker.skip()
-        elif left.is_leaf and right.is_leaf:
+    uf: UnionFind,
+    occurs_check: bool,
+) -> bool:
+    """Structural unification walk. Mutates *uf* with bindings."""
+    stack = [(a, b)]
+    while stack:
+        left, right = stack.pop()
+        left = uf.find(left)
+        right = uf.find(right)
+
+        if left is right:
+            continue
+
+        l_var = uf.is_var(left)
+        r_var = uf.is_var(right)
+
+        if l_var or r_var:
+            var, term = (left, right) if l_var else (right, left)
+            if not uf.bind(var, term, occurs_check=occurs_check):
+                return False
+            continue
+
+        # both non-var
+        if left.is_leaf and right.is_leaf:
             if left != right:
-                return None
-        elif left.is_leaf != right.is_leaf:
-            return None
-        else:
-            # Both non-leaf, non-var: deep_zip descends if arities match
-            if len(left) != len(right):
-                return None
-    return {k: frozenset(v) for k, v in bindings.items()}
+                return False
+            continue
+
+        if left.is_leaf != right.is_leaf:
+            return False
+
+        l_ch = list(left)
+        r_ch = list(right)
+        if len(l_ch) != len(r_ch):
+            return False
+
+        stack.extend(zip(reversed(l_ch), reversed(r_ch)))
+
+    return True
+
+
+# ── public API ────────────────────────────────────────────────────
 
 
 def unify(
     a: pm.Carrier,
     b: pm.Carrier,
     *,
-    is_var: Callable[[pm.Carrier], bool],
-    op: Callable[[frozenset[pm.Carrier]], pm.Carrier | None] = _default_op,
+    is_var: Callable[[pm.Carrier], bool] | None = None,
+    subst: UnionFind | None = None,
+    occurs_check: bool = True,
+    op: Callable | None = None,  # backward compat, ignored
 ) -> pm.Carrier | None:
     """Unify two carrier trees.
 
-    1. Capture: walk both trees in parallel, collect bindings for variables
-    2. Resolve: apply `op` to resolve each variable's binding set
-    3. Reify: substitute resolved bindings into `a`
+    Accepts either an ``is_var`` predicate (creates a fresh UnionFind) or
+    a shared ``subst`` (accumulates bindings across calls).
+
+    Returns the reified result rooted at *a*, or None on failure.
     """
-    # Stage 1: capture
-    raw = _capture(a, b, is_var)
-    if raw is None:
+    if subst is not None:
+        uf = subst
+    elif is_var is not None:
+        uf = UnionFind(is_var)
+    else:
+        raise TypeError("Either is_var or subst must be provided")
+
+    if not _walk(a, b, uf, occurs_check):
         return None
 
-    # Stage 2: resolve
-    resolved = {}
-    for var, vals in raw.items():
-        result = op(vals)
-        if result is None:
-            return None
-        resolved[var] = result
-
-    # Stage 3: reify
-    return a.subst(resolved)
+    return uf.reify(a)
