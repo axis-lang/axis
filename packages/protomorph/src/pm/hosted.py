@@ -33,6 +33,15 @@ class Host(Builtin):
     ) -> Any:
         raise NotImplementedError
 
+    def eval_logic_op(
+        self,
+        operator: pm.Placeholder,
+        *,
+        goal: pm.Spec,
+        session: object,
+    ) -> object | None:
+        return None
+
 
 def current_host() -> pm.Host:
     return pm.HOST.get()

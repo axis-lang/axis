@@ -34,9 +34,12 @@ def spec_name(cls: type[pm.Builtin]) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-class NativeVar(pm.Var[str | None, str]):
+class NativeVar(pm.Var):
     ctx: str | None
     id: str
+
+    def display_label(self) -> str | None:
+        return self.id
 
 
 def _native_ctx(template: object | None) -> str | None:
@@ -132,7 +135,7 @@ class NativeHost(Host, Consed):
             if (
                 len(converted) == 1
                 and isinstance(converted[0], pm.Placeholder)
-                and cast(pm.Var, converted[0]).id.startswith("*")
+                and (pm.placeholder_name(cast(pm.Placeholder, converted[0])) or "").startswith("*")
             ):
                 return converted[0]
             return cast(pm.Type, pm.VaryingType(converted))
@@ -227,7 +230,7 @@ class NativeHost(Host, Consed):
 
         def _make_replacement(ph: pm.Placeholder) -> object:
             replacement = mapping[ph]
-            if cast(pm.Var, ph).id.startswith("*") and isinstance(replacement, pm.VaryingType):
+            if (pm.placeholder_name(ph) or "").startswith("*") and isinstance(replacement, pm.VaryingType):
                 return pm.Spread(replacement.values)
             return replacement
 

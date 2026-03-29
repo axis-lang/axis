@@ -1,5 +1,11 @@
 ## Lo que implica resolución estilo Rust
 
+Documentos relacionados:
+
+- API publica actual: `packages/protomorph/doc/reasoning-api.md`
+- arquitectura URS: `packages/protomorph/doc/urs-design.md`
+- estado de cierre: `packages/protomorph/doc/urs-closure-roadmap.md`
+
 El caso canónico:
 
 ```rust

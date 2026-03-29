@@ -22,7 +22,7 @@ _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 
 def repr_any(obj: Any) -> str:
     """Single dispatch repr for any core object (Type, Val, Builtin)."""
-    from .type_ import Placeholder
+    from .type_ import Placeholder, placeholder_label
     from .domain import UniformType, UnionType, VaryingType, IndexedType
     from .domain import Spread, Spec, Qual
     from .carrier import Carrier, LeafCarrier, Tuple, NativeObjectCarrier, Index
@@ -35,7 +35,7 @@ def repr_any(obj: Any) -> str:
 
     # ── Concrete Types (check before generic Type) ──
     if isinstance(obj, Placeholder):
-        return f"${obj.id}"
+        return f"${placeholder_label(obj)}"
     if isinstance(obj, VaryingType):
         return _repr_varying(obj)
     if isinstance(obj, IndexedType):

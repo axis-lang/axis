@@ -65,19 +65,64 @@ class Placeholder(Type, abstract=True):
     def metatype(self) -> Type:
         return self
 
-
-class Var[C, I](Placeholder, abstract=True):
-    ctx: C
-    id: str
+    def display_label(self) -> str | None:
+        return None
 
 
-class SimpleVar(Var[Builtin | None, str]):
+class Var(Placeholder, abstract=True):
+    pass
+
+
+class SimpleVar(Var):
     ctx: Builtin | None
     id: str
+
+    def display_label(self) -> str | None:
+        return self.id
 
 
 def placeholder(id: str, context: Any = None) -> Placeholder:
     return SimpleVar(context, id)
 
 
-__all__ = ["Type", "Placeholder", "Var", "SimpleVar", "placeholder", "Field"]
+def placeholder_name(value: Placeholder) -> str | None:
+    ident = getattr(value, "id", None)
+    return ident if isinstance(ident, str) else None
+
+
+def placeholder_context(value: Placeholder) -> object | None:
+    return getattr(value, "ctx", None)
+
+
+def placeholder_slot(value: Placeholder) -> int | None:
+    slot = getattr(value, "slot", None)
+    return slot if isinstance(slot, int) else None
+
+
+def placeholder_label(value: Placeholder) -> str:
+    label_fn = getattr(value, "display_label", None)
+    if callable(label_fn):
+        label = label_fn()
+        if isinstance(label, str):
+            return label
+    ident = placeholder_name(value)
+    if ident is not None:
+        return ident
+    slot = placeholder_slot(value)
+    if slot is not None:
+        return str(slot)
+    return type(value).__name__
+
+
+__all__ = [
+    "Type",
+    "Placeholder",
+    "Var",
+    "SimpleVar",
+    "placeholder",
+    "placeholder_name",
+    "placeholder_context",
+    "placeholder_slot",
+    "placeholder_label",
+    "Field",
+]

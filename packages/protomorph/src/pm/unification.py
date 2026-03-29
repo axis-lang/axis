@@ -5,6 +5,9 @@ from typing import Callable
 import pm
 
 
+_MISSING = object()
+
+
 class UnionFind:
     """Substitution environment with path compression, occurs check, and rollback.
 
@@ -16,19 +19,30 @@ class UnionFind:
     constraint solving.
     """
 
-    __slots__ = ("_parent", "_rank", "_trail", "is_var")
+    __slots__ = ("_parent", "_rank", "_trail", "_var_info", "_class_info", "is_var", "info_for", "merge_info")
 
-    def __init__(self, is_var: Callable[[pm.Carrier], bool]):
+    def __init__(
+        self,
+        is_var: Callable[[pm.Carrier], bool],
+        *,
+        info_for: Callable[[pm.Carrier], object | None] | None = None,
+        merge_info: Callable[[object | None, object | None], object | None] | None = None,
+    ):
         self._parent: dict[pm.Carrier, pm.Carrier] = {}
         self._rank: dict[pm.Carrier, int] = {}
         self._trail: list[tuple] = []
+        self._var_info: dict[pm.Carrier, object] = {}
+        self._class_info: dict[pm.Carrier, object] = {}
         self.is_var = is_var
+        self.info_for = _default_info_for if info_for is None else info_for
+        self.merge_info = _default_merge_info if merge_info is None else merge_info
 
     # ── core operations ───────────────────────────────────────────
 
     def find(self, x: pm.Carrier) -> pm.Carrier:
         """Follow parent chain to canonical representative (with path compression)."""
         if x not in self._parent:
+            self._ensure_class_info(x)
             return x
         root = x
         while root in self._parent:
@@ -40,6 +54,7 @@ class UnionFind:
                 self._trail.append(("c", curr, nxt))
                 self._parent[curr] = root
             curr = nxt
+        self._ensure_class_info(root)
         return root
 
     def bind(self, var: pm.Carrier, term: pm.Carrier, *, occurs_check: bool = True) -> bool:
@@ -64,6 +79,7 @@ class UnionFind:
                 a, b = b, a
         self._trail.append(("b", a, self._parent.get(a)))
         self._parent[a] = b
+        self._merge_class_info(a, b)
         ra, rb = self._rank.get(a, 0), self._rank.get(b, 0)
         if ra == rb:
             self._trail.append(("r", b, rb))
@@ -90,11 +106,37 @@ class UnionFind:
             tag, node, old = self._trail.pop()
             if tag == "r":
                 self._rank[node] = old
+            elif tag == "i":
+                if old is _MISSING:
+                    self._class_info.pop(node, None)
+                else:
+                    self._class_info[node] = old
             else:  # "b" or "c"
                 if old is None:
                     self._parent.pop(node, None)
                 else:
                     self._parent[node] = old
+
+    def variable_info(self, var: pm.Carrier) -> object | None:
+        if var in self._var_info:
+            return self._var_info[var]
+        info = self.info_for(var)
+        if info is not None:
+            self._var_info[var] = info
+        return info
+
+    def class_info(self, carrier: pm.Carrier) -> object | None:
+        root = self.find(carrier)
+        self._ensure_class_info(root)
+        return self._class_info.get(root)
+
+    def set_class_info(self, carrier: pm.Carrier, info: object | None) -> None:
+        root = self.find(carrier)
+        self._trail.append(("i", root, self._class_info.get(root, _MISSING)))
+        if info is None:
+            self._class_info.pop(root, None)
+        else:
+            self._class_info[root] = info
 
     # ── reification ───────────────────────────────────────────────
 
@@ -121,6 +163,29 @@ class UnionFind:
         if not changed:
             return carrier
         return carrier.reconstruct(tuple(children))
+
+    def _ensure_class_info(self, root: pm.Carrier) -> None:
+        if root in self._class_info:
+            return
+        if not self.is_var(root):
+            return
+        info = self.variable_info(root)
+        if info is not None:
+            self._class_info[root] = info
+
+    def _merge_class_info(self, a: pm.Carrier, b: pm.Carrier) -> None:
+        self._ensure_class_info(a)
+        self._ensure_class_info(b)
+        merged = self.merge_info(self._class_info.get(a), self._class_info.get(b))
+        self._trail.append(("i", b, self._class_info.get(b, _MISSING)))
+        if merged is None:
+            self._class_info.pop(b, None)
+        else:
+            self._class_info[b] = merged
+        if a is b:
+            return
+        self._trail.append(("i", a, self._class_info.get(a, _MISSING)))
+        self._class_info.pop(a, None)
 
 
 # ── walk ──────────────────────────────────────────────────────────
@@ -200,3 +265,17 @@ def unify(
         return None
 
     return uf.reify(a)
+
+
+def _default_info_for(_: pm.Carrier) -> object | None:
+    return None
+
+
+def _default_merge_info(left: object | None, right: object | None) -> object | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    if isinstance(left, frozenset) and isinstance(right, frozenset):
+        return left | right
+    return right if left != right else left

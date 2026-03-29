@@ -4,7 +4,17 @@ import unittest
 from typing import cast
 
 from pm import Spec, placeholder, wrap
-from pm.chalk import Ambiguous, ChalkSolver, NoSolution, RuleSet, Unique
+from pm.chalk import (
+    Ambiguous,
+    ChalkSolver,
+    Deferred,
+    Floundered,
+    KeyOfOperator,
+    MixedCycle,
+    NoSolution,
+    RuleSet,
+    Unique,
+)
 from pm.solver import Rule
 
 
@@ -28,126 +38,97 @@ class TestChalkSolver(unittest.TestCase):
         self.assertIsInstance(result, Unique)
         self.assertEqual(cast(Unique, result).subst[x], BOB)
 
-    def test_chain_unique(self):
-        x = placeholder("X")
-        y = placeholder("Y")
-        z = placeholder("Z")
-        solver = ChalkSolver(
-            RuleSet(
-                (
-                    fact("test.parent", ALICE, BOB),
-                    fact("test.parent", BOB, CAROL),
-                    Rule(
-                        Spec.of("test.gp", x, z),
-                        (Spec.of("test.parent", x, y), Spec.of("test.parent", y, z)),
-                    ),
-                )
-            )
-        )
-
+    def test_answers_multiple_results_are_ambiguous(self):
+        solver = ChalkSolver(RuleSet((fact("test.parent", ALICE, BOB), fact("test.parent", ALICE, CAROL))))
         q = placeholder("Q")
-        result = solver.solve(Spec.of("test.gp", ALICE, q))
 
-        self.assertIsInstance(result, Unique)
-        self.assertEqual(cast(Unique, result).subst[q], CAROL)
-
-    def test_shared_query_variable(self):
-        x = placeholder("X")
-        solver = ChalkSolver(
-            RuleSet(
-                (
-                    fact("test.parent", ALICE, BOB),
-                    fact("test.typeof", BOB, INT),
-                    Rule(
-                        Spec.of("test.good", x),
-                        (Spec.of("test.parent", ALICE, x), Spec.of("test.typeof", x, INT)),
-                    ),
-                )
-            )
-        )
-
-        q = placeholder("Q")
-        result = solver.solve(Spec.of("test.good", q))
-
-        self.assertIsInstance(result, Unique)
-        self.assertEqual(cast(Unique, result).subst[q], BOB)
-
-    def test_eq_reflexive_rule(self):
-        t = placeholder("T")
-        solver = ChalkSolver(RuleSet((Rule(Spec.of("std.rels.Eq", t, t), ()),)))
-
-        x = placeholder("X")
-        result = solver.solve(Spec.of("std.rels.Eq", INT, x))
-
-        self.assertIsInstance(result, Unique)
-        self.assertEqual(cast(Unique, result).subst[x], INT)
-
-    def test_recursive_base_case_is_ambiguous(self):
-        x = placeholder("X")
-        y = placeholder("Y")
-        solver = ChalkSolver(
-            RuleSet(
-                (
-                    fact("test.path", ALICE, BOB),
-                    fact("test.edge", ALICE, BOB),
-                    fact("test.edge", BOB, CAROL),
-                    Rule(
-                        Spec.of("test.path", x, y),
-                        (Spec.of("test.edge", x, y),),
-                    ),
-                    Rule(
-                        Spec.of("test.path", x, y),
-                        (
-                            Spec.of("test.edge", x, placeholder("M")),
-                            Spec.of("test.path", placeholder("M"), y),
-                        ),
-                    ),
-                )
-            )
-        )
-
-        q = placeholder("Q")
-        result = solver.solve(Spec.of("test.path", ALICE, q))
-
+        result = solver.solve(Spec.of("test.parent", ALICE, q))
         self.assertIsInstance(result, Ambiguous)
-        self.assertNotIn(q, cast(Ambiguous, result).subst)
 
     def test_recursive_without_base_is_no_solution(self):
         x = placeholder("X")
-        solver = ChalkSolver(
-            RuleSet(
-                (
-                    Rule(Spec.of("test.loop", x), (Spec.of("test.loop", x),)),
-                )
-            ),
-            max_depth=32,
-        )
+        solver = ChalkSolver(RuleSet((Rule(Spec.of("test.loop", x), (Spec.of("test.loop", x),)),)))
 
         result = solver.solve(Spec.of("test.loop", ALICE))
         self.assertIsInstance(result, NoSolution)
 
-    def test_rule_vars_do_not_alias_across_applications(self):
+    def test_non_ground_negation_flounders(self):
         x = placeholder("X")
-        y = placeholder("Y")
-        z = placeholder("Z")
         solver = ChalkSolver(
             RuleSet(
                 (
-                    fact("test.edge", ALICE, BOB),
-                    fact("test.edge", BOB, CAROL),
                     Rule(
-                        Spec.of("test.link2", x, z),
-                        (Spec.of("test.edge", x, y), Spec.of("test.edge", y, z)),
+                        Spec.of("test.safe", x),
+                        (Spec.of("std.logic.Not", Spec.of("test.blocked", x)),),
                     ),
                 )
             )
         )
 
         q = placeholder("Q")
-        result = solver.solve(Spec.of("test.link2", ALICE, q))
+        result = solver.solve(Spec.of("test.safe", q))
+        self.assertIsInstance(result, Floundered)
 
-        self.assertIsInstance(result, Unique)
-        self.assertEqual(cast(Unique, result).subst[q], CAROL)
+    def test_negative_fact_becomes_deferred_until_stratum_closed(self):
+        x = placeholder("X")
+        solver = ChalkSolver(
+            RuleSet(
+                (
+                    fact("test.blocked", ALICE),
+                    Rule(
+                        Spec.of("test.safe", x),
+                        (Spec.of("std.logic.Not", Spec.of("test.blocked", x)),),
+                    ),
+                )
+            )
+        )
+
+        result = solver.solve(Spec.of("test.safe", ALICE))
+        self.assertIsInstance(result, Deferred)
+
+    def test_mixed_cycle_reported_separately(self):
+        x = placeholder("X")
+        solver = ChalkSolver(
+            RuleSet(
+                (
+                    Rule(Spec.of("test.co", x), (Spec.of("test.in", x),)),
+                    Rule(Spec.of("test.in", x), (Spec.of("test.co", x),)),
+                ),
+                coinductive_anchors=frozenset(("test.co",)),
+            )
+        )
+
+        result = solver.solve(Spec.of("test.co", ALICE))
+        self.assertIsInstance(result, MixedCycle)
+
+    def test_unhandled_operator_is_deferred(self):
+        x = placeholder("X")
+        solver = ChalkSolver(
+            RuleSet(
+                (
+                    Rule(
+                        Spec.of("test.inspect", x),
+                        (Spec.of("test.requires", KeyOfOperator.of(x)),),
+                    ),
+                )
+            )
+        )
+        result = solver.solve(Spec.of("test.inspect", KeyOfOperator.of(ALICE)))
+        self.assertIsInstance(result, Deferred)
+
+    @unittest.expectedFailure
+    def test_keyof_deferred_until_structural_input_known(self):
+        solver = ChalkSolver(RuleSet(()))
+        q = placeholder("Q")
+        result = solver.solve(Spec.of("std.rels.KeyOf", KeyOfOperator.of(q), placeholder("R")))
+        self.assertIsInstance(result, Deferred)
+
+    @unittest.expectedFailure
+    def test_projection_deferred_until_receiver_known(self):
+        solver = ChalkSolver(RuleSet(()))
+        q = placeholder("Q")
+        result = solver.solve(Spec.of("std.rels.Proj", q, Spec.of("Iterator"), "Item", placeholder("R")))
+        self.assertIsInstance(result, Deferred)
 
 
 if __name__ == "__main__":

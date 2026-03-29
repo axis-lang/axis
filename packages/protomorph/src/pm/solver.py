@@ -50,11 +50,12 @@ def _collect_placeholders(*specs: pm.Spec) -> set[pm.Placeholder]:
 
 def _fresh_placeholder(ph: pm.Placeholder, ctx: _FreshCtx) -> pm.Placeholder:
     """Create a fresh copy of *ph* under a new context."""
+    name = pm.placeholder_name(ph)
     if isinstance(ph, pm.SimpleVar):
-        return pm.SimpleVar(ctx, ph.id)
+        return pm.SimpleVar(ctx, name or "?")
     # Fallback for other Var subtypes: use SimpleVar with fresh ctx.
     if isinstance(ph, pm.Var):
-        return pm.SimpleVar(ctx, ph.id)
+        return pm.SimpleVar(ctx, name or pm.placeholder_label(ph))
     return pm.SimpleVar(ctx, "?")
 
 

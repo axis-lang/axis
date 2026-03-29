@@ -22,6 +22,10 @@ from .type_ import (
     Var,
     SimpleVar,
     placeholder,
+    placeholder_name,
+    placeholder_context,
+    placeholder_slot,
+    placeholder_label,
 )
 
 # ── Layer 4: Concrete types ──────────────────────────────────────
