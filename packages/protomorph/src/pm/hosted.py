@@ -38,8 +38,8 @@ class Host(Builtin):
         operator: pm.Placeholder,
         *,
         goal: pm.Spec,
-        session: object,
-    ) -> object | None:
+        session: Any,
+    ) -> Any | None:
         return None
 
 

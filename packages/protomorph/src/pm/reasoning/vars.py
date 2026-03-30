@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
-from .model import EqClassInfo, Rule
+from .model import EqClassInfo
 
 
 class ReasoningCtx(Builtin, abstract=True):
@@ -22,7 +23,7 @@ class RuleTemplateKey(Builtin):
 
 
 class RuleCtx(ReasoningCtx):
-    origin_rule: Rule
+    origin_rule: urs.Rule
     template_key: RuleTemplateKey
     source_names: tuple[str | None, ...] = ()
 
@@ -114,14 +115,14 @@ def origin_var_of(var: pm.Var) -> pm.Var:
     return var
 
 
-def class_info_for_var(var: pm.Var) -> EqClassInfo:
+def class_info_for_var(var: pm.Var) -> urs.EqClassInfo:
     origin = origin_var_of(var)
     source_name = source_name_of(origin)
     names = frozenset(() if source_name is None else (source_name,))
     return EqClassInfo(frozenset((origin,)), names)
 
 
-def merge_class_info(left: EqClassInfo | None, right: EqClassInfo | None) -> EqClassInfo | None:
+def merge_class_info(left: urs.EqClassInfo | None, right: urs.EqClassInfo | None) -> urs.EqClassInfo | None:
     if left is None:
         return right
     if right is None:

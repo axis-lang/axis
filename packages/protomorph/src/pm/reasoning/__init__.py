@@ -1,15 +1,16 @@
-from .database import Database, RuleSetDatabase
-from .engine import Engine, EngineTables
 from .model import (
     NEGATION_ANCHOR,
     Answer,
     Blocker,
     BindingsChanged,
+    BranchCompletion,
     CycleMember,
     CycleTrace,
     CycleIssue,
     DeferredGoal,
+    DirectCompletion,
     EqClassInfo,
+    ExpandCompletion,
     ImplSelectionBlocked,
     Judgment,
     LocalFactsChanged,
@@ -22,6 +23,7 @@ from .model import (
     ProjectionBlocked,
     ReasoningValue,
     Rule,
+    RuleCompletion,
     StratumClosed,
     StratumPending,
     TypeFunctionBlocked,
@@ -30,19 +32,6 @@ from .model import (
     is_negation,
     unwrap_negation,
 )
-from .result import (
-    Ambiguous,
-    Deferred,
-    Floundered,
-    MixedCycle,
-    NegativeCycle,
-    NoSolution,
-    SolverResult,
-    Unique,
-)
-from .session import Session, SessionState, SolveContext
-from .stratify import DependencyGraph, Scc, StratificationPlan
-from .subst import BindingSnapshot
 from .vars import (
     BranchCtx,
     BranchVar,
@@ -56,11 +45,10 @@ from .vars import (
     RuleTemplateKey,
     RuleVar,
 )
-from .query import Query, QueryTable, Result
-from .tabling import SessionTables, StoredAnswer
 from .operators import (
     LogicOpStep,
     OpAnswer,
+    OpBind,
     OpDeferred,
     OpExpand,
     OpFailed,
@@ -68,6 +56,24 @@ from .operators import (
     SolverOperator,
     KeyOfOperator,
 )
+from .result import (
+    Ambiguous,
+    Deferred,
+    Floundered,
+    MixedCycle,
+    NegativeCycle,
+    NoSolution,
+    SolverResult,
+    Unique,
+)
+from .tabling import EngineTables, SessionTables, StoredAnswer
+from .stratify import DependencyGraph, Scc, StratificationPlan
+from .subst import BindingSnapshot, contains_goal_slots, goal_slot_index_of
+from .database import Database, RuleSetDatabase
+from .core import EngineSolveCore, QueryCore, SessionSolveCore
+from .engine import Engine
+from .session import Session, SessionState, SolveContext
+from .query import Query, QueryTable, Result
 
 __all__ = [
     "NEGATION_ANCHOR",
@@ -81,7 +87,11 @@ __all__ = [
     "LocalFactsChanged",
     "StratumClosed",
     "OperatorRetriable",
+    "BranchCompletion",
     "PendingBranch",
+    "DirectCompletion",
+    "ExpandCompletion",
+    "RuleCompletion",
     "StratumPending",
     "NonGroundNegation",
     "OperatorPending",
@@ -103,12 +113,17 @@ __all__ = [
     "Floundered",
     "MixedCycle",
     "NegativeCycle",
+    "QueryCore",
+    "SessionSolveCore",
+    "EngineSolveCore",
     "Database",
     "RuleSetDatabase",
     "Engine",
     "EngineTables",
     "SolveContext",
     "BindingSnapshot",
+    "contains_goal_slots",
+    "goal_slot_index_of",
     "QueryCtx",
     "QueryVar",
     "RuleTemplateKey",
@@ -131,6 +146,7 @@ __all__ = [
     "LogicOpStep",
     "OpExpand",
     "OpAnswer",
+    "OpBind",
     "OpDeferred",
     "OpFailed",
     "SolverOperator",

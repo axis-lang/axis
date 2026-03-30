@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import Any, cast
 
 from protobase import frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.unification import UnionFind, unify
 
 from .model import (
@@ -56,9 +57,6 @@ from .subst import (
 )
 from .vars import EqClassInfo, RuleAppCtx, RuleCtx
 
-if TYPE_CHECKING:
-    from .session import Session
-
 
 class _CompiledLiteral(pm.Builtin):
     goal: pm.Carrier
@@ -66,8 +64,8 @@ class _CompiledLiteral(pm.Builtin):
 
 
 class _CompiledRule(pm.Builtin):
-    rule: Rule
-    ctx: RuleCtx
+    rule: urs.Rule
+    ctx: urs.RuleCtx
     head: pm.Carrier
     body: tuple[_CompiledLiteral, ...]
 
@@ -75,22 +73,22 @@ class _CompiledRule(pm.Builtin):
 class _AnswerData(pm.Builtin):
     subst: tuple[tuple[int, pm.Carrier], ...]
     evidence: pm.Spec | None = None
-    judgment: Judgment | None = None
+    judgment: urs.Judgment | None = None
 
 
 class _GoalOutcome(pm.Builtin):
     answers: tuple[_AnswerData, ...] = ()
-    deferred: tuple[DeferredGoal, ...] = ()
-    branches: tuple[PendingBranch, ...] = ()
-    cycle_issue: CycleIssue | None = None
-    failures: tuple[Judgment, ...] = ()
+    deferred: tuple[urs.DeferredGoal, ...] = ()
+    branches: tuple[urs.PendingBranch, ...] = ()
+    cycle_issue: urs.CycleIssue | None = None
+    failures: tuple[urs.Judgment, ...] = ()
 
 
 class _ResumeBranchResult(pm.Builtin):
     answers: tuple[_AnswerData, ...] = ()
-    branches: tuple[PendingBranch, ...] = ()
-    cycle_issue: CycleIssue | None = None
-    failures: tuple[Judgment, ...] = ()
+    branches: tuple[urs.PendingBranch, ...] = ()
+    cycle_issue: urs.CycleIssue | None = None
+    failures: tuple[urs.Judgment, ...] = ()
 
 
 @dataclass(slots=True)
@@ -109,15 +107,15 @@ class _GoalEntry:
     deferred: dict[tuple[pm.Spec, object], DeferredGoal] = field(default_factory=dict)
     branches: dict[
         tuple[
-            DeferredGoal,
+            urs.DeferredGoal,
             tuple[pm.Spec, ...],
             tuple[tuple[int, pm.Carrier], ...],
-            tuple[EqClassInfo | None, ...],
+            tuple[urs.EqClassInfo | None, ...],
         ],
-        PendingBranch,
+        urs.PendingBranch,
     ] = field(default_factory=dict)
-    cycle_issue: CycleIssue | None = None
-    failures: dict[Judgment, None] = field(default_factory=dict)
+    cycle_issue: urs.CycleIssue | None = None
+    failures: dict[urs.Judgment, None] = field(default_factory=dict)
 
     def outcome(self) -> _GoalOutcome:
         return _GoalOutcome(
@@ -130,11 +128,11 @@ class _GoalEntry:
 
 
 class _QueryCore:
-    def __init__(self, session: Session, goal: pm.Spec):
+    def __init__(self, session: urs.Session, goal: pm.Spec):
         self.session = session
         self.goal = goal
         self.engine = session.engine
-        self._compiled_rules: dict[Rule, _CompiledRule] = {}
+        self._compiled_rules: dict[urs.Rule, _CompiledRule] = {}
         self._tables: dict[pm.Spec, _GoalEntry] = {}
         self._next_owner = 1
         self._active_stack: list[_ActiveFrame] = []
@@ -213,7 +211,7 @@ class _QueryCore:
             return _GoalOutcome(answers=(_AnswerData((), evidence, Judgment(goal, evidence, trace=trace)),))
         return None
 
-    def _cycle_trace(self, index: int, goal: pm.Spec, coinductive: bool, via_negation: bool) -> CycleTrace:
+    def _cycle_trace(self, index: int, goal: pm.Spec, coinductive: bool, via_negation: bool) -> urs.CycleTrace:
         frames = self._active_stack[index:]
         members = tuple(CycleMember(frame.goal, frame.coinductive, frame.via_negation) for frame in frames)
         internal_negative = via_negation or any(frame.via_negation for frame in frames[1:])
@@ -264,14 +262,14 @@ class _QueryCore:
         answers: list[_AnswerData] = []
         deferred: list[DeferredGoal] = []
         branches: list[PendingBranch] = []
-        cycle_issue: CycleIssue | None = None
+        cycle_issue: urs.CycleIssue | None = None
         failures: list[Judgment] = []
 
         uf = make_union_find()
         if unify(self._instantiate_goal(goal), self._instantiate_goal(goal), subst=uf) is None:
             return _GoalOutcome()
 
-        def solve_body(index: int, subjudgments: tuple[Judgment, ...]) -> None:
+        def solve_body(index: int, subjudgments: tuple[urs.Judgment, ...]) -> None:
             nonlocal cycle_issue
             if index == len(goals):
                 evidence = _evidence_expand(goal.key, subjudgments)
@@ -313,7 +311,7 @@ class _QueryCore:
         solve_body(0, ())
         return _GoalOutcome(tuple(answers), tuple(_dedupe_deferred(deferred)), tuple(branches), cycle_issue, tuple(_dedupe_judgments(failures)))
 
-    def _rule_outcome(self, goal: CanonicalGoal, rule: Rule) -> _GoalOutcome:
+    def _rule_outcome(self, goal: CanonicalGoal, rule: urs.Rule) -> _GoalOutcome:
         compiled = self._compile_rule(rule)
         app_ctx = self._new_rule_app_ctx(goal.key, compiled.ctx)
         goal_runtime = self._instantiate_goal(goal)
@@ -324,10 +322,10 @@ class _QueryCore:
         answers: list[_AnswerData] = []
         deferred: list[DeferredGoal] = []
         branches: list[PendingBranch] = []
-        cycle_issue: CycleIssue | None = None
+        cycle_issue: urs.CycleIssue | None = None
         failures: list[Judgment] = []
 
-        def solve_body(index: int, subjudgments: tuple[Judgment, ...]) -> None:
+        def solve_body(index: int, subjudgments: tuple[urs.Judgment, ...]) -> None:
             nonlocal cycle_issue
             if index == len(compiled.body):
                 evidence = _evidence_rule(rule, subjudgments)
@@ -452,7 +450,7 @@ class _QueryCore:
             return _GoalOutcome(failures=tuple(_dedupe_judgments(failures)))
         return _GoalOutcome()
 
-    def _compile_rule(self, rule: Rule) -> _CompiledRule:
+    def _compile_rule(self, rule: urs.Rule) -> _CompiledRule:
         cached = self._compiled_rules.get(rule)
         if cached is not None:
             return cached
@@ -545,21 +543,21 @@ class _QueryCore:
         evidence = step.evidence
         return _AnswerData(tuple(subst), evidence, Judgment(goal.key, evidence))
 
-    def _new_rule_app_ctx(self, parent_goal: pm.Spec, rule_ctx: RuleCtx) -> RuleAppCtx:
+    def _new_rule_app_ctx(self, parent_goal: pm.Spec, rule_ctx: urs.RuleCtx) -> RuleAppCtx:
         owner = self._next_owner
         self._next_owner += 1
         return RuleAppCtx(parent_goal, rule_ctx, owner)
 
     def _persist_runtime_branch(
         self,
-        blocked: DeferredGoal,
+        blocked: urs.DeferredGoal,
         blocked_carrier: pm.Carrier,
         remaining_carriers: tuple[pm.Carrier, ...],
         uf: UnionFind,
         blocked_is_negated: bool,
-        completion: BranchCompletion,
-        subjudgments: tuple[Judgment, ...],
-    ) -> PendingBranch:
+        completion: urs.BranchCompletion,
+        subjudgments: tuple[urs.Judgment, ...],
+    ) -> urs.PendingBranch:
         blocked_goal, remaining_goals, subst, slot_info = canonicalize_branch(blocked_carrier, remaining_carriers, uf)
         return PendingBranch(
             blocked=DeferredGoal(blocked_goal, blocked.blocker, blocked.evidence, blocked.wake_on, blocked.judgment),
@@ -573,10 +571,10 @@ class _QueryCore:
 
 
 class _SessionSolveCore:
-    def __init__(self, session: Session):
+    def __init__(self, session: urs.Session):
         self.session = session
 
-    def run(self) -> Session:
+    def run(self) -> urs.Session:
         session = self.session
         while True:
             before = _session_signature(session)
@@ -592,7 +590,7 @@ class _SessionSolveCore:
             if _session_signature(session) == before:
                 return session
 
-    def _open_tables(self, session: Session) -> tuple:
+    def _open_tables(self, session: urs.Session) -> tuple:
         candidates: dict[pm.Spec, object] = {}
         tables = session.state.tables.query_tables
         has_targeted_updates = bool(session.state.recent_binding_updates or session.state.recent_local_fact_anchors)
@@ -617,7 +615,7 @@ class _SessionSolveCore:
 
         return tuple(candidates.values())
 
-    def _should_retry_table(self, table, session: Session) -> bool:
+    def _should_retry_table(self, table, session: urs.Session) -> bool:
         if not table.continuation_state:
             return False
         for branch in table.continuation_state:
@@ -625,11 +623,9 @@ class _SessionSolveCore:
                 return True
         return False
 
-    def _resume_table(self, table, session: Session):
-        from .tabling import QueryTable, StoredAnswer
-
-        next_branches: list[PendingBranch] = []
-        answers_by_subst: dict[tuple[tuple[int, pm.Carrier], ...], StoredAnswer] = {
+    def _resume_table(self, table, session: urs.Session):
+        next_branches: list[urs.PendingBranch] = []
+        answers_by_subst: dict[tuple[tuple[int, pm.Carrier], ...], urs.StoredAnswer] = {
             answer.subst: answer for answer in table.answers
         }
         failures = list(table.failures)
@@ -640,7 +636,7 @@ class _SessionSolveCore:
             if resumed.cycle_issue is not None:
                 cycle_issue = resumed.cycle_issue
             for answer in resumed.answers:
-                stored = StoredAnswer(answer.subst, answer.evidence, answer.judgment)
+                stored = urs.StoredAnswer(answer.subst, answer.evidence, answer.judgment)
                 current = answers_by_subst.get(stored.subst)
                 if current is None or _stored_answer_score(stored) > _stored_answer_score(current):
                     answers_by_subst[stored.subst] = stored
@@ -650,7 +646,7 @@ class _SessionSolveCore:
         deferred = tuple(branch.blocked for branch in next_branches)
         frontier = tuple(branch.blocked.goal for branch in next_branches)
         status = "cycle" if cycle_issue is not None else "blocked" if next_branches else "closed"
-        resumed_table = QueryTable(
+        resumed_table = urs.QueryTable(
             key=table.key,
             origin=table.origin,
             query_slot_indices=table.query_slot_indices,
@@ -669,7 +665,7 @@ class _SessionSolveCore:
         )
         return resumed_table
 
-    def _resume_branch(self, branch: PendingBranch, table, session: Session) -> _ResumeBranchResult:
+    def _resume_branch(self, branch: urs.PendingBranch, table, session: urs.Session) -> _ResumeBranchResult:
         env = rebuild_branch_env(branch, session.state.bindings)
         if env is None:
             return _ResumeBranchResult()
@@ -689,14 +685,14 @@ class _SessionSolveCore:
 
     def _resume_branch_state(
         self,
-        branch: PendingBranch,
+        branch: urs.PendingBranch,
         table,
-        session: Session,
+        session: urs.Session,
         uf: UnionFind,
         current_carrier: pm.Carrier,
         remaining_carriers: tuple[pm.Carrier, ...],
         slots: tuple[pm.Carrier, ...],
-        subjudgments: tuple[Judgment, ...],
+        subjudgments: tuple[urs.Judgment, ...],
         current_is_negated: bool,
     ) -> _ResumeBranchResult:
         while True:
@@ -788,19 +784,19 @@ class _SessionSolveCore:
             current_carrier, remaining_carriers = remaining_carriers[0], remaining_carriers[1:]
             current_is_negated = False
 
-    def _solve_canonical_goal(self, session: Session, goal: CanonicalGoal) -> _GoalOutcome:
+    def _solve_canonical_goal(self, session: urs.Session, goal: CanonicalGoal) -> _GoalOutcome:
         return _QueryCore(session, goal.key)._solve_goal(goal)
 
     def _persist_resumed_branch(
         self,
-        blocked: DeferredGoal,
+        blocked: urs.DeferredGoal,
         current_carrier: pm.Carrier,
         remaining_carriers: tuple[pm.Carrier, ...],
         uf: UnionFind,
         blocked_is_negated: bool,
-        completion: BranchCompletion | None,
-        subjudgments: tuple[Judgment, ...],
-    ) -> PendingBranch:
+        completion: urs.BranchCompletion | None,
+        subjudgments: tuple[urs.Judgment, ...],
+    ) -> urs.PendingBranch:
         blocked_goal, remaining_goals, subst, slot_info = canonicalize_branch(current_carrier, remaining_carriers, uf)
         return PendingBranch(
             blocked=DeferredGoal(blocked_goal, blocked.blocker, blocked.evidence, blocked.wake_on, blocked.judgment),
@@ -814,12 +810,12 @@ class _SessionSolveCore:
 
     def _persist_spec_branch(
         self,
-        branch: PendingBranch,
+        branch: urs.PendingBranch,
         trailing_goals: tuple[pm.Spec, ...],
         info_by_placeholder: dict[pm.Placeholder, EqClassInfo | None],
-        completion: BranchCompletion | None,
-        subjudgments: tuple[Judgment, ...],
-    ) -> PendingBranch:
+        completion: urs.BranchCompletion | None,
+        subjudgments: tuple[urs.Judgment, ...],
+    ) -> urs.PendingBranch:
         blocked_goal, remaining_goals = materialize_branch_goals(branch)
         canonical_blocked, canonical_remaining, subst, slot_info = canonicalize_branch_specs(
             blocked_goal,
@@ -844,15 +840,15 @@ class _SessionSolveCore:
 
     def _resume_branch_answers(
         self,
-        branch: PendingBranch,
+        branch: urs.PendingBranch,
         table,
-        session: Session,
+        session: urs.Session,
         current_goal: CanonicalGoal,
         answers: tuple[_AnswerData, ...],
         remaining_carriers: tuple[pm.Carrier, ...],
         slots: tuple[pm.Carrier, ...],
         uf: UnionFind,
-        subjudgments: tuple[Judgment, ...],
+        subjudgments: tuple[urs.Judgment, ...],
     ) -> _ResumeBranchResult:
         resumed_answers: list[_AnswerData] = []
         resumed_branches: list[PendingBranch] = []
@@ -892,11 +888,11 @@ class _SessionSolveCore:
 
     def _complete_branch(
         self,
-        branch: PendingBranch,
+        branch: urs.PendingBranch,
         table,
         current_goal: CanonicalGoal,
         answer: _AnswerData,
-        subjudgments: tuple[Judgment, ...],
+        subjudgments: tuple[urs.Judgment, ...],
         slots: tuple[pm.Carrier, ...],
         uf: UnionFind,
     ) -> _AnswerData | None:
@@ -914,7 +910,7 @@ class _SessionSolveCore:
             return _AnswerData(subst, evidence, Judgment(completion.rel, evidence, subjudgments))
         return None
 
-    def _wake_satisfied(self, table, wake, session: Session) -> bool:
+    def _wake_satisfied(self, table, wake, session: urs.Session) -> bool:
         from .model import BindingsChanged, LocalFactsChanged, OperatorRetriable, StratumClosed
 
         if isinstance(wake, BindingsChanged):
@@ -937,8 +933,6 @@ class _EngineSolveCore:
         self.engine = engine
 
     def run(self):
-        from .tabling import EngineTables
-
         known: dict[str, set[pm.Spec]] = {
             anchor: set(self.engine.facts_by_anchor.get(anchor, ()))
             for anchor in self.engine.anchors
@@ -988,7 +982,7 @@ class _EngineSolveCore:
             facts_by_component[component.id] = tuple(_dedupe_specs(facts))
             derived_by_component[component.id] = tuple(_dedupe_specs(component_derived))
 
-        return EngineTables(
+        return urs.EngineTables(
             facts_by_anchor=frozendict((anchor, tuple(sorted(values, key=repr))) for anchor, values in known.items()),
             derived_facts_by_anchor=frozendict((anchor, tuple(sorted(values, key=repr))) for anchor, values in derived.items()),
             facts_by_component=frozendict(sorted(facts_by_component.items())),
@@ -1019,20 +1013,20 @@ def _dedupe_specs(items: list[pm.Spec]) -> list[pm.Spec]:
     return list(deduped)
 
 
-def _dedupe_judgments(items: list[Judgment] | tuple[Judgment, ...]) -> tuple[Judgment, ...]:
-    deduped: dict[Judgment, None] = {}
+def _dedupe_judgments(items: list[Judgment] | tuple[urs.Judgment, ...]) -> tuple[urs.Judgment, ...]:
+    deduped: dict[urs.Judgment, None] = {}
     for item in items:
         deduped[item] = None
     return tuple(deduped)
 
 
-def _preferred_failures(outcome: _GoalOutcome, goal: pm.Spec) -> tuple[Judgment, ...]:
+def _preferred_failures(outcome: _GoalOutcome, goal: pm.Spec) -> tuple[urs.Judgment, ...]:
     if outcome.failures:
         return outcome.failures
     return (_failure_judgment(goal, "no matching proof"),)
 
 
-def _failure_judgment(goal: pm.Spec, reason: str, subjudgments: tuple[Judgment, ...] = ()) -> Judgment:
+def _failure_judgment(goal: pm.Spec, reason: str, subjudgments: tuple[urs.Judgment, ...] = ()) -> urs.Judgment:
     evidence = pm.Spec.of("std.logic.ByNoSolution", goal, reason)
     return Judgment(goal, evidence, subjudgments)
 
@@ -1045,7 +1039,7 @@ def _stored_answer_score(answer) -> tuple[int, int]:
     return _judgment_score(answer.judgment)
 
 
-def _judgment_score(judgment: Judgment | None) -> tuple[int, int]:
+def _judgment_score(judgment: urs.Judgment | None) -> tuple[int, int]:
     if judgment is None or judgment.evidence is None:
         return (0, 0)
     anchor = str(judgment.evidence.anchor)
@@ -1071,7 +1065,7 @@ def _has_generic_wake(table) -> bool:
     return False
 
 
-def _session_signature(session: Session):
+def _session_signature(session: urs.Session):
     state = session.state
     return (state.bindings, state.local_facts, state.deferred, state.tables)
 
@@ -1080,15 +1074,15 @@ def _evidence_fact(fact: pm.Spec) -> pm.Spec:
     return pm.Spec.of("std.logic.ByFact", fact)
 
 
-def _evidence_rule(rule: Rule, subjudgments: tuple[Judgment, ...] = ()) -> pm.Spec:
+def _evidence_rule(rule: urs.Rule, subjudgments: tuple[urs.Judgment, ...] = ()) -> pm.Spec:
     return pm.Spec.of("std.logic.ByRule", rule.head, *subjudgments)
 
 
-def _evidence_rule_head(rule_head: pm.Spec, subjudgments: tuple[Judgment, ...] = ()) -> pm.Spec:
+def _evidence_rule_head(rule_head: pm.Spec, subjudgments: tuple[urs.Judgment, ...] = ()) -> pm.Spec:
     return pm.Spec.of("std.logic.ByRule", rule_head, *subjudgments)
 
 
-def _evidence_expand(goal: pm.Spec, subjudgments: tuple[Judgment, ...] = ()) -> pm.Spec:
+def _evidence_expand(goal: pm.Spec, subjudgments: tuple[urs.Judgment, ...] = ()) -> pm.Spec:
     return pm.Spec.of("std.logic.ByExpand", goal, *subjudgments)
 
 
@@ -1108,17 +1102,17 @@ def _evidence_negation(goal: pm.Spec) -> pm.Spec:
     return pm.Spec.of("std.logic.ByNegation", goal)
 
 
-def _deferred_goal(goal: pm.Spec, blocker, evidence: pm.Spec | None = None) -> DeferredGoal:
+def _deferred_goal(goal: pm.Spec, blocker, evidence: pm.Spec | None = None) -> urs.DeferredGoal:
     evidence = evidence or _evidence_deferred(goal, blocker)
     return DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence))
 
 
-def _negation_judgment(goal: pm.Spec) -> Judgment:
+def _negation_judgment(goal: pm.Spec) -> urs.Judgment:
     rel = pm.Spec.of("std.logic.Not", goal)
     return Judgment(rel, _evidence_negation(goal))
 
 
-def _search_operator(value: object) -> SolverOperator | None:
+def _search_operator(value: Any) -> SolverOperator | None:
     if isinstance(value, SolverOperator):
         return value
     if isinstance(value, pm.Spec):
@@ -1135,7 +1129,7 @@ def _search_operator(value: object) -> SolverOperator | None:
     return None
 
 
-def _coerce_bound_value(goal: CanonicalGoal, slot: int, value: object) -> pm.Carrier:
+def _coerce_bound_value(goal: CanonicalGoal, slot: int, value: Any) -> pm.Carrier:
     if isinstance(value, pm.Carrier):
         return value
     if isinstance(value, pm.Spec):
@@ -1143,7 +1137,7 @@ def _coerce_bound_value(goal: CanonicalGoal, slot: int, value: object) -> pm.Car
     return pm.LeafCarrier(goal.slots[slot].descriptor, value)
 
 
-def _coerce_bound_value_for_carrier(slot: pm.Carrier, value: object) -> pm.Carrier:
+def _coerce_bound_value_for_carrier(slot: pm.Carrier, value: Any) -> pm.Carrier:
     if isinstance(value, pm.Carrier):
         return value
     if isinstance(value, pm.Spec):
@@ -1167,7 +1161,7 @@ def _remaining_rule_goals(
 
 
 def _derive_ground_facts(
-    rule: Rule,
+    rule: urs.Rule,
     known: dict[str, set[pm.Spec]],
     plan,
     current_stratum: int,
@@ -1251,3 +1245,8 @@ def _specs_from_carriers(carriers: tuple[pm.Carrier, ...], uf: UnionFind) -> tup
             raise TypeError("Expected branch carrier to reify to Spec")
         values.append(value)
     return tuple(values)
+
+
+QueryCore = _QueryCore
+SessionSolveCore = _SessionSolveCore
+EngineSolveCore = _EngineSolveCore

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
-from .model import Answer, DeferredGoal, Judgment, OperatorPending, ReasoningValue, default_wake_on
+from .model import DeferredGoal, Judgment, OperatorPending, default_wake_on
 
 
 class LogicOpStep(Builtin, abstract=True):
@@ -17,16 +18,16 @@ class OpExpand(LogicOpStep):
 
 
 class OpAnswer(LogicOpStep):
-    answers: tuple[Answer, ...] = ()
+    answers: tuple[urs.Answer, ...] = ()
 
 
 class OpBind(LogicOpStep):
-    subst: tuple[tuple[int, ReasoningValue], ...] = ()
+    subst: tuple[tuple[int, urs.ReasoningValue], ...] = ()
     evidence: pm.Spec | None = None
 
 
 class OpDeferred(LogicOpStep):
-    blocked: DeferredGoal
+    blocked: urs.DeferredGoal
 
 
 class OpFailed(LogicOpStep):
@@ -34,7 +35,7 @@ class OpFailed(LogicOpStep):
 
 
 class SolverOperator(pm.SimpleVar, abstract=True):
-    def eval(self, *, goal: pm.Spec, session: object, db: object) -> LogicOpStep:
+    def eval(self, *, goal: pm.Spec, session: urs.Session, db: urs.Database) -> urs.LogicOpStep:
         evaluator = getattr(db, "eval_logic_op", None)
         if callable(evaluator):
             result = evaluator(self, goal=goal, session=session)
@@ -47,13 +48,13 @@ class SolverOperator(pm.SimpleVar, abstract=True):
 
 class KeyOfOperator(SolverOperator):
     @classmethod
-    def of(cls, target: object) -> KeyOfOperator:
+    def of(cls, target: Any) -> KeyOfOperator:
         return cast(KeyOfOperator, cls(None, f"keyof:{target!r}"))
 
 
 class ProjectionOperator(SolverOperator):
     @classmethod
-    def of(cls, target: object, trait: pm.Spec, name: str) -> ProjectionOperator:
+    def of(cls, target: Any, trait: pm.Spec, name: str) -> ProjectionOperator:
         return cast(ProjectionOperator, cls(None, f"proj:{target!r}:{trait!r}:{name}"))
 
 

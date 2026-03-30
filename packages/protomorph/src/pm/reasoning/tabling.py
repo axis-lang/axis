@@ -3,15 +3,14 @@ from __future__ import annotations
 from protobase import frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
-
-from .model import CycleIssue, DeferredGoal, Judgment, PendingBranch, Rule
 
 
 class StoredAnswer(Builtin):
     subst: tuple[tuple[int, pm.Carrier], ...] = ()
     evidence: pm.Spec | None = None
-    judgment: Judgment | None = None
+    judgment: urs.Judgment | None = None
 
 
 class EngineTables(Builtin):
@@ -19,7 +18,7 @@ class EngineTables(Builtin):
     derived_facts_by_anchor: frozendict[str, tuple[pm.Spec, ...]] = frozendict()
     facts_by_component: frozendict[int, tuple[pm.Spec, ...]] = frozendict()
     derived_facts_by_component: frozendict[int, tuple[pm.Spec, ...]] = frozendict()
-    rules_by_anchor: frozendict[str, tuple[Rule, ...]] = frozendict()
+    rules_by_anchor: frozendict[str, tuple[urs.Rule, ...]] = frozendict()
     closed_components: frozenset[int] = frozenset()
     closed_strata: frozenset[int] = frozenset()
 
@@ -39,11 +38,11 @@ class QueryTable(Builtin):
     query_slot_indices: tuple[int, ...] = ()
     status: str = "closed"
     answers: tuple[StoredAnswer, ...] = ()
-    failures: tuple[Judgment, ...] = ()
-    deferred: tuple[DeferredGoal, ...] = ()
-    cycle_issue: CycleIssue | None = None
+    failures: tuple[urs.Judgment, ...] = ()
+    deferred: tuple[urs.DeferredGoal, ...] = ()
+    cycle_issue: urs.CycleIssue | None = None
     frontier: tuple[pm.Spec, ...] = ()
-    continuation_state: tuple[PendingBranch, ...] = ()
+    continuation_state: tuple[urs.PendingBranch, ...] = ()
     active: bool = False
     closed: bool = True
     binding_epoch: int = 0

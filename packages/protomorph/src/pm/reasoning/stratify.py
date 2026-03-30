@@ -3,9 +3,10 @@ from __future__ import annotations
 from protobase import frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
-from .model import CycleMember, CycleTrace, Rule
+from .model import CycleMember, CycleTrace
 
 
 class DependencyGraph(Builtin):
@@ -30,8 +31,8 @@ class Scc(Builtin):
 
 
 class StratificationPlan(Builtin):
-    graph: DependencyGraph
-    components: tuple[Scc, ...] = ()
+    graph: urs.DependencyGraph
+    components: tuple[urs.Scc, ...] = ()
     component_by_anchor: frozendict[str, int] = frozendict()
     stratum_by_component: tuple[int, ...] = ()
     negative_cycle_components: frozenset[int] = frozenset()
@@ -49,7 +50,7 @@ class StratificationPlan(Builtin):
         component = self.component_of(anchor)
         return component >= 0 and component in self.negative_cycle_components
 
-    def negative_cycle_trace(self, anchor: str) -> CycleTrace | None:
+    def negative_cycle_trace(self, anchor: str) -> urs.CycleTrace | None:
         component_id = self.component_of(anchor)
         if component_id < 0 or component_id not in self.negative_cycle_components:
             return None
@@ -61,10 +62,10 @@ class StratificationPlan(Builtin):
 
 
 def build_dependency_graph(
-    rules: tuple[Rule, ...],
+    rules: tuple[urs.Rule, ...],
     *,
     fact_anchors: frozenset[str] = frozenset(),
-) -> DependencyGraph:
+) -> urs.DependencyGraph:
     anchors = {str(rule.head.anchor) for rule in rules} | set(fact_anchors)
     positive: dict[str, set[str]] = {anchor: set() for anchor in anchors}
     negative: dict[str, set[str]] = {anchor: set() for anchor in anchors}
@@ -92,7 +93,7 @@ def build_dependency_graph(
     )
 
 
-def compute_sccs(graph: DependencyGraph) -> tuple[Scc, ...]:
+def compute_sccs(graph: urs.DependencyGraph) -> tuple[urs.Scc, ...]:
     index = 0
     indices: dict[str, int] = {}
     lowlinks: dict[str, int] = {}
@@ -135,9 +136,9 @@ def compute_sccs(graph: DependencyGraph) -> tuple[Scc, ...]:
 
 
 def compute_stratification(
-    graph: DependencyGraph,
-    components: tuple[Scc, ...],
-) -> StratificationPlan:
+    graph: urs.DependencyGraph,
+    components: tuple[urs.Scc, ...],
+) -> urs.StratificationPlan:
     component_by_anchor = {
         anchor: component.id
         for component in components

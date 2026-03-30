@@ -3,30 +3,25 @@ from __future__ import annotations
 from protobase import Consed, flux, frozendict
 
 import pm
+from pm import reasoning as urs
 
-from .database import Database
-from .core import _EngineSolveCore
-from .model import Rule
+from .core import EngineSolveCore
 from .stratify import (
-    DependencyGraph,
-    Scc,
-    StratificationPlan,
     build_dependency_graph,
     compute_sccs,
     compute_stratification,
 )
-from .tabling import EngineTables
 
 
 class Engine(Consed):
-    db: Database
+    db: urs.Database
 
     @flux.property
     def anchors(self) -> frozenset[str]:
         return self.db.anchors
 
     @flux.property
-    def rules_by_anchor(self) -> frozendict[str, tuple[Rule, ...]]:
+    def rules_by_anchor(self) -> frozendict[str, tuple[urs.Rule, ...]]:
         return frozendict(
             (anchor, self.db.rules_for_anchor(anchor))
             for anchor in sorted(self.anchors)
@@ -40,30 +35,30 @@ class Engine(Consed):
         )
 
     @flux.property
-    def all_rules(self) -> tuple[Rule, ...]:
-        ordered: list[Rule] = []
+    def all_rules(self) -> tuple[urs.Rule, ...]:
+        ordered: list[urs.Rule] = []
         for anchor in sorted(self.rules_by_anchor):
             ordered.extend(self.rules_by_anchor[anchor])
         return tuple(ordered)
 
     @flux.property
-    def dependency_graph(self) -> DependencyGraph:
+    def dependency_graph(self) -> urs.DependencyGraph:
         return build_dependency_graph(self.all_rules, fact_anchors=self.anchors)
 
     @flux.property
-    def sccs(self) -> tuple[Scc, ...]:
+    def sccs(self) -> tuple[urs.Scc, ...]:
         return compute_sccs(self.dependency_graph)
 
     @flux.property
-    def strata(self) -> StratificationPlan:
+    def strata(self) -> urs.StratificationPlan:
         return compute_stratification(self.dependency_graph, self.sccs)
 
     @flux.property
-    def global_tables(self) -> EngineTables:
-        return _EngineSolveCore(self).run()
+    def global_tables(self) -> urs.EngineTables:
+        return EngineSolveCore(self).run()
 
     @flux.method
-    def rules_for_anchor(self, anchor: str) -> tuple[Rule, ...]:
+    def rules_for_anchor(self, anchor: str) -> tuple[urs.Rule, ...]:
         return self.rules_by_anchor.get(anchor, ())
 
     @flux.method
@@ -80,10 +75,8 @@ class Engine(Consed):
 
     @flux.method
     def session(self, context=None, state=None):
-        from .session import Session, SessionState, SolveContext
-
-        return Session(
+        return urs.Session(
             self,
-            context if context is not None else SolveContext(),
-            state if state is not None else SessionState(),
+            context if context is not None else urs.SolveContext(),
+            state if state is not None else urs.SessionState(),
         )

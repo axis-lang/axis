@@ -166,7 +166,7 @@ class Tuple[*T](Carrier[tuple[*T]]):
         field = self.descriptor.item(id)
         return self.child(field.value, self.content[field.offset])
 
-    def __contains__(self, value: object) -> bool:
+    def __contains__(self, value: Any) -> bool:
         return value in self.content
 
     def __len__(self) -> int:

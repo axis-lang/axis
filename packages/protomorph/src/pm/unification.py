@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 import pm
 
@@ -25,14 +25,14 @@ class UnionFind:
         self,
         is_var: Callable[[pm.Carrier], bool],
         *,
-        info_for: Callable[[pm.Carrier], object | None] | None = None,
-        merge_info: Callable[[object | None, object | None], object | None] | None = None,
+        info_for: Callable[[pm.Carrier], Any | None] | None = None,
+        merge_info: Callable[[Any | None, Any | None], Any | None] | None = None,
     ):
         self._parent: dict[pm.Carrier, pm.Carrier] = {}
         self._rank: dict[pm.Carrier, int] = {}
         self._trail: list[tuple] = []
-        self._var_info: dict[pm.Carrier, object] = {}
-        self._class_info: dict[pm.Carrier, object] = {}
+        self._var_info: dict[pm.Carrier, Any] = {}
+        self._class_info: dict[pm.Carrier, Any] = {}
         self.is_var = is_var
         self.info_for = _default_info_for if info_for is None else info_for
         self.merge_info = _default_merge_info if merge_info is None else merge_info
@@ -117,7 +117,7 @@ class UnionFind:
                 else:
                     self._parent[node] = old
 
-    def variable_info(self, var: pm.Carrier) -> object | None:
+    def variable_info(self, var: pm.Carrier) -> Any | None:
         if var in self._var_info:
             return self._var_info[var]
         info = self.info_for(var)
@@ -125,12 +125,12 @@ class UnionFind:
             self._var_info[var] = info
         return info
 
-    def class_info(self, carrier: pm.Carrier) -> object | None:
+    def class_info(self, carrier: pm.Carrier) -> Any | None:
         root = self.find(carrier)
         self._ensure_class_info(root)
         return self._class_info.get(root)
 
-    def set_class_info(self, carrier: pm.Carrier, info: object | None) -> None:
+    def set_class_info(self, carrier: pm.Carrier, info: Any | None) -> None:
         root = self.find(carrier)
         self._trail.append(("i", root, self._class_info.get(root, _MISSING)))
         if info is None:
@@ -267,11 +267,11 @@ def unify(
     return uf.reify(a)
 
 
-def _default_info_for(_: pm.Carrier) -> object | None:
+def _default_info_for(_: pm.Carrier) -> Any | None:
     return None
 
 
-def _default_merge_info(left: object | None, right: object | None) -> object | None:
+def _default_merge_info(left: Any | None, right: Any | None) -> Any | None:
     if left is None:
         return right
     if right is None:

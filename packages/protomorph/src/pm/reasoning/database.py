@@ -3,9 +3,10 @@ from __future__ import annotations
 from protobase import Consed, flux, frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.hosted import Host
 
-from .model import DeferredGoal, Judgment, OperatorPending, ProjectionBlocked, Rule, TypeFunctionBlocked, default_wake_on
+from .model import DeferredGoal, Judgment, OperatorPending, ProjectionBlocked, TypeFunctionBlocked, default_wake_on
 
 
 class Database(Consed, abstract=True):
@@ -14,7 +15,7 @@ class Database(Consed, abstract=True):
         raise NotImplementedError
 
     @flux.method
-    def rules_for_anchor(self, anchor: str) -> tuple[Rule, ...]:
+    def rules_for_anchor(self, anchor: str) -> tuple[urs.Rule, ...]:
         raise NotImplementedError
 
     @flux.method
@@ -35,20 +36,20 @@ class Database(Consed, abstract=True):
         operator: pm.Placeholder,
         *,
         goal: pm.Spec,
-        session: object,
-    ) -> object | None:
+        session: urs.Session,
+    ) -> urs.LogicOpStep | None:
         raise NotImplementedError
 
 
 class RuleSetDatabase(Database):
-    rules: tuple[Rule, ...] = ()
+    rules: tuple[urs.Rule, ...] = ()
     facts: tuple[pm.Spec, ...] = ()
     coinductive_anchors: frozenset[str] = frozenset()
     host: Host = pm.NATIVE_HOST
 
     @flux.property
-    def rule_index(self) -> frozendict[str, tuple[Rule, ...]]:
-        buckets: dict[str, list[Rule]] = {}
+    def rule_index(self) -> frozendict[str, tuple[urs.Rule, ...]]:
+        buckets: dict[str, list[urs.Rule]] = {}
         for rule in self.rules:
             buckets.setdefault(str(rule.head.anchor), []).append(rule)
         return frozendict((anchor, tuple(items)) for anchor, items in buckets.items())
@@ -65,7 +66,7 @@ class RuleSetDatabase(Database):
         return frozenset((*self.rule_index.keys(), *self.fact_index.keys()))
 
     @flux.method
-    def rules_for_anchor(self, anchor: str) -> tuple[Rule, ...]:
+    def rules_for_anchor(self, anchor: str) -> tuple[urs.Rule, ...]:
         return self.rule_index.get(anchor, ())
 
     @flux.method
@@ -86,62 +87,59 @@ class RuleSetDatabase(Database):
         operator: pm.Placeholder,
         *,
         goal: pm.Spec,
-        session: object,
-    ) -> object | None:
+        session: urs.Session,
+    ) -> urs.LogicOpStep | None:
         result = self.host.eval_logic_op(operator, goal=goal, session=session)
         if result is not None:
             return result
 
-        from .operators import KeyOfOperator, OpBind, OpDeferred, OpFailed, ProjectionOperator, SolverOperator
-        from .subst import contains_goal_slots, goal_slot_index_of
-
         args = goal.args.content
-        if isinstance(operator, KeyOfOperator) and len(args) == 2:
+        if isinstance(operator, urs.KeyOfOperator) and len(args) == 2:
             target, result = args
-            slot = goal_slot_index_of(result)
+            slot = urs.goal_slot_index_of(result)
             if slot is None:
-                return OpFailed("keyof result must be a query slot")
-            if contains_goal_slots(target):
+                return urs.OpFailed("keyof result must be a query slot")
+            if urs.contains_goal_slots(target):
                 blocker = TypeFunctionBlocked(goal, "keyof")
                 evidence = pm.Spec.of("std.logic.ByDeferred", goal, blocker)
-                return OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
+                return urs.OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
             if not isinstance(target, pm.Spec):
-                if isinstance(target, SolverOperator):
+                if isinstance(target, urs.SolverOperator):
                     blocker = OperatorPending(goal, target)
                     evidence = pm.Spec.of("std.logic.ByDeferred", goal, blocker)
-                    return OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
-                return OpFailed("keyof target must be a hosted spec")
+                    return urs.OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
+                return urs.OpFailed("keyof target must be a hosted spec")
             schema = self.schema_for(target)
             if schema is None:
-                return OpFailed("keyof target has no schema")
+                return urs.OpFailed("keyof target has no schema")
             keys = tuple(item.key for item in schema.items() if item.key is not None)
-            return OpBind(((slot, keys),), pm.Spec.of("std.logic.ByBuiltin", goal))
+            return urs.OpBind(((slot, keys),), pm.Spec.of("std.logic.ByBuiltin", goal))
 
-        if isinstance(operator, ProjectionOperator) and len(args) in {3, 4}:
+        if isinstance(operator, urs.ProjectionOperator) and len(args) in {3, 4}:
             if len(args) == 3:
                 target, name, result = args
             else:
                 target, _, name, result = args
-            slot = goal_slot_index_of(result)
+            slot = urs.goal_slot_index_of(result)
             if slot is None or not isinstance(name, str):
-                return OpFailed("projection result must be a query slot")
-            if contains_goal_slots(target):
+                return urs.OpFailed("projection result must be a query slot")
+            if urs.contains_goal_slots(target):
                 blocker = ProjectionBlocked(goal, goal)
                 evidence = pm.Spec.of("std.logic.ByDeferred", goal, blocker)
-                return OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
+                return urs.OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
             if not isinstance(target, pm.Spec):
-                if isinstance(target, SolverOperator):
+                if isinstance(target, urs.SolverOperator):
                     blocker = OperatorPending(goal, target)
                     evidence = pm.Spec.of("std.logic.ByDeferred", goal, blocker)
-                    return OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
-                return OpFailed("projection target must be a hosted spec")
+                    return urs.OpDeferred(DeferredGoal(goal, blocker, evidence, default_wake_on(blocker), Judgment(goal, evidence)))
+                return urs.OpFailed("projection target must be a hosted spec")
             schema = self.schema_for(target)
             if schema is None:
-                return OpFailed("projection target has no schema")
+                return urs.OpFailed("projection target has no schema")
             try:
                 item = schema.item(pm.Id(name))
             except Exception:
-                return OpFailed(f"projection field {name!r} not found")
-            return OpBind(((slot, item.value),), pm.Spec.of("std.logic.ByBuiltin", goal))
+                return urs.OpFailed(f"projection field {name!r} not found")
+            return urs.OpBind(((slot, item.value),), pm.Spec.of("std.logic.ByBuiltin", goal))
 
         return None

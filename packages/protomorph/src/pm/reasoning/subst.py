@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Mapping, cast
+from typing import Any, Mapping, cast
 
 from protobase import frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 from pm.unification import UnionFind, unify
 
-from .model import PendingBranch, ReasoningValue, Rule
+from .model import EqClassInfo, PendingBranch
 from .operators import SolverOperator
 from .vars import (
     BranchCtx,
     BranchVar,
-    EqClassInfo,
     GoalCtx,
     GoalVar,
     QueryCtx,
@@ -30,7 +30,7 @@ from .vars import (
 
 
 class BindingSnapshot(Builtin):
-    values: frozendict[pm.Placeholder, ReasoningValue] = frozendict()
+    values: frozendict[pm.Placeholder, urs.ReasoningValue] = frozendict()
 
 
 class CanonicalGoal(Builtin):
@@ -47,7 +47,7 @@ def native_logic_host():
         pm.HOST.reset(token)
 
 
-def wrap_logic(value: object) -> pm.Carrier:
+def wrap_logic(value: Any) -> pm.Carrier:
     with native_logic_host():
         return pm.wrap(value)
 
@@ -102,7 +102,7 @@ def seed_query_bindings(
 
 def compile_template(
     spec: pm.Spec,
-    rule_ctx: RuleCtx,
+    rule_ctx: urs.RuleCtx,
     slot_by_placeholder: dict[pm.Placeholder, int] | None = None,
 ) -> pm.Carrier:
     slots = {} if slot_by_placeholder is None else slot_by_placeholder
@@ -120,7 +120,7 @@ def compile_template(
     return carrier if not mapping else carrier.subst(mapping)
 
 
-def instantiate_template(carrier: pm.Carrier, ctx: RuleAppCtx) -> pm.Carrier:
+def instantiate_template(carrier: pm.Carrier, ctx: urs.RuleAppCtx) -> pm.Carrier:
     mapping: dict[pm.Carrier, pm.Carrier] = {}
     for leaf in carrier.deep_iter():
         value = leaf.fetch()
@@ -130,7 +130,7 @@ def instantiate_template(carrier: pm.Carrier, ctx: RuleAppCtx) -> pm.Carrier:
     return carrier if not mapping else carrier.subst(mapping)
 
 
-def rule_context_for(rule: Rule) -> RuleCtx:
+def rule_context_for(rule: urs.Rule) -> urs.RuleCtx:
     slot_by_placeholder: dict[pm.Placeholder, int] = {}
     head = _skeletonize_value(rule.head, slot_by_placeholder)
     body = tuple(_skeletonize_value(goal, slot_by_placeholder) for goal in rule.body)
@@ -222,13 +222,13 @@ def public_subst(
     placeholders: tuple[pm.Placeholder, ...],
     goal: CanonicalGoal,
     subst: tuple[tuple[int, pm.Carrier], ...],
-) -> frozendict[pm.Placeholder, ReasoningValue]:
+) -> frozendict[pm.Placeholder, urs.ReasoningValue]:
     query_slots = goal_query_slot_indices(goal)
     replacements: tuple[pm.Carrier, ...] = tuple(
         pm.LeafCarrier(goal.slots[index].descriptor, placeholders[query_slots[index]])
         for index in range(len(goal.slots))
     )
-    items: list[tuple[pm.Placeholder, ReasoningValue]] = []
+    items: list[tuple[pm.Placeholder, urs.ReasoningValue]] = []
     for slot, carrier in subst:
         if slot >= len(query_slots):
             continue
@@ -281,7 +281,7 @@ def canonicalize_branch(
 def canonicalize_branch_specs(
     blocked_goal: pm.Spec,
     remaining_goals: tuple[pm.Spec, ...],
-    info_by_placeholder: Mapping[pm.Placeholder, EqClassInfo | None] | None = None,
+    info_by_placeholder: Mapping[pm.Placeholder, urs.EqClassInfo | None] | None = None,
 ) -> tuple[
     pm.Spec,
     tuple[pm.Spec, ...],
@@ -291,7 +291,7 @@ def canonicalize_branch_specs(
     blocked_carrier = wrap_logic(blocked_goal)
     remaining_carriers = tuple(wrap_logic(goal) for goal in remaining_goals)
     slot_by_placeholder: dict[pm.Placeholder, int] = {}
-    slot_info_by_slot: list[EqClassInfo | None] = []
+    slot_info_by_slot: list[urs.EqClassInfo | None] = []
     blocked_skeleton = _skeletonize_any(blocked_carrier, slot_by_placeholder, slot_info_by_slot, info_by_placeholder)
     remaining_skeletons = tuple(
         _skeletonize_any(goal, slot_by_placeholder, slot_info_by_slot, info_by_placeholder)
@@ -306,20 +306,20 @@ def canonicalize_branch_specs(
     return blocked, remaining, (), tuple(slot_info_by_slot)
 
 
-def branch_bindings(branch: PendingBranch) -> frozendict[pm.Placeholder, ReasoningValue]:
+def branch_bindings(branch: urs.PendingBranch) -> frozendict[pm.Placeholder, urs.ReasoningValue]:
     var_by_slot = _branch_var_by_slot(branch.blocked.goal, branch.remaining_goals, branch.subst)
-    items: list[tuple[pm.Placeholder, ReasoningValue]] = []
+    items: list[tuple[pm.Placeholder, urs.ReasoningValue]] = []
     for slot, term in branch.subst:
         var = var_by_slot.get(slot)
         if var is None:
             continue
         items.append((var, term))
-    return frozendict(cast(tuple[tuple[pm.Placeholder, ReasoningValue], ...], tuple(items)))
+    return frozendict(cast(tuple[tuple[pm.Placeholder, urs.ReasoningValue], ...], tuple(items)))
 
 
-def branch_placeholder_info(branch: PendingBranch) -> dict[pm.Placeholder, EqClassInfo | None]:
+def branch_placeholder_info(branch: urs.PendingBranch) -> dict[pm.Placeholder, urs.EqClassInfo | None]:
     var_by_slot = _branch_var_by_slot(branch.blocked.goal, branch.remaining_goals, branch.subst)
-    info: dict[pm.Placeholder, EqClassInfo | None] = {}
+    info: dict[pm.Placeholder, urs.EqClassInfo | None] = {}
     for slot, var in var_by_slot.items():
         slot_info = branch.slot_info[slot] if slot < len(branch.slot_info) else None
         info[var] = slot_info
@@ -327,10 +327,10 @@ def branch_placeholder_info(branch: PendingBranch) -> dict[pm.Placeholder, EqCla
 
 
 def branch_session_bindings(
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
     session_bindings: BindingSnapshot,
-) -> tuple[tuple[int, ReasoningValue], ...]:
-    matches: list[tuple[int, ReasoningValue]] = []
+) -> tuple[tuple[int, urs.ReasoningValue], ...]:
+    matches: list[tuple[int, urs.ReasoningValue]] = []
     for slot, info in enumerate(branch.slot_info):
         if info is None:
             continue
@@ -347,7 +347,7 @@ def branch_session_bindings(
 
 
 def instantiate_branch(
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
 ) -> tuple[pm.Carrier, tuple[pm.Carrier, ...], tuple[pm.Carrier, ...]]:
     blocked = wrap_logic(branch.blocked.goal)
     remaining = tuple(wrap_logic(goal) for goal in branch.remaining_goals)
@@ -377,7 +377,7 @@ def seed_branch_subst(
 def seed_branch_slot_info(
     uf: UnionFind,
     slots: tuple[pm.Carrier, ...],
-    slot_info: tuple[EqClassInfo | None, ...],
+    slot_info: tuple[urs.EqClassInfo | None, ...],
 ) -> None:
     for index, info in enumerate(slot_info):
         if info is None or index >= len(slots):
@@ -388,7 +388,7 @@ def seed_branch_slot_info(
 def seed_branch_session_bindings(
     uf: UnionFind,
     slots: tuple[pm.Carrier, ...],
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
     session_bindings: BindingSnapshot,
 ) -> bool:
     slot_by_index = {index: carrier for index, carrier in enumerate(slots)}
@@ -402,7 +402,7 @@ def seed_branch_session_bindings(
 
 
 def rebuild_branch_env(
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
     session_bindings: BindingSnapshot,
 ) -> tuple[UnionFind, pm.Carrier, tuple[pm.Carrier, ...], tuple[pm.Carrier, ...]] | None:
     blocked, remaining, slots = instantiate_branch(branch)
@@ -417,13 +417,13 @@ def rebuild_branch_env(
 
 def materialize_branch_goal(
     goal: pm.Spec,
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
 ) -> pm.Spec:
     bindings = branch_bindings(branch)
     return substitute_public_goal(goal, bindings)
 
 
-def materialize_branch_goals(branch: PendingBranch) -> tuple[pm.Spec, tuple[pm.Spec, ...]]:
+def materialize_branch_goals(branch: urs.PendingBranch) -> tuple[pm.Spec, tuple[pm.Spec, ...]]:
     bindings = branch_bindings(branch)
     return (
         substitute_public_goal(branch.blocked.goal, bindings),
@@ -432,10 +432,10 @@ def materialize_branch_goals(branch: PendingBranch) -> tuple[pm.Spec, tuple[pm.S
 
 
 def branch_with_bindings(
-    branch: PendingBranch,
-    bindings: Mapping[pm.Placeholder, ReasoningValue],
-) -> PendingBranch:
-    current: dict[pm.Placeholder, ReasoningValue] = dict(branch_bindings(branch))
+    branch: urs.PendingBranch,
+    bindings: Mapping[pm.Placeholder, urs.ReasoningValue],
+) -> urs.PendingBranch:
+    current: dict[pm.Placeholder, urs.ReasoningValue] = dict(branch_bindings(branch))
     current.update(bindings)
     return PendingBranch(
         blocked=branch.blocked,
@@ -450,7 +450,7 @@ def branch_with_bindings(
 
 def substitute_public_goal(
     goal: pm.Spec,
-    subst: frozendict[pm.Placeholder, ReasoningValue],
+    subst: frozendict[pm.Placeholder, urs.ReasoningValue],
 ) -> pm.Spec:
     wrapped = wrap_logic(goal)
     mapping: dict[pm.Carrier, pm.Carrier] = {}
@@ -476,7 +476,7 @@ def substitute_public_goal(
 
 def substitute_public_goals(
     goals: tuple[pm.Spec, ...],
-    subst: frozendict[pm.Placeholder, ReasoningValue],
+    subst: frozendict[pm.Placeholder, urs.ReasoningValue],
 ) -> tuple[pm.Spec, ...]:
     if not subst:
         return goals
@@ -518,11 +518,11 @@ def runtime_var_of(carrier: pm.Carrier) -> pm.Var | None:
     return None
 
 
-def goal_slot_index_of(value: object) -> int | None:
+def goal_slot_index_of(value: Any) -> int | None:
     return value.slot if isinstance(value, GoalVar) else None
 
 
-def contains_goal_slots(value: object) -> bool:
+def contains_goal_slots(value: Any) -> bool:
     if goal_slot_index_of(value) is not None:
         return True
     if isinstance(value, pm.Spec):
@@ -546,13 +546,13 @@ def goal_query_slot_indices(goal: CanonicalGoal) -> tuple[int, ...]:
     return tuple(indices)
 
 
-def class_info_of(uf: UnionFind, carrier: pm.Carrier) -> EqClassInfo | None:
+def class_info_of(uf: UnionFind, carrier: pm.Carrier) -> urs.EqClassInfo | None:
     info = uf.class_info(carrier)
     return info if isinstance(info, EqClassInfo) else None
 
 
-def goal_placeholder_info(goal: CanonicalGoal) -> dict[pm.Placeholder, EqClassInfo | None]:
-    info: dict[pm.Placeholder, EqClassInfo | None] = {}
+def goal_placeholder_info(goal: CanonicalGoal) -> dict[pm.Placeholder, urs.EqClassInfo | None]:
+    info: dict[pm.Placeholder, urs.EqClassInfo | None] = {}
     wrapped = wrap_logic(goal.key)
     for leaf in wrapped.deep_iter():
         value = leaf.fetch()
@@ -567,7 +567,7 @@ def goal_placeholder_info(goal: CanonicalGoal) -> dict[pm.Placeholder, EqClassIn
 def extract_branch_answer(
     root_key: pm.Spec,
     query_slot_indices: tuple[int, ...],
-    branch: PendingBranch,
+    branch: urs.PendingBranch,
     slots: tuple[pm.Carrier, ...],
     uf: UnionFind,
 ) -> tuple[tuple[int, pm.Carrier], ...]:
@@ -662,13 +662,13 @@ def _is_identity_slot(carrier: pm.Carrier, slot: int) -> bool:
     return isinstance(value, GoalVar) and value.slot == slot
 
 
-def _as_carrier(value: ReasoningValue) -> pm.Carrier:
+def _as_carrier(value: urs.ReasoningValue) -> pm.Carrier:
     if isinstance(value, pm.Carrier):
         return value
     return wrap_logic(value)
 
 
-def _is_logical_placeholder(value: object) -> bool:
+def _is_logical_placeholder(value: Any) -> bool:
     return isinstance(value, pm.Placeholder) and not isinstance(value, SolverOperator)
 
 
@@ -720,7 +720,7 @@ def _slot_placeholder(slot: int) -> pm.Placeholder:
     return pm.SimpleVar(None, str(slot))
 
 
-def _slot_value(value: object) -> int | None:
+def _slot_value(value: Any) -> int | None:
     if not isinstance(value, pm.SimpleVar) or value.ctx is not None:
         return None
     name = pm.placeholder_name(value)
@@ -743,8 +743,8 @@ def _goal_ctx_skeleton(carrier: pm.Carrier) -> pm.Spec:
 def _skeletonize_any(
     carrier: pm.Carrier,
     slot_by_placeholder: dict[pm.Placeholder, int],
-    slot_info_by_slot: list[EqClassInfo | None],
-    info_by_placeholder: Mapping[pm.Placeholder, EqClassInfo | None] | None,
+    slot_info_by_slot: list[urs.EqClassInfo | None],
+    info_by_placeholder: Mapping[pm.Placeholder, urs.EqClassInfo | None] | None,
 ) -> pm.Carrier:
     mapping: dict[pm.Carrier, pm.Carrier] = {}
     for leaf in carrier.deep_iter():
@@ -906,8 +906,8 @@ def _instantiate_branch_slots(carrier: pm.Carrier, slots: Mapping[int, pm.Carrie
 
 
 def _branch_subst_from_bindings(
-    branch: PendingBranch,
-    bindings: Mapping[pm.Placeholder, ReasoningValue],
+    branch: urs.PendingBranch,
+    bindings: Mapping[pm.Placeholder, urs.ReasoningValue],
 ) -> tuple[tuple[int, pm.Carrier], ...]:
     var_by_slot = _branch_var_by_slot(branch.blocked.goal, branch.remaining_goals, branch.subst)
     items: list[tuple[int, pm.Carrier]] = []
@@ -956,14 +956,14 @@ def _is_identity_root_slot(carrier: pm.Carrier, slot: int) -> bool:
     return isinstance(value, GoalVar) and value.slot == slot
 
 
-def _class_info_for_carrier(carrier: pm.Carrier) -> EqClassInfo | None:
+def _class_info_for_carrier(carrier: pm.Carrier) -> urs.EqClassInfo | None:
     if not carrier.is_leaf:
         return None
     value = carrier.fetch()
     return class_info_for_var(value) if isinstance(value, pm.Var) else None
 
 
-def _merge_class_info(left: object | None, right: object | None) -> EqClassInfo | None:
+def _merge_class_info(left: Any | None, right: Any | None) -> urs.EqClassInfo | None:
     left_info = left if isinstance(left, EqClassInfo) else None
     right_info = right if isinstance(right, EqClassInfo) else None
     return merge_class_info(left_info, right_info)
@@ -979,8 +979,8 @@ def _public_placeholder_for_origin(origin: pm.Var) -> pm.Placeholder | None:
 
 def _placeholder_info(
     placeholder: pm.Placeholder,
-    info_by_placeholder: Mapping[pm.Placeholder, EqClassInfo | None] | None,
-) -> EqClassInfo | None:
+    info_by_placeholder: Mapping[pm.Placeholder, urs.EqClassInfo | None] | None,
+) -> urs.EqClassInfo | None:
     if info_by_placeholder is not None and placeholder in info_by_placeholder:
         return info_by_placeholder[placeholder]
     return class_info_for_var(placeholder) if isinstance(placeholder, pm.Var) else None

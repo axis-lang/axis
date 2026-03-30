@@ -5,18 +5,18 @@ from typing import Mapping, cast
 from protobase import Consed, flux, frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
-from .core import _QueryCore
-from .model import Answer, BindingsChanged, DeferredGoal, DirectCompletion, EqClassInfo, Judgment, NegativeCycleIssue, NonGroundNegation, PendingBranch, ReasoningValue
-from .result import Ambiguous, Deferred, Floundered, MixedCycle, NegativeCycle, NoSolution, SolverResult, Unique
-from .session import Session
+from .core import QueryCore
+from .model import Answer, BindingsChanged, DeferredGoal, DirectCompletion, Judgment, NegativeCycleIssue, NonGroundNegation, PendingBranch
+from .result import Ambiguous, Deferred, Floundered, MixedCycle, NegativeCycle, NoSolution, Unique
 from .subst import canonicalize, canonicalize_branch_specs, goal_placeholder_info, goal_query_slot_indices, instantiate_query, make_union_find, public_goal, seed_query_bindings
 from .tabling import QueryTable, StoredAnswer
 
 
 class Query(Consed):
-    session: Session
+    session: urs.Session
     goal: pm.Spec
 
     @flux.property
@@ -39,14 +39,14 @@ class Query(Consed):
         return None if semantic is None else semantic.key
 
     @flux.property
-    def table(self) -> QueryTable:
+    def table(self) -> urs.QueryTable:
         semantic = self.semantic_goal
         if semantic is None:
             return QueryTable(key=self.goal, origin=self.goal)
         cached = self.session.state.tables.query_tables.get(semantic.key)
         if cached is not None:
             return cached
-        canonical_goal, _, outcome = _QueryCore(self.session, self.goal).run()
+        canonical_goal, _, outcome = QueryCore(self.session, self.goal).run()
         stored_answers = tuple(StoredAnswer(answer.subst, answer.evidence, answer.judgment) for answer in outcome.answers)
         deferred = tuple(_specialize_deferred(blocked, self.query_placeholders) for blocked in outcome.deferred)
         branches = tuple(_specialize_branch_wakes(branch, self.query_placeholders) for branch in outcome.branches)
@@ -81,10 +81,10 @@ class Query(Consed):
         )
 
     @flux.property
-    def result(self) -> Result:
+    def result(self) -> urs.Result:
         semantic = self.semantic_goal
         if semantic is None:
-            outcome: SolverResult = NoSolution(
+            outcome: urs.SolverResult = NoSolution(
                 self.goal,
                 "conflicting seed bindings",
                 _no_solution_judgment(self.goal, "conflicting seed bindings"),
@@ -96,7 +96,7 @@ class Query(Consed):
         if table.cycle_issue is not None:
             judgment = _cycle_judgment(self.goal, table.cycle_issue)
             if isinstance(table.cycle_issue, NegativeCycleIssue):
-                outcome: SolverResult = NegativeCycle(
+                outcome: urs.SolverResult = NegativeCycle(
                     self.goal,
                     table.cycle_issue.cycle,
                     table.cycle_issue.reason,
@@ -172,54 +172,54 @@ class Query(Consed):
 
 
 class Result(Builtin):
-    query: Query
-    outcome: SolverResult
-    next_session: Session | None = None
-    continuation: Query | None = None
+    query: urs.Query
+    outcome: urs.SolverResult
+    next_session: urs.Session | None = None
+    continuation: urs.Query | None = None
 
     @property
     def can_continue(self) -> bool:
         return self.continuation is not None
 
-    def resume(self) -> Result:
+    def resume(self) -> urs.Result:
         if self.continuation is None:
             return self
         return self.continuation.result
 
 
 def _merge_visible_bindings(
-    seed: frozendict[pm.Placeholder, ReasoningValue],
+    seed: frozendict[pm.Placeholder, urs.ReasoningValue],
     placeholders: tuple[pm.Placeholder, ...],
     canonical_goal,
     subst,
-) -> frozendict[pm.Placeholder, ReasoningValue]:
+) -> frozendict[pm.Placeholder, urs.ReasoningValue]:
     from .subst import public_subst
 
     merged = dict(seed)
     merged.update(public_subst(placeholders, canonical_goal, subst))
-    return frozendict(cast(tuple[tuple[pm.Placeholder, ReasoningValue], ...], tuple(merged.items())))
+    return frozendict(cast(tuple[tuple[pm.Placeholder, urs.ReasoningValue], ...], tuple(merged.items())))
 
 
-def _shared_subst(answers: tuple[Answer, ...]) -> frozendict[pm.Placeholder, ReasoningValue]:
+def _shared_subst(answers: tuple[urs.Answer, ...]) -> frozendict[pm.Placeholder, urs.ReasoningValue]:
     shared = dict(answers[0].subst)
     for answer in answers[1:]:
         current = dict(answer.subst)
         for key, value in tuple(shared.items()):
             if key not in current or current[key] != value:
                 shared.pop(key)
-    return frozendict(cast(tuple[tuple[pm.Placeholder, ReasoningValue], ...], tuple(shared.items())))
+    return frozendict(cast(tuple[tuple[pm.Placeholder, urs.ReasoningValue], ...], tuple(shared.items())))
 
 
-def _shared_evidence(answers: tuple[Answer, ...]) -> pm.Spec | None:
+def _shared_evidence(answers: tuple[urs.Answer, ...]) -> pm.Spec | None:
     first = answers[0].evidence
     if all(answer.evidence == first for answer in answers):
         return first
     return None
 
 
-def _deferred_judgments(blocked: tuple[DeferredGoal, ...], answers: tuple[Answer, ...]) -> tuple[Judgment, ...]:
-    ordered: list[Judgment] = []
-    seen: dict[Judgment, None] = {}
+def _deferred_judgments(blocked: tuple[urs.DeferredGoal, ...], answers: tuple[urs.Answer, ...]) -> tuple[urs.Judgment, ...]:
+    ordered: list[urs.Judgment] = []
+    seen: dict[urs.Judgment, None] = {}
     for judgment in (item.judgment for item in blocked):
         if judgment is None or judgment in seen:
             continue
@@ -233,7 +233,7 @@ def _deferred_judgments(blocked: tuple[DeferredGoal, ...], answers: tuple[Answer
     return tuple(ordered)
 
 
-def _cycle_judgment(goal: pm.Spec, issue) -> Judgment:
+def _cycle_judgment(goal: pm.Spec, issue) -> urs.Judgment:
     trace = issue.trace
     if isinstance(issue, NegativeCycleIssue):
         evidence = pm.Spec.of("std.logic.ByNegativeCycle", goal, trace if trace is not None else issue.cycle)
@@ -242,12 +242,12 @@ def _cycle_judgment(goal: pm.Spec, issue) -> Judgment:
     return Judgment(goal, evidence, trace=trace)
 
 
-def _no_solution_judgment(goal: pm.Spec, reason: str) -> Judgment:
+def _no_solution_judgment(goal: pm.Spec, reason: str) -> urs.Judgment:
     evidence = pm.Spec.of("std.logic.ByNoSolution", goal, reason)
     return Judgment(goal, evidence)
 
 
-def _root_no_solution_judgment(goal: pm.Spec, failures: tuple[Judgment, ...], reason: str) -> Judgment:
+def _root_no_solution_judgment(goal: pm.Spec, failures: tuple[urs.Judgment, ...], reason: str) -> urs.Judgment:
     if not failures:
         return _no_solution_judgment(goal, reason)
     return Judgment(goal, pm.Spec.of("std.logic.ByNoSolution", goal, reason), failures)
@@ -263,7 +263,7 @@ def _specialize_deferred(blocked, placeholders: tuple[pm.Placeholder, ...]):
     return blocked.__class__(public_goal(blocked.goal, placeholders), blocked.blocker, blocked.evidence, tuple(wakes), blocked.judgment)
 
 
-def _specialize_branch(branch: PendingBranch, placeholders: tuple[pm.Placeholder, ...]) -> PendingBranch:
+def _specialize_branch(branch: urs.PendingBranch, placeholders: tuple[pm.Placeholder, ...]) -> urs.PendingBranch:
     return PendingBranch(
         blocked=_specialize_deferred(branch.blocked, placeholders),
         remaining_goals=tuple(public_goal(goal, placeholders) for goal in branch.remaining_goals),
@@ -275,7 +275,7 @@ def _specialize_branch(branch: PendingBranch, placeholders: tuple[pm.Placeholder
     )
 
 
-def _specialize_branch_wakes(branch: PendingBranch, placeholders: tuple[pm.Placeholder, ...]) -> PendingBranch:
+def _specialize_branch_wakes(branch: urs.PendingBranch, placeholders: tuple[pm.Placeholder, ...]) -> urs.PendingBranch:
     return PendingBranch(
         blocked=_specialize_deferred(branch.blocked, placeholders),
         remaining_goals=branch.remaining_goals,
@@ -288,10 +288,10 @@ def _specialize_branch_wakes(branch: PendingBranch, placeholders: tuple[pm.Place
 
 
 def _branch_from_canonical_deferred(
-    blocked: DeferredGoal,
-    info_by_placeholder: Mapping[pm.Placeholder, EqClassInfo | None],
+    blocked: urs.DeferredGoal,
+    info_by_placeholder: Mapping[pm.Placeholder, urs.EqClassInfo | None],
     completion,
-) -> PendingBranch:
+) -> urs.PendingBranch:
     canonical_goal, remaining_goals, subst, slot_info = canonicalize_branch_specs(blocked.goal, (), info_by_placeholder)
     return PendingBranch(
         blocked=DeferredGoal(canonical_goal, blocked.blocker, blocked.evidence, blocked.wake_on, blocked.judgment),

@@ -90,7 +90,7 @@ def placeholder_name(value: Placeholder) -> str | None:
     return ident if isinstance(ident, str) else None
 
 
-def placeholder_context(value: Placeholder) -> object | None:
+def placeholder_context(value: Placeholder) -> Any | None:
     return getattr(value, "ctx", None)
 
 

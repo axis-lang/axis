@@ -3,6 +3,7 @@ from __future__ import annotations
 from protobase import frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
 NEGATION_ANCHOR = "std.logic.Not"
@@ -42,21 +43,21 @@ class Answer(Builtin):
     goal: pm.Spec
     subst: frozendict[pm.Placeholder, ReasoningValue] = frozendict()
     evidence: pm.Spec | None = None
-    judgment: Judgment | None = None
+    judgment: urs.Judgment | None = None
 
 
 class Judgment(Builtin):
     rel: pm.Spec
     evidence: pm.Spec | None = None
-    subjudgments: tuple[Judgment, ...] = ()
-    trace: CycleTrace | None = None
+    subjudgments: tuple[urs.Judgment, ...] = ()
+    trace: urs.CycleTrace | None = None
 
 
 class EqClassInfo(Builtin):
     origins: frozenset[pm.Var] = frozenset()
     source_names: frozenset[str] = frozenset()
 
-    def merge(self, other: EqClassInfo) -> EqClassInfo:
+    def merge(self, other: urs.EqClassInfo) -> urs.EqClassInfo:
         return EqClassInfo(self.origins | other.origins, self.source_names | other.source_names)
 
 
@@ -77,13 +78,13 @@ class RuleCompletion(BranchCompletion):
 
 
 class PendingBranch(Builtin):
-    blocked: DeferredGoal
+    blocked: urs.DeferredGoal
     remaining_goals: tuple[pm.Spec, ...] = ()
     subst: tuple[tuple[int, pm.Carrier], ...] = ()
-    slot_info: tuple[EqClassInfo | None, ...] = ()
+    slot_info: tuple[urs.EqClassInfo | None, ...] = ()
     blocked_is_negated: bool = False
-    completion: BranchCompletion | None = None
-    subjudgments: tuple[Judgment, ...] = ()
+    completion: urs.BranchCompletion | None = None
+    subjudgments: tuple[urs.Judgment, ...] = ()
 
 
 class Blocker(Builtin, abstract=True):
@@ -141,10 +142,10 @@ class ImplSelectionBlocked(Blocker):
 
 class DeferredGoal(Builtin):
     goal: pm.Spec
-    blocker: Blocker
+    blocker: urs.Blocker
     evidence: pm.Spec | None = None
-    wake_on: tuple[WakeCondition, ...] = ()
-    judgment: Judgment | None = None
+    wake_on: tuple[urs.WakeCondition, ...] = ()
+    judgment: urs.Judgment | None = None
 
 
 class CycleMember(Builtin):
@@ -154,7 +155,7 @@ class CycleMember(Builtin):
 
 
 class CycleTrace(Builtin):
-    members: tuple[CycleMember, ...] = ()
+    members: tuple[urs.CycleMember, ...] = ()
     kind: str = ""
     reason: str = ""
     closes_via_negation: bool = False
@@ -163,7 +164,7 @@ class CycleTrace(Builtin):
 class CycleIssue(Builtin, abstract=True):
     cycle: tuple[pm.Spec, ...] = ()
     reason: str = ""
-    trace: CycleTrace | None = None
+    trace: urs.CycleTrace | None = None
 
     @property
     def kind(self) -> str:
@@ -188,7 +189,7 @@ class NegativeCycleIssue(CycleIssue):
     pass
 
 
-def default_wake_on(blocker: Blocker) -> tuple[WakeCondition, ...]:
+def default_wake_on(blocker: urs.Blocker) -> tuple[urs.WakeCondition, ...]:
     if isinstance(blocker, StratumPending):
         return (StratumClosed(blocker.target_stratum),)
     if isinstance(blocker, NonGroundNegation):

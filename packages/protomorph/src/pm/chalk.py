@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from protobase import Consed, flux, frozendict
 
@@ -113,7 +113,7 @@ class SolverOperator(pm.SimpleVar, abstract=True):
 
 class KeyOfOperator(SolverOperator):
     @classmethod
-    def of(cls, target: object) -> KeyOfOperator:
+    def of(cls, target: Any) -> KeyOfOperator:
         return cast(KeyOfOperator, cls(None, f"keyof:{target!r}"))
 
 

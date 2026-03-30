@@ -205,7 +205,7 @@ class Spec(Type):
         return schema.item(id)
 
     @classmethod
-    def of(cls, anchor: str, *args: object, **kwargs: object) -> Spec:
+    def of(cls, anchor: str, *args: Any, **kwargs: Any) -> Spec:
         values = args + tuple(kwargs.values())
         descriptors = tuple(_value_descriptor(value) for value in values)
         indexed_type = cast(Any, getattr(pm, "IndexedType"))
@@ -261,7 +261,7 @@ class Qual(Type):
         return cast(Qual, cls(underlying, _normalize_tuple_values(tuple(qualifiers))))
 
 
-def _value_descriptor(value: object) -> pm.Type:
+def _value_descriptor(value: Any) -> pm.Type:
     if isinstance(value, pm.Carrier):
         return value.descriptor
     if isinstance(value, pm.Type):
@@ -269,10 +269,10 @@ def _value_descriptor(value: object) -> pm.Type:
     return _project_runtime_type(value)
 
 
-def _project_runtime_type(value: object) -> pm.Type:
+def _project_runtime_type(value: Any) -> pm.Type:
     return cast(pm.Type, pm.wrap(type(value)).fetch())
 
 
-def _normalize_tuple_values(values: tuple[object, ...]) -> pm.Tuple:
+def _normalize_tuple_values(values: tuple[Any, ...]) -> pm.Tuple:
     descriptors = tuple(_value_descriptor(value) for value in values)
     return cast(pm.Tuple, pm.Tuple(pm.VaryingType(descriptors), values))

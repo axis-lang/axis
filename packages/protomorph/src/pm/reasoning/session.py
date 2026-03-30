@@ -1,30 +1,29 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from protobase import Consed, frozendict
 
 import pm
+from pm import reasoning as urs
 from pm.foundation import Builtin
 
-from .engine import Engine
-from .model import BindingsChanged, DeferredGoal, LocalFactsChanged, ReasoningValue
+from .model import BindingsChanged, LocalFactsChanged
 from .subst import BindingSnapshot, ground_fact_for
-from .tabling import QueryTable, SessionTables
-
-if TYPE_CHECKING:
-    from .query import Query
+from .tabling import SessionTables
 
 
 class SolveContext(Builtin):
     label: str = ""
 
 
+urs.SolveContext = SolveContext
+urs.SessionTables = SessionTables
+
+
 class SessionState(Builtin):
     bindings: BindingSnapshot = BindingSnapshot()
     local_facts: tuple[pm.Spec, ...] = ()
-    deferred: tuple[DeferredGoal, ...] = ()
-    tables: SessionTables = SessionTables()
+    deferred: tuple[urs.DeferredGoal, ...] = ()
+    tables: urs.SessionTables = SessionTables()
     epoch: int = 0
     binding_epoch: int = 0
     local_facts_epoch: int = 0
@@ -32,23 +31,24 @@ class SessionState(Builtin):
     recent_local_fact_anchors: tuple[str, ...] = ()
 
 
+urs.SessionState = SessionState
+
+
 class Session(Consed):
-    engine: Engine
-    context: SolveContext = SolveContext()
-    state: SessionState = SessionState()
+    engine: urs.Engine
+    context: urs.SolveContext = SolveContext()
+    state: urs.SessionState = SessionState()
 
-    def query(self, goal: pm.Spec) -> Query:
-        from .query import Query
-
-        return Query(self, goal)
+    def query(self, goal: pm.Spec) -> urs.Query:
+        return urs.Query(self, goal)
 
     def solve(self, goal: pm.Spec):
         return self.query(goal).result.outcome
 
     def with_bindings(
         self,
-        bindings: frozendict[pm.Placeholder, ReasoningValue],
-    ) -> Session:
+        bindings: frozendict[pm.Placeholder, urs.ReasoningValue],
+    ) -> urs.Session:
         merged = dict(self.state.bindings.values)
         merged.update(bindings)
         next_state = SessionState(
@@ -64,8 +64,8 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def with_deferred(self, deferred: tuple[DeferredGoal, ...]) -> Session:
-        merged: dict[tuple[pm.Spec, object], DeferredGoal] = {
+    def with_deferred(self, deferred: tuple[urs.DeferredGoal, ...]) -> urs.Session:
+        merged: dict[tuple[pm.Spec, object], urs.DeferredGoal] = {
             (item.goal, item.blocker): item for item in self.state.deferred
         }
         for item in deferred:
@@ -83,7 +83,7 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def clear_deferred(self) -> Session:
+    def clear_deferred(self) -> urs.Session:
         next_state = SessionState(
             self.state.bindings,
             self.state.local_facts,
@@ -97,7 +97,7 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def with_query_table(self, key: pm.Spec, table: QueryTable) -> Session:
+    def with_query_table(self, key: pm.Spec, table: urs.QueryTable) -> urs.Session:
         tables_by_goal = dict(self.state.tables.query_tables)
         answers_by_anchor = {anchor: list(values) for anchor, values in self.state.tables.answers_by_anchor.items()}
         tables_by_goal[key] = table
@@ -121,7 +121,7 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def without_goal(self, key: pm.Spec) -> Session:
+    def without_goal(self, key: pm.Spec) -> urs.Session:
         tables_by_goal = dict(self.state.tables.query_tables)
         tables_by_goal.pop(key, None)
         next_tables = _build_session_tables(tables_by_goal, self.state.tables.answers_by_anchor)
@@ -138,7 +138,7 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def with_local_facts(self, *facts: pm.Spec) -> Session:
+    def with_local_facts(self, *facts: pm.Spec) -> urs.Session:
         next_state = SessionState(
             self.state.bindings,
             (*self.state.local_facts, *facts),
@@ -152,16 +152,14 @@ class Session(Consed):
         )
         return Session(self.engine, self.context, next_state)
 
-    def retry_deferred(self) -> Session:
-        from .core import _SessionSolveCore
+    def retry_deferred(self) -> urs.Session:
+        return urs.SessionSolveCore(self).run()
 
-        return _SessionSolveCore(self).run()
-
-    def resume_open_queries(self) -> Session:
+    def resume_open_queries(self) -> urs.Session:
         return self.retry_deferred()
 
 
-def _promoted_facts(table: QueryTable) -> tuple[pm.Spec, ...]:
+def _promoted_facts(table: urs.QueryTable) -> tuple[pm.Spec, ...]:
     facts: list[pm.Spec] = []
     if not table.closed or table.deferred or table.cycle_issue is not None:
         return ()
@@ -180,9 +178,9 @@ def _dedupe_specs(values: list[pm.Spec]) -> list[pm.Spec]:
 
 
 def _build_session_tables(
-    query_tables: dict[pm.Spec, QueryTable],
+    query_tables: dict[pm.Spec, urs.QueryTable],
     answers_by_anchor: frozendict[str, tuple[pm.Spec, ...]],
-) -> SessionTables:
+) -> urs.SessionTables:
     deferred_by_anchor: dict[str, set[pm.Spec]] = {}
     deferred_by_placeholder: dict[pm.Placeholder, set[pm.Spec]] = {}
 

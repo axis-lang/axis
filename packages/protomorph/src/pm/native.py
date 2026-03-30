@@ -42,7 +42,7 @@ class NativeVar(pm.Var):
         return self.id
 
 
-def _native_ctx(template: object | None) -> str | None:
+def _native_ctx(template: Any | None) -> str | None:
     if template is None:
         return None
     if isinstance(template, str):
@@ -89,7 +89,7 @@ class NativeHost(Host, Consed):
         self,
         annotation: Any,
         *,
-        template: object | None = None,
+        template: Any | None = None,
     ) -> pm.Type:
         if isinstance(annotation, pm.Type):
             return annotation
@@ -228,7 +228,7 @@ class NativeHost(Host, Consed):
             index = indexed_schema.index.splice()
             return indexed_type(cast(pm.Type, inner), index)
 
-        def _make_replacement(ph: pm.Placeholder) -> object:
+        def _make_replacement(ph: pm.Placeholder) -> Any:
             replacement = mapping[ph]
             if (pm.placeholder_name(ph) or "").startswith("*") and isinstance(replacement, pm.VaryingType):
                 return pm.Spread(replacement.values)
@@ -311,7 +311,7 @@ def register_python_transform(origin: type, transform: PythonTransform) -> None:
 def _project_type(
     annotation: Any,
     *,
-    template: object | None = None,
+    template: Any | None = None,
 ) -> pm.Type:
     return pm.NATIVE_HOST.project_type(annotation, template=template)
 
