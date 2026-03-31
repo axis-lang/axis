@@ -102,6 +102,9 @@ class UnionFind:
 
     def rollback(self, mark: int) -> None:
         """Undo all operations since *mark*."""
+        assert 0 <= mark <= len(self._trail), (
+            f"Invalid rollback mark {mark!r}: trail has {len(self._trail)} entries"
+        )
         while len(self._trail) > mark:
             tag, node, old = self._trail.pop()
             if tag == "r":

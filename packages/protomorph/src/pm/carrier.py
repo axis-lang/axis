@@ -313,6 +313,7 @@ class Index(Tuple):
         super().__invariants__()
         ids = [key for key in self.content if key is not None]
         assert len(ids) == len(set(ids)), "Index ids must be unique"
+        
 def _tail_inner(inner: pm.Type) -> pm.Type:
     indexed_type = getattr(pm, "IndexedType", None)
     if isinstance(inner, pm.VaryingType):

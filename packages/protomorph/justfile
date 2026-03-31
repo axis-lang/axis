@@ -5,5 +5,8 @@ test:
     @poetry run coverage run -m unittest discover -s tests
     @poetry run coverage report -m
 
+serve:
+    poetry run mkdocs serve -oa 0.0.0.0:8888
+
 coverage:
     @just test

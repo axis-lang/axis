@@ -1,0 +1,102 @@
+site_name: Protomorph
+site_description: Host-agnostic morphological data model and logic reasoning engine
+site_author: jdluque
+repo_url: https://github.com/axis/protomorph
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.annotate
+    - content.code.copy
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_bases: true
+            show_inheritance_diagram: false
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+
+hooks:
+  - hooks.py
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - Manual:
+    - Layer 0 — Foundation: manual/layer-0-foundation.md
+    - Layer 1 — Type System: manual/layer-1-type-system.md
+    - Layer 2 — Carriers: manual/layer-2-carriers.md
+    - Layer 3 — Domain Types: manual/layer-3-domain-types.md
+    - Layer 4 — Traversal & Unification: manual/layer-4-traversal-unification.md
+    - Layer 5 — Host Interface: manual/layer-5-host-interface.md
+    - Layer 6 — Native Host: manual/layer-6-native-host.md
+    - Reasoning:
+      - Overview: manual/reasoning/overview.md
+      - Model & Variables: manual/reasoning/model-vars.md
+      - Database & Rules: manual/reasoning/database-rules.md
+      - Engine & Session: manual/reasoning/engine-session.md
+      - Queries & Results: manual/reasoning/queries-results.md
+  - API Reference:
+    - pm: reference/pm.md
+    - pm.reasoning: reference/pm-reasoning.md
+  - Notebooks:
+    - Types & Carriers: notebooks/types-and-carriers.html
+    - Unification: notebooks/unification.html
+    - Reasoning Basics: notebooks/reasoning-basics.html

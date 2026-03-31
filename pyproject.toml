@@ -34,6 +34,12 @@ pyright = "^1.1.408"
 sphinx = "^7.4.7"
 textual = "^0.83.0"
 
+[tool.poetry.group.docs.dependencies]
+mkdocs = ">=1.6"
+mkdocs-material = ">=9.5"
+mkdocstrings = {extras = ["python"], version = ">=0.27"}
+marimo = ">=0.9"
+
 [tool.pyright]
 exclude = ["src/axis/syn/grammar/*.py"]
 

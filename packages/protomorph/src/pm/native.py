@@ -17,7 +17,7 @@ from typing import (
 from protobase import Consed, attr_info_of, flux, frozendict
 
 import pm
-from .foundation import _ALL_BUILTINS
+from .foundation import _ALL_BUILTINS, Anchor, Id
 from .hosted import Host
 
 type PythonTransform = Callable[..., pm.Type]
@@ -101,7 +101,7 @@ class NativeHost(Host, Consed):
             return pm.Spec.of("std.types.Tuple")
 
         if annotation is pm.Index:
-            return pm.Spec.of("std.types.Tuple")
+            return pm.Spec.of("std.types.Index")
 
         if isinstance(annotation, TypeVar):
             return NativeVar(_native_ctx(template), annotation.__name__)
@@ -113,8 +113,14 @@ class NativeHost(Host, Consed):
         if scalar_spec is not None:
             return scalar_spec
 
-        if annotation is str:
+        if annotation is Anchor:
             return pm.Spec.of("std.types.Anchor")
+
+        if annotation is Id:
+            return pm.Spec.of("std.types.Id")
+
+        if annotation is str:
+            return pm.Spec.of("std.types.Text")
 
         origin = get_origin(annotation)
         args = get_args(annotation)
@@ -199,6 +205,24 @@ class NativeHost(Host, Consed):
         builtin_cls: type[pm.Builtin],
     ) -> dict[pm.Placeholder, pm.Type]:
         arg_types = tuple(cast(pm.Type, child.fetch()) for child in spec.args)
+
+        variadic_index = next(
+            (i for i, p in enumerate(cls_params) if isinstance(p, TypeVarTuple)), None
+        )
+        if variadic_index is None:
+            if len(arg_types) != len(cls_params):
+                raise TypeError(
+                    f"{spec_name(builtin_cls)} expects {len(cls_params)} type argument(s), "
+                    f"got {len(arg_types)}"
+                )
+        else:
+            required = len(cls_params) - 1  # all params except the TypeVarTuple
+            if len(arg_types) < required:
+                raise TypeError(
+                    f"{spec_name(builtin_cls)} expects at least {required} type argument(s), "
+                    f"got {len(arg_types)}"
+                )
+
         mapping: dict[pm.Placeholder, pm.Type] = {}
         for index, (param, arg_type) in enumerate(zip(cls_params, arg_types)):
             if isinstance(param, TypeVarTuple):

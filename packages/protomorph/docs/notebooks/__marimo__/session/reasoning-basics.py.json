@@ -1,0 +1,312 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.21.1",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "a50ced77431d49fb33811de3b61082b5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"reasoning-basics\">Reasoning Basics</h1>\n<span class=\"paragraph\">End-to-end walkthrough of <code>pm.reasoning</code>:</span>\n<ul>\n<li>Facts and rules</li>\n<li>Recursive queries (ancestor)</li>\n<li>Stratified negation</li>\n<li>Floundering (non-ground negation)</li>\n<li>Coinduction</li>\n<li>Proof terms (Judgment)</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "4ba7cdaa55d525e21227e4b250fb0149",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "585223273d0c4515e6481fcd3524b8fe",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-facts-and-direct-query\">1 \u2014 Facts and direct query</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "aed3cf147001a1ab2f16e6070081f83d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Unique \u2192 test.bob\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "da6c7f4f23cbe5fe346ae2879d3cdb69",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-recursive-rules-ancestor\">2 \u2014 Recursive rules (ancestor)</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "3e4dc36b50d3ae08b618f7b61711244b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Ambiguous\nancestors: [test.bob, test.carol]\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "b4da180e1040e67ca0d9bab503336ec0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"3-no-solution\">3 \u2014 No solution</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "922cb454f08c3a8f7bf563ea11f17af6",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "NoSolution no matching proof\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "cf8b8065b1f0f7800872beac7d5e91ef",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"4-stratified-negation\">4 \u2014 Stratified negation</h2>\n<span class=\"paragraph\"><code>alice</code> is blocked \u2192 <code>safe(alice)</code> fails. <code>bob</code> is not blocked \u2192 <code>safe(bob)</code> succeeds.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "5310eb81c34b03542cf5c6d7549402df",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "safe(alice): NoSolution\nsafe(bob)  : Unique\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "emfo",
+      "code_hash": "246d182041285c02605e8b9718c63c2a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-floundering\">5 \u2014 Floundering</h2>\n<span class=\"paragraph\">Querying <code>safe(Q)</code> with unbound <code>Q</code> can't decide <code>not blocked(Q)</code> \u2192 <code>Floundered</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "e96e892eddf34e2ac026fe77d8bbe657",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Floundered\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "9648ee71d303970f05b6d1a4bdcd4be2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"6-coinduction\">6 \u2014 Coinduction</h2>\n<span class=\"paragraph\">Mark <code>test.stream</code> as coinductive so the engine treats the cycle\n<code>stream(X) :- stream(X)</code> as a successful (corecursive) proof.</span>\n<blockquote>\n<span class=\"paragraph\"><strong>Note</strong>: without <code>coinductive_anchors</code>, a pure positive self-cycle\nhas undefined termination in the current engine \u2014 always pass the\nanchor when reasoning about corecursive predicates.</span>\n</blockquote></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "15da7be83b50147afbcc977e1a10aee9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "coinductive: Unique\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "b71b2a8bb2430ac151bd68ec8e07ea5f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"7-stratification-plan\">7 \u2014 Stratification plan</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "dde6026ece666c0a28631f7ec677bad4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "  test.blocked: stratum 0\n  test.safe: stratum 1\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "c6572d0dd675455e28e35557e7170a81",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"8-proof-terms-judgment\">8 \u2014 Proof terms (Judgment)</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "94565affd54c873fdd3a7b63c580b4f3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "rel       : test.ancestor[test.alice, $g0]\nevidence  : logic.ByRule[test.ancestor[$X, $Y], Judgment(rel=test.parent[test.alice, $g0], evidence=logic.ByRule[test.parent[test.alice, test.bob]], subjudgments=(), trace=None)]\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    }
+  ]
+}

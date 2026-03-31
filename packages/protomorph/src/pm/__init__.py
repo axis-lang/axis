@@ -82,16 +82,6 @@ from .native import (
     _bootstrap_defaults,
 )
 
-# ── Layer 8: Solver ───────────────────────────────────────────
-from .solver import (
-    Rule,
-    Solver,
-    freshen_rule,
-    Resolved,
-    NewGoals,
-    Deferred,
-    Failed,
-)
 
 assert issubclass(Type, contract.Descriptor)
 

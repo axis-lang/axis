@@ -6,7 +6,7 @@ from typing import Any, ClassVar, cast
 import pm
 
 from .abstract.contract import Item
-from .foundation import Builtin, Id
+from .foundation import Builtin, Id, Anchor
 from .type_ import Type
 from .hosted import Host, current_host
 
@@ -205,7 +205,7 @@ class Spec(Type):
         return schema.item(id)
 
     @classmethod
-    def of(cls, anchor: str, *args: Any, **kwargs: Any) -> Spec:
+    def of(cls, anchor: Anchor | str, *args: Any, **kwargs: Any) -> Spec:
         values = args + tuple(kwargs.values())
         descriptors = tuple(_value_descriptor(value) for value in values)
         indexed_type = cast(Any, getattr(pm, "IndexedType"))
@@ -223,7 +223,7 @@ class Spec(Type):
     @classmethod
     def new(
         cls,
-        anchor: str,
+        anchor: Anchor | str,
         *vals: pm.Carrier,
         **kwvals: pm.Carrier,
     ) -> Spec:
