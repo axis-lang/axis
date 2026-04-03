@@ -24,6 +24,7 @@ from protobase.record import Record
 __all__ = [
     "functions",
     "input",
+    "contextvar",
     "method",
     "property",
     "iter",
@@ -39,7 +40,7 @@ __all__ = [
     "CycleError",
 ]
 
-ObjT = TypeVar("ObjT", bound=object, covariant=True)
+ObjT = TypeVar("ObjT", bound=object)
 R = TypeVar("R")
 P = ParamSpec("P")
 
@@ -551,6 +552,8 @@ _runtime = Runtime()
 
 register_inmutable(weakref.ReferenceType)
 
+_MISSING = object()
+
 
 def _supports_weakref(owner: type) -> bool:
     for base in owner.__mro__:
@@ -674,6 +677,13 @@ if TYPE_CHECKING:
             **kwargs: Any,
         ) -> frozenset[object]: ...
 
+    class TrackedContextVar(Generic[R]):
+        def get(self, default: R | object = ...) -> R: ...
+
+        def set(self, value: R) -> Token[R]: ...
+
+        def reset(self, token: Token[R]) -> None: ...
+
     def method(func: Callable[Concatenate[ObjT, P], R]) -> Query[ObjT, P, R]: ...
 
     def functions(func: Callable[P, R]) -> Query[None, P, R]: ...
@@ -681,6 +691,8 @@ if TYPE_CHECKING:
     def property(func: Callable[[ObjT], R]) -> Property[R]: ...
 
     def input(func: Callable[[ObjT], R]) -> Input[R]: ...
+
+    def contextvar(name: str, *, default: R | object = ...) -> TrackedContextVar[R]: ...
 
 else:
     class Query:
@@ -799,6 +811,61 @@ else:
             _runtime.input_invalidate_all(self.func_id)
 
 
+    class TrackedContextVar:
+        def __init__(self, name: str, *, default: Any = _MISSING) -> None:
+            self._name = name
+            if default is _MISSING:
+                self._var: ContextVar[Any] = ContextVar(name)
+            else:
+                self._var = ContextVar(name, default=default)
+
+            def _tracked_contextvar() -> Any:
+                return None
+
+            _tracked_contextvar.__name__ = name
+            _tracked_contextvar.__qualname__ = name
+            self._func_id = _runtime.register_input(_tracked_contextvar)
+            self._sync_runtime()
+
+        def _current_value(self) -> Any:
+            try:
+                return self._var.get()
+            except LookupError:
+                return _MISSING
+
+        def _sync_runtime(self) -> None:
+            _runtime.input_set(self._func_id, None, self._current_value())
+
+        def get(self, default: Any = _MISSING) -> Any:
+            try:
+                value = _runtime.input_get(self._func_id, None)
+            except RuntimeError:
+                self._sync_runtime()
+                value = _runtime.input_get(self._func_id, None)
+            if value is _MISSING:
+                if default is not _MISSING:
+                    return default
+                raise LookupError(self._name)
+            return self._var.get() if default is _MISSING else self._var.get(default)
+
+        def set(self, value: Any) -> Token[Any]:
+            _runtime._ensure_not_in_query("flux.contextvar.set")
+            token = self._var.set(value)
+            self._sync_runtime()
+            return token
+
+        def reset(self, token: Token[Any]) -> None:
+            _runtime._ensure_not_in_query("flux.contextvar.reset")
+            self._var.reset(token)
+            self._sync_runtime()
+
+        def _set_untracked(self, value: Any) -> Token[Any]:
+            return self._var.set(value)
+
+        def _reset_untracked(self, token: Token[Any]) -> None:
+            self._var.reset(token)
+
+
     def method(func: Callable[..., Any]) -> Query:
         query = Query(func)
         query._requires_owner = True
@@ -815,6 +882,10 @@ else:
 
     def input(func: Callable[..., Any]) -> Input:
         return Input(func)
+
+
+    def contextvar(name: str, *, default: Any = _MISSING) -> TrackedContextVar:
+        return TrackedContextVar(name, default=default)
 
 
 def in_query() -> bool:

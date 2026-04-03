@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Self, cast
+from typing import Any, Iterable, Self, cast
 
 import protomorph as pm
 
-from axis import items, sem, src
+from axis import Codebase, Workspace, items, sem, src
 
 
 STD_CORE_PATH = Path("codebase/std-core")
@@ -87,15 +87,15 @@ class TestPackage(items.Package):
 
     def unit(self, path: str = "std") -> items.Unit:
         anchor = pm.anchor(path)
-        for ctx in self.all_contexts:
-            if isinstance(ctx, items.Unit) and ctx.anchor == anchor:
+        for ctx in self.workspace.all_contexts:
+            if isinstance(ctx, items.Unit) and cast(Any, ctx).anchor == anchor:
                 return ctx
         raise KeyError(f"Unit {path!r} not found")
 
     def context(self, path: str) -> sem.Context:
         anchor = pm.anchor(path)
-        for ctx in self.all_contexts:
-            if ctx.anchor == anchor:
+        for ctx in self.workspace.all_contexts:
+            if cast(Any, ctx).anchor == anchor:
                 return ctx
         raise KeyError(f"Context {path!r} not found")
 
@@ -103,7 +103,7 @@ class TestPackage(items.Package):
         return self.context(path).scope
 
     def entity(self, anchor: str) -> sem.Entity:
-        return self[anchor]
+        return self.workspace[anchor]
 
     def contributions(
         self,
@@ -113,9 +113,40 @@ class TestPackage(items.Package):
         target = pm.anchor(anchor)
         return tuple(
             contrib
-            for contrib in self.all_contributions
+            for contrib in self.workspace.all_contributions
             if contrib.anchor == target and (cls is None or isinstance(contrib, cls))
         )
+
+    @property
+    def workspace(self) -> Workspace:
+        codebase = self.codebase
+        if not isinstance(codebase, Codebase):
+            codebase = Codebase.from_path(STD_CORE_PATH.parent)
+        return Workspace(codebase=codebase, roots=(self,))
+
+    @property
+    def all_contributions(self):
+        return self.workspace.all_contributions
+
+    @property
+    def all_facts(self):
+        return self.workspace.all_facts
+
+    @property
+    def all_clauses(self):
+        return self.workspace.all_clauses
+
+    @property
+    def entities_by_anchor(self):
+        return self.workspace.entities_by_anchor
+
+    @property
+    def namespaces_by_anchor(self):
+        return self.workspace.namespaces_by_anchor
+
+    @property
+    def logic_solver(self):
+        return self.workspace.logic_solver
 
     def _with_units(
         self,

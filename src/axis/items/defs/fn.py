@@ -4,7 +4,6 @@ from typing import ClassVar, Optional
 from itertools import product
 
 from protobase import flux, _
-import protomorph as pm
 
 from axis import expr, log, sem, syn
 

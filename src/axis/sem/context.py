@@ -4,6 +4,7 @@ from types import NotImplementedType
 from protobase import flux, _
 from protobase.cached_property import slot_cached_property
 import protomorph as pm
+from protomorph import reasoning as urs
 
 from axis import syn, sem
 
@@ -25,12 +26,15 @@ class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=Tru
             return frozenset()
 
         @flux.property
-        def clauses(self) -> frozenset[pm.Clause]:
+        def rules(self) -> frozenset[urs.Rule]:
             return frozenset()
+
+        def _check(self) -> None:
+            pass
 
         @flux.method
         def check(self):
-            pass
+            self._check()
 
     class EntityContribution(Contribution):
         pass
@@ -46,13 +50,13 @@ class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=Tru
             return self._facts
 
     class ClaimContribution(FactContribution):
-        _clauses: frozenset[pm.Clause] = frozenset()
+        _rules: frozenset[urs.Rule] = frozenset()
 
         @flux.property
-        def clauses(self) -> frozenset[pm.Clause]:
-            return self._clauses
+        def rules(self) -> frozenset[urs.Rule]:
+            return self._rules
 
-    realm: sem.Realm = _
+    #realm: sem.Realm = _
 
     @flux.property
     def contributions(self) -> frozenset[Contribution]:
@@ -79,7 +83,10 @@ class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=Tru
 
     def _build_scope(self, scope_builder: Scope.Builder): ...
 
+    def _check(self) -> None:
+        pass
+
     @flux.method
     def check(self):
         self.scope
-        pass
+        self._check()

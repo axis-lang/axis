@@ -6,6 +6,13 @@ The **host** is the extension point that makes Protomorph host-agnostic. It deco
 - custom carrier behaviour for opaque values
 - logic operator evaluation
 
+For the clean-cut Axis migration plan and the future division of responsibility
+between `pm.Host`, `pm.reasoning.Database`, `pm.Realm`, `NativeRealm`, and the
+reasoning engine, see [PM / Axis Clean-Cut Roadmap](pm-axis-roadmap.md).
+
+This page documents the current `Host` interface. Under the roadmap, `Host` is
+expected to become a temporary alias toward the canonical `Realm` abstraction.
+
 ---
 
 ## `Host`
@@ -72,6 +79,12 @@ try:
 finally:
     pm.HOST.reset(token)
 ```
+
+`pm.HOST` currently controls ordinary host-sensitive type operations.
+
+Under the roadmap, this context model is expected to collapse into a single
+tracked semantic context (`REALM`) shared by type, qualifier, and reasoning
+operations.
 
 ---
 

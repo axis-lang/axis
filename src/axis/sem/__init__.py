@@ -5,6 +5,5 @@ from .bound import *
 from .constraints import *
 from .context import *
 from .entity import *
-from .index import *
 from .realm import *
 from .scope import *

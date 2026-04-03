@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import ClassVar, Literal, cast
 
 import protomorph as pm
+from protomorph import reasoning as urs
 from protobase import _, flux, slot_cached_property
 
 from axis import expr, log, sem, syn
@@ -35,7 +36,7 @@ class Claim(Item):
                 children: syn.Block.Children,
                 **kwargs,
             ):
-                kwargs.pop("realm", None)
+                kwargs.pop("package", None)
                 _ = children
                 return cls(expr=expr_node, **kwargs)
 
@@ -51,7 +52,7 @@ class Claim(Item):
             children: syn.Block.Children,
             **kwargs,
         ):
-            kwargs.pop("realm", None)
+            kwargs.pop("package", None)
             assert kw == cls.outline_keyword
             assert sep == ":"
             return cls(clauses=tuple(child for child in children if isinstance(child, cls.Clause)))
@@ -191,45 +192,45 @@ class Claim(Item):
                     origin=self.head,
                     ctx=self,
                     _facts=frozenset(),
-                    _clauses=frozenset((pm.Clause(head=head, body=body_goals),)),
+                    _rules=frozenset((urs.Rule(head=head, body=body_goals),)),
                 ),
             )
         )
 
-    @flux.method
-    def check(self):
-        self.scope
+    def _check(self) -> None:
+        # self.scope
 
-        head = self.head_fact
-        _raise_claim_error(head, origin=self.head, message="Invalid claim head")
-        assert isinstance(head, pm.Spec)
+        # head = self.head_fact
+        # _raise_claim_error(head, origin=self.head, message="Invalid claim head")
+        # assert isinstance(head, pm.Spec)
 
-        entity = self.realm.entities_by_anchor[head.anchor] if head.anchor in self.realm.entities_by_anchor else None
-        if entity is None or not entity.spec_index.facet(sem.Entity.PredicateFacet):
-            log.error("Claim target must have predicate facet").label(self.head).throw()
+        # entity = self.realm.entities_by_anchor[head.anchor] if head.anchor in self.realm.entities_by_anchor else None
+        # if entity is None or not entity.spec_index.facet(sem.Entity.PredicateFacet):
+        #     log.error("Claim target must have predicate facet").label(self.head).throw()
 
-        body_goals = self.body_goals
-        _raise_claim_error(body_goals, origin=self.when[0] if self.when else self.head, message="Invalid claim condition")
-        assert not isinstance(body_goals, pm.Err)
+        # body_goals = self.body_goals
+        # _raise_claim_error(body_goals, origin=self.when[0] if self.when else self.head, message="Invalid claim condition")
+        # assert not isinstance(body_goals, pm.Err)
 
-        if not entity.exists_spec(head, sem.Entity.PredicateFacet):
-            log.error("Claim head is not admitted by any declared predicate spec").label(self.head).throw()
+        # if not entity.exists_spec(head, sem.Entity.PredicateFacet):
+        #     log.error("Claim head is not admitted by any declared predicate spec").label(self.head).throw()
 
-        if not body_goals:
-            return
+        # if not body_goals:
+        #     return
 
-        head_vars = _logic_vars((head,), self)
-        body_vars = _logic_vars(body_goals, self)
-        unsafe = tuple(sorted(var for var in head_vars if var not in body_vars))
-        if not unsafe:
-            return
+        # head_vars = _logic_vars((head,), self)
+        # body_vars = _logic_vars(body_goals, self)
+        # unsafe = tuple(sorted(var for var in head_vars if var not in body_vars))
+        # if not unsafe:
+        #     return
 
-        names = ", ".join(unsafe)
-        report = log.error("Conditional claim must be range-restricted")
-        report = report.label(self.head, f"head variables must appear in when: {names}")
-        for clause in self.when[0].clauses:
-            report = report.label(clause, "when body grounds claim variables")
-        report.throw()
+        # names = ", ".join(unsafe)
+        # report = log.error("Conditional claim must be range-restricted")
+        # report = report.label(self.head, f"head variables must appear in when: {names}")
+        # for clause in self.when[0].clauses:
+        #     report = report.label(clause, "when body grounds claim variables")
+        # report.throw()
+        pass
 
     def _subject_for_binding(self, binding: sem.BindingStruct.Field) -> pm.Val | None:
         if binding.binder_name is None:

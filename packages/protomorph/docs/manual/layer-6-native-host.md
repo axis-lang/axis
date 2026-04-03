@@ -2,6 +2,14 @@
 
 `NativeHost` is the default `Host` implementation. It bridges Python's own type annotation system (`typing`, `TypeVar`, standard collections) into the Protomorph type algebra.
 
+It is a useful built-in implementation, not the semantic source of truth for all
+hosts. Axis is expected to provide its own semantic implementation during the
+clean-cut migration. See [PM / Axis Clean-Cut Roadmap](pm-axis-roadmap.md).
+
+Under the roadmap, `NativeHost` is expected to converge toward `NativeRealm`,
+with native/testing overlays used to inject rules, facts, and impls while
+reusing native semantics.
+
 ---
 
 ## How it works
@@ -28,7 +36,7 @@ _project_type(str)              # Spec("std.types.Text")
 _project_type(list[int])        # Qual(Integer, List)
 _project_type(dict[str, int])   # Qual(Integer, Map(Text))
 _project_type(int | str)        # UnionType({Integer, Text})
-_project_type(tuple[int, str])  # Spec("std.types.Tuple", Integer, Text)
+_project_type(tuple[int, str])  # VaryingType(Integer, Text)
 ```
 
 Projection is recursive and handles:
@@ -147,7 +155,7 @@ It handles:
 | `list` | `Qual(value, List)` |
 | `set` | `Qual(value, Set)` |
 | `frozenset` | `Qual(value, FrozenSet)` |
-| `tuple` | `Spec("std.types.Tuple", ...)` |
+| `tuple` | structural tuple types (`VaryingType` / `UniformType`) |
 
 ---
 

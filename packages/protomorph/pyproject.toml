@@ -8,6 +8,14 @@ authors = ["jdluque <jdluque@leitat.org>"]
 include = "protomorph"
 from = "src"
 
+[[tool.poetry.packages]]
+include = "protomorph_"
+from = "src"
+
+[[tool.poetry.packages]]
+include = "pm.py"
+from = "src"
+
 [tool.poetry.dependencies]
 python = "^3.13"
 protobase = { path = "../protobase", develop = true }

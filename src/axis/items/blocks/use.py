@@ -4,7 +4,7 @@ from protobase import Inmutable, frozendict
 from protobase.cached_property import slot_cached_property
 import protomorph as pm
 
-from axis import expr, sem, syn
+from axis import expr, log, sem, syn
 from axis.sem import Scope
 
 
@@ -80,9 +80,6 @@ class Use(syn.Block, Inmutable):
                 continue
             match alias:
                 case expr.Lit() as lit if lit.is_ellipsis:
-                    # wildcard import
-                    for resolved_target in namespaces.get(target, ()):
-                        scope_builder.define(resolved_target.name, resolved_target, origin=lit)
-                    pass
+                    log.error("Ellipsis imports are temporarily disabled").label(lit).throw()
                 case expr.Sym(name=name) as sym:
                     scope_builder.define(name, target, origin=sym)

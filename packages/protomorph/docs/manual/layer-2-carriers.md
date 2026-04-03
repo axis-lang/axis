@@ -108,7 +108,7 @@ print(idx.key_at(2))              # None
 | `UniformType` (unique) | `Index` |
 | `IndexedType` | `Tuple` |
 | `Spec` | `NativeObjectCarrier` or `LeafCarrier` depending on schema |
-| `Qual` | delegates to `underlying.make(data)` |
+| `Qual` | delegates to `underlying.make(data)`, except `Result[...]` uses the specialized `Result` carrier |
 
 ---
 

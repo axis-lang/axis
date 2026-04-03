@@ -21,6 +21,7 @@ Protomorph provides two complementary systems:
 |---|---|
 | Install and run a first example | [Quick Start](getting-started/quick-start.md) |
 | Understand the type system layer by layer | [Manual](manual/layer-0-foundation.md) |
+| Follow the Axis migration plan | [PM / Axis Clean-Cut Roadmap](manual/pm-axis-roadmap.md) |
 | Use the reasoning engine | [Reasoning Overview](manual/reasoning/overview.md) |
 | Look up a class or function | [API Reference](reference/pm.md) |
 | Run interactive examples | [Notebooks](notebooks/types-and-carriers.html) |

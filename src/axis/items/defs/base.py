@@ -145,7 +145,7 @@ class Def(Item, syn.ClassMatcher):
             children: syn.Block.Children,
             **kwargs,
         ):
-            kwargs.pop("realm", None)
+            kwargs.pop("package", None)
             _ = children
             return cls(expr=expr_node, **kwargs)
 
@@ -162,7 +162,7 @@ class Def(Item, syn.ClassMatcher):
             children: syn.Block.Children,
             **kwargs,
         ):
-            kwargs.pop("realm", None)
+            kwargs.pop("package", None)
             return cls(expr=expr_node, **kwargs)
 
     outline_keyword: ClassVar = "def"

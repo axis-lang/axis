@@ -138,8 +138,44 @@ class FluxInputTest(unittest.TestCase):
                 raise NotImplementedError
 
         token = Token("alpha")
-        token.version = 1
+        Token.version.set(token, 1)
         self.assertEqual(token.version, 1)
+
+
+class FluxContextVarTest(unittest.TestCase):
+    def test_contextvar_read_is_tracked(self):
+        calls = {"value": 0}
+        current = flux.contextvar("test.current", default=2)
+
+        @flux.functions
+        def doubled() -> int:
+            calls["value"] += 1
+            return cast(int, current.get()) * 2
+
+        self.assertEqual(doubled(), 4)
+        self.assertEqual(doubled(), 4)
+        self.assertEqual(calls["value"], 1)
+
+        token = current.set(3)
+        try:
+            self.assertEqual(doubled(), 6)
+            self.assertEqual(calls["value"], 2)
+        finally:
+            current.reset(token)
+
+        self.assertEqual(doubled(), 4)
+        self.assertEqual(calls["value"], 3)
+
+    def test_contextvar_set_inside_query_raises(self):
+        current = flux.contextvar("test.reentrant", default=1)
+
+        @flux.functions
+        def bad() -> int:
+            current.set(2)
+            return 0
+
+        with self.assertRaises(RuntimeError):
+            bad()
 
 
 class FluxDependencyTest(unittest.TestCase):

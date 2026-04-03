@@ -29,9 +29,9 @@ def __(mo):
 
 @app.cell
 def __():
-    import pm
-    from pm import placeholder, wrap, unify, UnionFind, Spec, LeafCarrier, VaryingType
-    return LeafCarrier, Spec, UnionFind, VaryingType, placeholder, pm, unify, wrap
+    import protomorph
+    from protomorph import placeholder, wrap, unify, UnionFind, Spec, LeafCarrier, VaryingType
+    return LeafCarrier, Spec, UnionFind, VaryingType, placeholder, protomorph, unify, wrap
 
 
 @app.cell

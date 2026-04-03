@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-import protomorph as pm
-
 from protobase import Inmutable
 
 from axis import expr, log, syn

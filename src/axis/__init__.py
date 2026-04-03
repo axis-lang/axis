@@ -11,4 +11,6 @@ import axis.src
 import axis.syn
 import axis.sem
 
+from .codebase import Codebase
+from .workspace import Workspace
 

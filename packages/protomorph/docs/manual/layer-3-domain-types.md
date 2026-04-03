@@ -167,6 +167,10 @@ q2 = pm.Qual.of(q1,    pm.Spec.of("std.qualifiers.Optional"))
 
 ## Putting it together — Python type projection
 
+This section reflects the current structural projection model implemented by
+`NativeHost.project_type`. Older notes that describe `tuple[...]` as
+`Spec("std.types.Tuple", ...)` are obsolete.
+
 `NativeHost.project_type` converts Python annotations into the corresponding `pm.Type`:
 
 | Python annotation | `pm.Type` |
@@ -175,7 +179,8 @@ q2 = pm.Qual.of(q1,    pm.Spec.of("std.qualifiers.Optional"))
 | `str` | `Spec("std.types.Text")` |
 | `list[int]` | `Qual(int_t, Spec("std.qualifiers.List"))` |
 | `dict[str, int]` | `Qual(int_t, Spec("std.qualifiers.Map", str_t))` |
-| `tuple[int, str]` | `Spec("std.types.Tuple", int_t, str_t)` |
+| `tuple[int, str]` | `VaryingType(int_t, str_t)` |
+| `tuple[int, ...]` | `UniformType(int_t)` |
 | `int \| str` | `UnionType({int_t, str_t})` |
 | `TypeVar("T")` | `NativeVar(ctx, "T")` |
 

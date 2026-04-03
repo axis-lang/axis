@@ -1,6 +1,15 @@
 # Reasoning — Database & Rules
 
-The `Database` is the knowledge source for the reasoning engine. It answers three questions: what rules exist for a given predicate, what ground facts exist, and whether a predicate is coinductive.
+This page documents the current `Database` interface.
+
+Under the clean-cut roadmap, `Database` is expected to become a temporary alias
+or compatibility layer toward the canonical `pm.Realm` abstraction. The current
+material remains useful for understanding the reasoning-side responsibilities,
+but it is not the final semantic-context design.
+
+The `Database` is the knowledge source for the reasoning engine. It answers
+three questions: what rules exist for a given predicate, what ground facts
+exist, and whether a predicate is coinductive.
 
 ---
 
@@ -23,6 +32,9 @@ class Database(Consed, abstract=True):
 ## `RuleSetDatabase`
 
 The standard concrete implementation.
+
+In the roadmap direction, this role is expected to migrate toward a native
+overlay realm used mainly for testing and lightweight reasoning fixtures.
 
 ```python
 from pm.reasoning import Rule, RuleSetDatabase

@@ -26,12 +26,12 @@ def __(mo):
 
 @app.cell
 def __():
-    import pm
-    from pm import (
+    import protomorph
+    from protomorph import (
         Spec, VaryingType, UniformType, UnionType, IndexedType, Qual,
         LeafCarrier, wrap, placeholder, Id,
     )
-    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, placeholder, pm, wrap
+    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, placeholder, protomorph, wrap
 
 
 @app.cell
@@ -98,7 +98,7 @@ def __(mo):
 
 @app.cell
 def __():
-    from pm import _project_type
+    from protomorph import _project_type
 
     for annotation, tp in [
         ("int",           _project_type(int)),

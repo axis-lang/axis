@@ -1,6 +1,6 @@
 # %%
 
-from pm import *
+from protomorph import *
 
 
 class B[T: int = int](): ...

@@ -2,471 +2,432 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import NoneType, UnionType as PEP604Union
-from typing import Any, Callable, TypeVar, Union, cast, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    TypeVar,
+    TypeVarTuple,
+    Union,
+    Unpack,
+    cast,
+    get_args,
+    get_origin,
+)
 
-# Top-level runtime imports - needed for inheritance/descriptors
-from protobase import Consed, flux, frozendict
+from protobase import Consed, attr_info_of, flux, frozendict
 
-# Import protomorph for internal use and type hints
-import protomorph as pm
+import protomorph
+from .foundation import _ALL_BUILTINS, Anchor, Id
+from .realm import OverlayRealm, Realm
 
-__all__ = [
-    "NativeGenericVarType",
-    "NativeRegistry", 
-    "NativeBackend",
-    "register_native_type",
-    "register_python_type", 
-    "register_atomic_layout",
-    "type_from_python",
-    "build_builtin_type", 
-    "builtin_runtime_type_args",
-]
+type PythonTransform = Callable[..., protomorph.Type]
 
-# Type aliases
-type PythonTransform = Callable[..., pm.Type]
-
-# === Global State - Sources of Truth ===
-
-# Mutable global mappings - single source of truth
-_NATIVE_TYPES: dict[type, pm.Type] = {}
+_NATIVE_SPECS: dict[Any, protomorph.Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
-_ATOMIC_LAYOUTS: dict[str, pm.AtomicLayout] = {}
-
-# Bootstrap guard
 _BOOTSTRAPPED = False
 
-# === Context Classes ===
 
-class TypeBuildContext(pm.ContextProto):
-    def lookup_bound(self, name: str) -> pm.Type | None:
-        _ = name
+def spec_name(cls: type[protomorph.Builtin]) -> str:
+    name = getattr(cls, "SPEC_NAME", None)
+    if isinstance(name, str):
+        return name
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+class NativeVar(protomorph.Var):
+    ctx: str | None
+    id: str
+
+    def display_label(self) -> str | None:
+        return self.id
+
+
+def _native_ctx(template: Any | None) -> str | None:
+    if template is None:
         return None
+    if isinstance(template, str):
+        return template
+    if isinstance(template, type) and issubclass(template, protomorph.Builtin):
+        return spec_name(template)
+    if isinstance(template, protomorph.Spec):
+        return str(template.anchor)
+    return str(template)
 
 
-class BuiltinContext(pm.ContextProto):
-    builtin_cls: type[pm.Builtin]
-
-    def lookup_bound(self, name: str) -> pm.Type | None:
-        _ = name
-        return None
-
-
-class NativeGenericVarType(pm.VarType[pm.ContextProto]):
-    ANCHOR = "std.types.NativeGenericVarType"
-
-
-# === Singleton Registry ===
-
-class NativeRegistry(Consed):
-    """Singleton registry for native type mappings and builtin types.
-    
-    Uses protobase.flux for automatic cache invalidation and dependency tracking.
-    All mutations happen through global register_* functions.
-    """
-    
-    # === Flux Sources of Truth ===
-    
+class NativeRealm(Realm, Consed):
     @flux.property
-    def all_builtins(self) -> frozenset[type[pm.Builtin]]:
-        """All builtin classes discovered during class construction."""
-        return frozenset(pm.ALL_BUILTINS)
-    
+    def all_builtins(self) -> frozenset[type[protomorph.Builtin]]:
+        return frozenset(_ALL_BUILTINS)
+
     @flux.property
-    def native_types(self) -> frozendict[type, pm.Type]:
-        """Native type mappings from global state"""
-        return frozendict(_NATIVE_TYPES)
-    
+    def native_specs(self) -> frozendict[Any, protomorph.Spec]:
+        return frozendict(_NATIVE_SPECS)
+
     @flux.property
     def python_transforms(self) -> frozendict[type, PythonTransform]:
-        """Python transforms from global state"""
         return frozendict(_PYTHON_TRANSFORMS)
-    
-    @flux.property
-    def atomic_layouts(self) -> frozendict[pm.Anchor, pm.AtomicLayout]:
-        """Atomic layouts from global state"""
-        return frozendict({
-            pm.anchor(anchor_str): layout 
-            for anchor_str, layout in _ATOMIC_LAYOUTS.items()
-        })
-    
-    # === Flux Cached Queries ===
-    
+
     @flux.method
-    def template_for(self, builtin_cls: type[pm.Builtin]) -> tuple[pm.Struct[str, pm.Type], frozenset[pm.Var]]:
-        """Get template for builtin class. Cached per class."""
-        # Import here to avoid circulars  
-        from protobase import attr_info_of
-        
+    def schema_template_for(self, builtin_cls: type[protomorph.Builtin]) -> protomorph.TupleLikeType:
         attrs = attr_info_of(builtin_cls)
         if not attrs:
-            return cast(pm.Struct[str, pm.Type], pm.Struct.Empty), frozenset()
+            return protomorph.VaryingType(())
 
-        vars: set[pm.Var] = set()
-        field_types: dict[str, pm.Type] = {}
-        ctx = BuiltinContext(builtin_cls=builtin_cls)
-        
-        for name, attr_info in attrs.items():
-            field_types[name] = type_from_python(
-                attr_info.type,
-                ctx=ctx,
-                vars=vars,
-                registry=self,
+        names = list(attrs.keys())
+        types = tuple(self.project_type(info.type, template=builtin_cls) for info in attrs.values())
+        indexed_type = cast(Any, getattr(protomorph, "IndexedType"))
+        return indexed_type(
+            protomorph.VaryingType(types), protomorph.Index.of(*(protomorph.Id(name) for name in names))
+        )
+
+    @flux.property
+    def builtin_by_spec_name(self) -> frozendict[str, type[protomorph.Builtin]]:
+        return frozendict({spec_name(cls): cls for cls in self.all_builtins})
+
+    @flux.method
+    def project_type(
+        self,
+        annotation: Any,
+        *,
+        template: Any | None = None,
+    ) -> protomorph.Type:
+        if isinstance(annotation, protomorph.Type):
+            return annotation
+
+        if annotation is protomorph.Type:
+            return protomorph.Spec.of("std.metas.Type")
+
+        if annotation is protomorph.Tuple:
+            return protomorph.Spec.of("std.types.Tuple")
+
+        if annotation is protomorph.Index:
+            return protomorph.Spec.of("std.types.Index")
+
+        if isinstance(annotation, TypeVar):
+            return NativeVar(_native_ctx(template), annotation.__name__)
+
+        if isinstance(annotation, TypeVarTuple):
+            return NativeVar(_native_ctx(template), f"*{annotation.__name__}")
+
+        scalar_spec = self.native_specs.get(annotation)
+        if scalar_spec is not None:
+            return scalar_spec
+
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+
+        if origin is Union or isinstance(annotation, PEP604Union):
+            return protomorph.UnionType.of(
+                *(self.project_type(arg, template=template) for arg in args)
             )
 
-        return pm.Struct.new(**field_types), frozenset(vars)
-    
+        if origin is Unpack and args:
+            return self.project_type(args[0], template=template)
+
+        if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+            return protomorph.UniformType(self.project_type(args[0], template=template))
+
+        if origin is tuple and args:
+            converted = tuple(self.project_type(arg, template=template) for arg in args)
+            if (
+                len(converted) == 1
+                and isinstance(converted[0], protomorph.Placeholder)
+                and (protomorph.placeholder_name(cast(protomorph.Placeholder, converted[0])) or "").startswith("*")
+            ):
+                return converted[0]
+            return cast(protomorph.Type, protomorph.VaryingType(converted))
+
+        if isinstance(origin, type):
+            typed_origin = cast(type, origin)
+            transform = self.python_transforms.get(typed_origin)
+            if transform is not None:
+                converted = tuple(
+                    (
+                        self.project_type(arg, template=template)
+                        if arg is not Ellipsis
+                        else arg
+                    )
+                    for arg in args
+                )
+                return transform(*converted)
+
+            if issubclass(typed_origin, protomorph.Builtin):
+                arg_types = tuple(
+                    self.project_type(arg, template=template) for arg in args
+                )
+                return self._spec_for_builtin(typed_origin, arg_types)
+
+        if isinstance(annotation, type) and issubclass(annotation, protomorph.Builtin):
+            return self._spec_for_builtin(annotation, ())
+
+        if isinstance(annotation, type) and issubclass(annotation, protomorph.Tuple):
+            return protomorph.Spec.of("std.types.Tuple")
+
+        raise ValueError(f"Unsupported annotation: {annotation!r}")
+
     @flux.method
-    def class_for(self, type_: pm.NominalType) -> type[pm.Builtin] | None:
-        """Get builtin class for nominal type. Cached per type."""
-        anchor = type_.spec_ref.anchor
-        
-        # Look for builtin with matching anchor
-        for builtin_cls in self.all_builtins:
-            if pm.anchor(builtin_cls._anchor_path()) == anchor:
-                return builtin_cls
-        return None
-    
+    def schema_for(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:
+        return self._schema_for_cached(spec)
+
     @flux.method
-    def layout_for_spec(self, spec: pm.Spec) -> pm.Layout | None:
-        """Compute layout for specific spec. Cached per spec."""
-        anchor = spec.anchor
-        
-        # Try atomic layout first
-        atomic_layout = self.atomic_layouts.get(anchor)
-        if atomic_layout is not None:
-            return atomic_layout
-        
-        # Try builtin layout
-        builtin_cls = None
-        for cls in self.all_builtins:
-            if pm.anchor(cls._anchor_path()) == anchor:
-                builtin_cls = cls
-                break
-        
+    def _schema_for_cached(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:
+        builtin_cls = self.builtin_by_spec_name.get(str(spec.anchor))
         if builtin_cls is None:
             return None
-        
-        template, vars = self.template_for(builtin_cls)
-        if not vars:
-            return pm.StructLayout(fields=template, builtin_cls=builtin_cls)
-        
-        # Substitute type variables
-        resolved = template.map(
-            lambda field_type: self._substitute_type(field_type, spec, builtin_cls)
-        )
-        return pm.StructLayout(fields=resolved, builtin_cls=builtin_cls)
-    
-    # === Public Interface ===
-    
-    def layout(self, type_: pm.NominalType) -> pm.Layout | None:
-        """Public layout method for nominal types."""
-        return self.layout_for_spec(type_.spec_ref)
-    
-    def construct(self, type_: pm.NominalType, args: tuple[pm.Data, ...]) -> pm.Data:
-        """Construct instance of builtin type."""
-        resolved_layout = self.layout(type_)
-        if not isinstance(resolved_layout, pm.StructLayout):
-            raise ValueError(f"No materializable layout for {type_!r}")
-        layout = resolved_layout
-        builtin_cls = layout.builtin_cls
-        if builtin_cls is None:
-            raise ValueError(f"No materializable layout for {type_!r}")
 
-        if len(args) != len(layout.fields):
-            raise ValueError(
-                f"Cannot construct {builtin_cls.__name__}: expected {len(layout.fields)} args, got {len(args)}"
+        schema = self.schema_template_for(builtin_cls)
+        cls_params = getattr(builtin_cls, "__type_params__", ())
+        if not cls_params or len(spec.args) == 0:
+            return schema
+
+        mapping = self._mapping_for_spec(spec, cls_params, builtin_cls)
+        return self._specialize_schema(schema, mapping)
+
+    def _spec_for_builtin(
+        self,
+        builtin_cls: type[protomorph.Builtin],
+        arg_types: tuple[protomorph.Type, ...],
+    ) -> protomorph.Spec:
+        return protomorph.Spec.of(spec_name(builtin_cls), *arg_types)
+
+    def _mapping_for_spec(
+        self,
+        spec: protomorph.Spec,
+        cls_params: tuple[object, ...],
+        builtin_cls: type[protomorph.Builtin],
+    ) -> dict[protomorph.Placeholder, protomorph.Type]:
+        arg_types = tuple(cast(protomorph.Type, child.fetch()) for child in spec.args)
+
+        variadic_index = next(
+            (i for i, p in enumerate(cls_params) if isinstance(p, TypeVarTuple)), None
+        )
+        if variadic_index is None:
+            if len(arg_types) != len(cls_params):
+                raise TypeError(
+                    f"{spec_name(builtin_cls)} expects {len(cls_params)} type argument(s), "
+                    f"got {len(arg_types)}"
+                )
+        else:
+            required = len(cls_params) - 1  # all params except the TypeVarTuple
+            if len(arg_types) < required:
+                raise TypeError(
+                    f"{spec_name(builtin_cls)} expects at least {required} type argument(s), "
+                    f"got {len(arg_types)}"
+                )
+
+        mapping: dict[protomorph.Placeholder, protomorph.Type] = {}
+        for index, (param, arg_type) in enumerate(zip(cls_params, arg_types)):
+            if isinstance(param, TypeVarTuple):
+                remaining = arg_types[index:]
+                mapping[NativeVar(spec_name(builtin_cls), f"*{param.__name__}")] = cast(
+                    protomorph.Type,
+                    protomorph.VaryingType(remaining),
+                )
+                break
+            mapping[NativeVar(spec_name(builtin_cls), cast(TypeVar, param).__name__)] = arg_type
+        return mapping
+
+    def _specialize_schema(
+        self,
+        schema: protomorph.TupleLikeType,
+        mapping: dict[protomorph.Placeholder, protomorph.Type],
+    ) -> protomorph.TupleLikeType:
+        indexed_type = getattr(protomorph, "IndexedType", None)
+        if indexed_type is not None and isinstance(schema, indexed_type):
+            indexed_schema = cast(Any, schema)
+            inner = cast(
+                protomorph.TupleLikeType,
+                self._specialize_schema(
+                    cast(protomorph.TupleLikeType, indexed_schema.inner), mapping
+                ),
             )
+            index = indexed_schema.index.splice()
+            return indexed_type(cast(protomorph.Type, inner), index)
 
-        attrs = {
-            key: value
-            for key, value in zip(layout.fields.index.keys, args)
-            if key is not None
-        }
-        return cast(pm.Data, builtin_cls(**attrs))
-    
-    # === Private Helpers ===
-    
-    def _resolve_var(self, var: pm.Var, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Type:
-        """Resolve type variable in builtin context."""
-        if not isinstance(var.__type__, NativeGenericVarType):
-            return var
-        ctx = var.__type__.ctx
-        if not isinstance(ctx, BuiltinContext) or ctx.builtin_cls is not builtin_cls:
-            return var
+        def _make_replacement(ph: protomorph.Placeholder) -> Any:
+            replacement = mapping[ph]
+            if (protomorph.placeholder_name(ph) or "").startswith("*") and isinstance(replacement, protomorph.VaryingType):
+                return protomorph.Spread(replacement.values)
+            return replacement
 
-        args = spec.args
-        if args is None or args.index.is_empty:
-            return _any_type()
-
-        name = var.__data__
-        if not isinstance(name, str):
-            return _any_type()
-
-        binding = args.get(name, default=None)
-        # Import here to avoid circulars
-        resolved = pm.as_type(binding)
-        return resolved if resolved is not None else _any_type()
-
-    def _substitute_spec(self, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Spec:
-        """Substitute type variables in spec."""
-        # Import here to avoid circulars
-        return pm._subst_spec(
-            spec,
-            lambda value: (
-                pm.val(self._resolve_var(value, spec, builtin_cls))
-                if isinstance(value, pm.Var)
-                else None
-            ),
+        new_types: list[protomorph.Type] = []
+        varying_schema = cast(protomorph.VaryingType, schema)
+        for field_type in varying_schema.values:
+            if isinstance(field_type, protomorph.Placeholder) and field_type in mapping:
+                new_types.append(cast(protomorph.Type, _make_replacement(field_type)))
+                continue
+            if isinstance(field_type, protomorph.UniformType):
+                element_type = field_type.element_type
+                if isinstance(element_type, protomorph.Placeholder) and element_type in mapping:
+                    replacement = mapping[element_type]
+                    if isinstance(replacement, protomorph.VaryingType):
+                        new_types.append(replacement)
+                    else:
+                        new_types.append(protomorph.UniformType(replacement))
+                    continue
+            if isinstance(field_type, protomorph.VaryingType):
+                replaced_values = []
+                changed = False
+                for item_type in field_type.values:
+                    if isinstance(item_type, protomorph.Placeholder) and item_type in mapping:
+                        replacement = mapping[item_type]
+                        if isinstance(replacement, protomorph.VaryingType):
+                            replaced_values.extend(replacement.values)
+                        else:
+                            replaced_values.append(replacement)
+                        changed = True
+                    else:
+                        replaced_values.append(item_type)
+                if changed:
+                    new_types.append(
+                        cast(
+                            protomorph.Type,
+                            protomorph.VaryingType(tuple(replaced_values)).splice(),
+                        )
+                    )
+                    continue
+            field_carrier = wrap(field_type)
+            carrier_mapping: dict[protomorph.Carrier, protomorph.Carrier] = {}
+            for leaf in field_carrier.deep_iter():
+                data = leaf.fetch()
+                if data in mapping:
+                    carrier_mapping[leaf] = protomorph.LeafCarrier(
+                        leaf.descriptor,
+                        _make_replacement(cast(protomorph.Placeholder, data)),
+                    )
+            if carrier_mapping:
+                result = field_carrier.subst(carrier_mapping).fetch()
+                if isinstance(result, protomorph.TupleLikeType):
+                    result = result.splice()
+                new_types.append(cast(protomorph.Type, result))
+            else:
+                new_types.append(field_type)
+        return cast(
+            protomorph.TupleLikeType,
+            protomorph.VaryingType(tuple(new_types)).splice(),
         )
 
-    def _substitute_type(self, type_: pm.Type, spec: pm.Spec, builtin_cls: type[pm.Builtin]) -> pm.Type:
-        """Substitute type variables in type."""
-        # Import here to avoid circulars
-        return pm._subst_type(
-            type_,
-            lambda value: (
-                pm.val(self._resolve_var(value, spec, builtin_cls))
-                if isinstance(value, pm.Var)
-                else None
-            ),
-        )
+    def with_rules(self, *rules: protomorph.Builtin) -> OverlayRealm:
+        return OverlayRealm(base=self, rules=rules, facts=(), impls=(), coinductive_anchors=frozenset())
+
+    def with_facts(self, *facts: protomorph.Builtin) -> OverlayRealm:
+        return OverlayRealm(base=self, rules=(), facts=facts, impls=(), coinductive_anchors=frozenset())
+
+    def with_impls(self, *impls: protomorph.Builtin) -> OverlayRealm:
+        return OverlayRealm(base=self, rules=(), facts=(), impls=impls, coinductive_anchors=frozenset())
 
 
-# === Singleton Backend ===
-
-class NativeBackend(pm.SemanticBridgeBase, Consed):
-    """Singleton semantic bridge using global native registry."""
-    
-    registry: NativeRegistry
-    
-    def layout(self, type: pm.Type) -> pm.Layout | None:
-        if isinstance(type, pm.NominalType):
-            return self.registry.layout(type)
-        return super().layout(type)
-
-    def construct(self, type: pm.NominalType, args: tuple[pm.Data, ...]) -> pm.Data:
-        return self.registry.construct(type, args)
+def register_native_spec(python_type: Any, spec: protomorph.Spec) -> None:
+    _NATIVE_SPECS[python_type] = spec
+    try:
+        NativeRealm.native_specs.invalidate_for(protomorph.NATIVE_REALM)
+    except AttributeError:
+        pass
 
 
-# === Global Registration API with Flux Invalidation ===
-
-def register_native_type(native_type: type, proto_type: pm.Type) -> None:
-    """Register native type mapping globally."""
-    _NATIVE_TYPES[native_type] = proto_type
-    # Invalidate flux property
-    NativeRegistry.native_types.invalidate_for(pm.NATIVE_REGISTRY)
-
-
-def register_python_type(origin: type, transform: PythonTransform) -> None:
-    """Register python transform globally."""  
+def register_python_transform(origin: type, transform: PythonTransform) -> None:
     _PYTHON_TRANSFORMS[origin] = transform
-    # Invalidate flux property
-    NativeRegistry.python_transforms.invalidate_for(pm.NATIVE_REGISTRY)
+    try:
+        NativeRealm.python_transforms.invalidate_for(protomorph.NATIVE_REALM)
+    except AttributeError:
+        pass
 
 
-def register_atomic_layout(anchor: str | pm.Anchor, layout: pm.AtomicLayout) -> None:
-    """Register atomic layout globally."""
-    if isinstance(anchor, pm.Anchor):
-        anchor = anchor.path
-    _ATOMIC_LAYOUTS[anchor] = layout
-    # Invalidate flux property
-    NativeRegistry.atomic_layouts.invalidate_for(pm.NATIVE_REGISTRY)
-
-
-# === Type Conversion Functions ===
-
-_TYPE_BUILD_CTX = TypeBuildContext()
-
-
-def type_from_python(
+def _project_type(
     annotation: Any,
     *,
-    ctx: pm.ContextProto | None = None,
-    vars: set[pm.Var] | None = None,
-    registry: NativeRegistry | None = None,
-) -> pm.Type:
-    """Convert Python type annotation to protomorph Type."""
-    # Use global registry if none specified
-    registry = registry if registry is not None else pm.NATIVE_REGISTRY
-    ctx = _TYPE_BUILD_CTX if ctx is None else ctx
-
-    if isinstance(annotation, pm.Type):
-        return annotation
-
-    if annotation is None:
-        return _empty_type()
-
-    if annotation is Any:
-        return _any_type()
-
-    if isinstance(annotation, TypeVar):
-        var = cast(pm.Var, pm.Var(NativeGenericVarType(ctx=ctx), annotation.__name__))
-        if vars is not None:
-            vars.add(var)
-        return var
-
-    origin = get_origin(annotation)
-    args = get_args(annotation)
-
-    if origin is Union or origin is PEP604Union:
-        return union_type(*(type_from_python(arg, ctx=ctx, vars=vars, registry=registry) for arg in args))
-
-    # Check native type mappings
-    scalar = registry.native_types.get(annotation)
-    if scalar is not None:
-        return scalar
-
-    if origin is not None:
-        return _transform_generic(origin, args, ctx, vars, registry)
-
-    if isinstance(annotation, type):
-        if issubclass(annotation, pm.Builtin):
-            return build_builtin_type(annotation, registry=registry)
-        return _any_type()
-
-    return _any_type()
+    template: Any | None = None,
+) -> protomorph.Type:
+    return protomorph.NATIVE_REALM.project_type(annotation, template=template)
 
 
-def _transform_generic(
-    origin: type,
-    args: tuple[Any, ...],
-    ctx: pm.ContextProto,
-    vars: set[pm.Var] | None,
-    registry: NativeRegistry,
-) -> pm.Type:
-    """Transform generic Python type to protomorph type."""
-    transform = registry.python_transforms.get(origin)
-    if transform is not None:
-        converted = tuple(
-            type_from_python(arg, ctx=ctx, vars=vars, registry=registry)
-            if arg is not Ellipsis
-            else arg
-            for arg in args
+def wrap(*args, **kwargs) -> protomorph.Carrier:
+
+    if not args and not kwargs:
+        raise TypeError("wrap() requires at least one argument")
+
+    if len(args) > 1 or kwargs:
+        return protomorph.VaryingType.new(
+            *(wrap(arg) for arg in args),
+            **{key: wrap(value) for key, value in kwargs.items()},
         )
-        return transform(*converted)
 
-    if isinstance(origin, type) and issubclass(origin, pm.Builtin):
-        return build_builtin_type(origin, *args, registry=registry)
+    obj = args[0] # type: ignore
 
-    return _any_type()
+    if isinstance(obj, protomorph.Carrier):
+        return obj
 
+    if isinstance(obj, protomorph.Type):
+        if isinstance(obj, (protomorph.Spec, protomorph.Qual, protomorph.VaryingType)):
+            return protomorph.NativeObjectCarrier(_project_type(type(obj)), obj)
+        return obj.metatype().make(obj)
 
-def _coerce_builtin_type_arg(arg: object | pm.Type, registry: NativeRegistry) -> pm.Type:
-    """Coerce builtin type argument to protomorph Type."""
-    if isinstance(arg, pm.Type):
-        return arg
+    if isinstance(obj, type):
+        return _project_type(obj).metatype().make(_project_type(obj))
 
-    projected = type_from_python(arg, registry=registry)
-    if projected is _any_type() and arg is not Any:
-        raise TypeError(f"Cannot project Builtin type argument {arg!r} to protomorph.Type")
-    return projected
+    if get_origin(obj) is not None or isinstance(obj, PEP604Union):
+        descriptor = _project_type(obj)
+        return descriptor.metatype().make(descriptor)
 
+    if isinstance(obj, protomorph.Builtin):
+        descriptor = _project_type(type(obj))
+        return descriptor.make(obj)
 
-def build_builtin_type(
-    builtin_cls: type[pm.Builtin],
-    *args: object | pm.Type,
-    registry: NativeRegistry | None = None,
-) -> pm.Type:
-    """Build nominal type for builtin class."""
-    # Use global registry if none specified
-    registry = registry if registry is not None else pm.NATIVE_REGISTRY
-    
-    # Builtin auto-discovery ensures all builtins are registered
-    # No need to check or register - they're automatically discovered
-
-    parameters = tuple(getattr(builtin_cls, "__parameters__", ()))
-    expected = len(parameters)
-    received = len(args)
-
-    if expected == 0:
-        if received != 0:
-            raise TypeError(f"{builtin_cls.__name__} expects no type arguments, got {received}")
-        return nominal_type(builtin_cls._anchor_path())
-
-    if received == 0:
-        return nominal_type(builtin_cls._anchor_path())
-
-    if received != expected:
-        raise TypeError(f"{builtin_cls.__name__} expects {expected} type arguments, got {received}")
-
-    projected_args = tuple(_coerce_builtin_type_arg(arg, registry) for arg in args)
-
-    bindings: dict[str, pm.Type] = {}
-    for param, projected_arg in zip(parameters, projected_args):
-        name = getattr(param, "__name__", None)
-        if not isinstance(name, str):
-            raise TypeError(f"Unsupported type parameter {param!r} in {builtin_cls.__name__}")
-        bindings[name] = projected_arg
-
-    return nominal_type(builtin_cls._anchor_path(), _spec_from_types(**bindings))
+    descriptor = cast(protomorph.Type, wrap(type(obj)).fetch())
+    return descriptor.make(obj)
 
 
-def builtin_runtime_type_args(value: pm.Builtin) -> tuple[object | pm.Type, ...] | None:
-    """Extract runtime type arguments from builtin instance."""
-    orig_class = getattr(value, "__orig_class__", None)
-    if orig_class is None:
-        return None
-
-    origin = get_origin(orig_class)
-    if origin is None or not isinstance(origin, type) or origin is not value.__class__:
-        return None
-
-    runtime_args = get_args(orig_class)
-    if not runtime_args:
-        return ()
-
-    extracted: list[object | pm.Type] = []
-    for arg in runtime_args:
-        if isinstance(arg, pm.Type) or isinstance(arg, type) or arg is Any:
-            extracted.append(arg)
-            continue
-
-        if isinstance(arg, TypeVar) or get_origin(arg) is not None:
-            extracted.append(arg)
-            continue
-
-        return None
-
-    return tuple(extracted)
+def _set_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Set")))
 
 
-# === Helper Functions ===
-
-def _spec_from_types(**bindings: pm.Type) -> pm.Const | None:
-    """Create spec from type bindings."""
-    if not bindings:
-        return None
-
-    return pm.struct(**{name: cast(pm.Const | pm.Var, pm.val(type_)) for name, type_ in bindings.items()})
+def _map_transform(key_type: protomorph.Type, value_type: protomorph.Type) -> protomorph.Type:
+    return cast(
+        protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Map", key_type))
+    )
 
 
-def _tuple_transform(*args: pm.Type) -> pm.Type:
-    """Transform tuple type annotation."""
-    if len(args) == 2 and args[1] is Ellipsis:
-        return nominal_qual("std.qualifiers.List", _spec_from_types(), underlying=args[0])
-    return pm.StructType(meta_attrs=pm.Struct.new(*args))
+def _list_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.List")))
 
 
-def _any_type() -> pm.Type:
-    """Get ANY_TYPE."""
-    return pm.ANY_TYPE
+def _frozenset_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.FrozenSet")))
 
 
-def _empty_type() -> pm.Type:
-    """Get EMPTY_TYPE."""  
-    return pm.EMPTY_TYPE
+def _tuple_transform(*types: protomorph.Type | object) -> protomorph.Type:
+    if len(types) == 2 and types[1] is Ellipsis:
+        return cast(protomorph.Type, protomorph.UniformType(cast(protomorph.Type, types[0])))
+    if any(type_ is Ellipsis for type_ in types):
+        raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
+    return cast(protomorph.Type, protomorph.VaryingType(cast(tuple[protomorph.Type, ...], types)))
 
 
-def nominal_type(anchor: str, spec: pm.Const | None = None) -> pm.NominalType:
-    """Create nominal type."""
-    return pm.nominal_type(anchor, spec)
+def _result_transform(err_type: protomorph.Type, ok_type: protomorph.Type) -> protomorph.Type:
+    return cast(
+        protomorph.Type,
+        protomorph.Qual.of(ok_type, protomorph.Spec.of("std.qualifiers.Result", err_type)),
+    )
 
 
-def nominal_qual(anchor: str, spec: pm.Const | None = None, *, underlying: pm.Type) -> pm.NominalQualifier:
-    """Create nominal qualifier."""
-    return pm.nominal_qual(anchor, spec, underlying=underlying)
+def _bootstrap_defaults() -> None:
+    global _BOOTSTRAPPED
+    if _BOOTSTRAPPED:
+        return
 
+    register_native_spec(int, protomorph.Spec.of("std.types.Integer"))
+    register_native_spec(str, protomorph.Spec.of("std.types.Text"))
+    register_native_spec(float, protomorph.Spec.of("std.types.Decimal"))
+    register_native_spec(Decimal, protomorph.Spec.of("std.types.Decimal"))
+    register_native_spec(bool, protomorph.Spec.of("std.types.Boolean"))
+    register_native_spec(NoneType, protomorph.Spec.of("std.types.Empty"))
+    register_native_spec(Id, protomorph.Spec.of("std.types.Id"))
+    register_native_spec(Anchor, protomorph.Spec.of("std.types.Anchor"))
+    register_python_transform(dict, _map_transform)
+    register_python_transform(list, _list_transform)
+    register_python_transform(set, _set_transform)
+    register_python_transform(frozenset, _frozenset_transform)
+    register_python_transform(tuple, _tuple_transform)
+    register_python_transform(protomorph.Result, _result_transform)
 
-def union_type(*types: pm.Type) -> pm.UnionType:
-    """Create union type."""
-    return pm.union_type(*types)
+    _BOOTSTRAPPED = True

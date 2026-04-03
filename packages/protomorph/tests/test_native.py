@@ -1,0 +1,116 @@
+from __future__ import annotations
+
+import unittest
+from typing import cast
+
+from protomorph import Builtin, HOST, Id, IndexedType, NATIVE_REALM, NativeHost, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, Spec, current_realm, placeholder, wrap, spec_name
+from protomorph.reasoning import Rule
+
+
+INT = cast(Spec, wrap(int).fetch())
+STR = cast(Spec, wrap(str).fetch())
+
+
+class Point(Builtin):
+    SPEC_NAME = "test.Point"
+    x: int
+    y: int
+
+
+class Container[T](Builtin):
+    SPEC_NAME = "test.Container"
+    value: T
+
+
+class Pair[A, B](Builtin):
+    SPEC_NAME = "test.Pair"
+    first: A
+    second: B
+
+
+class TestWrap(unittest.TestCase):
+    def test_wrap_builtin_class_returns_type_carrier(self):
+        carrier = wrap(Point)
+        self.assertIsInstance(carrier.fetch(), Spec)
+        self.assertEqual(carrier.fetch(), Spec.of(spec_name(Point)))
+
+    def test_wrap_scalar_annotation_returns_type_carrier(self):
+        carrier = wrap(int)
+        self.assertEqual(carrier.fetch(), Spec.of("std.types.Integer"))
+
+    def test_wrap_runtime_builtin_returns_native_carrier(self):
+        carrier = wrap(Point(1, 2))
+        self.assertIsInstance(carrier, NativeObjectCarrier)
+        self.assertEqual(carrier.attr(Id("x")).fetch(), 1)
+        self.assertEqual(carrier.attr(Id("y")).fetch(), 2)
+
+
+class TestNativeHostSchemaFor(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.host = NativeHost()
+
+    def test_unknown_spec_returns_none(self):
+        self.assertIsNone(self.host.schema_for(Spec.of("unknown.Thing")))
+
+    def test_simple_class_schema(self):
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Point))))
+        self.assertEqual(schema.item_at(0).value, INT)
+        self.assertEqual(schema.item_at(1).value, INT)
+
+    def test_generic_unspecialized(self):
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container))))
+        self.assertIsInstance(schema.item_at(0).value, Placeholder)
+        self.assertIsInstance(schema.item_at(0).value, NativeVar)
+
+    def test_generic_specialized(self):
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container), INT)))
+        self.assertIs(schema.item_at(0).value, INT)
+
+    def test_pair_specialized(self):
+        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Pair), INT, STR)))
+        self.assertIs(schema.item_at(0).value, INT)
+        self.assertIs(schema.item_at(1).value, STR)
+
+
+class TestDelegation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.token = HOST.set(NativeHost())
+
+    @classmethod
+    def tearDownClass(cls):
+        HOST.reset(cls.token)
+
+    def test_spec_item_access_delegates_to_host(self):
+        spec = Spec.of(spec_name(Point))
+        self.assertEqual(spec.item_at(0).key, "x")
+        self.assertEqual(spec.item(Id("y")).value, INT)
+
+    def test_qual_item_access_is_opaque_without_derived_schema(self):
+        spec = Spec.of(spec_name(Point))
+        qual = Qual.of(spec, Spec.of("std.qualifiers.List"))
+        with self.assertRaises(IndexError):
+            qual.item_at(0)
+
+
+class TestRealmAliases(unittest.TestCase):
+    def test_native_host_alias_points_to_native_realm(self):
+        self.assertIs(NativeHost, NativeRealm)
+
+    def test_realm_context_manager_sets_current_realm(self):
+        realm = NativeRealm()
+        with realm:
+            self.assertIs(current_realm(), realm)
+
+    def test_native_realm_with_rules_builds_overlay(self):
+        x = placeholder("X")
+        rule = Rule(Spec.of("test.edge", x), ())
+        overlay = NATIVE_REALM.with_rules(rule)
+
+        self.assertEqual(overlay.rules_for_anchor("test.edge"), (rule,))
+        self.assertIsNone(overlay.schema_for(Spec.of("unknown.Thing")))
+
+
+if __name__ == "__main__":
+    unittest.main()

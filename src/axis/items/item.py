@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-import protomorph as pm
+from typing import Any
+
+import protomorph
 
 from axis import syn, sem
-from protobase import slot_cached_property, cached_property
+from protobase import Consed, slot_cached_property, _
 
 
 
 class Item(sem.Context['Item'], abstract=True):
+    package: Consed = _
 
     @slot_cached_property 
-    def anchor(self) -> pm.Anchor:
+    def anchor(self) -> protomorph.Anchor:
         raise NotImplementedError("Item subclasses must implement anchor property")
 
     # @property

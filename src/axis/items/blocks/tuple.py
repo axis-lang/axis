@@ -27,7 +27,7 @@ class TupleBlock(syn.Block, expr.Tuple, abstract=True):
             kw: Literal["val", "var", "let", "dyn", "mut"],
             *args,
             children: syn.OutlineChildren,
-            realm,
+            package,
             **kwargs,
         ):
             assert (
@@ -61,7 +61,11 @@ class TupleBlock(syn.Block, expr.Tuple, abstract=True):
 
     @classmethod
     def build(
-        cls, *args, realm, children: syn.OutlineChildren, **kwargs
+        cls,
+        *args,
+        package,
+        children: syn.OutlineChildren,
+        **kwargs,
     ):
         match args:
             case (kw, sep):
