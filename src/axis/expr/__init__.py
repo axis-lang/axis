@@ -16,7 +16,7 @@ from .lit import *
 from .compound import *
 from .trail import *
 from .ir import *
-from .bound_support import *
+from .lowering import *
 from .matching_support import *
 
 

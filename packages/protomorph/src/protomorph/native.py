@@ -74,7 +74,7 @@ class NativeRealm(Realm, Consed):
             return protomorph.VaryingType(())
 
         names = list(attrs.keys())
-        types = tuple(self.project_type(info.type, template=builtin_cls) for info in attrs.values())
+        types = tuple(_project_type(info.type, template=builtin_cls) for info in attrs.values())
         indexed_type = cast(Any, getattr(protomorph, "IndexedType"))
         return indexed_type(
             protomorph.VaryingType(types), protomorph.Index.of(*(protomorph.Id(name) for name in names))
@@ -83,87 +83,6 @@ class NativeRealm(Realm, Consed):
     @flux.property
     def builtin_by_spec_name(self) -> frozendict[str, type[protomorph.Builtin]]:
         return frozendict({spec_name(cls): cls for cls in self.all_builtins})
-
-    @flux.method
-    def project_type(
-        self,
-        annotation: Any,
-        *,
-        template: Any | None = None,
-    ) -> protomorph.Type:
-        if isinstance(annotation, protomorph.Type):
-            return annotation
-
-        if annotation is protomorph.Type:
-            return protomorph.Spec.of("std.metas.Type")
-
-        if annotation is protomorph.Tuple:
-            return protomorph.Spec.of("std.types.Tuple")
-
-        if annotation is protomorph.Index:
-            return protomorph.Spec.of("std.types.Index")
-
-        if isinstance(annotation, TypeVar):
-            return NativeVar(_native_ctx(template), annotation.__name__)
-
-        if isinstance(annotation, TypeVarTuple):
-            return NativeVar(_native_ctx(template), f"*{annotation.__name__}")
-
-        scalar_spec = self.native_specs.get(annotation)
-        if scalar_spec is not None:
-            return scalar_spec
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        if origin is Union or isinstance(annotation, PEP604Union):
-            return protomorph.UnionType.of(
-                *(self.project_type(arg, template=template) for arg in args)
-            )
-
-        if origin is Unpack and args:
-            return self.project_type(args[0], template=template)
-
-        if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
-            return protomorph.UniformType(self.project_type(args[0], template=template))
-
-        if origin is tuple and args:
-            converted = tuple(self.project_type(arg, template=template) for arg in args)
-            if (
-                len(converted) == 1
-                and isinstance(converted[0], protomorph.Placeholder)
-                and (protomorph.placeholder_name(cast(protomorph.Placeholder, converted[0])) or "").startswith("*")
-            ):
-                return converted[0]
-            return cast(protomorph.Type, protomorph.VaryingType(converted))
-
-        if isinstance(origin, type):
-            typed_origin = cast(type, origin)
-            transform = self.python_transforms.get(typed_origin)
-            if transform is not None:
-                converted = tuple(
-                    (
-                        self.project_type(arg, template=template)
-                        if arg is not Ellipsis
-                        else arg
-                    )
-                    for arg in args
-                )
-                return transform(*converted)
-
-            if issubclass(typed_origin, protomorph.Builtin):
-                arg_types = tuple(
-                    self.project_type(arg, template=template) for arg in args
-                )
-                return self._spec_for_builtin(typed_origin, arg_types)
-
-        if isinstance(annotation, type) and issubclass(annotation, protomorph.Builtin):
-            return self._spec_for_builtin(annotation, ())
-
-        if isinstance(annotation, type) and issubclass(annotation, protomorph.Tuple):
-            return protomorph.Spec.of("std.types.Tuple")
-
-        raise ValueError(f"Unsupported annotation: {annotation!r}")
 
     @flux.method
     def schema_for(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:
@@ -338,7 +257,83 @@ def _project_type(
     *,
     template: Any | None = None,
 ) -> protomorph.Type:
-    return protomorph.NATIVE_REALM.project_type(annotation, template=template)
+    if isinstance(annotation, protomorph.Type):
+        return annotation
+
+    if annotation is protomorph.Type:
+        return protomorph.Spec.of("std.metas.Type")
+
+    if annotation is protomorph.Carrier:
+        return protomorph.Spec.of("std.core.Any")
+
+    if annotation is Any:
+        return protomorph.Spec.of("std.core.Any")
+
+    if annotation is protomorph.Tuple:
+        return protomorph.Spec.of("std.types.Tuple")
+
+    if annotation is protomorph.Index:
+        return protomorph.Spec.of("std.types.Index")
+
+    if isinstance(annotation, TypeVar):
+        return NativeVar(_native_ctx(template), annotation.__name__)
+
+    if isinstance(annotation, TypeVarTuple):
+        return NativeVar(_native_ctx(template), f"*{annotation.__name__}")
+
+    scalar_spec = _NATIVE_SPECS.get(annotation)
+    if scalar_spec is not None:
+        return scalar_spec
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is Union or isinstance(annotation, PEP604Union):
+        return protomorph.UnionType.of(
+            *(_project_type(arg, template=template) for arg in args)
+        )
+
+    if origin is Unpack and len(args) == 1:
+        return _project_type(args[0], template=template)
+
+    if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+        return protomorph.UniformType(_project_type(args[0], template=template))
+
+    if origin is tuple and args:
+        converted = tuple(_project_type(arg, template=template) for arg in args)
+        if (
+            len(converted) == 1
+            and isinstance(converted[0], protomorph.Placeholder)
+            and (protomorph.placeholder_name(cast(protomorph.Placeholder, converted[0])) or "").startswith("*")
+        ):
+            return converted[0]
+        return cast(protomorph.Type, protomorph.VaryingType(converted))
+
+    if isinstance(origin, type):
+        typed_origin = cast(type, origin)
+        transform = _PYTHON_TRANSFORMS.get(typed_origin)
+        if transform is not None:
+            converted = tuple(
+                (
+                    _project_type(arg, template=template)
+                    if arg is not Ellipsis
+                    else arg
+                )
+                for arg in args
+            )
+            return transform(*converted)
+
+        if issubclass(typed_origin, protomorph.Builtin):
+            arg_types = tuple(_project_type(arg, template=template) for arg in args)
+            return protomorph.Spec.of(spec_name(typed_origin), *arg_types)
+
+    if isinstance(annotation, type) and issubclass(annotation, protomorph.Builtin):
+        return protomorph.Spec.of(spec_name(annotation))
+
+    if isinstance(annotation, type) and issubclass(annotation, protomorph.Tuple):
+        return protomorph.Spec.of("std.types.Tuple")
+
+    raise ValueError(f"Unsupported annotation: {annotation!r}")
 
 
 def wrap(*args, **kwargs) -> protomorph.Carrier:

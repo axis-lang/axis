@@ -1,17 +1,19 @@
+from __future__ import annotations
+
 from decimal import Decimal
 from types import EllipsisType
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 import protomorph as pm
 
 from axis.literals import WildcardType, Wildcard
-from axis import syn
+from axis import log, syn
 
-from .bound_support import literal_to_bound
+from .lowering import literal_to_bound
 
 
 class Lit(syn.Expr):
-    type Value = pm.Literal | EllipsisType | WildcardType
+    type Value = int | float | str | bool | None | EllipsisType | WildcardType
 
     @classmethod
     def build(cls, value: Value) -> Self:
@@ -27,7 +29,7 @@ class Lit(syn.Expr):
     def is_ellipsis(self) -> bool:
         return self.value is Ellipsis
 
-    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Result[log.Report, Any]:
         _ = scope
         return literal_to_bound(self.value, self)
 

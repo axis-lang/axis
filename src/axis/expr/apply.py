@@ -1,10 +1,12 @@
-from typing import Self
+from __future__ import annotations
+
+from typing import Any, Self
 
 import protomorph as pm
 
-from axis import syn
+from axis import log, syn
 
-from .bound_support import unsupported_bound
+from .lowering import unsupported_bound
 from .tuple_ import Tuple
 
 class Apply(syn.Expr):
@@ -16,7 +18,7 @@ class Apply(syn.Expr):
         assert isinstance(argument, Tuple)
         return cls(function=function, argument=argument)
 
-    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Result[log.Report, Any]:
         _ = scope
         return unsupported_bound(
             self,

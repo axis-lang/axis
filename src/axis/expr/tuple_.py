@@ -1,10 +1,12 @@
-from typing import ClassVar, Optional, Self
+from __future__ import annotations
+
+from typing import Any, ClassVar, Optional, Self
 
 import protomorph as pm
 
 from axis import syn, expr, log
 
-from .bound_support import build_tuple_bound
+from .lowering import build_tuple_bound
 
 
 class Tuple(syn.Expr):
@@ -129,7 +131,7 @@ class Tuple(syn.Expr):
     def __iter__(self):
         return iter(self.elements)
 
-    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Result[log.Report, Any]:
         return build_tuple_bound(self.elements, scope)
 
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from protobase import flux as protobase_flux
 
@@ -10,6 +10,7 @@ from .foundation import (
     Id,
     Anchor,
     Builtin,
+    Datum,
 )
 
 # ── Layer 1: Type ────────────────────────────────────────────────
@@ -19,8 +20,16 @@ from .type_ import (
     Field,
     Type,
     Placeholder,
+    PlaceholderMetatype,
     Var,
+    Mark,
+    WildcardMark,
+    EllipsisMark,
+    ItMark,
     SimpleVar,
+    WILDCARD,
+    ELLIPSIS,
+    IT,
     placeholder,
     placeholder_name,
     placeholder_context,
@@ -55,7 +64,12 @@ from .carrier import (
     Index,
     Ok,
     Err,
+    Some,
+    None_,
     Result,
+    Option,
+    ResultUnwrapError,
+    OptionUnwrapError,
 )
 
 # ── Layer 3: Spreads ──────────────────────────────────────────────
@@ -70,6 +84,33 @@ from .traversal import (
 from .unification import (
     UnionFind,
     unify,
+)
+
+from .matching import (
+    MatchNode,
+    MatchBinding,
+    MatchEnv,
+    MatchDefaultPlan,
+    MatchSolution,
+    MatchResult,
+    MatchPathStep,
+    MatchPath,
+    MatchAmbiguity,
+    MatchShapeSummary,
+    MatchCaseSummary,
+    MatchCase,
+    MatchDispatch,
+    MatchLeaf,
+    MatchMany,
+    MatchGuardShape,
+    MatchSwitchDescriptors,
+    MatchSwitchFieldDescriptors,
+    MatchSwitchNominalDescriptors,
+    MatchTree,
+    MatchWalker,
+    match,
+    compile,
+    diagnose,
 )
 
 # ── Layer 7: Native host ───────────────────────────────────────
@@ -101,47 +142,28 @@ HOST = REALM
 NativeHost = NativeRealm
 
 
-def carrier_factory_for(tp: Type) -> Callable[[Type, Any], Carrier] | None:
-    for cls in type(tp).__mro__:
-        provider = _CARRIER_FACTORIES.get(cast(type[Type], cls), None)
-        if provider is not None:
-            return provider
-    return None
-
-
-def _spec_carrier(tp: Type, dt: Any) -> Carrier:
-    spec = cast(Spec, tp)
-    if REALM.get().schema_for(spec) is None:
+def _make_carrier(tp: Type, dt: Any) -> Carrier:
+    if isinstance(tp, (Placeholder, UnionType)):
         return LeafCarrier(tp, dt)
-    return NativeObjectCarrier(tp, dt)
-
-
-def _tuple_carrier(tp: Type, dt: Any) -> Carrier:
-    return Tuple(cast(TupleLikeType, tp), dt)
-
-
-def _index_carrier(tp: Type, dt: Any) -> Carrier:
-    return Index(cast(UniformType, tp), dt)
-
-
-def _qual_carrier(tp: Type, dt: Any) -> Carrier:
-    qual = cast(Qual, tp)
-    qualifiers = tuple(cast(Spec, child.fetch()) for child in qual.qualifiers)
-    if qualifiers and qualifiers[-1].anchor == Anchor("std.qualifiers.Result"):
-        if not isinstance(dt, (Ok, Err)):
-            raise TypeError("Result-qualified types require explicit Ok(...) or Err(...)")
-        return Result(qual, dt)
-    return qual.underlying.make(dt)
-
-
-_CARRIER_FACTORIES: dict[type[Type], Callable[[Type, Any], Carrier]] = {
-    Placeholder: LeafCarrier,
-    UnionType: LeafCarrier,
-    VaryingType: _tuple_carrier,
-    UniformType: lambda tp, dt: _index_carrier(tp, dt) if cast(UniformType, tp).unique else _tuple_carrier(tp, dt),
-    IndexedType: _tuple_carrier,
-    Spec: _spec_carrier,
-    Qual: _qual_carrier,
-}
+    if isinstance(tp, Qual):
+        qualifier = tp.last_qualifier
+        if qualifier is not None and qualifier.anchor == Anchor("std.qualifiers.Result"):
+            if not isinstance(dt, (Ok, Err)):
+                raise TypeError("Result-qualified types require explicit Ok(...) or Err(...)")
+            return Result(tp, dt)
+        if qualifier is not None and qualifier.anchor == Anchor("std.qualifiers.Optional"):
+            if not isinstance(dt, (Some, None_)):
+                raise TypeError("Optional-qualified types require explicit Some(...) or None_()")
+            return Option(tp, dt)
+        return _make_carrier(tp.underlying, dt)
+    if isinstance(tp, UniformType):
+        return Index(tp, dt) if tp.unique else Tuple(tp, dt)
+    if isinstance(tp, (IndexedType, VaryingType)):
+        return Tuple(cast(TupleLikeType, tp), dt)
+    if isinstance(tp, Spec):
+        if REALM.get().schema_for(tp) is None:
+            return LeafCarrier(tp, dt)
+        return NativeObjectCarrier(tp, dt)
+    raise NotImplementedError(f"No carrier factory for type {type(tp).__name__}")
 
 _bootstrap_defaults()

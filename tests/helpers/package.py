@@ -71,7 +71,7 @@ class TestPackage(items.Package):
         def_cls: type[D],
         source: str,
     ) -> D:
-        node = items.Def.from_src(dedent(source), realm=self)[0]
+        node = items.Def.from_src(dedent(source), package=self)[0]
         assert node is not None
         assert isinstance(node, def_cls)
         return cast(D, node)
@@ -80,20 +80,20 @@ class TestPackage(items.Package):
         self,
         source: str,
     ) -> items.Def:
-        node = items.Def.from_src(dedent(source), realm=self)[0]
+        node = items.Def.from_src(dedent(source), package=self)[0]
         assert node is not None
         assert isinstance(node, items.Def)
         return node
 
     def unit(self, path: str = "std") -> items.Unit:
-        anchor = pm.anchor(path)
+        anchor = pm.Anchor(path)
         for ctx in self.workspace.all_contexts:
             if isinstance(ctx, items.Unit) and cast(Any, ctx).anchor == anchor:
                 return ctx
         raise KeyError(f"Unit {path!r} not found")
 
     def context(self, path: str) -> sem.Context:
-        anchor = pm.anchor(path)
+        anchor = pm.Anchor(path)
         for ctx in self.workspace.all_contexts:
             if cast(Any, ctx).anchor == anchor:
                 return ctx
@@ -110,7 +110,7 @@ class TestPackage(items.Package):
         anchor: str,
         cls: type | None = None,
     ) -> tuple[sem.Context.Contribution, ...]:
-        target = pm.anchor(anchor)
+        target = pm.Anchor(anchor)
         return tuple(
             contrib
             for contrib in self.workspace.all_contributions
@@ -133,10 +133,6 @@ class TestPackage(items.Package):
         return self.workspace.all_facts
 
     @property
-    def all_clauses(self):
-        return self.workspace.all_clauses
-
-    @property
     def entities_by_anchor(self):
         return self.workspace.entities_by_anchor
 
@@ -147,6 +143,16 @@ class TestPackage(items.Package):
     @property
     def logic_solver(self):
         return self.workspace.logic_solver
+
+    def check(self) -> None:
+        workspace = self.workspace
+        with workspace:
+            for context in workspace.all_contexts:
+                context.check()
+            for contribution in workspace.all_contributions:
+                contribution.check()
+            for entity in workspace.all_entities:
+                entity.check()
 
     def _with_units(
         self,

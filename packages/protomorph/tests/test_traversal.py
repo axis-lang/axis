@@ -6,7 +6,7 @@ from typing import cast
 from protomorph import (
     Builtin,
     Placeholder, placeholder,
-    LeafCarrier, Spec, Tuple,
+    LeafCarrier, Option, Result, Spec, Tuple,
     VaryingType,
     wrap,
     deep_zip,
@@ -49,6 +49,24 @@ class TestDeepMap(unittest.TestCase):
         result = c.deep_map(lambda leaf: LeafCarrier(leaf.descriptor, leaf.fetch() * 2))
         self.assertEqual(result.fetch(), (20, 40))
 
+    def test_transform_result_ok_leaves(self):
+        vt = cast(VaryingType, VaryingType.of(INT, INT))
+        carrier = Result.ok(Tuple(vt, (10, 20)))
+
+        result = cast(Result, carrier.deep_map(lambda leaf: LeafCarrier(leaf.descriptor, leaf.fetch() * 2)))
+
+        self.assertTrue(result.is_ok)
+        self.assertEqual(result.unwrap().fetch(), (20, 40))
+
+    def test_transform_option_some_leaves(self):
+        vt = cast(VaryingType, VaryingType.of(INT, INT))
+        carrier = Option.some(Tuple(vt, (10, 20)))
+
+        result = cast(Option, carrier.deep_map(lambda leaf: LeafCarrier(leaf.descriptor, leaf.fetch() * 2)))
+
+        self.assertTrue(result.is_some)
+        self.assertEqual(result.unwrap().fetch(), (20, 40))
+
 
 class TestSubst(unittest.TestCase):
     def test_varying_type_subst(self):
@@ -66,6 +84,20 @@ class TestSearch(unittest.TestCase):
         vt = cast(VaryingType, VaryingType.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         self.assertTrue(c.search(c[1]))
+
+    def test_find_leaf_inside_result_ok(self):
+        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        inner = Tuple(vt, (1, "a"))
+        carrier = Result.ok(inner)
+
+        self.assertTrue(carrier.search(inner[1]))
+
+    def test_find_leaf_inside_option_some(self):
+        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        inner = Tuple(vt, (1, "a"))
+        carrier = Option.some(inner)
+
+        self.assertTrue(carrier.search(inner[1]))
 
 
 class TestDeepZip(unittest.TestCase):

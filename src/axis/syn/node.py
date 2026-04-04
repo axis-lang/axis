@@ -4,6 +4,7 @@ from typing import Any, Callable, ClassVar, Protocol, Self
 import protomorph as pm
 
 from protobase import Inmutable
+from axis import log
 
 from .outline import EmbeddedOutlineNode, FromOutlineNodeMixin, SegregatedOutlineNode
 
@@ -67,7 +68,12 @@ class SymLike(Protocol):
 
 
 class ScopeLike(Protocol):
-    def lookup(self, sym: SymLike, *, origin: Node) -> pm.Val: ...
+    def lookup(
+        self,
+        sym: SymLike,
+        *,
+        origin: Node,
+    ) -> pm.Result[log.Report, Any]: ...
 
 
 class BoundLoweringError(Exception):
@@ -78,7 +84,7 @@ class Expr(Statement, abstract=True):
     grammar_context_infix: ClassVar[str] = "Expr"
     grammar_parser_name: ClassVar[str] = "expr"
 
-    def to_bound(self, scope: ScopeLike) -> pm.Val | None:
+    def to_bound(self, scope: ScopeLike) -> pm.Result[log.Report, Any]:
         _ = scope
         raise BoundLoweringError(
             f"unsupported bound expression: {type(self).__qualname__}"

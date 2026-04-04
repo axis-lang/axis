@@ -4,8 +4,14 @@ from typing import cast
 
 import protomorph as pm
 
-from axis import syn
+from axis import log, syn
 from axis.expr.ir.bound import bound_as_type, build_bound, build_default, build_term
+
+
+def _unwrap_result[T](value: pm.Result["log.Report", T], source: str):
+    if value.is_err:
+        raise AssertionError(f"Expected successful semantic value from {source!r}, got {value!r}")
+    return value.unwrap().fetch()
 
 
 def parse(source: str) -> syn.Expr:
@@ -15,19 +21,19 @@ def parse(source: str) -> syn.Expr:
 def bound(source: str, scope) -> pm.Val:
     value = build_bound(parse(source), scope)
     assert value is not None
-    return value
+    return _unwrap_result(value, source)
 
 
 def default(source: str, scope) -> pm.Val:
     value = build_default(parse(source), scope)
     assert value is not None
-    return value
+    return _unwrap_result(value, source)
 
 
 def term(source: str, scope) -> pm.Val:
     value = build_term(parse(source), scope)
     assert value is not None
-    return value
+    return _unwrap_result(value, source)
 
 
 def type_bound(source: str, scope) -> pm.Type:
@@ -49,6 +55,7 @@ def layout(type_source: str, scope, *, pkg) -> pm.Layout | None:
 def bound_type_data(source: str, scope) -> pm.Type:
     value = build_term(parse(source), scope)
     assert value is not None
+    value = _unwrap_result(value, source)
     if not isinstance(value, pm.Const):
         raise AssertionError(f"Expected Const from {source!r}, got {value!r}")
     if not isinstance(value.__data__, pm.Type):

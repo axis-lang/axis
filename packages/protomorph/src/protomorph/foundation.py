@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from protobase import frozendict
 from protobase import Consed
 
 
@@ -11,6 +12,10 @@ class Id(str):
 class Anchor(str):
     """Typed string for type system anchor paths (e.g. 'std.types.Text')."""
     __slots__ = ()
+
+    @property
+    def name(self) -> Id:
+        return self.segments[-1]
 
     @property
     def segments(self) -> tuple[Id, ...]:
@@ -48,3 +53,16 @@ class Builtin(Consed, abstract=True):
             pm_core.NativeRealm.all_builtins.invalidate_for(pm_core.NATIVE_REALM)
         except (AttributeError, ImportError):
             pass
+
+
+type Datum = (
+    int
+    | float
+    | str
+    | bool
+    | None
+    | tuple[Datum, ...]
+    | frozenset[Datum]
+    | frozendict[Datum, Datum]
+    | Builtin
+)

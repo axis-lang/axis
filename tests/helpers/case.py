@@ -153,7 +153,7 @@ class SemanticTestCase(unittest.TestCase):
             msg=f"Expected anchor from {source!r} ({self._scope_desc(scope)}), got {term!r}",
         )
         assert isinstance(term, pm.Anchor)
-        self.assertEqual(term.path, path)
+        self.assertEqual(str(term), path)
 
     def assertType(self, source: str, expected: pm.Type, scope=None) -> None:
         self._assert_semantic_equal(

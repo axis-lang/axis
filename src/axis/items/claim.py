@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
 import protomorph as pm
 from protomorph import reasoning as urs
@@ -12,6 +12,11 @@ from axis import expr, log, sem, syn
 from .blocks import tuple as tuple_blocks
 from .item import Item
 from .defs.base import build_binding_struct
+
+
+type SpecResult = pm.Result[log.Report, pm.Spec]
+type ConstraintTupleResult = pm.Result[log.Report]
+type GoalTupleResult = pm.Result[log.Report]
 
 
 class Claim(Item):
@@ -123,20 +128,16 @@ class Claim(Item):
                 continue
             scope_builder.define(
                 name,
-                pm.var(
-                    cast(type[pm.VarType[pm.ContextProto]], sem.Context.LogicVar),
-                    cast(pm.ContextProto, self),
-                    name,
-                ),
+                sem.Context.LogicVar(self, name),
                 origin=binding.key_expr,
             )
 
     @flux.property
-    def head_fact(self) -> pm.Spec | pm.Err | None:
-        return _build_claim_spec(self.head, self.scope)
+    def head_fact(self) -> SpecResult | None:
+        return _build_claim_spec(self.head, self.scope, scope_ref=self.parent.anchor if self.parent else None)
 
     @flux.property
-    def where_constraints(self) -> tuple[sem.Constraint, ...] | pm.Err:
+    def where_constraints(self) -> ConstraintTupleResult:
         return sem.binding_constraints(
             self.bindings,
             self.scope,
@@ -145,35 +146,47 @@ class Claim(Item):
         )
 
     @flux.property
-    def body_goals(self) -> tuple[pm.Spec, ...] | pm.Err:
+    def body_goals(self) -> GoalTupleResult:
         implicit_constraints = self.where_constraints
-        if isinstance(implicit_constraints, pm.Err):
-            return implicit_constraints
+        if implicit_constraints.is_err:
+            return cast(GoalTupleResult, implicit_constraints)
 
-        implicit = tuple(constraint.goal for constraint in implicit_constraints)
+        implicit = tuple(
+            constraint.goal
+            for constraint in cast(tuple[sem.Constraint, ...], implicit_constraints.unwrap().fetch())
+        )
 
         if not self.when:
-            return implicit
+            return pm.Result.ok(_tuple_carrier(*implicit))
 
         goals: list[pm.Spec] = list(implicit)
         for clause in self.when[0].clauses:
-            goal = _build_claim_spec(clause.expr, self.scope)
-            if not isinstance(goal, pm.Spec):
-                return pm.Err() if goal is None else goal
-            goals.append(goal)
-        return tuple(goals)
+            goal_result = _build_claim_spec(
+                clause.expr,
+                self.scope,
+                scope_ref=self.parent.anchor if self.parent else None,
+            )
+            if goal_result is None:
+                report = log.error("Claim condition must be a fact-like expression").label(clause.expr).build()
+                return pm.Result.err(pm.wrap(report))
+            if goal_result.is_err:
+                return cast(GoalTupleResult, goal_result)
+            goals.append(cast(pm.Spec, goal_result.unwrap().fetch()))
+        return pm.Result.ok(_tuple_carrier(*goals))
 
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
-        head = self.head_fact
-        if not isinstance(head, pm.Spec):
+        head_result = self.head_fact
+        if head_result is None or head_result.is_err:
             return frozenset()
+        head = cast(pm.Spec, head_result.unwrap().fetch())
 
-        body_goals = self.body_goals
-        if isinstance(body_goals, pm.Err):
+        body_goals_result = self.body_goals
+        if body_goals_result.is_err:
             return frozenset()
+        body_goals = cast(tuple[pm.Spec, ...], body_goals_result.unwrap().fetch())
 
-        if not body_goals:
+        if not self.when:
             return frozenset(
                 (
                     sem.Context.ClaimContribution(
@@ -197,79 +210,26 @@ class Claim(Item):
             )
         )
 
-    def _check(self) -> None:
-        # self.scope
-
-        # head = self.head_fact
-        # _raise_claim_error(head, origin=self.head, message="Invalid claim head")
-        # assert isinstance(head, pm.Spec)
-
-        # entity = self.realm.entities_by_anchor[head.anchor] if head.anchor in self.realm.entities_by_anchor else None
-        # if entity is None or not entity.spec_index.facet(sem.Entity.PredicateFacet):
-        #     log.error("Claim target must have predicate facet").label(self.head).throw()
-
-        # body_goals = self.body_goals
-        # _raise_claim_error(body_goals, origin=self.when[0] if self.when else self.head, message="Invalid claim condition")
-        # assert not isinstance(body_goals, pm.Err)
-
-        # if not entity.exists_spec(head, sem.Entity.PredicateFacet):
-        #     log.error("Claim head is not admitted by any declared predicate spec").label(self.head).throw()
-
-        # if not body_goals:
-        #     return
-
-        # head_vars = _logic_vars((head,), self)
-        # body_vars = _logic_vars(body_goals, self)
-        # unsafe = tuple(sorted(var for var in head_vars if var not in body_vars))
-        # if not unsafe:
-        #     return
-
-        # names = ", ".join(unsafe)
-        # report = log.error("Conditional claim must be range-restricted")
-        # report = report.label(self.head, f"head variables must appear in when: {names}")
-        # for clause in self.when[0].clauses:
-        #     report = report.label(clause, "when body grounds claim variables")
-        # report.throw()
-        pass
-
-    def _subject_for_binding(self, binding: sem.BindingStruct.Field) -> pm.Val | None:
+    def _subject_for_binding(self, binding: sem.BindingStruct.Field) -> sem.ScopeLookupResult | None:
         if binding.binder_name is None:
             return None
         return self.scope.lookup(expr.to_sym(binding.key_expr), origin=binding.key_expr)
 
 
-def _build_claim_spec(expr_node: syn.Expr, scope: sem.Scope) -> pm.Spec | pm.Err | None:
-    try:
-        return expr.build_fact(expr_node, scope)
-    except log.Report.Exception as exc:
-        return exc.report.tag(pm.Err())
-    except TypeError as exc:
-        return log.error("Unsupported claim expression").label(expr_node, str(exc)).tag(pm.Err())
-
-
-def _raise_claim_error(
-    value: tuple[pm.Spec, ...] | pm.Spec | pm.Err | None,
+def _build_claim_spec(
+    expr_node: syn.Expr,
+    scope: sem.Scope,
     *,
-    origin: syn.Node,
-    message: str,
-) -> None:
-    err = value if isinstance(value, pm.Err) else None
-    if err is None:
-        return
+    scope_ref: pm.Anchor | None,
+) -> SpecResult | None:
+    return expr.build_fact(expr_node, scope, scope_ref=scope_ref)
 
-    report = log.Report.of(err)
-    if report is not None:
-        if report.message.startswith("Unbound symbol: "):
-            symbol = report.message.removeprefix("Unbound symbol: ")
-            wrapped = log.error("Claim references an unresolved symbol").label(
-                origin,
-                f"declare `{symbol}` in where: or bring it into scope",
-            )
-            for label in report.labels:
-                wrapped = wrapped.label(label.ast, label.message, style=label.style)
-            wrapped.note(report.message).throw()
-        report.throw()
-    log.error(message).label(origin).throw()
+
+def _tuple_carrier(*values: object) -> pm.Carrier:
+    if not values:
+        return pm.Tuple.Empty
+    carriers = tuple(pm.wrap(value) for value in values)
+    return pm.Tuple(pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)), carriers)
 
 
 def _logic_vars(values: Iterable[pm.Spec], claim: Claim) -> frozenset[str]:
@@ -281,43 +241,47 @@ def _logic_vars(values: Iterable[pm.Spec], claim: Claim) -> frozenset[str]:
 
 def _collect_logic_vars(value: object, claim: Claim, found: set[str]) -> None:
     if isinstance(value, pm.Var):
-        if isinstance(value.__type__, sem.Context.LogicVar) and value.__type__.ctx is claim:
-            if isinstance(value.__data__, str):
-                found.add(value.__data__)
+        if isinstance(value, sem.Context.LogicVar) and value.ctx is claim:
+            found.add(value.id)
         return
 
     if isinstance(value, pm.Spec):
         _collect_logic_vars(value.anchor, claim, found)
         args = value.args
         if args is not None:
-            for item in args.values:
+            for item in args.content:
                 _collect_logic_vars(item, claim, found)
         return
 
-    if isinstance(value, pm.Const):
-        attrs = value.attrs
-        if attrs is not None:
-            for item in attrs.values:
-                _collect_logic_vars(item, claim, found)
-            return
-        if isinstance(value.__data__, pm.Type):
-            _collect_logic_vars(value.__data__, claim, found)
-        return
-
-    if isinstance(value, pm.NominalQualifier):
-        _collect_logic_vars(value.spec_ref, claim, found)
+    if isinstance(value, pm.Qual):
         _collect_logic_vars(value.underlying, claim, found)
+        for item in value.qualifiers.content:
+            _collect_logic_vars(item.fetch(), claim, found)
         return
 
-    if isinstance(value, pm.NominalType):
-        _collect_logic_vars(value.spec_ref, claim, found)
-        return
-
-    if isinstance(value, pm.StructType):
-        for item in value.meta_attrs.values:
+    if isinstance(value, pm.VaryingType):
+        for item in value.values:
             _collect_logic_vars(item, claim, found)
         return
 
+    if isinstance(value, pm.UniformType):
+        _collect_logic_vars(value.element_type, claim, found)
+        return
+
+    if isinstance(value, pm.IndexedType):
+        indexed_value = cast(Any, value)
+        _collect_logic_vars(indexed_value.inner, claim, found)
+        for item in indexed_value.index.content:
+            if item is not None:
+                _collect_logic_vars(item, claim, found)
+        return
+
+    if isinstance(value, pm.Carrier):
+        if not value.is_leaf:
+            for item in value:
+                _collect_logic_vars(item, claim, found)
+        return
+
     if isinstance(value, pm.UnionType):
-        for item in value.types:
+        for item in value.variants:
             _collect_logic_vars(item, claim, found)

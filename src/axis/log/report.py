@@ -4,7 +4,7 @@ from enum import Enum, auto
 
 from typing import NoReturn, Optional, Self, Iterable, TYPE_CHECKING
 
-from protobase import Inmutable, Metadata, Record, flux, mutate
+from protobase import Record, flux
 import protomorph as pm
 from rich import print
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -13,7 +13,9 @@ from rich.style import Style
 from axis import syn, src
 
 
-class Report(Metadata[pm.Val]):
+class Report(pm.Builtin):
+    SPEC_NAME = "axis.log.Report"
+
     class Exception(Exception):
         def __init__(self, report: "Report"):
             self.report = report
@@ -39,7 +41,9 @@ class Report(Metadata[pm.Val]):
         LabelStyle.SECONDARY: Style(color="white", bgcolor="blue"),
     }
 
-    class Label(Inmutable):
+    class Label(pm.Builtin):
+        SPEC_NAME = "axis.log.Report.Label"
+
         ast: syn.Node
         message: Optional[str] = None
         style: Optional["Report.LabelStyle"] = None
@@ -115,8 +119,10 @@ class Report(Metadata[pm.Val]):
                 suggestion=self._suggestion,
             )
 
-        def tag[V: std.Val](self, val: V, *args, **kwargs) -> V:
-            return self.build().tag(val, *args, **kwargs)
+        def tag[V](self, val: V, *args, **kwargs) -> V:
+            _ = args, kwargs
+            self.build()
+            return val
 
         def show(self, *args, **kwargs):
             return self.build().show(*args, **kwargs)
@@ -137,6 +143,13 @@ class Report(Metadata[pm.Val]):
     def show(self) -> Self:
         print(self)
         return self
+
+    @classmethod
+    def of(cls, obj: object) -> Self | None:
+        return obj if isinstance(obj, cls) else None
+
+    def tag[V](self, obj: V) -> V:
+        return obj
 
     def emit(self, or_show=True) -> Self:
         if flux.in_query():
@@ -176,3 +189,9 @@ def warn(message: str) -> Report.Builder:
 
 def info(message: str) -> Report.Builder:
     return Report.Builder(_severity=Report.Severity.INFO, _message=message)
+
+
+def register_native_specs() -> None:
+    pm.register_native_spec(syn.Node, pm.Spec.of("axis.syn.Node"))
+    pm.register_native_spec(Report.Severity, pm.Spec.of("axis.log.Report.Severity"))
+    pm.register_native_spec(Report.LabelStyle, pm.Spec.of("axis.log.Report.LabelStyle"))

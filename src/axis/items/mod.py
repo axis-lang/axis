@@ -62,13 +62,9 @@ class Mod(Item):
         return expr.name_of(self.path) if self.path is not None else None
 
     def _build_scope(self, scope_builder: Scope.Builder) -> None:
-        # TODO: YA No podemos utilizar self.realm, debemos desactivar elliptic-imports 
-        # namespaces = self.realm.namespaces_by_anchor
-        # for resolved_target in namespaces.get(self.anchor, ()):
-        #     scope_builder.define(resolved_target.name, resolved_target, origin=self)
-        # for use in self.uses:
-        #     use._contribute_to_scope(scope_builder, namespaces)
-        pass
+        namespaces = frozendict()
+        for use in self.uses:
+            use._contribute_to_scope(scope_builder, namespaces)
 
     # @flux.property
     # def scope(self) -> sem.Scope:

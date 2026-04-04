@@ -264,6 +264,20 @@ class Qual(Type):
             raise KeyError(id)
         return schema.item(id)
 
+    @property
+    def last_qualifier(self) -> Spec | None:
+        qualifiers = tuple(cast(Spec, child.fetch()) for child in self.qualifiers)
+        if not qualifiers:
+            return None
+        return qualifiers[-1]
+
+    @property
+    def unwrap(self) -> pm.Type:
+        qualifiers = tuple(cast(Spec, child.fetch()) for child in self.qualifiers)
+        if len(qualifiers) <= 1:
+            return self.underlying
+        return cast(pm.Type, type(self).of(self.underlying, *qualifiers[:-1]))
+
     @classmethod
     def of(cls, underlying: pm.Type, *qualifiers: Spec) -> Qual:
         if isinstance(underlying, Qual):

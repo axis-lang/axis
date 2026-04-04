@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from types import NotImplementedType
-from protobase import flux, _
+from typing import cast
+from protobase import Inmutable, flux, _
 from protobase.cached_property import slot_cached_property
 import protomorph as pm
 from protomorph import reasoning as urs
@@ -11,12 +12,13 @@ from axis import syn, sem
 from .scope import Scope
 
 
-class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=True):
+class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
 
-    class LogicVar(pm.VarType["Context"]):
-        pass
+    class LogicVar(pm.SimpleVar):
+        ctx: Context
+        id: str
 
-    class Contribution(pm.ContextProto, abstract=True):
+    class Contribution(Inmutable, abstract=True):
         anchor: pm.Anchor = _
         origin: syn.Node = _
         ctx: Context = _
@@ -42,24 +44,50 @@ class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=Tru
     class NamespaceContribution(EntityContribution):
         pass
 
-    class FactContribution(EntityContribution):
+    class ClaimContribution(EntityContribution):
         _facts: frozenset[pm.Spec] = frozenset()
+        _rules: frozenset[urs.Rule] = frozenset()
 
         @flux.property
         def facts(self) -> frozenset[pm.Spec]:
             return self._facts
 
-    class ClaimContribution(FactContribution):
-        _rules: frozenset[urs.Rule] = frozenset()
-
         @flux.property
         def rules(self) -> frozenset[urs.Rule]:
             return self._rules
 
-    #realm: sem.Realm = _
+        def _check(self) -> None:
+            from axis import log, sem
+
+            heads = tuple(self._facts) + tuple(rule.head for rule in self._rules)
+            body_goals = tuple(
+                cast(pm.Spec, goal.fetch()) if isinstance(goal, pm.Carrier) else cast(pm.Spec, goal)
+                for rule in self._rules
+                for goal in rule.body
+            )
+            if not heads and not body_goals:
+                return
+
+            realm = cast(sem.Realm, pm.current_realm())
+            for head in heads:
+                _check_goal_admission(
+                    realm,
+                    head,
+                    origin=self.origin,
+                    missing_message="Claim target must have fact facet",
+                    mismatch_message="Claim head is not admitted by any declared fact spec",
+                )
+            for goal in body_goals:
+                _check_goal_admission(
+                    realm,
+                    goal,
+                    origin=self.origin,
+                    missing_message="Claim body target must have fact facet",
+                    mismatch_message="Claim body goal is not admitted by any declared fact spec",
+                )
 
     @flux.property
-    def contributions(self) -> frozenset[Contribution]:
+    def contributions(self) -> frozenset[Context.Contribution]:
         return frozenset()
 
     @property
@@ -90,3 +118,26 @@ class Context[P: "Context"](syn.SegregatedItem[P], pm.ContextProto, abstract=Tru
     def check(self):
         self.scope
         self._check()
+
+
+def _check_goal_admission(
+    realm: "sem.Realm",
+    goal: pm.Spec,
+    *,
+    origin: syn.Node,
+    missing_message: str,
+    mismatch_message: str,
+) -> None:
+    from axis import log, sem
+
+    entity = realm.entities_by_anchor.get(goal.anchor)
+    if entity is None:
+        log.error(missing_message).label(origin).throw()
+
+    pattern = entity.spec_pattern_for(sem.Entity.FactFacet)
+    if pattern is None:
+        log.error(missing_message).label(origin).throw()
+
+    args = goal.args
+    if args is None or pattern.match(args) is None:
+        log.error(mismatch_message).label(origin).throw()

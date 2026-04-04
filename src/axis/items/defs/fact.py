@@ -6,7 +6,7 @@ from protobase import flux, _
 
 from axis import expr, log, sem, syn
 
-from .base import SymDef, build_extends_fact_contribution, build_spec_bindings
+from .base import SymDef, build_spec_bindings
 
 
 class FactDef(SymDef):
@@ -28,21 +28,12 @@ class FactDef(SymDef):
         for where in self.where or (None,):
             spec_bindings = build_spec_bindings(self.spec, where)
             contributions.add(
-                sem.Entity.PredicateFacet(
+                sem.Entity.FactFacet(
                     anchor=self.anchor,
                     spec_bindings=spec_bindings,
                     origin=self.origin,
                     ctx=self,
                 )
             )
-            fact_contrib = build_extends_fact_contribution(
-                self,
-                scope_name=self.anchor.name,
-                bindings=spec_bindings,
-                extends=self.extends,
-                origin=self.origin,
-            )
-            if fact_contrib is not None:
-                contributions.add(fact_contrib)
 
         return frozenset(contributions)

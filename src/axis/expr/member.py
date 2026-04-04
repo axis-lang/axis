@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+from typing import Any
+
 import protomorph as pm
 
-from axis import syn
+from axis import log, syn
 
-from .bound_support import unsupported_bound, val_type_name
+from .lowering import unsupported_bound, val_type_name
 from .sym import Sym
 
 __all__ = ["Member"]
@@ -30,19 +34,21 @@ class Member(syn.Expr):
     def as_sym(self):
         return Sym(name=self.name).with_span_of(self)
 
-    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
-        of_val = self.of.to_bound(scope)
-        if isinstance(of_val, pm.Err):
-            return of_val
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Result[log.Report, Any]:
+        of_result = self.of.to_bound(scope)
+        if of_result.is_err:
+            return of_result
+        of_val = of_result.unwrap().fetch()
         if isinstance(of_val, pm.Anchor):
-            return of_val.child(self.name)
-        return unsupported_bound(
+            return pm.Result.ok(pm.wrap(of_val.child(pm.Id(self.name))))
+        report = log.error("Unsupported bound expression").label(
             self,
             f"member access requires an Anchor base, got {val_type_name(of_val)}",
-        )
+        ).build()
+        return pm.Result.err(pm.wrap(report))
 
     def to_anchor(self, scope_ref: pm.Anchor | None) -> pm.Anchor:
-        return self.of.to_anchor(scope_ref).child(self.name)
+        return self.of.to_anchor(scope_ref).child(pm.Id(self.name))
 
     @classmethod
     def build(cls, of: syn.Expr, *members):

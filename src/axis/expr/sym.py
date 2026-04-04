@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import ClassVar, Literal, Optional
+from typing import Any, ClassVar, Literal, Optional
 
 import protomorph as pm
 
@@ -45,13 +45,13 @@ class Sym(syn.Expr):
     def build(cls, name: str, at: Literal["@"] | None = None, scope: Optional[str] = None):
         return cls(name=name, at=scope)
 
-    def to_bound(self, scope: syn.ScopeLike) -> pm.Val:
+    def to_bound(self, scope: syn.ScopeLike) -> pm.Result[log.Report, Any]:
         return scope.lookup(self, origin=self)
 
     def to_anchor(self, scope_ref: pm.Anchor | None) -> pm.Anchor:
         if self.at is not None:
             log.warn("Anchor cannot @-qualify a symbol").label(self).emit()
-        return pm.Anchor.from_root(self.name) if scope_ref is None else scope_ref.child(self.name)
+        return pm.Anchor(self.name) if scope_ref is None else scope_ref.child(pm.Id(self.name))
 
 
 Sym.ROOT = Sym("@root")

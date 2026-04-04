@@ -20,10 +20,7 @@ class Type[T](Builtin, abstract=True):
         raise NotImplementedError(f"Metatype not implemented for {self!r}")
 
     def make(self, data: T):
-        carrier_fact = protomorph.carrier_factory_for(self)
-        if carrier_fact is None:
-            raise NotImplementedError(f"No carrier factory for type {type(self).__name__}")
-        return carrier_fact(self, data)
+        return protomorph._make_carrier(self, data)
 
     @flux.property
     def schema(self) -> protomorph.TupleLikeType | None:
@@ -72,7 +69,7 @@ class Placeholder(Type, abstract=True):
     """
 
     def metatype(self) -> Type:
-        return self
+        return PlaceholderMetatype(self, 1)
 
     def display_label(self) -> str | None:
         return None
@@ -80,6 +77,39 @@ class Placeholder(Type, abstract=True):
 
 class Var(Placeholder, abstract=True):
     pass
+
+
+class Mark(Placeholder, abstract=True):
+    pass
+
+
+class WildcardMark(Mark):
+    def display_label(self) -> str | None:
+        return "_"
+
+
+class EllipsisMark(Mark):
+    def display_label(self) -> str | None:
+        return "..."
+
+
+class ItMark(Mark):
+    def display_label(self) -> str | None:
+        return "it"
+
+
+class PlaceholderMetatype(Placeholder):
+    of: Placeholder
+    level: int
+
+    def metatype(self) -> Type:
+        return type(self)(self.of, self.level + 1)
+
+    def display_label(self) -> str | None:
+        base = placeholder_label(self.of)
+        if self.level <= 3:
+            return base + ("'" * self.level)
+        return f"{base}^{self.level}"
 
 
 class SimpleVar(Var):
@@ -92,6 +122,11 @@ class SimpleVar(Var):
 
 def placeholder(id: str, context: Any = None) -> Placeholder:
     return SimpleVar(context, id)
+
+
+WILDCARD = WildcardMark()
+ELLIPSIS = EllipsisMark()
+IT = ItMark()
 
 
 def placeholder_name(value: Placeholder) -> str | None:
@@ -126,8 +161,16 @@ def placeholder_label(value: Placeholder) -> str:
 __all__ = [
     "Type",
     "Placeholder",
+    "PlaceholderMetatype",
     "Var",
+    "Mark",
+    "WildcardMark",
+    "EllipsisMark",
+    "ItMark",
     "SimpleVar",
+    "WILDCARD",
+    "ELLIPSIS",
+    "IT",
     "placeholder",
     "placeholder_name",
     "placeholder_context",

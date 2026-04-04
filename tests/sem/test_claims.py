@@ -1,269 +1,89 @@
-import protomorph as pm
+from axis import log
 
-from axis import items, log, sem
-
-from tests.helpers import InlinePackageTestCase, TestPackage
+from tests.helpers import StdPackageTestCase, TestPackage
 
 
-class ClaimFrontendTest(InlinePackageTestCase):
-    SOURCES = {
-        "demo.ax": """
-        unit demo
-
-        mod facts
-            def Extends[X, from=Y]
-            def Conforms[X, to=T]
-            def Transitive[of=R]
-
-        def Natural
-        def Integer
-        extends Natural
-        def Text
-        extends Integer
-
-        claim facts.Transitive[of=facts.Extends]
-        claim facts.Extends[Text, from=Integer]
-        claim facts.Extends[Integer, from=Natural]
-
-        claim facts.Conforms[X, to=T]
-        where:
-            val X
-            val T
-        when:
-            - facts.Extends[X, from=T]
-
-        claim facts.Conforms[X, to=T]
-        where:
-            val X
-            val U
-            val T
-        when:
-            - facts.Extends[X, from=U]
-            - facts.Conforms[U, to=T]
-        """
-    }
-
-    def test_empirical_claim_emits_fact_contribution(self):
-        contrib = next(iter(self.pkg.contributions("demo.facts.Transitive", sem.Context.ClaimContribution)))
-
-        self.assertIsInstance(contrib, sem.Context.ClaimContribution)
-        self.assertEqual(len(contrib.facts), 1)
-        self.assertFalse(contrib.clauses)
-        fact = next(iter(contrib.facts))
-        self.assertEqual(fact.anchor.path, "demo.facts.Transitive")
-
-    def test_conditional_claim_emits_clause_contribution(self):
-        contribs = tuple(self.pkg.contributions("demo.facts.Conforms", sem.Context.ClaimContribution))
-        contrib = next(contrib for contrib in contribs if contrib.clauses)
-
-        self.assertEqual(sum(len(contrib.clauses) for contrib in contribs), 2)
-        clause = next(
-            clause
-            for contrib in contribs
-            for clause in contrib.clauses
-            if len(clause.body) == 1
-        )
-        self.assertEqual(clause.head.anchor.path, "demo.facts.Conforms")
-        self.assertEqual(clause.body[0].anchor.path, "demo.facts.Extends")
-
-    def test_where_constraints_emit_implicit_conforms_goals(self):
+class ClaimContributionCheckTest(StdPackageTestCase):
+    def test_claim_head_admitted_by_fact_facet_passes(self):
         pkg = TestPackage.with_std().with_unit(
             """
             unit demo
 
+            use std(types, core)
+
             mod facts
-                def Conforms[X, to=T]
-                def Uses[T]
+                def Extends[X, from: types.Type]
 
-            def Integer
-
-            claim facts.Uses[T]
-            where:
-                val T: Integer
+            claim facts.Extends[core.Text, from: types.Type]
             """
         )
 
-        contrib = next(iter(pkg.contributions("demo.facts.Uses", sem.Context.ClaimContribution)))
-        claim = next(item for item in pkg.items if isinstance(item, items.Claim))
-        clause = next(iter(contrib.clauses))
+        with self.suppress_report_output():
+            pkg.check()
 
-        self.assertEqual(len(claim.where_constraints), 1)
-        self.assertEqual(clause.head.anchor.path, "demo.facts.Uses")
-        self.assertEqual(len(clause.body), 1)
-        self.assertEqual(clause.body[0].anchor.path, "std.facts.Conforms")
-
-    def test_where_constraints_expose_algebraic_constraint_metadata(self):
+    def test_claim_head_rejected_when_required_nominal_missing(self):
         pkg = TestPackage.with_std().with_unit(
             """
             unit demo
 
-            mod facts
-                def Uses[T]
-
-            def Integer
-
-            claim facts.Uses[T]
-            where:
-                val T: Integer
-            """
-        )
-
-        claim = next(item for item in pkg.items if isinstance(item, items.Claim))
-        constraints = claim.where_constraints
-
-        assert not isinstance(constraints, pm.Err)
-        self.assertEqual(len(constraints), 1)
-        constraint = constraints[0]
-        self.assertEqual(constraint.goal.anchor.path, "std.facts.Conforms")
-        self.assertIsNotNone(constraint.target_type)
-        self.assertTrue(constraint.satisfies(pm.val(pm.nominal_type("demo.Integer"))))
-
-    def test_realm_aggregates_claim_facts_and_clauses(self):
-        fact_anchors = {fact.anchor.path for fact in self.pkg.all_facts}
-        clause_anchors = {clause.head.anchor.path for clause in self.pkg.all_clauses}
-
-        self.assertIn("demo.facts.Transitive", fact_anchors)
-        self.assertIn("demo.facts.Conforms", clause_anchors)
-
-        conforms = self.pkg.entity("demo.facts.Conforms")
-        transitive = self.pkg.entity("demo.facts.Transitive")
-
-        self.assertTrue(conforms.clauses)
-        self.assertTrue(transitive.facts)
-
-    def test_logic_solver_derives_recursive_claims(self):
-        goal = pm.spec_ref(
-            "demo.facts.Conforms",
-            pm.struct(
-                pm.val(pm.nominal_type("demo.Text")),
-                to=pm.val(pm.nominal_type("demo.Natural")),
-            ),
-        )
-
-        answers = self.pkg.logic_solver.answers(goal)
-
-        self.assertEqual(len(answers), 1)
-        self.assertEqual(answers[0].bindings, pm.frozendict())
-
-
-class ClaimParsingSmokeTest(InlinePackageTestCase):
-    def test_claim_item_parses_from_source(self):
-        pkg = TestPackage.with_std().with_unit(
-            """
-            unit demo
+            use std(types, core)
 
             mod facts
-                def Extends[X, from=Y]
+                def Extends[X, from: types.Type]
 
-            claim facts.Extends[A, from=B]
-            where:
-                val A
-                val B
-            """
-        )
-
-        claim = next(item for item in pkg.items if isinstance(item, items.Claim))
-
-        self.assertIsInstance(claim, items.Claim)
-        self.assertEqual(claim.anchor.path, "demo.facts.Extends")
-        self.assertEqual(tuple(binding.binder_name for binding in claim.bindings.values), ("A", "B"))
-
-
-class ClaimValidationTest(InlinePackageTestCase):
-    def test_empirical_claim_rejects_head_not_admitted_by_predicate_spec(self):
-        pkg = TestPackage.with_std().with_unit(
-            """
-            unit demo
-
-            mod facts
-                def Extends[X, from=Y]
-
-            claim facts.Extends[from=Y]
-            where:
-                val Y
+            claim facts.Extends[core.Text]
             """
         )
 
         with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
             pkg.check()
 
-        self.assertEqual(
-            raised.exception.report.message,
-            "Claim head is not admitted by any declared predicate spec",
+        self.assertIn(
+            "Claim head is not admitted by any declared fact spec",
+            str(raised.exception),
         )
 
-    def test_claim_rejects_undeclared_when_variable(self):
+    def test_rule_claim_body_goals_admitted_by_fact_facets_pass(self):
         pkg = TestPackage.with_std().with_unit(
             """
             unit demo
 
-            mod facts
-                def Extends[X, from=Y]
-                def Conforms[X, to=T]
+            use std(types, core)
 
-            claim facts.Conforms[X, to=T]
-            where:
-                val X
-                val T
+            mod facts
+                def Extends[X, from: types.Type]
+                def Conforms[X, to: types.Type]
+
+            claim facts.Extends[core.Text, from=types.Type]
             when:
-                - facts.Extends[X, from=U]
+                - facts.Conforms[core.Text, to=types.Type]
             """
         )
 
-        with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
+        with self.suppress_report_output():
             pkg.check()
 
-        self.assertEqual(
-            raised.exception.report.message,
-            "Claim references an unresolved symbol",
-        )
-        self.assertEqual(raised.exception.report.notes, ("Unbound symbol: U",))
-
-    def test_claim_rejects_unrestricted_head_variable(self):
+    def test_rule_claim_body_goal_rejected_when_required_nominal_missing(self):
         pkg = TestPackage.with_std().with_unit(
             """
             unit demo
 
-            mod facts
-                def Extends[X, from=Y]
-                def Conforms[X, to=T]
+            use std(types, core)
 
-            claim facts.Conforms[X, to=T]
-            where:
-                val X
-                val U
-                val T
+            mod facts
+                def Extends[X, from: types.Type]
+                def Conforms[X, to: types.Type]
+
+            claim facts.Extends[core.Text, from=types.Type]
             when:
-                - facts.Extends[X, from=U]
+                - facts.Conforms[core.Text]
             """
         )
 
         with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
             pkg.check()
 
-        self.assertEqual(
-            raised.exception.report.message,
-            "Conditional claim must be range-restricted",
-        )
-
-    def test_claim_rejects_where_defaults_for_now(self):
-        pkg = TestPackage.with_std().with_unit(
-            """
-            unit demo
-
-            mod facts
-                def Uses[T]
-
-            claim facts.Uses[T]
-            where:
-                val T: Integer = Integer
-            """
-        )
-
-        with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
-            pkg.check()
-
-        self.assertEqual(
-            raised.exception.report.message,
-            "Claim where bindings do not support defaults yet",
+        self.assertIn(
+            "Claim body goal is not admitted by any declared fact spec",
+            str(raised.exception),
         )

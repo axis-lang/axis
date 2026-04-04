@@ -25,12 +25,12 @@ class Entity(Consed):
             name = field.binder_name
             if name is None:
                 return None
-            return pm.var(Entity.SpecVar, self, name)
+            return Entity.SpecVar(self, name)
 
         @flux.property
         def spec_scope(self) -> sem.Scope:
             builder = sem.Scope.Builder(name=self.anchor.name, parent=self.ctx.scope)
-            builder.define("Self", pm.var(Entity.SpecVar, self, "Self"), origin=self.origin)
+            builder.define("Self", Entity.SpecVar(self, "Self"), origin=self.origin)
             for binding in self.spec_bindings.nameable_fields:
                 name = binding.binder_name
                 if name is None:
@@ -48,14 +48,20 @@ class Entity(Consed):
                 binder_for=self._spec_binder,
             )
 
+        @flux.property
+        def spec_binding_ir(self) -> sem.BindingIR:
+            return sem.build_binding_ir(self.lowered_spec_bindings)
+
         def _check(self) -> None:
             self.spec_scope
             self.lowered_spec_bindings
+            self.spec_binding_ir
 
-    class SpecVar(pm.VarType[SpecContribution]):
-        pass
+    class SpecVar(pm.SimpleVar):
+        ctx: "Entity.SpecContribution"
+        id: str
 
-    class PredicateFacet(Facet, SpecContribution):
+    class FactFacet(Facet, SpecContribution):
         pass
 
     class OverloadContribution(SpecContribution, abstract=True):
@@ -65,12 +71,12 @@ class Entity(Consed):
             name = field.binder_name
             if name is None:
                 return None
-            return pm.var(Entity.ParamVar, self, name)
+            return Entity.ParamVar(self, name)
 
         @flux.property
         def overload_scope(self) -> sem.Scope:
             builder = sem.Scope.Builder(name=self.anchor.name, parent=self.spec_scope)
-            builder.define("self", pm.var(Entity.ParamVar, self, "self"), origin=self.origin)
+            builder.define("self", Entity.ParamVar(self, "self"), origin=self.origin)
             for binding in self.param_bindings.nameable_fields:
                 name = binding.binder_name
                 if name is None:
@@ -89,11 +95,15 @@ class Entity(Consed):
             )
 
         @flux.property
-        def param_constraints(self) -> tuple[sem.Constraint, ...] | pm.Err:
+        def param_constraints(self) -> pm.Result[log.Report]:
             return sem.binding_constraints(
                 self.param_bindings,
                 self.overload_scope,
-                subject_for_binding=lambda field: self._param_binder(field),
+                subject_for_binding=lambda field: (
+                    None
+                    if self._param_binder(field) is None
+                    else pm.Result.ok(pm.wrap(cast(pm.Var, self._param_binder(field))))
+                ),
                 origin_label="parameter",
                 allow_defaults=True,
             )
@@ -104,8 +114,9 @@ class Entity(Consed):
             self.lowered_param_bindings
             self.param_constraints
 
-    class ParamVar(pm.VarType[OverloadContribution]):
-        pass
+    class ParamVar(pm.SimpleVar):
+        ctx: "Entity.OverloadContribution"
+        id: str
 
     class ClassFacet(Facet, OverloadContribution):
         pass
@@ -120,7 +131,7 @@ class Entity(Consed):
         @flux.property
         def result_constraint(self) -> sem.Constraint | None:
             bound = self.result_bound
-            return None if bound is None else sem.constraint_from_term(pm.THIS, bound)
+            return None if bound is None else sem.constraint_from_term(Entity.ParamVar(self, "self"), bound)
 
         def __invariant__(self):
             if self.result_bound_expr is None:
@@ -148,7 +159,7 @@ class Entity(Consed):
         @flux.property
         def underlying_constraint(self) -> sem.Constraint | None:
             bound = self.underlying_bound
-            return None if bound is None else sem.constraint_from_term(pm.THIS, bound)
+            return None if bound is None else sem.constraint_from_term(Entity.ParamVar(self, "self"), bound)
 
         def _check(self) -> None:
             self.spec_scope
@@ -170,6 +181,26 @@ class Entity(Consed):
     @flux.property
     def rules(self) -> frozenset[urs.Rule]:
         return frozenset(rule for contrib in self.contributions for rule in contrib.rules)
+
+    @flux.property
+    def spec_pattern(self) -> pm.Carrier | None:
+        specs = tuple(
+            contrib for contrib in self.contributions if isinstance(contrib, Entity.SpecContribution)
+        )
+        if not specs:
+            return None
+        return pm.compile(
+            {contrib.spec_binding_ir.admission: frozenset((contrib,)) for contrib in specs}
+        )
+
+    @flux.method
+    def spec_pattern_for(self, cls: type[SpecContribution]) -> pm.Carrier | None:
+        specs = tuple(contrib for contrib in self.contributions if isinstance(contrib, cls))
+        if not specs:
+            return None
+        return pm.compile(
+            {contrib.spec_binding_ir.admission: frozenset((contrib,)) for contrib in specs}
+        )
 
     @flux.method
     def check(self):

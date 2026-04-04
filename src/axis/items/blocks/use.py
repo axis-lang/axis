@@ -80,6 +80,6 @@ class Use(syn.Block, Inmutable):
                 continue
             match alias:
                 case expr.Lit() as lit if lit.is_ellipsis:
-                    log.error("Ellipsis imports are temporarily disabled").label(lit).throw()
+                    continue
                 case expr.Sym(name=name) as sym:
                     scope_builder.define(name, target, origin=sym)

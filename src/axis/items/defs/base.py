@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Literal, Optional, cast
-
-import protomorph as pm
+from typing import ClassVar, Literal, Optional
 
 from protobase import _, slot_cached_property
 
@@ -35,75 +33,6 @@ def build_param_bindings(
 ) -> sem.BindingStruct:
     """Build the parameter binding struct from `takes` clauses."""
     return build_binding_struct(inline_expr, block_expr)
-
-
-def build_logic_scope(
-    ctx: sem.Context,
-    *,
-    scope_name: str | None,
-    bindings: sem.BindingStruct,
-    origin: syn.Node,
-    include_self: bool = False,
-) -> sem.Scope:
-    builder = sem.Scope.Builder(name=scope_name, parent=ctx.scope)
-    if include_self:
-        builder.define(
-            "Self",
-            pm.var(
-                cast(type[pm.VarType[pm.ContextProto]], sem.Context.LogicVar),
-                cast(pm.ContextProto, ctx),
-                "Self",
-            ),
-            origin=origin,
-        )
-
-    for binding in bindings.nameable_fields:
-        name = binding.binder_name
-        if name is None:
-            continue
-        builder.define(
-            name,
-            pm.var(
-                cast(type[pm.VarType[pm.ContextProto]], sem.Context.LogicVar),
-                cast(pm.ContextProto, ctx),
-                name,
-            ),
-            origin=binding.key_expr,
-        )
-
-    return builder.build()
-
-
-def build_extends_fact_contribution(
-    ctx: sem.Context,
-    *,
-    scope_name: str | None,
-    bindings: sem.BindingStruct,
-    extends: tuple[Def.Extends, ...],
-    origin: syn.Node,
-) -> sem.Context.FactContribution | None:
-    if not extends:
-        return None
-
-    logic_scope = build_logic_scope(
-        ctx,
-        scope_name=scope_name,
-        bindings=bindings,
-        origin=origin,
-        include_self=True,
-    )
-    fact = expr.build_extends_fact(extends[0].expr, logic_scope)
-    if not isinstance(fact, pm.Spec):
-        return None
-
-    return sem.Context.FactContribution(
-        anchor=fact.anchor,
-        _facts=frozenset((fact,)),
-        origin=extends[0],
-        ctx=ctx,
-    )
-
-
 class Def(Item, syn.ClassMatcher):
     class Members(syn.Block):
         outline_keyword: ClassVar = "members"

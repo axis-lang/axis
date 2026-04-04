@@ -25,7 +25,7 @@ def repr_any(obj: Any) -> str:
     from .type_ import Placeholder, placeholder_label
     from .domain import UniformType, UnionType, VaryingType, IndexedType
     from .domain import Spread, Spec, Qual
-    from .carrier import Carrier, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result
+    from .carrier import Carrier, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
 
     # ── Hosted (check before Val and Type) ──
     if isinstance(obj, Qual):
@@ -48,6 +48,8 @@ def repr_any(obj: Any) -> str:
     # ── Carriers (check before generic fallback) ──
     if isinstance(obj, Result):
         return _repr_result_carrier(obj)
+    if isinstance(obj, Option):
+        return _repr_option_carrier(obj)
     if isinstance(obj, LeafCarrier):
         return _repr_leaf(obj)
     if isinstance(obj, NativeObjectCarrier):
@@ -176,3 +178,9 @@ def _repr_result_carrier(carrier) -> str:
     if carrier.is_ok:
         return f"Ok({repr_any(carrier.value_carrier())})"
     return f"Err({repr_any(carrier.error_carrier())})"
+
+
+def _repr_option_carrier(carrier) -> str:
+    if carrier.is_some:
+        return f"Some({repr_any(carrier.value_carrier())})"
+    return "None"

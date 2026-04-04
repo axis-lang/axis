@@ -10,7 +10,9 @@ traceback.install()
 import axis.src
 import axis.syn
 import axis.sem
+import axis.log
+
+axis.log.register_native_specs()
 
 from .codebase import Codebase
 from .workspace import Workspace
-
