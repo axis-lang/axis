@@ -70,6 +70,39 @@ Imports
   (`from axis import log` -> `log.Report`, `log.error(...)`) over deep imports
   like `from axis.log.report import Report`
 
+URS import policy (`packages/protomorph/src/pm/reasoning/`)
+- Apply this policy strictly and systematically across all URS modules.
+- Categorize every dependency as exactly one of:
+  - `annotation-only`
+  - `import-time runtime`
+  - `runtime-late`
+- `annotation-only`
+  - Always import `import pm` and `from pm import reasoning as urs`.
+  - All URS type hints must use qualified names through `urs.*` or `pm.*`.
+  - Do not add direct sibling imports only to shorten annotations.
+  - Example: `db: urs.Database`, `goal: pm.Spec`, `tables: urs.SessionTables`.
+- `import-time runtime`
+  - Use selective direct imports only for symbols actually needed while the module
+    is importing or for top-level executable runtime use.
+  - These imports define the real dependency graph and layering.
+  - Example: `from .stratify import build_dependency_graph`.
+- `runtime-late`
+  - Decide the import form from the origin module:
+    - if that module is already present in `import-time runtime`, use that path
+    - otherwise use the global rule (`urs.*` / `pm.*`) instead of introducing a
+      new hidden sibling dependency
+- Do not use `typing.TYPE_CHECKING` in URS.
+- Treat as private only the names that remain inside their defining module.
+  - If a symbol is referenced from another URS module, do not keep it private by
+    convention alone; either export a public name or refactor so it stops crossing
+    module boundaries.
+- Keep `pm.reasoning.__init__` ordered according to the real URS layering so the
+  `urs.*` annotation namespace is available during module initialization.
+- This policy resolves three recurring problems:
+  - annotation imports accidentally creating fake architectural dependencies
+  - circular imports hidden inside local imports and `TYPE_CHECKING`
+  - cross-module use of pseudo-private helpers without an explicit public surface
+
 Formatting
 - Use 4-space indentation
 - Keep line length reasonable; wrap complex expressions
@@ -82,7 +115,11 @@ Typing and annotations
 - Codebase uses modern typing (PEP 695 generics, Self, ParamSpec)
 - Prefer `type | None` over `Optional[type]` at runtime
 - Use the protobase `_` sentinel for required fields after defaults
-- Use TYPE_CHECKING for type-only imports and overloads
+- Use `TYPE_CHECKING` for type-only imports and overloads outside URS; in
+  `packages/protomorph/src/pm/reasoning/` follow the URS import policy above and
+  do not use it
+- For genuinely arbitrary payloads, prefer `typing.Any` over `object`; in URS do
+  not use `object` as a placeholder for unknown runtime values
 
 Naming conventions
 - Classes: CamelCase

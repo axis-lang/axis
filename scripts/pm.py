@@ -1,22 +1,13 @@
-#%%
-import protomorph as pm
+# %%
 
-class DummyContext(pm.ContextProto):
-    pass
+from pm import *
 
-class DummyVarType(pm.VarType):
-    pass
 
-ctx = DummyContext()
-T = pm.var(DummyVarType, ctx, 'T')
+class B[T: int = int](): ...
 
-# std.MyType[T]
-spec = pm.val({'T': T})
-assert isinstance(spec, pm.Const)
-assert isinstance(spec.__type__, pm.StructType)
-print(spec.__type__.meta_attrs)
 
-print(pm.nominal_type('std.MyType', spec)) # CRASH!
-v = pm.val(pm.nominal_type('std.MyType', spec)) # Crash!
-print(v) # CRASH!
+wrap(1, 2, 3)
 
+
+
+# %%

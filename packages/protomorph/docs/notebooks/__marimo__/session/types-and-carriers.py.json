@@ -1,0 +1,279 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.21.1",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "2c78042f756958b6c7da5fdfd5771ae8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"types-carriers\">Types &amp; Carriers</h1>\n<span class=\"paragraph\">This notebook walks through Protomorph's type algebra hands-on.\nWe cover <code>Spec</code>, <code>VaryingType</code>, <code>UniformType</code>, <code>UnionType</code>, <code>IndexedType</code>,\n<code>Qual</code>, and how to wrap values into carriers.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "71762afb58e19727bb2ef8ac47393547",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "2a85b17d46ad2dfd3777b49e28b58951",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-scalar-types\">1 \u2014 Scalar types</h2>\n<span class=\"paragraph\"><code>Spec</code> is the nominal type constructor. Equal specs are the <em>same object</em> (hash-consing).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "62c1b1ff2a7b4f1aa27cea54a1f20d1a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Integer\nText\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "c905ec0ffc89bc49bea18fae28512eae",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-composite-types\">2 \u2014 Composite types</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "caa1881958ebd0a47619235e151eb522",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "pair arity : 2\nlist arity : None  (None = unbounded)\nunion      : frozenset({Text, Integer})\npoint.x    : Item(offset=0, key='x', value=Integer)\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "506b7ab81772f54e1a973f0e3b733c83",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"3-qualified-types\">3 \u2014 Qualified types</h2>\n<span class=\"paragraph\"><code>Qual</code> wraps an underlying type with qualifiers \u2014 used for collection types like <code>list[int]</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "de88d3363b374b64acc69603b3917e41",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Qual       : List Integer\nunderlying : Integer\nqualifiers : [List]\nflattened  : Integer [List, Optional]\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "14f6aeb248301316fdc34eca345e7a39",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"4-from-python-annotations\">4 \u2014 From Python annotations</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "5b92b2ce1f1254f9e767ef86f2c771b8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "  int                \u2192 Integer\n  list[int]          \u2192 List Integer\n  dict[str,int]      \u2192 Map[Id] Integer\n  int | str          \u2192 Id | Integer\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "emfo",
+      "code_hash": "8d5e853e75958584837932d99de1e9f8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-carriers\">5 \u2014 Carriers</h2>\n<span class=\"paragraph\">A carrier holds a value under a type. Use <code>type.make(data)</code> or <code>wrap(value)</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "02ed808ec876850056c4b088911ad335",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "LeafCarrier 42\n42 hello\nInteger 99\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "76cb08c5896ef9493aa0bf22126febe6",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"6-deep-traversal\">6 \u2014 Deep traversal</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "fcb17a52c9c8203772a0c1ec3e071ee7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Leaves:\n   Integer \u2192 42\n   Text \u2192 hello\n   Boolean \u2192 True\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "169223dd42b2ac93d20c2d40180e5660",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"7-substitution\">7 \u2014 Substitution</h2>\n<span class=\"paragraph\">Replace a variable carrier with a concrete value using <code>subst</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "fc3f46813572d57a341d1ba67f8c2a57",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "[1, 99]\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    }
+  ]
+}

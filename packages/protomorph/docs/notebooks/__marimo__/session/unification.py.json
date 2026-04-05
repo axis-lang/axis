@@ -1,0 +1,246 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.21.1",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "d7b0e3e7d727876b8e7904168cfe0c31",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"unification\">Unification</h1>\n<span class=\"paragraph\">This notebook explores Protomorph's unification engine:</span>\n<ul>\n<li>Robinson unification with structural terms</li>\n<li><code>UnionFind</code>: path compression and rollback</li>\n<li>Occurs check</li>\n<li>Shared substitutions across multiple goals</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "de28fb6bba0e65772b75d83005f467d1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "2863fe824195a7044d38bf476680aacd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-basic-unification\">1 \u2014 Basic unification</h2>\n<span class=\"paragraph\">Unify <code>f(X, b)</code> with <code>f(a, Y)</code>. Both variables get bound.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "b772d63a070456c42c2ef11f4cbc7e19",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Spec(anchor='test.f', args=(test.a, test.b))\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "a77742967aa7d521e7721e6b6ae8751a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-failure\">2 \u2014 Failure</h2>\n<span class=\"paragraph\">Differing ground terms \u2192 <code>None</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "dbd86a24f5b00e39fe232c8eac235db7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "None\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "b9a2aba84378257a354d1ab277235ae5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"3-shared-unionfind-accumulating-bindings-across-goals\">3 \u2014 Shared <code>UnionFind</code>: accumulating bindings across goals</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "b51ce8969bc6d2bb23c5ff22d79547e4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "None\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "dfabefe5d7adabbaf1e16484bf23e3bc",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"4-rollback\">4 \u2014 Rollback</h2>\n<span class=\"paragraph\">Snapshot before a tentative binding; roll back if it fails.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "f0de26201957e07a4bd3879b37a52204",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "before rollback: test.a\nafter rollback:  $Z\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "emfo",
+      "code_hash": "ba963e895b786429c5442d713f3d6d19",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-occurs-check\">5 \u2014 Occurs check</h2>\n<span class=\"paragraph\">Prevents <code>W = f(W)</code> (cyclic term). Disable with <code>occurs_check=False</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "0bda0f3b601bb315f745f9a7e6d92da3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "with occurs check   : None\nwithout occurs check: Spec(anchor='test.f', args=($W))\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "7f858f3244b4b38d016adcbf8abcbb71",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"6-path-compression\">6 \u2014 Path compression</h2>\n<span class=\"paragraph\">After chaining <code>A\u2192B\u2192C\u2192ground</code>, <code>find(A)</code> flattens the chain in one call.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "276480937bb5f0c916e7f076fc706dcd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "root              : test.ground\nA direct parent   : test.ground\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    }
+  ]
+}

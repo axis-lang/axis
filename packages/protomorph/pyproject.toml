@@ -21,11 +21,15 @@ version-pinning-rule = "=="
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[dependency-groups]
-dev = [
-    "pyright (>=1.1.408,<2.0.0)",
-    "coverage (>=7.13.4,<8.0.0)",
-]
+[tool.poetry.group.dev.dependencies]
+pyright = ">=1.1.408,<2.0.0"
+coverage = ">=7.13.4,<8.0.0"
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = ">=1.6"
+mkdocs-material = ">=9.5"
+mkdocstrings = {extras = ["python"], version = ">=0.27"}
+marimo = ">=0.9"
 
 [tool.coverage.run]
 source = ["src/protomorph"]
