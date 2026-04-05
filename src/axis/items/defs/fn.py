@@ -37,7 +37,7 @@ class FnDef(SymDef):
                 .throw()
             )
         return frozenset(
-            sem.Entity.FunctionFacet(
+            sem.EntityView.FunctionFacet(
                 anchor=self.anchor,
                 spec_bindings=build_spec_bindings(self.spec, where),
                 param_bindings=build_param_bindings(self.args, takes),

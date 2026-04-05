@@ -1,5 +1,5 @@
 # %%
-from copy import deepcopy
+from copy import copy, deepcopy
 from functools import cached_property
 from itertools import chain, filterfalse
 from types import GenericAlias, MappingProxyType, UnionType
@@ -337,14 +337,14 @@ class Object(metaclass=Type, abstract=True):
                 )
 
         sticky_members: Any = {
-            k: v
+            k: copy(v)
             for k, v in bld.namespace.items()
             if isinstance(v, Type.StickyMember)
         }
 
         for base_sticky_members in bld.mro_data("sticky").values():
             for k, v in base_sticky_members.items():
-                if k in bld.namespace:
+                if k in bld.namespace and not isinstance(bld.namespace[k], Type.StickyMember):
                     sticky_members[k] = Missing
 
         bld.data(
@@ -382,7 +382,10 @@ class Object(metaclass=Type, abstract=True):
 
             for k, v in bld.mro_dict("sticky").items():
                 if k not in bld.namespace and v is not Missing:
-                    setattr(cls, k, v)
+                    inherited = copy(v)
+                    if hasattr(inherited, "__set_name__"):
+                        inherited.__set_name__(cls, k)
+                    setattr(cls, k, inherited)
 
             # assign self as parent of nested classes
             # for k, v in cls.__dict__.items():

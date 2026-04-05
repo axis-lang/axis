@@ -47,8 +47,8 @@ def native_logic_host():
 
 
 def wrap_logic(value: Any) -> protomorph.Carrier:
-    with native_logic_host():
-        return protomorph.wrap(value)
+    #with native_logic_host():
+    return protomorph.wrap(value)
 
 
 def make_union_find() -> UnionFind:

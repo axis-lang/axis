@@ -120,6 +120,10 @@ class Realm(protomorph.Realm, Consed):
     def schema_for(self, spec: protomorph.Spec):
         return protomorph.NATIVE_REALM.schema_for(spec)
 
+    @flux.property
+    def logic_solver(self) -> urs.Engine:
+        return urs.Engine(self)
+
     def val_is_leaf(self, meta: protomorph.Type, data: Any) -> bool:
         return protomorph.NATIVE_REALM.val_is_leaf(meta, data)
 
@@ -178,12 +182,11 @@ class Realm(protomorph.Realm, Consed):
             f"Realm.combine has no semantic rule for {left!r} {op or '?'} {right!r}"
         )
 
-    @flux.method
-    def check(self):
-        with self:
-            for contribution in self.all_contexts:
-                contribution.check()
-            for contribution in self.all_contributions:
-                contribution.check()
-            for entity in self.all_entities:
-                entity.check()
+    @flux.property
+    def status(self) -> sem.Status:
+        return sem.Status(
+            children=(
+                *(context.status for context in self.all_contexts),
+                *(entity.status for entity in self.all_entities),
+            )
+        )

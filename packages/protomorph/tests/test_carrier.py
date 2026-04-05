@@ -3,12 +3,12 @@ from __future__ import annotations
 import unittest
 from typing import Any, cast
 
-from protomorph import Builtin, ELLIPSIS, Err, IT, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, placeholder, wrap
+from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, placeholder, wrap
 
 
 INT = cast(Spec, wrap(int).fetch())
 STR = cast(Spec, wrap(str).fetch())
-ANY = Spec.of("std.core.Any")
+ANY = Spec.of("std.types.Any")
 
 
 class TestLeafCarrier(unittest.TestCase):
@@ -103,16 +103,16 @@ class TestCarrierSubstitution(unittest.TestCase):
         self.assertEqual(updated.fetch(), (1, 20))
 
     def test_subst_marks_replaces_it_and_wildcard(self):
-        carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (IT, WILDCARD))
+        carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (SELF, WILDCARD))
 
-        updated = carrier.subst_marks({IT: LeafCarrier(INT, 7), WILDCARD: "x"})
+        updated = carrier.subst_marks({SELF: LeafCarrier(INT, 7), WILDCARD: "x"})
 
         self.assertEqual(updated.fetch(), (7, "x"))
 
     def test_subst_it_replaces_it_mark(self):
-        carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, IT))
+        carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, SELF))
 
-        updated = carrier.subst_it(LeafCarrier(INT, 9))
+        updated = carrier.subst_self(LeafCarrier(INT, 9))
 
         self.assertEqual(updated.fetch(), (1, 9))
 

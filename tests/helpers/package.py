@@ -144,15 +144,11 @@ class TestPackage(items.Package):
     def logic_solver(self):
         return self.workspace.logic_solver
 
-    def check(self) -> None:
+    @property
+    def status(self):
         workspace = self.workspace
         with workspace:
-            for context in workspace.all_contexts:
-                context.check()
-            for contribution in workspace.all_contributions:
-                contribution.check()
-            for entity in workspace.all_entities:
-                entity.check()
+            return workspace.status
 
     def _with_units(
         self,

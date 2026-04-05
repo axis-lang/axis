@@ -1,12 +1,12 @@
 unit std
 
 use std(
-    core(...),
     types(...),
     qualifiers(...),
 )
 
-mod core
+
+mod types
     def Any
     def Empty
     def Boolean
@@ -32,7 +32,6 @@ mod core
 
 
 
-mod types
     def Type
 
     def Anchor(path)

@@ -74,13 +74,13 @@ class TestField(unittest.TestCase):
     """Field is a NamedTuple(offset, key, type)."""
 
     def test_creation(self):
-        f = Field(0, Id("x"), Spec.of("std.core.Any"))
+        f = Field(0, Id("x"), Spec.of("std.types.Any"))
         self.assertEqual(f.offset, 0)
         self.assertEqual(f.key, Id("x"))
-        self.assertEqual(f.value, Spec.of("std.core.Any"))
+        self.assertEqual(f.value, Spec.of("std.types.Any"))
 
     def test_no_key(self):
-        f = Field(1, None, Spec.of("std.core.Any"))
+        f = Field(1, None, Spec.of("std.types.Any"))
         self.assertIsNone(f.key)
 
 
@@ -88,18 +88,18 @@ class TestTypeDefaults(unittest.TestCase):
     """Type base class defaults: arity=0, item_at raises, item raises."""
 
     def test_default_arity(self):
-        self.assertEqual(Spec.of("std.core.Any").arity, 0)
+        self.assertEqual(Spec.of("std.types.Any").arity, 0)
 
     def test_item_at_raises(self):
         with self.assertRaises(IndexError):
-            Spec.of("std.core.Any").item_at(0)
+            Spec.of("std.types.Any").item_at(0)
 
     def test_item_raises(self):
         with self.assertRaises(KeyError):
-            Spec.of("std.core.Any").item(Id("x"))
+            Spec.of("std.types.Any").item(Id("x"))
 
     def test_items_empty(self):
-        self.assertEqual(list(Spec.of("std.core.Any").items()), [])
+        self.assertEqual(list(Spec.of("std.types.Any").items()), [])
 
 
 if __name__ == "__main__":

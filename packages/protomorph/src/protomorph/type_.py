@@ -93,9 +93,9 @@ class EllipsisMark(Mark):
         return "..."
 
 
-class ItMark(Mark):
+class SelfMark(Mark):
     def display_label(self) -> str | None:
-        return "it"
+        return "self"
 
 
 class PlaceholderMetatype(Placeholder):
@@ -126,7 +126,7 @@ def placeholder(id: str, context: Any = None) -> Placeholder:
 
 WILDCARD = WildcardMark()
 ELLIPSIS = EllipsisMark()
-IT = ItMark()
+SELF = SelfMark()
 
 
 def placeholder_name(value: Placeholder) -> str | None:
@@ -166,11 +166,11 @@ __all__ = [
     "Mark",
     "WildcardMark",
     "EllipsisMark",
-    "ItMark",
+    "SelfMark",
     "SimpleVar",
     "WILDCARD",
     "ELLIPSIS",
-    "IT",
+    "SELF",
     "placeholder",
     "placeholder_name",
     "placeholder_context",

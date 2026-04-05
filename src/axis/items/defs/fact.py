@@ -28,7 +28,7 @@ class FactDef(SymDef):
         for where in self.where or (None,):
             spec_bindings = build_spec_bindings(self.spec, where)
             contributions.add(
-                sem.Entity.FactFacet(
+                sem.EntityView.FactFacet(
                     anchor=self.anchor,
                     spec_bindings=spec_bindings,
                     origin=self.origin,

@@ -24,7 +24,7 @@ solver that can:
 - Inline and block binding forms now converge on one semantic binding model, and
   `QualDef` already emits semantic contributions.
 - `std-core` now follows the canonical module layout:
-  - `std.core.*`
+  - `std.types.*`
   - `std.types.*`
   - `std.qualifiers.*`
 - Axis tests now have dedicated semantic helper infrastructure under

@@ -7,6 +7,7 @@ from protobase import frozendict
 
 import protomorph
 from protomorph import Builtin, Host, Spec, placeholder, spec_name
+from protomorph.native import instantiate_builtin
 from protomorph.reasoning import (
     Answer,
     Deferred,
@@ -18,6 +19,8 @@ from protomorph.reasoning import (
     OpFailed,
     RuleSetDatabase,
     SolveContext,
+    AttrOperator,
+    TypeOfOperator,
     Unique,
 )
 
@@ -59,6 +62,25 @@ class SubstAnswerHost(Host):
 
 
 class TestReasoningOperators(unittest.TestCase):
+    def test_instantiate_builtin_reconstructs_logic_attr_operator(self):
+        args = protomorph.VaryingType.new(protomorph.wrap(ALICE), protomorph.wrap("name"))
+
+        builtin = instantiate_builtin("std.logic.Attr", args)
+
+        self.assertIsInstance(builtin, AttrOperator)
+        assert isinstance(builtin, AttrOperator)
+        self.assertEqual(builtin.of_value.fetch(), ALICE)
+        self.assertEqual(builtin.key, protomorph.Id("name"))
+
+    def test_instantiate_builtin_reconstructs_logic_typeof_operator(self):
+        args = protomorph.VaryingType.new(protomorph.wrap("hey"))
+
+        builtin = instantiate_builtin("std.logic.TypeOf", args)
+
+        self.assertIsInstance(builtin, TypeOfOperator)
+        assert isinstance(builtin, TypeOfOperator)
+        self.assertEqual(builtin.of_value.fetch(), "hey")
+
     def test_operator_expand_resolves_query(self):
         goal = Spec.of("test.inspect", KeyOfOperator.of(ALICE))
         engine = Engine(RuleSetDatabase(facts=(Spec.of("test.parent", ALICE, BOB),), host=ExpandHost()))
@@ -159,6 +181,32 @@ class TestReasoningOperators(unittest.TestCase):
         result = engine.session().query(goal).result.outcome
 
         self.assertIsInstance(result, Deferred)
+
+    def test_builtin_typeof_returns_runtime_type(self):
+        engine = Engine(RuleSetDatabase())
+        r = placeholder("R")
+        goal = Spec.of("std.logic.TypeOf", "hey", r)
+
+        result = engine.session().query(goal).result.outcome
+
+        self.assertIsInstance(result, Unique)
+        self.assertEqual(cast(Unique, result).subst[r], protomorph.wrap("hey").type.fetch())
+
+    def test_builtin_conforms_identity_accepts_typeof_value(self):
+        engine = Engine(RuleSetDatabase())
+        goal = Spec.of("std.facts.Conforms", TypeOfOperator.of("hey"), to=protomorph.wrap("hey").type.fetch())
+
+        result = engine.session().query(goal).result.outcome
+
+        self.assertIsInstance(result, Unique)
+
+    def test_builtin_conforms_identity_rejects_distinct_types(self):
+        engine = Engine(RuleSetDatabase())
+        goal = Spec.of("std.facts.Conforms", TypeOfOperator.of("hey"), to=protomorph.wrap(3).type.fetch())
+
+        result = engine.session().query(goal).result.outcome
+
+        self.assertIsInstance(result, NoSolution)
 
 
 if __name__ == "__main__":

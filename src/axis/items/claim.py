@@ -229,7 +229,10 @@ def _tuple_carrier(*values: object) -> pm.Carrier:
     if not values:
         return pm.Tuple.Empty
     carriers = tuple(pm.wrap(value) for value in values)
-    return pm.Tuple(pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)), carriers)
+    return pm.Tuple(
+        pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
+        tuple(carrier.fetch() for carrier in carriers),
+    )
 
 
 def _logic_vars(values: Iterable[pm.Spec], claim: Claim) -> frozenset[str]:

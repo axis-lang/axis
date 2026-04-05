@@ -90,10 +90,14 @@ class MatchPath(Builtin):
     steps: tuple[MatchPathStep, ...] = ()
 
 
-class MatchAmbiguity(Builtin):
+class MatchBucket(Builtin):
     case_ids: frozenset[int]
+    id: int = 0
     path: MatchPath | None = None
     kind: str = "leaf"
+
+
+MatchAmbiguity = MatchBucket
 
 
 class MatchShapeSummary(Builtin):
@@ -160,7 +164,11 @@ class MatchSwitchNominalDescriptors(MatchDispatch):
 class MatchTree(Generic[P], MatchNode):
     root: MatchDispatch
     cases: tuple[MatchCase[P], ...]
-    ambiguities: tuple[MatchAmbiguity, ...] = ()
+    ambiguities: tuple[MatchBucket, ...] = ()
+
+    @property
+    def buckets(self) -> tuple[MatchBucket, ...]:
+        return self.ambiguities
 
     def match_step(
         self,
@@ -743,7 +751,11 @@ def compile[P](cases: Mapping[MatchCaseSummary, frozenset[P] | P]) -> pm.Carrier
         for index, (summary, payloads) in enumerate(merged.items())
     )
     root, ambiguities = _compile_dispatch(compiled_cases)
-    return pm.wrap(MatchTree(root=root, cases=compiled_cases, ambiguities=ambiguities))
+    numbered_ambiguities = tuple(
+        MatchBucket(id=index, case_ids=bucket.case_ids, path=bucket.path, kind=bucket.kind)
+        for index, bucket in enumerate(ambiguities)
+    )
+    return pm.wrap(MatchTree(root=root, cases=compiled_cases, ambiguities=numbered_ambiguities))
 
 
 def match[P](

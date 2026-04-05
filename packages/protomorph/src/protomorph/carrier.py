@@ -23,7 +23,9 @@ class Carrier[T](Consed, abstract=True):
     def child(self, tp: pm.Type, dt: Any) -> Carrier:
         if isinstance(dt, Carrier):
             return dt
-        if isinstance(dt, pm.Placeholder):
+        if isinstance(dt, pm.Var | pm.Mark):
+            if isinstance(tp, pm.Spec) and pm.REALM.get().schema_for(tp) is not None:
+                return pm._make_carrier(tp, dt)
             return LeafCarrier(tp, dt)
         if isinstance(dt, pm.Type):
             return dt.metatype().make(dt)
@@ -142,9 +144,9 @@ class Carrier[T](Consed, abstract=True):
 
         return self.subst_where(_pred, _replace)
 
-    def subst_it(self, subject: Carrier | pm.Datum) -> Carrier:
+    def subst_self(self, subject: Carrier | pm.Datum) -> Carrier:
         replacement = subject if isinstance(subject, Carrier) else pm.wrap(subject)
-        return self.subst_marks({pm.IT: replacement})
+        return self.subst_marks({pm.SELF: replacement})
 
     def search(self, target: Carrier) -> bool:
         stack: list[Carrier] = [self]
@@ -182,15 +184,15 @@ class NativeObjectCarrier[T](Carrier[T]):
         return self.child(field.value, getattr(self.content, field.key))
 
     def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
-        values = []
+        values: dict[str, Any] = {}
         for item, child in zip(self.descriptor.items(), children):
             assert item.key is not None
             original = getattr(self.content, item.key)
             if isinstance(original, Carrier):
-                values.append(child)
+                values[str(item.key)] = child
             else:
-                values.append(child.fetch())
-        return cast(Self, type(self)(self.descriptor, type(self.content)(*values)))
+                values[str(item.key)] = child.fetch()
+        return cast(Self, type(self)(self.descriptor, type(self.content)(**values)))
 
 
 class LeafCarrier[T](Carrier[T]):

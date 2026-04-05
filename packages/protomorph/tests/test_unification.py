@@ -11,7 +11,7 @@ from protomorph import (
     UnionFind, unify, wrap,
 )
 
-ANY = Spec.of("std.core.Any")
+ANY = Spec.of("std.types.Any")
 INT = cast(Spec, wrap(int).fetch())
 STR = cast(Spec, wrap(str).fetch())
 FLOAT = cast(Spec, wrap(float).fetch())

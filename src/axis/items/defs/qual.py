@@ -30,7 +30,7 @@ class QualDef(SymDef):
                 spec_bindings = build_spec_bindings(self.spec, where)
                 for takes in self.takes or (None,):
                     contributions.add(
-                        sem.Entity.QualifierContribution(
+                        sem.EntityView.QualifierContribution(
                             anchor=self.anchor,
                             spec_bindings=spec_bindings,
                             param_bindings=build_param_bindings(None, takes),

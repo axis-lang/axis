@@ -174,7 +174,7 @@ Alineación:
   keys[1]="y", meta[1]=MetaStr,  data[1]="hello"  ✓ align(MetaStr, "hello")
 ```
 
-Valor nominal: `NominalType("std.core.Integer")` (como clasificador de `42`)
+Valor nominal: `NominalType("std.types.Integer")` (como clasificador de `42`)
 
 ```
 Pure[MetaNominal, Spec[...]]
@@ -183,7 +183,7 @@ Pure[MetaNominal, Spec[...]]
     __data__: None
   __data__: Spec
     __meta__: MetaSpec (con MetaStruct vacío para args)
-    __data__: ("std.core.Integer", ())
+    __data__: ("std.types.Integer", ())
 ```
 
 ---
@@ -398,7 +398,7 @@ se representa como dos specs dentro de un qualifier chain:
 ```text
 MetaQual(
   Spec(std.qualifiers.Array, 4, 4),
-  Spec(std.core.Natural)
+  Spec(std.types.Natural)
 )
 ```
 
@@ -1044,7 +1044,7 @@ std.metas.Index
 std.metas.List
 std.metas.Anchor
 std.metas.Qualifier
-std.core.Natural
+std.types.Natural
 std.qualifiers.Array
 ```
 
@@ -1152,7 +1152,7 @@ se modela como:
 ```text
 Qual(
   ( std.qualifiers.Array[(4,4)] ; ),
-  std.core.Natural
+  std.types.Natural
 )
 ```
 

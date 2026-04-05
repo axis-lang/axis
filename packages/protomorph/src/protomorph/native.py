@@ -252,6 +252,50 @@ def register_python_transform(origin: type, transform: PythonTransform) -> None:
         pass
 
 
+def instantiate_builtin(
+    anchor: protomorph.Anchor | str,
+    args: protomorph.Tuple | None = None,
+) -> protomorph.Builtin | None:
+    if isinstance(anchor, str):
+        anchor = protomorph.Anchor(anchor)
+
+    builtin_cls = protomorph.NATIVE_REALM.builtin_by_spec_name.get(str(anchor))
+    if builtin_cls is None:
+        return None
+
+    tuple_args = args or protomorph.Tuple.Empty
+    arg_values: list[object] = []
+    arg_nominal: dict[str, object] = {}
+    for i in range(len(tuple_args)):
+        item = tuple_args.descriptor.item_at(i)
+        value = tuple_args[i].fetch()
+        if item.key is None:
+            arg_values.append(value)
+        else:
+            arg_nominal[str(item.key)] = value
+
+    attrs = list(attr_info_of(builtin_cls).keys())
+
+    kwargs: dict[str, object] = {}
+    remaining = iter(arg_values)
+    for name in attrs:
+        info = attr_info_of(builtin_cls)[name]
+        wants_carrier = info.type is protomorph.Carrier or repr(info.type).startswith("protomorph.carrier.Carrier")
+        if name in arg_nominal:
+            kwargs[name] = tuple_args.attr(protomorph.Id(name)) if wants_carrier else arg_nominal[name]
+            continue
+        try:
+            value = next(remaining)
+            kwargs[name] = tuple_args[len(kwargs)] if wants_carrier else value
+        except StopIteration:
+            break
+
+    try:
+        return builtin_cls(**kwargs)
+    except TypeError:
+        return None
+
+
 def _project_type(
     annotation: Any,
     *,
@@ -264,10 +308,13 @@ def _project_type(
         return protomorph.Spec.of("std.metas.Type")
 
     if annotation is protomorph.Carrier:
-        return protomorph.Spec.of("std.core.Any")
+        return protomorph.Spec.of("std.types.Any")
 
     if annotation is Any:
-        return protomorph.Spec.of("std.core.Any")
+        return protomorph.Spec.of("std.types.Any")
+
+    if annotation is protomorph.Datum or repr(annotation) == "Datum":
+        return protomorph.Spec.of("std.types.Any")
 
     if annotation is protomorph.Tuple:
         return protomorph.Spec.of("std.types.Tuple")

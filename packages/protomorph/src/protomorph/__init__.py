@@ -13,6 +13,8 @@ from .foundation import (
     Datum,
 )
 
+from .constraint import Constraint
+
 # ── Layer 1: Type ────────────────────────────────────────────────
 from .abstract.contract import Item
 
@@ -25,11 +27,11 @@ from .type_ import (
     Mark,
     WildcardMark,
     EllipsisMark,
-    ItMark,
+    SelfMark,
     SimpleVar,
     WILDCARD,
     ELLIPSIS,
-    IT,
+    SELF,
     placeholder,
     placeholder_name,
     placeholder_context,
@@ -95,6 +97,7 @@ from .matching import (
     MatchResult,
     MatchPathStep,
     MatchPath,
+    MatchBucket,
     MatchAmbiguity,
     MatchShapeSummary,
     MatchCaseSummary,

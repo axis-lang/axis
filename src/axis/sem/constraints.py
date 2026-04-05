@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import cast
 
-from protobase import Inmutable
-
 import protomorph as pm
+from protomorph import reasoning as urs
 
 from axis import expr, log, sem, syn
 
 
+Constraint = pm.Constraint
 type ConstraintResult = pm.Result[log.Report, Constraint]
 type GoalResult = pm.Result[log.Report, pm.Spec]
 type ConstraintTupleResult = pm.Result[log.Report]
@@ -17,33 +17,19 @@ type GoalTupleResult = pm.Result[log.Report]
 type ScopeLookupResult = sem.ScopeLookupResult
 
 
-class Constraint(Inmutable):
-    subject: pm.Datum
-    term: pm.Datum
-    target: pm.Datum
-
-    @property
-    def goal(self) -> pm.Spec:
-        return self.goal_for(self.subject)
-
-    @property
-    def template_goal(self) -> pm.Spec:
-        return cast(pm.Spec, _goal_carrier(self.target).fetch())
-
-    def goal_for(self, subject: pm.Datum | pm.Carrier) -> pm.Spec:
-        return cast(pm.Spec, _goal_carrier(self.target).subst_it(subject).fetch())
-
-    @property
-    def target_type(self) -> pm.Type | None:
-        return sem.bound_as_type(self.term)
-
-
-def constraint_from_term(subject: pm.Datum, term: pm.Datum) -> Constraint:
-    return Constraint(subject=subject, term=term, target=_constraint_target_term(term))
+def constraint_from_term(subject: pm.Carrier | pm.Datum, term: pm.Carrier | pm.Datum) -> Constraint:
+    subject_carrier = _carrier_of(subject)
+    term_carrier = _carrier_of(term)
+    target = _constraint_target_term(term_carrier)
+    return Constraint(
+        subject=_constraint_subject_term(subject_carrier, target),
+        term=term_carrier,
+        target=target,
+    )
 
 
 def constraint_for(
-    subject: pm.Datum,
+    subject: pm.Carrier | pm.Datum,
     bound_expr: syn.Expr | None,
     scope: syn.ScopeLike,
 ) -> ConstraintResult | None:
@@ -57,12 +43,12 @@ def constraint_for(
         return cast(ConstraintResult, term_result)
     return cast(
         ConstraintResult,
-        pm.Result.ok(pm.wrap(constraint_from_term(subject, term_result.unwrap().fetch()))),
+        pm.Result.ok(pm.wrap(constraint_from_term(subject, term_result.unwrap()))),
     )
 
 
 def constraint_goal_for(
-    subject: pm.Datum,
+    subject: pm.Carrier | pm.Datum,
     bound_expr: syn.Expr | None,
     scope: syn.ScopeLike,
 ) -> GoalResult | None:
@@ -99,7 +85,7 @@ def binding_constraints(
         if subject_result.is_err:
             return cast(ConstraintTupleResult, subject_result)
 
-        constraint_result = constraint_for(subject_result.unwrap().fetch(), binding.bound_expr, scope)
+        constraint_result = constraint_for(subject_result.unwrap(), binding.bound_expr, scope)
         if constraint_result is None:
             continue
         if constraint_result.is_err:
@@ -133,13 +119,22 @@ def _tuple_result(*values: object) -> pm.Carrier:
     if not values:
         return pm.Tuple.Empty
     carriers = tuple(pm.wrap(value) for value in values)
-    return pm.Tuple(pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)), carriers)
+    return pm.Tuple(
+        pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
+        tuple(carrier.fetch() for carrier in carriers),
+    )
 
 
-def _goal_carrier(target: pm.Datum) -> pm.Carrier:
-    return pm.wrap(pm.Spec.of(expr.CONFORMS_FACT, pm.IT, to=target))
+def _carrier_of(value: pm.Carrier | pm.Datum) -> pm.Carrier:
+    return value if isinstance(value, pm.Carrier) else pm.wrap(value)
 
 
-def _constraint_target_term(term: pm.Datum) -> pm.Datum:
+def _constraint_target_term(term: pm.Carrier) -> pm.Carrier:
     type_ = sem.bound_as_type(term)
-    return term if type_ is None else type_
+    return term if type_ is None else pm.wrap(type_)
+
+
+def _constraint_subject_term(subject: pm.Carrier, target: pm.Carrier) -> pm.Carrier:
+    if isinstance(target.fetch(), pm.Type):
+        return pm.wrap(urs.TypeOfOperator.of(subject))
+    return subject

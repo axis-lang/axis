@@ -31,7 +31,7 @@ from protomorph import (
 )
 
 
-ANY = Spec.of("std.core.Any")
+ANY = Spec.of("std.types.Any")
 INT = cast(Spec, wrap(int).fetch())
 STR = cast(Spec, wrap(str).fetch())
 

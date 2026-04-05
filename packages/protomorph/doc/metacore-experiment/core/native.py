@@ -301,7 +301,7 @@ def _tuple_transform(*args: Meta | object) -> Meta:
         return Qual.of(cast(Meta, args[0]), Spec.of("std.qualifiers.List"))
     if any(arg is Ellipsis for arg in args):
         raise NativeProjectionError("Only tuple[T, ...] homogeneous tuples are supported")
-    return Spec.of("std.core.Tuple", *cast(tuple[Meta, ...], args))
+    return Spec.of("std.types.Tuple", *cast(tuple[Meta, ...], args))
 
 
 def _field_index(*names: str):

@@ -8,7 +8,7 @@ import protomorph as pm
 from axis import log, syn
 
 
-type ScopeValue = pm.Anchor | pm.Var
+type ScopeValue = pm.Datum
 type ScopeLookupResult = pm.Result[log.Report, Any]
 
 

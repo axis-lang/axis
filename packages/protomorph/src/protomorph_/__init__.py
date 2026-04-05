@@ -272,12 +272,12 @@ def _bootstrap() -> None:
     DEFAULT_BRIDGE = NATIVE_BACKEND
     BRIDGE = ContextVar("protomorph.BRIDGE", default=DEFAULT_BRIDGE)
 
-    empty_type = nominal_type("std.core.Empty")
-    boolean_type = nominal_type("std.core.Boolean")
-    integer_type = nominal_type("std.core.Integer")
-    decimal_type = nominal_type("std.core.Decimal")
-    text_type = nominal_type("std.core.Text")
-    any_type = nominal_type("std.core.Any")
+    empty_type = nominal_type("std.types.Empty")
+    boolean_type = nominal_type("std.types.Boolean")
+    integer_type = nominal_type("std.types.Integer")
+    decimal_type = nominal_type("std.types.Decimal")
+    text_type = nominal_type("std.types.Text")
+    any_type = nominal_type("std.types.Any")
 
     EMPTY_TYPE = empty_type
     INTEGER_TYPE = integer_type
@@ -311,13 +311,13 @@ def _bootstrap() -> None:
     register_python_type(tuple, native._tuple_transform)
     register_python_type(cast(type, PEP604Union), union_transform)
 
-    register_atomic_layout("std.core.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
-    register_atomic_layout("std.core.Boolean", AtomicLayout(valid_types=frozenset({bool})))
-    register_atomic_layout("std.core.Natural", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.core.Whole", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.core.Integer", AtomicLayout(valid_types=frozenset({int})))
-    register_atomic_layout("std.core.Decimal", AtomicLayout(valid_types=frozenset({int, float, Decimal})))
-    register_atomic_layout("std.core.Text", AtomicLayout(valid_types=frozenset({str})))
+    register_atomic_layout("std.types.Empty", AtomicLayout(valid_types=frozenset({NoneType})))
+    register_atomic_layout("std.types.Boolean", AtomicLayout(valid_types=frozenset({bool})))
+    register_atomic_layout("std.types.Natural", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.types.Whole", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.types.Integer", AtomicLayout(valid_types=frozenset({int})))
+    register_atomic_layout("std.types.Decimal", AtomicLayout(valid_types=frozenset({int, float, Decimal})))
+    register_atomic_layout("std.types.Text", AtomicLayout(valid_types=frozenset({str})))
 
     native._BOOTSTRAPPED = True
 

@@ -108,7 +108,7 @@ class StratumClosed(WakeCondition):
 
 
 class OperatorRetriable(WakeCondition):
-    operator: protomorph.Placeholder
+    operator: protomorph.Builtin
 
 
 class StratumPending(Blocker):
@@ -122,7 +122,7 @@ class NonGroundNegation(Blocker):
 
 class OperatorPending(Blocker):
     blocked_on: protomorph.Spec
-    operator: protomorph.Placeholder
+    operator: protomorph.Builtin
 
 
 class ProjectionBlocked(Blocker):

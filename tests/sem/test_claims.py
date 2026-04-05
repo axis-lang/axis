@@ -19,7 +19,7 @@ class ClaimContributionCheckTest(StdPackageTestCase):
         )
 
         with self.suppress_report_output():
-            pkg.check()
+            pkg.status.throw()
 
     def test_claim_head_rejected_when_required_nominal_missing(self):
         pkg = TestPackage.with_std().with_unit(
@@ -36,7 +36,7 @@ class ClaimContributionCheckTest(StdPackageTestCase):
         )
 
         with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
-            pkg.check()
+            pkg.status.throw()
 
         self.assertIn(
             "Claim head is not admitted by any declared fact spec",
@@ -61,7 +61,7 @@ class ClaimContributionCheckTest(StdPackageTestCase):
         )
 
         with self.suppress_report_output():
-            pkg.check()
+            pkg.status.throw()
 
     def test_rule_claim_body_goal_rejected_when_required_nominal_missing(self):
         pkg = TestPackage.with_std().with_unit(
@@ -81,7 +81,7 @@ class ClaimContributionCheckTest(StdPackageTestCase):
         )
 
         with self.suppress_report_output(), self.assertRaises(log.Report.Exception) as raised:
-            pkg.check()
+            pkg.status.throw()
 
         self.assertIn(
             "Claim body goal is not admitted by any declared fact spec",

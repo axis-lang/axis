@@ -180,8 +180,9 @@ class _QueryCore:
                     entry.answers[answer.subst] = answer
                     changed = True
 
-            operator_outcome = self._operator_outcome(goal)
-            changed |= self._merge_outcome(entry, operator_outcome)
+            if _builtin_relation_answer(goal.key) is None:
+                operator_outcome = self._operator_outcome(goal)
+                changed |= self._merge_outcome(entry, operator_outcome)
             if entry.cycle_issue is not None:
                 break
 
@@ -227,8 +228,11 @@ class _QueryCore:
         return CycleTrace(members, "inductive", "inductive cycle", via_negation)
 
     def _fact_answers(self, goal: CanonicalGoal) -> tuple[_AnswerData, ...]:
-        goal_runtime = self._instantiate_goal(goal)
         answers: list[_AnswerData] = []
+        builtin_answer = _builtin_relation_answer(goal.key)
+        if builtin_answer is not None:
+            answers.append(builtin_answer)
+        goal_runtime = self._instantiate_goal(goal)
         for fact in self._facts_for_anchor(goal.key.anchor):
             uf = make_union_find()
             if unify(goal_runtime, wrap_logic(fact), subst=uf) is None:
@@ -520,17 +524,18 @@ class _QueryCore:
         if not seed_query_bindings(uf, goal.slots, query_placeholders, self.session.state.bindings):
             raise ValueError("Conflicting session bindings for operator answer")
 
-        query_slot_indices = goal_query_slot_indices(goal)
-        slot_by_placeholder = {
-            query_placeholders[query_slot_indices[index]]: goal.slots[index]
-            for index in range(len(goal.slots))
-        }
-        for placeholder, value in public_answer.subst.items():
-            slot = slot_by_placeholder.get(placeholder)
-            if slot is None:
-                continue
-            if unify(slot, _coerce_bound_value_for_carrier(slot, value), subst=uf) is None:
-                raise ValueError(f"Conflicting operator answer for placeholder {placeholder!r}")
+        if public_answer.subst:
+            query_slot_indices = goal_query_slot_indices(goal)
+            slot_by_placeholder = {
+                query_placeholders[query_slot_indices[index]]: goal.slots[index]
+                for index in range(len(goal.slots))
+            }
+            for placeholder, value in public_answer.subst.items():
+                slot = slot_by_placeholder.get(placeholder)
+                if slot is None:
+                    continue
+                if unify(slot, _coerce_bound_value_for_carrier(slot, value), subst=uf) is None:
+                    raise ValueError(f"Conflicting operator answer for placeholder {placeholder!r}")
 
         judgment = public_answer.judgment or Judgment(goal.key, public_answer.evidence)
         return _AnswerData(extract_visible_subst(goal, uf), public_answer.evidence, judgment)
@@ -1089,6 +1094,66 @@ def _evidence_expand(goal: protomorph.Spec, subjudgments: tuple[urs.Judgment, ..
 
 def _evidence_builtin(goal: protomorph.Spec) -> protomorph.Spec:
     return protomorph.Spec.of("std.logic.ByBuiltin", goal)
+
+
+def _builtin_relation_answer(goal: protomorph.Spec) -> _AnswerData | None:
+    if goal.anchor != protomorph.Anchor("std.facts.Conforms"):
+        return None
+    args = goal.args
+    if args is None or len(args) == 0:
+        return None
+    try:
+        subject = _resolve_builtin_term(args[0].fetch())
+        target = _resolve_builtin_term(args.attr(protomorph.Id("to")).fetch())
+    except (IndexError, KeyError):
+        return None
+    if subject == target:
+        evidence = _evidence_builtin(goal)
+        return _AnswerData((), evidence, Judgment(goal, evidence))
+    return None
+
+
+def _resolve_builtin_term(value: object) -> object | None:
+    if isinstance(value, protomorph.Carrier):
+        return _resolve_builtin_term(value.fetch())
+    if isinstance(value, urs.AttrOperator):
+        target = _resolve_builtin_term(value.of_value)
+        if target is None:
+            return None
+        if isinstance(target, protomorph.Spec):
+            args = target.args
+            if args is None:
+                return None
+            if isinstance(value.key, protomorph.Id):
+                try:
+                    return args.attr(value.key).fetch()
+                except KeyError:
+                    return None
+            if isinstance(value.key, int):
+                try:
+                    return args[value.key].fetch()
+                except IndexError:
+                    return None
+            return None
+        if isinstance(target, protomorph.Tuple):
+            if isinstance(value.key, protomorph.Id):
+                try:
+                    return target.attr(value.key).fetch()
+                except KeyError:
+                    return None
+            if isinstance(value.key, int):
+                try:
+                    return target[value.key].fetch()
+                except IndexError:
+                    return None
+            return None
+        return None
+    if isinstance(value, urs.TypeOfOperator):
+        target = _resolve_builtin_term(value.of_value)
+        if target is None:
+            return None
+        return protomorph.wrap(target).type.fetch()
+    return value
 
 
 def _evidence_coinduction(goal: protomorph.Spec) -> protomorph.Spec:

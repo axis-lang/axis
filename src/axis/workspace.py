@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 
-from protobase import flux
+import protomorph as pm
+
+from protobase import flux, frozendict
 
 from axis import items, log, sem
 
@@ -50,6 +52,22 @@ class Workspace(sem.Realm):
     def all_reports(self) -> frozenset[log.Report]:
         return frozenset()
 
+    @flux.property
+    def root_entities(self) -> tuple[sem.Entity, ...]:
+        grouped: dict[object, list[sem.Context.EntityContribution]] = {}
+        for package in self.root_packages:
+            for context in package.all_contexts:
+                for contribution in context.contributions:
+                    if isinstance(contribution, sem.Context.EntityContribution):
+                        grouped.setdefault(contribution.anchor, []).append(contribution)
+        return tuple(
+            sem.Entity(anchor=cast(pm.Anchor, anchor), contributions=frozenset(contributions))
+            for anchor, contributions in grouped.items()
+        )
+
+    @flux.property
+    def status(self) -> sem.Status:
+        return sem.Status(children=tuple(entity.status for entity in self.root_entities))
+
     def schema_for(self, spec: Any) -> Any | None:
-        _ = spec
-        return None
+        return super().schema_for(spec)

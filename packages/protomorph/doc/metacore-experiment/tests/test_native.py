@@ -146,7 +146,7 @@ class TestMetaFromNativeContainers(unittest.TestCase):
     def test_tuple_heterogeneous_becomes_tuple_spec(self):
         m = meta_from_native(tuple[int, str])
         self.assertIsInstance(m, Spec)
-        self.assertEqual(m.path, "std.core.Tuple")
+        self.assertEqual(m.path, "std.types.Tuple")
         self.assertIs(m.args[0], Integer)
         self.assertIs(m.args[1], Text)
 

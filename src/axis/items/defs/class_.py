@@ -38,7 +38,7 @@ class ClassDef(SymDef):
         for where, takes in product(self.where or (None,), self.takes or (None,)):
             spec_bindings = expr.build_binding_struct(self.spec, where)
             contributions.add(
-                sem.Entity.ClassFacet(
+                sem.EntityView.ClassFacet(
                     anchor=self.anchor,
                     spec_bindings=spec_bindings,
                     param_bindings=expr.build_binding_struct(self.args, takes),

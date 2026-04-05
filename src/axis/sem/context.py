@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from types import NotImplementedType
+from collections.abc import Callable
 from typing import cast
 from protobase import Inmutable, flux, _
 from protobase.cached_property import slot_cached_property
 import protomorph as pm
 from protomorph import reasoning as urs
 
-from axis import syn, sem
+from axis import log, syn, sem
 
 from .scope import Scope
 
@@ -18,7 +19,7 @@ class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
         ctx: Context
         id: str
 
-    class Contribution(Inmutable, abstract=True):
+    class Contribution(pm.Builtin, abstract=True):
         anchor: pm.Anchor = _
         origin: syn.Node = _
         ctx: Context = _
@@ -34,9 +35,9 @@ class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
         def _check(self) -> None:
             pass
 
-        @flux.method
-        def check(self):
-            self._check()
+        @flux.property
+        def status(self) -> sem.Status:
+            return _status_from_check(self._check)
 
     class EntityContribution(Contribution):
         pass
@@ -114,10 +115,10 @@ class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
     def _check(self) -> None:
         pass
 
-    @flux.method
-    def check(self):
+    @flux.property
+    def status(self) -> sem.Status:
         self.scope
-        self._check()
+        return _status_from_check(self._check)
 
 
 def _check_goal_admission(
@@ -141,3 +142,11 @@ def _check_goal_admission(
     args = goal.args
     if args is None or pattern.match(args) is None:
         log.error(mismatch_message).label(origin).throw()
+
+
+def _status_from_check(check: Callable[[], None]) -> sem.Status:
+    try:
+        check()
+    except log.Report.Exception as raised:
+        return sem.Status(reports=(raised.report,))
+    return sem.Status()

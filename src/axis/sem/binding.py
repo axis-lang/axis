@@ -274,6 +274,8 @@ def _allowed_keys(bindings: LoweredBindingStruct) -> frozenset[pm.Id] | None:
 def _descriptor_for(field: LoweredBindingStruct.Field) -> pm.Type | None:
     from axis import sem
 
+    if field.binder is not None:
+        return None
     return sem.bound_as_type(_bound_carrier(field.match_expr, origin=field.origin))
 
 

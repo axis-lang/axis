@@ -19,7 +19,7 @@ class AtomDef(SymDef):
     @flux.property
     def contributions(self) -> frozenset[sem.Context.Contribution]:
         return frozenset({
-            sem.Entity.SpecContribution(
+            sem.EntityView.SpecContribution(
                 anchor=self.anchor,
                 spec_bindings=sem.BindingStruct(),
                 origin=self.origin,
