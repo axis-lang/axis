@@ -1,7 +1,13 @@
 import unittest
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, Literal, TypeAliasType, TypeVar, cast
 
+from protobase import frozendict
 from protobase.inmutable import check_inmutable, inmutable, is_inmutable, register_inmutable
+
+
+GoalAlias = TypeAliasType("GoalAlias", tuple[int, str])
+TableKeyAlias = TypeAliasType("TableKeyAlias", GoalAlias)
+TableIndexAlias = TypeAliasType("TableIndexAlias", frozendict[str, tuple[TableKeyAlias, ...]])
 
 
 class InmutableTest(unittest.TestCase):
@@ -36,6 +42,11 @@ class InmutableTest(unittest.TestCase):
     def test_check_inmutable_alias(self) -> None:
         Alias = tuple[int, str]
         check_inmutable(Alias)
+
+    def test_check_inmutable_chained_type_alias(self) -> None:
+        check_inmutable(TableKeyAlias)
+        check_inmutable(tuple[TableKeyAlias, ...])
+        check_inmutable(TableIndexAlias)
 
     def test_check_inmutable_special_cases(self) -> None:
         check_inmutable("ForwardRef")

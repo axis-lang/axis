@@ -7,7 +7,7 @@ from protobase import flux
 from .abstract.contract import Item
 
 import protomorph
-from .foundation import Builtin, Id
+from .foundation import Builtin, Id, Datum
 
 Field = Item
 
@@ -112,12 +112,12 @@ class PlaceholderMetatype(Placeholder):
         return f"{base}^{self.level}"
 
 
-class SimpleVar(Var):
-    ctx: Builtin | None
-    id: str
+class SimpleVar[C: Builtin, I: Datum = str](Var):
+    ctx: C
+    id: I
 
     def display_label(self) -> str | None:
-        return self.id
+        return str(self.id)
 
 
 def placeholder(id: str, context: Any = None) -> Placeholder:

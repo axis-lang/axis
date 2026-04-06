@@ -11,6 +11,10 @@ from .foundation import Anchor, Builtin
 
 
 class Realm(Builtin, abstract=True):
+    def eval(self, carrier: Any, *, to: Any) -> Any:
+        _ = (carrier, to)
+        raise NotImplementedError(f"{type(self).__name__}.eval() is not implemented")
+
     def schema_for(self, spec: Any) -> Any | None:
         _ = spec
         return None
@@ -60,6 +64,10 @@ class Realm(Builtin, abstract=True):
     def is_coinductive_anchor(self, anchor: Anchor) -> bool:
         _ = anchor
         return False
+
+    @flux.property
+    def logic_assertions(self):
+        return frozenset()
 
     @flux.property
     def reasoning(self):
@@ -128,6 +136,13 @@ class OverlayRealm(Realm):
     def is_coinductive_anchor(self, anchor: Anchor) -> bool:
         return anchor in self.coinductive_anchors or self.base.is_coinductive_anchor(anchor)
 
+    @flux.property
+    def logic_assertions(self):
+        return self.base.logic_assertions | frozenset(
+            _logic_assertion(item)
+            for item in (*self.facts, *self.rules)
+        )
+
     def schema_for(self, spec: Any) -> Any | None:
         return self.base.schema_for(spec)
 
@@ -183,6 +198,20 @@ class OverlayRealm(Realm):
             impls=impls,
             coinductive_anchors=frozenset(),
         )
+
+
+def _logic_assertion(item: Builtin):
+    import protomorph as pm
+    from protomorph import logic
+
+    if isinstance(item, logic.Assertion):
+        return item
+    if isinstance(item, pm.Carrier):
+        return logic.Assertion(item)
+    value = cast(Any, item)
+    if hasattr(value, "head") and hasattr(value, "body"):
+        raise TypeError("Realm.logic_assertions no longer adapts legacy Rule-like objects; provide pm.logic.Assertion values explicitly")
+    return logic.Assertion(item if isinstance(item, pm.Carrier) else pm.wrap(item))
 
 
 def current_realm() -> Realm:

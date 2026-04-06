@@ -107,7 +107,7 @@ def check_inmutable(tp: object, _seen_aliases: set[TypeAliasType] | None = None)
     if _seen_aliases is None:
         _seen_aliases = set()
 
-    if isinstance(tp, TypeAliasType):
+    while isinstance(tp, TypeAliasType):
         if tp in _seen_aliases:
             return
         _seen_aliases.add(tp)

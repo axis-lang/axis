@@ -5,6 +5,7 @@ from types import NoneType, UnionType as PEP604Union
 from typing import (
     Any,
     Callable,
+    TypeAliasType,
     TypeVar,
     TypeVarTuple,
     Union,
@@ -54,6 +55,18 @@ def _native_ctx(template: Any | None) -> str | None:
     return str(template)
 
 
+def _resolve_type_alias(annotation: Any) -> Any:
+    seen: set[int] = set()
+    current = annotation
+    while isinstance(current, TypeAliasType):
+        marker = id(current)
+        if marker in seen:
+            break
+        seen.add(marker)
+        current = current.__value__
+    return current
+
+
 class NativeRealm(Realm, Consed):
     @flux.property
     def all_builtins(self) -> frozenset[type[protomorph.Builtin]]:
@@ -67,7 +80,7 @@ class NativeRealm(Realm, Consed):
     def python_transforms(self) -> frozendict[type, PythonTransform]:
         return frozendict(_PYTHON_TRANSFORMS)
 
-    @flux.method
+    @flux.method  # pyright: ignore[reportIncompatibleMethodOverride]
     def schema_template_for(self, builtin_cls: type[protomorph.Builtin]) -> protomorph.TupleLikeType:
         attrs = attr_info_of(builtin_cls)
         if not attrs:
@@ -85,7 +98,7 @@ class NativeRealm(Realm, Consed):
         return frozendict({spec_name(cls): cls for cls in self.all_builtins})
 
     @flux.method
-    def schema_for(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:
+    def schema_for(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._schema_for_cached(spec)
 
     @flux.method
@@ -301,6 +314,8 @@ def _project_type(
     *,
     template: Any | None = None,
 ) -> protomorph.Type:
+    annotation = _resolve_type_alias(annotation)
+
     if isinstance(annotation, protomorph.Type):
         return annotation
 
@@ -309,6 +324,15 @@ def _project_type(
 
     if annotation is protomorph.Carrier:
         return protomorph.Spec.of("std.types.Any")
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is protomorph.Carrier:
+        return protomorph.Spec.of("std.types.Any")
+
+    if origin is protomorph.Type:
+        return protomorph.Spec.of("std.metas.Type")
 
     if annotation is Any:
         return protomorph.Spec.of("std.types.Any")
@@ -331,9 +355,6 @@ def _project_type(
     scalar_spec = _NATIVE_SPECS.get(annotation)
     if scalar_spec is not None:
         return scalar_spec
-
-    origin = get_origin(annotation)
-    args = get_args(annotation)
 
     if origin is Union or isinstance(annotation, PEP604Union):
         return protomorph.UnionType.of(

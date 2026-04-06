@@ -65,6 +65,12 @@ def repr_any(obj: Any) -> str:
     if isinstance(obj, Spread):
         return f"..({', '.join(_format(v) for v in obj.values)})"
 
+    # ── Builtin (must check before Consed fallback to avoid wrong class name) ──
+    from .foundation import Builtin
+
+    if isinstance(obj, Builtin):
+        return _repr_builtin(obj)
+
     # ── Fallback: Consed default ──
     from protobase import Consed
 
