@@ -4,5 +4,3 @@ from .realm import Realm, current_realm
 
 Host = Realm
 current_host = current_realm
-
-__all__ = ["Host", "current_host"]

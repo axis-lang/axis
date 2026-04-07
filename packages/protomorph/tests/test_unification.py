@@ -5,7 +5,7 @@ from typing import cast
 
 from protomorph import (
     Builtin,
-    Placeholder, placeholder,
+    Placeholder, var,
     LeafCarrier, NativeObjectCarrier, Tuple,
     VaryingType, Spec,
     UnionFind, unify, wrap,
@@ -35,7 +35,7 @@ class TestUnify(unittest.TestCase):
         self.assertIsNone(unify(a, b, is_var=is_var))
 
     def test_var_captures_value(self):
-        T = placeholder("T")
+        T = var("T")
         a = LeafCarrier(ANY, T)
         b = LeafCarrier(ANY, INT)
         result = unify(a, b, is_var=is_var)
@@ -44,7 +44,7 @@ class TestUnify(unittest.TestCase):
 
     def test_tuple_unification(self):
         vt = cast(VaryingType, VaryingType.of(ANY, ANY))
-        T = placeholder("T")
+        T = var("T")
         a = Tuple(vt, (T, STR))
         b = Tuple(vt, (INT, STR))
         result = unify(a, b, is_var=is_var)
@@ -66,7 +66,7 @@ class TestUnify(unittest.TestCase):
 class TestOccursCheck(unittest.TestCase):
     def test_self_referential_fails(self):
         """$T = Tuple($T, int) should fail — prevents infinite types."""
-        T = placeholder("T")
+        T = var("T")
         vt = cast(VaryingType, VaryingType.of(ANY, ANY))
         a = LeafCarrier(ANY, T)
         b = Tuple(vt, (T, INT))
@@ -74,7 +74,7 @@ class TestOccursCheck(unittest.TestCase):
 
     def test_self_referential_allowed_without_check(self):
         """With occurs_check=False, self-referential binding succeeds."""
-        T = placeholder("T")
+        T = var("T")
         vt = cast(VaryingType, VaryingType.of(ANY, ANY))
         a = LeafCarrier(ANY, T)
         b = Tuple(vt, (T, INT))
@@ -85,8 +85,8 @@ class TestOccursCheck(unittest.TestCase):
 class TestTransitiveResolution(unittest.TestCase):
     def test_var_chain(self):
         """$T = $U, $U = int  →  $T resolves to int."""
-        T = placeholder("T")
-        U = placeholder("U")
+        T = var("T")
+        U = var("U")
         uf = UnionFind(is_var)
 
         a1 = LeafCarrier(ANY, T)
@@ -103,7 +103,7 @@ class TestTransitiveResolution(unittest.TestCase):
 
     def test_conflicting_binding_fails(self):
         """$T = int then $T = str should fail."""
-        T = placeholder("T")
+        T = var("T")
         uf = UnionFind(is_var)
 
         r1 = unify(LeafCarrier(ANY, T), LeafCarrier(ANY, INT), subst=uf)
@@ -114,7 +114,7 @@ class TestTransitiveResolution(unittest.TestCase):
 
     def test_consistent_rebinding_succeeds(self):
         """$T = int then $T = int again should succeed."""
-        T = placeholder("T")
+        T = var("T")
         uf = UnionFind(is_var)
 
         r1 = unify(LeafCarrier(ANY, T), LeafCarrier(ANY, INT), subst=uf)
@@ -126,7 +126,7 @@ class TestTransitiveResolution(unittest.TestCase):
 
 class TestSnapshotRollback(unittest.TestCase):
     def test_rollback_undoes_binding(self):
-        T = placeholder("T")
+        T = var("T")
         uf = UnionFind(is_var)
         mark = uf.snapshot()
 
@@ -139,8 +139,8 @@ class TestSnapshotRollback(unittest.TestCase):
         self.assertIsInstance(resolved.fetch(), Placeholder)
 
     def test_rollback_nested(self):
-        T = placeholder("T")
-        U = placeholder("U")
+        T = var("T")
+        U = var("U")
         uf = UnionFind(is_var)
 
         # Bind T
@@ -158,7 +158,7 @@ class TestSnapshotRollback(unittest.TestCase):
 
     def test_rollback_allows_alternative(self):
         """Simulate impl selection: try one, rollback, try another."""
-        T = placeholder("T")
+        T = var("T")
         uf = UnionFind(is_var)
         mark = uf.snapshot()
 
@@ -175,8 +175,8 @@ class TestSnapshotRollback(unittest.TestCase):
 class TestSharedSubst(unittest.TestCase):
     def test_bidirectional_resolution(self):
         """Simulate Rust-style: info flows forward then backward."""
-        T = placeholder("T")
-        U = placeholder("U")
+        T = var("T")
+        U = var("U")
         uf = UnionFind(is_var)
 
         # Forward: from call site, we know T = int
@@ -199,8 +199,8 @@ class TestSharedSubst(unittest.TestCase):
 
     def test_deep_reify(self):
         """Reify resolves variables inside bound terms."""
-        T = placeholder("T")
-        U = placeholder("U")
+        T = var("T")
+        U = var("U")
         uf = UnionFind(is_var)
 
         # T = Tuple(U, int)

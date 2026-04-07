@@ -3,11 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import (
-    Builtin, Id, Spec,
-    Placeholder, Var, placeholder,
-    Field, Type,
-)
+from protomorph import Builtin, Item as Field, Id, Placeholder, SimpleVar, Spec, Type, Var, var
 
 
 class TestBuiltin(unittest.TestCase):
@@ -43,31 +39,31 @@ class TestPlaceholder(unittest.TestCase):
     """Placeholder: universal stand-in, hash-consed by (context, id)."""
 
     def test_identity(self):
-        a = placeholder("T")
-        b = placeholder("T")
+        a = var("T")
+        b = var("T")
         self.assertIs(a, b)
 
     def test_different_id(self):
-        self.assertIsNot(placeholder("T"), placeholder("U"))
+        self.assertIsNot(var("T"), var("U"))
 
     def test_different_context(self):
         class C(Builtin):
             x: int
         ctx = C(1)
-        self.assertIsNot(placeholder("T"), placeholder("T", context=ctx))
+        self.assertIsNot(var("T"), var("T", context=ctx))
 
     # def test_metatype_is_metadata_spec(self):
     #     self.assertEqual(placeholder("T").metatype(), ("T"))
 
     def test_arity_zero(self):
-        self.assertEqual(placeholder("T").arity, 0)
+        self.assertEqual(var("T").arity, 0)
 
     def test_spread_placeholder(self):
-        p = placeholder("*T")
-        self.assertEqual(cast(Var, p).id, "*T")
+        p = var("*T")
+        self.assertEqual(cast(SimpleVar, p).id, "*T")
 
     def test_placeholder_is_var(self):
-        self.assertIsInstance(placeholder("T"), Var)
+        self.assertIsInstance(var("T"), Var)
 
 
 class TestField(unittest.TestCase):

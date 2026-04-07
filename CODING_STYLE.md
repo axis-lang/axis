@@ -1,138 +1,225 @@
 # Axis Coding Style
 
-This document captures repository-specific style rules for imports, type
-annotations, semantic layering, and a few recurring architectural patterns.
+This document captures the current repository-wide rules for code structure,
+imports, package surfaces, public API design, and testing philosophy.
+
+It is intentionally opinionated. Prefer clean cuts over compatibility layers,
+explicit architecture over accidental behavior, and public-surface tests over
+implementation-detail tests.
+
+## Core Principles
+
+- Prefer the smallest clean design over incremental clutter.
+- Do not preserve dead compatibility paths unless there is a real external need.
+- Do not add shims, aliases, wrappers, or compatibility adapters "just in case".
+- If a design is being replaced, finish the replacement and remove the old path.
+- Avoid parallel sources of truth.
+- Keep bootstrap and runtime ownership explicit.
+- Treat package structure and imports as part of the architecture, not mere style.
 
 ## Imports
 
 - Prefer package imports:
   - `import protomorph as pm`
   - `from axis import syn, sem`
-- Prefer package-qualified names in code and in type annotations instead of
-  importing symbols only to shorten references.
-- Use direct internal imports when they represent a hard dependency at runtime.
-- Use weak direct imports only when the imported module is clearly foundational
-  and there is no suspected circularity.
-- Avoid direct internal imports used only for annotations.
+- Prefer package-qualified names in code and annotations instead of importing
+  symbols only to shorten references.
+- Type hints do not count as architectural dependencies.
+- Do not add direct imports only to satisfy annotations when `pm.*`, `sem.*`,
+  or other package namespaces are enough.
+- Use direct internal imports only when they are real runtime dependencies:
+  - class bases
+  - descriptors
+  - constants
+  - module initialization
+  - top-level executable behavior
+- Prefer weak or local imports only when they genuinely reduce coupling and do
+  not hide the real module dependency graph.
+- Avoid `typing.TYPE_CHECKING` as a structural escape hatch. If imports are
+  awkward, fix the dependency structure instead.
 
-### URS import policy (`packages/protomorph/src/pm/reasoning/`)
+## Package `__init__` Policy
 
-Apply this policy strictly and systematically across all URS modules.
+- Package surfaces should generally be assembled with `from .subpackage import *`.
+- Prefer naming-based privacy over `__all__`.
+- Avoid `__all__` by default.
+- Private names must start with `_`.
+- If a module is re-exported with `import *`, keep support imports private too:
+  - `_Any`
+  - `_cast`
+  - `_Callable`
+  - etc.
+- Do not hand-maintain long export lists in `__init__.py` unless there is a
+  concrete exception that justifies it.
+- If something should be available from the package root, make that decision
+  intentionally as public API. Do not leak it accidentally.
 
-- Classify every dependency as exactly one of:
-  - `annotation-only`
-  - `import-time runtime`
-  - `runtime-late`
+## Namespace Policy
 
-- `annotation-only`
-  - Always import both:
-    - `import pm`
-    - `from pm import reasoning as urs`
-  - All type annotations must use qualified names through `urs.*` or `pm.*`.
-  - Do not add direct sibling imports only to shorten annotations.
-  - Examples:
-    - `db: urs.Database`
-    - `session: urs.Session`
-    - `goal: pm.Spec`
-    - `tables: urs.SessionTables`
+- When a subsystem starts accumulating many types with the same prefix, prefer a
+  namespace package over repeating the prefix in every public symbol.
+- Example:
+  - prefer `pm.match.Tree`, `pm.match.CaseSummary`, `pm.match.GuardShape`
+  - instead of `pm.MatchTree`, `pm.MatchCaseSummary`, `pm.MatchGuardShape`
+- When making this kind of cleanup, do the rename completely.
+- Do not keep both naming schemes alive.
+- Do not leave compatibility aliases behind unless there is a concrete external
+  compatibility requirement.
 
-- `import-time runtime`
-  - Use selective direct imports only for symbols actually needed while the
-    module is importing or for top-level executable runtime use.
-  - These imports define the real dependency graph and layering.
-  - Example:
-    - `from .stratify import build_dependency_graph, compute_sccs`
+## Public API Cleanliness
 
-- `runtime-late`
-  - Choose the form based on whether the origin module is already present in the
-    module's `import-time runtime` set.
-  - If it is already present, use that path.
-  - If it is not present, use the global rule (`urs.*` / `pm.*`) instead of
-    introducing a hidden sibling dependency.
+- Public API should be deliberate, small, and coherent.
+- If a helper is private, keep it private and do not test or export it from the
+  package root.
+- If a helper is promoted because users need it, promote it cleanly as public API
+  and move tests to that public name.
+- If code outside the defining module needs a symbol, either:
+  - promote it to a real public API, or
+  - refactor so the cross-module dependency disappears.
+- Prefer one clean public entry point over several overlapping ones.
+- Remove dead indirection when it no longer expresses meaningful architecture.
+- Avoid magic-string or path-based classification when a structural check is enough.
+- Keep helper modules small. If a helper exists only as a compatibility shim,
+  remove it.
 
-- Do not use `typing.TYPE_CHECKING` in URS.
+## Compatibility and Cleanup Policy
 
-- A symbol is private only if it stays inside its defining module.
-  - If another URS module references it, either export a public name or refactor
-    so the cross-module use disappears.
-
-- Keep `pm.reasoning.__init__` ordered according to the real URS layering so the
-  `urs.*` annotation namespace is available during module initialization.
-
-This policy solves three recurring problems:
-
-- annotation imports creating fake architectural dependencies
-- circular imports hidden behind `TYPE_CHECKING` or ad hoc local imports
-- cross-module use of pseudo-private helpers without an explicit public surface
-
-## Type Annotations
-
-- In annotations, prefer package-qualified names:
-  - `value: pm.Val`
-  - `fields: dict[str, pm.Val]`
-  - `scope: sem.Scope`
-- Type annotations do not count as dependencies for architectural reasoning.
-- Do not import internal names only to shorten annotations.
-- In URS specifically, use `urs.*` / `pm.*` exclusively for annotations; do not
-  use sibling imports for hints.
-- For genuinely arbitrary payloads, use `Any`; do not use `object` as a catch-all
-  placeholder type in URS.
+- Do not keep old and new structures alive at the same time without a real need.
+- Do not leave partially migrated packages, duplicate modules, or fallback trees.
+- After a rename or namespace cleanup, remove the old surface in the same change.
+- When refactoring package layout:
+  - move the implementation
+  - update imports
+  - update tests
+  - delete the abandoned path
+- Prefer a short period of breakage during refactor over long-term architectural
+  debt from compatibility glue.
 
 ## Dependency Policy
 
 - Strong dependency:
-  - class bases
+  - class inheritance
   - top-level executable references
-  - global initialization using symbols from another module
+  - global initialization
+  - bootstrap ordering
 - Weak dependency:
-  - deferred access inside methods or functions
+  - deferred use inside methods or functions
   - local imports used to avoid unnecessary coupling
-- Type annotations do not count as dependencies.
-- In URS, `annotation-only` imports are intentionally separated from
-  `import-time runtime` imports so the latter alone define the dependency
-  hierarchy.
+- Type annotations do not define dependency hierarchy.
+- The runtime import graph should reflect the real architecture.
+
+## Bootstrap and Global State
+
+- `protomorph.__init__` is the package orchestrator and public API surface.
+- Bootstrap should happen in `__init__`, after package imports, in a deliberate
+  and readable order.
+- Do not reintroduce bootstrap helpers in side modules.
+- Minimize package globals.
+- Globals are allowed only when they are:
+  - real public API
+  - bootstrap-owned shared state
+  - runtime singletons
+- Prefer private globals over exported globals.
+
+## Typing and Annotations
+
+- Use type annotations for public functions, methods, and class attributes.
+- Prefer package-qualified annotations:
+  - `value: pm.Carrier`
+  - `shape: pm.match.ShapeSummary`
+  - `scope: sem.Scope`
+- Prefer `type | None` over `Optional[type]` at runtime.
+- For genuinely arbitrary payloads, prefer `Any` over `object`.
+- Do not import internal names only to shorten annotations.
+
+## Naming
+
+- Classes: CamelCase
+- Functions and variables: snake_case
+- Constants: UPPER_CASE
+- Private helpers: leading underscore
+- Do not encode redundant subsystem prefixes in public types when a namespace is
+  already carrying that information.
+
+## Formatting
+
+- Use 4-space indentation.
+- Keep line length reasonable.
+- Wrap complex expressions instead of compressing them.
+- Use f-strings for formatting.
+- Keep docstrings short and action-oriented.
+- Avoid trailing whitespace.
+
+## Errors and Diagnostics
+
+- Use `TypeError` for invalid API use or invalid types.
+- Use `ValueError` for invalid values or invalid state.
+- Preserve context when re-raising with `raise ... from exc` where useful.
+- Keep error messages user-facing and precise.
+- Prefer structured diagnostics over raw print/debug output in core logic.
+
+## Testing Philosophy
+
+- Tests should validate public behavior, public surface, and usability.
+- Prefer end-to-end or behavior-oriented tests over tests that mirror private
+  implementation details.
+- Do not test private helpers through package-root imports.
+- If a helper seems important enough to test directly, first decide whether it
+  should become public API.
+- When a public feature can be exercised through a user-facing entry point,
+  prefer that route over testing internal plumbing.
+- Keep assertions focused on semantically useful outcomes.
+- For unordered results, assert sets instead of order-dependent strings.
+- Use explicit `assertRaises` around the smallest failing call.
+
+## Test Organization
+
+- Write tests by subsystem, not as one large smoke file.
+- Cover happy paths first, then branch paths, then exceptional paths.
+- Name tests after the route or behavior being exercised.
+- Prefer small, purpose-built fixtures over magical shared setup.
+- When a behavior is surprising, preserve it with a test before changing it.
+- When adding coverage for a new subsystem, prefer a new focused file over
+  growing an unrelated one.
+
+Recommended naming patterns:
+
+- `test_<surface>_route_<expected_path>`
+- `test_<surface>_happy_paths_cover_<paths>`
+- `test_<surface>_exception_paths_cover_<failures>`
 
 ## Module Responsibilities
 
 - `axis.expr`
-  - represents syntax and expression nodes
-  - should stay focused on syntax and local lowering helpers
+  - syntax and local lowering helpers only
 - `axis.expr.ir`
-  - lowers syntax into declarative IR
+  - declarative IR lowering
   - should not own semantic resolution
 - `axis.sem`
-  - owns semantic lowering, validation, indexing, and entity logic
+  - semantic lowering, validation, indexing, and entity logic
 - `protomorph`
-  - owns generic matching, indexing, schemas, and runtime machinery
+  - generic matching, indexing, type/value runtime machinery, and schemas
 
 ## Matching and Indexing
 
-- Axis semantic indexes should be thin facades over `pm.compile(...)`.
+- Axis semantic indexes should be thin facades over `protomorph` facilities.
 - Avoid duplicating matching logic in `axis.sem` when `protomorph` can own it.
-- Prefer `pm.StructSchema` over ad-hoc shape/signature logic.
-- Entity-level methods may validate nominal identity (`anchor`) before delegating
-  to a structural index.
+- Prefer structural and typed representations over ad-hoc signatures or magic
+  shape logic.
 
-## Bindings
+## Flux, Records, and Immutability
 
-- Keep declarative bindings separate from lowered bindings.
-- Prefer nested field types:
-  - `BindingStruct.Field`
-  - `LoweredBindingStruct.Field`
-- Bounds and defaults should be lowered once per scope, then reused.
+- Use `@flux.property` for derived, dependency-tracked values.
+- Use `@flux.method` for cached derivations and queries.
+- Invalidate flux properties explicitly on mutation.
+- Do not mutate immutable/consed objects after construction.
+- Use persistent updates rather than in-place mutation.
+- Avoid manual caches when the data already belongs to the registry or flux model.
 
-## Struct Usage
+## Repository Notes
 
-- Make `None` explicit in struct key types:
-  - `pm.Struct[str, T]`
-  - `pm.Struct[str | None, T]`
-- Prefer `prefix`, `middle`, `suffix`, and `split_variadic` over manual index slicing.
-- Prefer `with_values(...)` and `map(...)` over reconstructing structs with
-  `from_keys(...)` when keys do not change.
-
-## Testing
-
-- Add direct tests for each representation case, not only integration coverage.
-- Cover positive, negative, ambiguous, and edge cases.
-- When a subsystem is intentionally disabled, tests should assert the explicit
-  failure message rather than silently skipping behavior.
+- Follow existing patterns where they are clean and current, not where they are
+  clearly transitional or obsolete.
+- Avoid new dependencies unless there is a concrete need.
+- Prefer incremental implementation steps, but each committed design step should
+  still be architecturally clean.

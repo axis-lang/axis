@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from typing import TypeVar
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, UniformType, UnionType, Var, VaryingType, _project_type, wrap
+from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, UniformType, UnionType, Var, VaryingType, project_type, wrap
 
 
 INT = wrap(int).fetch()
@@ -13,34 +14,34 @@ BOOL = wrap(bool).fetch()
 NONE = wrap(type(None)).fetch()
 
 
-class TestProjectType(unittest.TestCase):
+class TestWrapProjection(unittest.TestCase):
     def test_scalars(self):
-        self.assertEqual(_project_type(int), INT)
-        self.assertEqual(_project_type(str), STR)
-        self.assertEqual(_project_type(float), FLOAT)
-        self.assertEqual(_project_type(bool), BOOL)
-        self.assertEqual(_project_type(type(None)), NONE)
+        self.assertEqual(wrap(int).fetch(), INT)
+        self.assertEqual(wrap(str).fetch(), STR)
+        self.assertEqual(wrap(float).fetch(), FLOAT)
+        self.assertEqual(wrap(bool).fetch(), BOOL)
+        self.assertEqual(wrap(type(None)).fetch(), NONE)
 
     def test_type_passthrough(self):
-        self.assertIs(_project_type(INT), INT)
+        self.assertIs(wrap(INT).fetch(), INT)
 
     def test_tuple_uniform(self):
-        result = cast(UniformType, _project_type(tuple[int, ...]))
+        result = cast(UniformType, project_type(tuple[int, ...]))
         self.assertIsInstance(result, UniformType)
         self.assertIs(result.element_type, INT)
 
     def test_tuple_varying(self):
-        result = cast(VaryingType, _project_type(tuple[int, str, float]))
+        result = cast(VaryingType, project_type(tuple[int, str, float]))
         self.assertIsInstance(result, VaryingType)
         self.assertEqual(result.values, (INT, STR, FLOAT))
 
     def test_union(self):
-        result = cast(UnionType, _project_type(int | str))
+        result = cast(UnionType, project_type(int | str))
         self.assertIsInstance(result, UnionType)
         self.assertEqual(result.variants, frozenset({INT, STR}))
 
     def test_union_with_none(self):
-        result = cast(UnionType, _project_type(int | None))
+        result = cast(UnionType, project_type(int | None))
         self.assertIn(INT, result.variants)
         self.assertIn(NONE, result.variants)
 
@@ -49,25 +50,19 @@ class TestProjectType(unittest.TestCase):
             SPEC_NAME = "test.bridge.Point"
             x: int
 
-        self.assertEqual(_project_type(Pt), Spec.of("test.bridge.Point"))
+        self.assertEqual(project_type(Pt), Spec.of("test.bridge.Point"))
 
     def test_typevar_projects_to_placeholder(self):
-        from typing import TypeVar
-
         T = TypeVar("T")
-        result = cast(Placeholder, _project_type(T))
+        result = cast(Placeholder, project_type(cast(object, T)))
         self.assertIsInstance(result, Placeholder)
         self.assertIsInstance(result, Var)
         self.assertIsInstance(result, NativeVar)
-        self.assertEqual(cast(Var, result).id, "T")
+        self.assertEqual(cast(NativeVar, result).id, "T")
 
     def test_unknown_annotation_raises(self):
         with self.assertRaises(ValueError):
-            _project_type(object)
-
-    def test_unknown_wrap_raises(self):
-        with self.assertRaises(ValueError):
-            wrap(object)
+            project_type(object)
 
 
 class TestWrap(unittest.TestCase):
@@ -76,6 +71,11 @@ class TestWrap(unittest.TestCase):
 
     def test_wrap_tuple_annotation_returns_type_carrier(self):
         self.assertIsInstance(wrap(tuple[int, ...]).fetch(), UniformType)
+
+    def test_wrap_tuple_varying_annotation_returns_type_value(self):
+        descriptor = cast(VaryingType, cast(object, project_type(tuple[int, str, float])))
+        self.assertIsInstance(descriptor, VaryingType)
+        self.assertEqual(descriptor.values, (INT, STR, FLOAT))
 
     def test_wrap_runtime_builtin_returns_native_carrier(self):
         class Pt(Builtin):
@@ -91,7 +91,7 @@ class TestWrap(unittest.TestCase):
         self.assertIs(carrier.descriptor, INT)
 
     def test_list_projection_builds_qual(self):
-        projected = _project_type(list[int])
+        projected = project_type(list[int])
         self.assertIsInstance(projected, Qual)
 
 

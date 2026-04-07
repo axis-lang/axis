@@ -317,7 +317,7 @@ def _binding_value(field: LoweredBindingStruct.Field) -> pm.Carrier:
         assert value is not None
         return value
     if field.is_placeholder:
-        return pm.wrap(pm.placeholder("_"))
+        return pm.wrap(pm.var("_"))
     raise ValueError(f"Binding field {field.origin!r} cannot be lowered to a matching value")
 
 

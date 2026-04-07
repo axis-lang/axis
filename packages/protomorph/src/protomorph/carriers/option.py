@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Self, cast
+from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
-from ..foundation import Builtin, Id
 from .base import Carrier, UnwrapError
 from .result import Result, Ok, Err, _result_descriptor
 from ..native import _project_type as _native_project_type
-
+from ..domain import Builtin
 
 _OPTIONAL_QUALIFIER = pm.Anchor("std.qualifiers.Optional")
 
@@ -27,13 +26,13 @@ def _some_descriptor_of(qual: pm.Qual) -> pm.Type:
 
 
 def _optional_descriptor(value_descriptor: pm.Type) -> pm.Qual:
-    return cast(pm.Qual, pm.Qual.of(value_descriptor, pm.Spec.of(_OPTIONAL_QUALIFIER)))
+    return _cast(pm.Qual, pm.Qual.of(value_descriptor, pm.Spec.of(_OPTIONAL_QUALIFIER)))
 
 
-def _descriptor_from_annotation(annotation: Any) -> pm.Type:
+def _descriptor_from_annotation(annotation: _Any) -> pm.Type:
     if isinstance(annotation, Carrier):
         return annotation.descriptor
-    return cast(pm.Type, _native_project_type(annotation))
+    return _cast(pm.Type, _native_project_type(annotation))
 
 
 class Some[V](Builtin):
@@ -73,7 +72,7 @@ class Option[V](Carrier):
             raise IndexError(offset)
         return self.value_carrier()[offset]
 
-    def attr(self, id: Id) -> Carrier:
+    def attr(self, id: pm.Id) -> Carrier:
         if isinstance(self.content, None_):
             raise KeyError(id)
         return self.value_carrier().attr(id)
@@ -83,7 +82,7 @@ class Option[V](Carrier):
             assert not children
             return self
         rebuilt = self.value_carrier().reconstruct(children)
-        return cast(Self, self._with_some(rebuilt))
+        return _cast(Self, self._with_some(rebuilt))
 
     def __invariants__(self) -> None:
         super().__invariants__()
@@ -113,7 +112,7 @@ class Option[V](Carrier):
             return self.value_carrier()
         return default
 
-    def unwrap_or_else(self, f: Callable[[], Carrier[V]]) -> Carrier[V]:
+    def unwrap_or_else(self, f: _Callable[[], Carrier[V]]) -> Carrier[V]:
         if isinstance(self.content, Some):
             return self.value_carrier()
         value = f()
@@ -126,7 +125,7 @@ class Option[V](Carrier):
             return self.value_carrier()
         raise UnwrapError(message=message)
 
-    def map(self, f: Callable[[Carrier[V]], Carrier]) -> Option[Any]:
+    def map(self, f: _Callable[[Carrier[V]], Carrier]) -> Option[_Any]:
         if isinstance(self.content, None_):
             return self
         value = f(self.value_carrier())
@@ -134,7 +133,7 @@ class Option[V](Carrier):
             raise TypeError("Option.map() callback must return a Carrier")
         return self._with_some(value)
 
-    def and_then(self, f: Callable[[Carrier[V]], Any]) -> Option[Any]:
+    def and_then(self, f: _Callable[[Carrier[V]], _Any]) -> Option[_Any]:
         if isinstance(self.content, None_):
             return self
         result = f(self.value_carrier())
@@ -142,7 +141,7 @@ class Option[V](Carrier):
             raise TypeError("Option.and_then() callback must return an Option")
         return result
 
-    def ok_or(self, error: Carrier) -> Result[Any, V]:
+    def ok_or(self, error: Carrier) -> Result[_Any, V]:
         if not isinstance(error, Carrier):
             raise TypeError("Option.ok_or() expects a Carrier")
         descriptor = _result_descriptor(_some_descriptor_of(self.descriptor), error.descriptor)
@@ -157,11 +156,8 @@ class Option[V](Carrier):
         return cls(_optional_descriptor(value.descriptor), Some(value.content))
 
     @classmethod
-    def none(cls, annotation: Any) -> Option:
-        return cls(_optional_descriptor(_descriptor_from_annotation(annotation)), None_())
+    def none(cls, annotation: _Any) -> Option:
+        return cls(_optional_descriptor(pm.project_type(annotation)), None_())
 
-    def _with_some(self, value: Carrier) -> Option[Any]:
+    def _with_some(self, value: Carrier) -> Option[_Any]:
         return type(self)(_optional_descriptor(value.descriptor), Some(value.content))
-
-
-__all__ = ["Some", "None_", "Option"]

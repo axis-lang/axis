@@ -43,6 +43,3 @@ class Constraint(pm.Builtin):
 
     def goal_for(self, spec: pm.Carrier | pm.Datum) -> pm.Spec:
         return self.subst_self(spec).goal
-
-
-__all__ = ["Constraint"]

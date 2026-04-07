@@ -10,23 +10,10 @@ from protomorph import (
     Builtin,
     WILDCARD,
     LeafCarrier,
-    MatchBinding,
-    MatchCaseSummary,
-    MatchEnv,
-    MatchGuardShape,
-    MatchLeaf,
-    MatchMany,
-    MatchShapeSummary,
-    MatchSwitchFieldDescriptors,
-    MatchSwitchNominalDescriptors,
-    MatchTree,
     PlaceholderMetatype,
     Spec,
     VaryingType,
-    compile,
-    diagnose,
-    match,
-    placeholder,
+    var,
     wrap,
 )
 
@@ -47,11 +34,11 @@ class TestCarrierPatternFlag(unittest.TestCase):
         self.assertFalse(wrap(Point(1, 2)).is_pattern)
 
     def test_placeholder_leaf_is_pattern(self):
-        T = placeholder("T")
+        T = var("T")
         self.assertTrue(LeafCarrier(ANY, T).is_pattern)
 
     def test_placeholder_metatype_wraps_placeholder(self):
-        T = placeholder("T")
+        T = var("T")
         meta = cast(PlaceholderMetatype, T.metatype())
         self.assertEqual(meta.of, T)
         self.assertEqual(meta.level, 1)
@@ -59,33 +46,33 @@ class TestCarrierPatternFlag(unittest.TestCase):
 
 class TestSimpleMatching(unittest.TestCase):
     def test_leaf_var_captures_subject(self):
-        T = placeholder("T")
+        T = var("T")
         pattern = LeafCarrier(ANY, T)
         subject = wrap(42)
 
-        result = match(pattern, subject)
+        result = pm.match.match(pattern, subject)
 
         self.assertIsNotNone(result)
         assert result is not None
-        self.assertEqual(result.solutions[0].env.values[pattern], MatchBinding(frozenset({subject})))
+        self.assertEqual(result.solutions[0].env.values[pattern], pm.match.Binding(frozenset({subject})))
 
     def test_custom_is_var_can_disable_capture(self):
-        T = placeholder("T")
+        T = var("T")
         pattern = LeafCarrier(ANY, T)
         subject = LeafCarrier(ANY, T)
 
-        result = match(pattern, subject, is_var=lambda _: False)
+        result = pm.match.match(pattern, subject, is_var=lambda _: False)
 
         self.assertIsNotNone(result)
         assert result is not None
         self.assertEqual(result.solutions[0].env.values, frozendict())
 
     def test_multiple_captures_accumulate(self):
-        T = placeholder("T")
+        T = var("T")
         pair = pm.Tuple(cast(pm.Type[tuple], VaryingType((ANY, ANY))), (T, T))
         subject = pm.Tuple(cast(pm.Type[tuple], VaryingType((ANY, ANY))), (1, 2))
 
-        result = match(pair, subject)
+        result = pm.match.match(pair, subject)
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -93,13 +80,13 @@ class TestSimpleMatching(unittest.TestCase):
         self.assertEqual({capture.fetch() for capture in binding.captures}, {1, 2})
 
     def test_matchenv_merge_raises_exceptiongroup_for_all_conflicts(self):
-        T = LeafCarrier(ANY, placeholder("T"))
-        U = LeafCarrier(ANY, placeholder("U"))
-        env = MatchEnv(
+        T = LeafCarrier(ANY, var("T"))
+        U = LeafCarrier(ANY, var("U"))
+        env = pm.match.Env(
             frozendict(
                 {
-                    T: MatchBinding(frozenset({wrap(1), wrap(2)})),
-                    U: MatchBinding(frozenset({wrap("a"), wrap("b")})),
+                    T: pm.match.Binding(frozenset({wrap(1), wrap(2)})),
+                    U: pm.match.Binding(frozenset({wrap("a"), wrap("b")})),
                 }
             )
         )
@@ -115,14 +102,14 @@ class TestSimpleMatching(unittest.TestCase):
         self.assertEqual(len(ctx.exception.exceptions), 2)
 
     def test_structural_builtin_match(self):
-        result = match(wrap(Point(1, 2)), wrap(Point(1, 2)))
+        result = pm.match.match(wrap(Point(1, 2)), wrap(Point(1, 2)))
         self.assertIsNotNone(result)
 
     def test_wildcard_mark_matches_without_capture(self):
         pattern = LeafCarrier(ANY, WILDCARD)
         subject = wrap(42)
 
-        result = match(pattern, subject)
+        result = pm.match.match(pattern, subject)
 
         self.assertIsNotNone(result)
         assert result is not None
@@ -131,86 +118,86 @@ class TestSimpleMatching(unittest.TestCase):
 
 class TestSummaryCompile(unittest.TestCase):
     def test_compile_wraps_tree(self):
-        summary = MatchCaseSummary(
+        summary = pm.match.CaseSummary(
             pattern=wrap(1),
-            shape=MatchShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
-        tree = compile({summary: "one"})
-        self.assertIsInstance(tree.fetch(), MatchTree)
+        tree = pm.match.compile({summary: "one"})
+        self.assertIsInstance(tree.fetch(), pm.match.Tree)
 
     def test_shape_groups_compile_to_matchmany(self):
-        no_args = MatchCaseSummary(
+        no_args = pm.match.CaseSummary(
             pattern=wrap(1),
-            shape=MatchShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
-        one_arg = MatchCaseSummary(
+        one_arg = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=MatchShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
         )
 
-        tree = compile({no_args: "zero", one_arg: "one"})
-        tree_val = cast(MatchTree, tree.fetch())
+        tree = pm.match.compile({no_args: "zero", one_arg: "one"})
+        tree_val = cast(pm.match.Tree, tree.fetch())
 
-        self.assertIsInstance(tree_val.root, MatchMany)
+        self.assertIsInstance(tree_val.root, pm.match.Many)
 
     def test_same_shape_is_guarded(self):
-        summary = MatchCaseSummary(
+        summary = pm.match.CaseSummary(
             pattern=wrap(1),
-            shape=MatchShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
-        tree = compile({summary: "one"})
-        tree_val = cast(MatchTree, tree.fetch())
-        self.assertIsInstance(tree_val.root, MatchGuardShape)
+        tree = pm.match.compile({summary: "one"})
+        tree_val = cast(pm.match.Tree, tree.fetch())
+        self.assertIsInstance(tree_val.root, pm.match.GuardShape)
 
     def test_prefix_descriptor_switch_selected_first(self):
-        int_summary = MatchCaseSummary(
+        int_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=MatchShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
             prefix_descriptors=(INT,),
         )
-        str_summary = MatchCaseSummary(
+        str_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=MatchShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
             prefix_descriptors=(STR,),
         )
 
-        tree = compile({int_summary: "int", str_summary: "str"})
-        root = cast(MatchGuardShape, cast(MatchTree, tree.fetch()).root)
-        self.assertIsInstance(root.child, MatchSwitchFieldDescriptors)
+        tree = pm.match.compile({int_summary: "int", str_summary: "str"})
+        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.fetch()).root)
+        self.assertIsInstance(root.child, pm.match.SwitchFieldDescriptors)
 
     def test_nominal_descriptor_switch_used_when_positional_not_available(self):
         text_key = pm.Id("text")
-        int_summary = MatchCaseSummary(
+        int_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=MatchShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
+            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
             required_nominal_descriptors=frozendict({text_key: INT}),
         )
-        str_summary = MatchCaseSummary(
+        str_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=MatchShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
+            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
             required_nominal_descriptors=frozendict({text_key: STR}),
         )
 
-        tree = compile({int_summary: "int", str_summary: "str"})
-        root = cast(MatchGuardShape, cast(MatchTree, tree.fetch()).root)
-        self.assertIsInstance(root.child, MatchSwitchNominalDescriptors)
+        tree = pm.match.compile({int_summary: "int", str_summary: "str"})
+        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.fetch()).root)
+        self.assertIsInstance(root.child, pm.match.SwitchNominalDescriptors)
 
     def test_ambiguity_residual_leaf(self):
-        a = MatchCaseSummary(
-            pattern=LeafCarrier(ANY, placeholder("T")),
-            shape=MatchShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+        a = pm.match.CaseSummary(
+            pattern=LeafCarrier(ANY, var("T")),
+            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
             prefix_descriptors=(None,),
         )
-        b = MatchCaseSummary(
-            pattern=LeafCarrier(ANY, placeholder("U")),
-            shape=MatchShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+        b = pm.match.CaseSummary(
+            pattern=LeafCarrier(ANY, var("U")),
+            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
             prefix_descriptors=(None,),
         )
-        tree = compile({a: "left", b: "right"})
-        tree_val = cast(MatchTree, tree.fetch())
-        root = cast(MatchGuardShape, tree_val.root)
-        self.assertIsInstance(root.child, MatchLeaf)
-        self.assertEqual(len(diagnose(tree_val)), 1)
+        tree = pm.match.compile({a: "left", b: "right"})
+        tree_val = cast(pm.match.Tree, tree.fetch())
+        root = cast(pm.match.GuardShape, tree_val.root)
+        self.assertIsInstance(root.child, pm.match.Leaf)
+        self.assertEqual(len(pm.match.diagnose(tree_val)), 1)
 
 
 if __name__ == "__main__":

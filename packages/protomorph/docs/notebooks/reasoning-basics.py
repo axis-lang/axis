@@ -32,7 +32,7 @@ def __(mo):
 @app.cell
 def __():
     import protomorph
-    from protomorph import Spec, placeholder
+    from protomorph import Spec, var
     from protomorph.reasoning import (
         Rule, Engine, Session, RuleSetDatabase,
         Unique, Ambiguous, NoSolution, Deferred, Floundered,
@@ -42,7 +42,7 @@ def __():
     return (
         Ambiguous, Deferred, Engine, Floundered, MixedCycle,
         NEGATION_ANCHOR, NegativeCycle, NoSolution, Rule,
-        RuleSetDatabase, Session, Spec, Unique, placeholder, protomorph,
+        RuleSetDatabase, Session, Spec, Unique, var, protomorph,
     )
 
 

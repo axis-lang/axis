@@ -48,18 +48,18 @@ assert a is b   # hash-consed
 
 ### Auto-registration
 
-Every non-abstract `Builtin` subclass registers itself in `_ALL_BUILTINS` the moment the class is defined:
+Every non-abstract `Builtin` subclass registers itself in `ALL_BUILTINS` the moment the class is defined:
 
 ```python
 class Builtin(Consed, abstract=True):
     def __init_subclass__(cls, abstract: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)
         if not abstract:
-            _ALL_BUILTINS.add(cls)
+            ALL_BUILTINS.add(cls)
             # also invalidates NativeHost cache
 ```
 
-`NativeHost` uses `_ALL_BUILTINS` to discover the full schema of every registered type at runtime.
+`NativeHost` uses `ALL_BUILTINS` to discover the full schema of every registered type at runtime.
 
 ### Repr delegation
 

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Self, cast
+from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
-from ..foundation import Builtin, Id
+from ..domain import Builtin, Id
 from .base import Carrier, UnwrapError
-from ..native import _project_type as _native_project_type
 
 
 _RESULT_QUALIFIER = pm.Anchor("std.qualifiers.Result")
@@ -29,20 +28,20 @@ def _err_descriptor_of(qual: pm.Qual) -> pm.Type:
     qualifier = _result_qualifier_of(qual)
     if qualifier is None or len(qualifier.args) != 1:
         raise TypeError("Result qualifier must have exactly one error type argument")
-    return cast(pm.Type, qualifier.args[0].fetch())
+    return _cast(pm.Type, qualifier.args[0].fetch())
 
 
 def _result_descriptor(ok_descriptor: pm.Type, err_descriptor: pm.Type) -> pm.Qual:
-    return cast(
+    return _cast(
         pm.Qual,
         pm.Qual.of(ok_descriptor, pm.Spec.of(_RESULT_QUALIFIER, err_descriptor)),
     )
 
 
-def _descriptor_from_annotation(annotation: Any) -> pm.Type:
+def _descriptor_from_annotation(annotation: _Any) -> pm.Type:
     if isinstance(annotation, Carrier):
         return annotation.descriptor
-    return cast(pm.Type, _native_project_type(annotation))
+    return _cast(pm.Type, pm.project_type(annotation))
 
 
 class Ok[V](Builtin):
@@ -55,6 +54,13 @@ class Err[E](Builtin):
     """Err variant of Result[E, V]."""
     SPEC_NAME = "std.types.Result.Err"
     error: E
+
+
+class _ResultVarCtx(Builtin):
+    pass
+
+
+_RESULT_VAR_CTX = _ResultVarCtx()
 
 
 class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
@@ -97,7 +103,7 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
             assert not children
             return self
         rebuilt = self.value_carrier().reconstruct(children)
-        return cast(Self, self._with_ok(rebuilt))
+        return _cast(Self, self._with_ok(rebuilt))
 
     def __invariants__(self) -> None:
         super().__invariants__()
@@ -136,7 +142,7 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
             return self.value_carrier()
         return default
 
-    def unwrap_or_else(self, f: Callable[[Carrier[E]], Carrier[V]]) -> Carrier[V]:
+    def unwrap_or_else(self, f: _Callable[[Carrier[E]], Carrier[V]]) -> Carrier[V]:
         if isinstance(self.content, Ok):
             return self.value_carrier()
         value = f(self.error_carrier())
@@ -162,7 +168,7 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
         assert isinstance(self.content, Ok)
         raise UnwrapError(self.value_carrier(), message)
 
-    def map(self, f: Callable[[Carrier[V]], Carrier]) -> Result[E, Any]:
+    def map(self, f: _Callable[[Carrier[V]], Carrier]) -> Result[E, _Any]:
         if isinstance(self.content, Err):
             return self
         value = f(self.value_carrier())
@@ -170,7 +176,7 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
             raise TypeError("Result.map() callback must return a Carrier")
         return self._with_ok(value)
 
-    def map_err(self, f: Callable[[Carrier[E]], Carrier]) -> Result[Any, V]:
+    def map_err(self, f: _Callable[[Carrier[E]], Carrier]) -> Result[_Any, V]:
         if isinstance(self.content, Ok):
             return self
         error = f(self.error_carrier())
@@ -178,7 +184,7 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
             raise TypeError("Result.map_err() callback must return a Carrier")
         return self._with_err(error)
 
-    def and_then(self, f: Callable[[Carrier[V]], Any]) -> Result[Any, Any]:
+    def and_then(self, f: _Callable[[Carrier[V]], _Any]) -> Result[_Any, _Any]:
         if isinstance(self.content, Err):
             return self
         result = f(self.value_carrier())
@@ -190,29 +196,26 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
     def ok(cls, value: Carrier) -> Result:
         if not isinstance(value, Carrier):
             raise TypeError("Result.ok() expects a Carrier")
-        err_type = cast(pm.Type, pm.SimpleVar(None, "E"))
+        err_type = _cast(pm.Type, pm.SimpleVar(_RESULT_VAR_CTX, "E"))
         descriptor = _result_descriptor(value.descriptor, err_type)
-        return cast(Result, cls(descriptor, Ok(value.content)))
+        return _cast(Result, cls(descriptor, Ok(value.content)))
 
     @classmethod
     def err(cls, error: Carrier) -> Result:
         if not isinstance(error, Carrier):
             raise TypeError("Result.err() expects a Carrier")
-        ok_type = cast(pm.Type, pm.SimpleVar(None, "V"))
+        ok_type = _cast(pm.Type, pm.SimpleVar(_RESULT_VAR_CTX, "V"))
         descriptor = _result_descriptor(ok_type, error.descriptor)
-        return cast(Result, cls(descriptor, Err(error.content)))
+        return _cast(Result, cls(descriptor, Err(error.content)))
 
-    def _with_ok(self, value: Carrier) -> Result[Any, Any]:
+    def _with_ok(self, value: Carrier) -> Result[_Any, _Any]:
         return type(self)(
             _result_descriptor(value.descriptor, _err_descriptor_of(self.descriptor)),
             Ok(value.content),
         )
 
-    def _with_err(self, error: Carrier) -> Result[Any, Any]:
+    def _with_err(self, error: Carrier) -> Result[_Any, _Any]:
         return type(self)(
             _result_descriptor(_ok_descriptor_of(self.descriptor), error.descriptor),
             Err(error.content),
         )
-
-
-__all__ = ["Ok", "Err", "Result"]

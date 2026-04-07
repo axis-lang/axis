@@ -51,7 +51,7 @@ class TestLogicEngine(unittest.TestCase):
             _ = realm.logic_assertions
 
     def test_engine_adapts_realm_rules_and_stratifies(self):
-        x = pm.placeholder("X")
+        x = pm.var("X")
         realm = AssertionRealm(
             assertions=frozenset(
                 (
@@ -77,9 +77,9 @@ class TestLogicEngine(unittest.TestCase):
         self.assertEqual(engine.strata.stratum_of(safe_key), engine.strata.stratum_of(blocked_key) + 1)
 
     def test_engine_derives_positive_global_facts(self):
-        x = pm.placeholder("X")
-        y = pm.placeholder("Y")
-        z = pm.placeholder("Z")
+        x = pm.var("X")
+        y = pm.var("Y")
+        z = pm.var("Z")
         realm = AssertionRealm(
             assertions=frozenset(
                 (

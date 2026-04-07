@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, placeholder, unify, wrap
+from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, var, unify, wrap
 
 
 INT = wrap(int).fetch()
@@ -37,7 +37,7 @@ class TestSpecWrap(unittest.TestCase):
         self.assertEqual(carrier[1][0].fetch(), INT)
 
     def test_subst_wrapped_spec(self):
-        T = placeholder("T")
+        T = var("T")
         carrier = wrap(Spec.of("std.List", T))
         ph_leaf = next(leaf for leaf in carrier.deep_iter() if leaf.fetch() is T)
         result = carrier.subst({ph_leaf: LeafCarrier(ph_leaf.descriptor, INT)}).fetch()

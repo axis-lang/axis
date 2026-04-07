@@ -5,9 +5,9 @@ from types import TracebackType
 from typing import Any, Self, cast
 from weakref import WeakKeyDictionary
 
-from protobase import flux, frozendict
+from protobase import flux, frozendict, cached_property
 
-from .foundation import Anchor, Builtin
+from .domain import Anchor, Builtin
 
 
 class Realm(Builtin, abstract=True):
@@ -17,6 +17,16 @@ class Realm(Builtin, abstract=True):
 
     def schema_for(self, spec: Any) -> Any | None:
         _ = spec
+        return None
+
+    def eval_logic_op(
+        self,
+        operator: Any,
+        *,
+        goal: Any,
+        session: Any,
+    ) -> Any | None:
+        _ = (operator, goal, session)
         return None
 
     def val_is_leaf(self, meta: Any, data: Any) -> bool:
@@ -39,41 +49,13 @@ class Realm(Builtin, abstract=True):
         _ = (meta, children)
         raise NotImplementedError
 
-    def eval_logic_op(
-        self,
-        operator: Any,
-        *,
-        goal: Any,
-        session: Any,
-    ) -> Any | None:
-        _ = (operator, goal, session)
-        return None
-
-    @property
+    @flux.property
     def anchors(self) -> frozenset[Anchor]:
         return frozenset()
-
-    def rules_for_anchor(self, anchor: Anchor) -> tuple[Builtin, ...]:
-        _ = anchor
-        return ()
-
-    def facts_by_anchor(self, anchor: Anchor) -> tuple[Builtin, ...]:
-        _ = anchor
-        return ()
-
-    def is_coinductive_anchor(self, anchor: Anchor) -> bool:
-        _ = anchor
-        return False
 
     @flux.property
     def logic_assertions(self):
         return frozenset()
-
-    @flux.property
-    def reasoning(self):
-        from protomorph import reasoning as urs
-
-        return urs.Engine(self)
 
     def __enter__(self) -> Self:
         import protomorph
@@ -123,18 +105,9 @@ class OverlayRealm(Realm):
             buckets.setdefault(item.anchor, []).append(fact)
         return frozendict((anchor, tuple(items)) for anchor, items in buckets.items())
 
-    @property
+    @flux.property
     def anchors(self) -> frozenset[Anchor]:
         return frozenset((*self.base.anchors, *self.rule_index.keys(), *self.fact_index.keys()))
-
-    def rules_for_anchor(self, anchor: Anchor):
-        return (*self.base.rules_for_anchor(anchor), *self.rule_index.get(anchor, ()))
-
-    def facts_by_anchor(self, anchor: Anchor):
-        return (*self.base.facts_by_anchor(anchor), *self.fact_index.get(anchor, ()))
-
-    def is_coinductive_anchor(self, anchor: Anchor) -> bool:
-        return anchor in self.coinductive_anchors or self.base.is_coinductive_anchor(anchor)
 
     @flux.property
     def logic_assertions(self):

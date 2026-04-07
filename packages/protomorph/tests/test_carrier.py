@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import Any, cast
 
-from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, placeholder, wrap
+from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, wrap
 
 
 INT = cast(Spec, wrap(int).fetch())
@@ -76,7 +76,7 @@ class TestNativeObjectCarrier(unittest.TestCase):
 
 class TestChildRules(unittest.TestCase):
     def test_placeholder_data_becomes_leaf(self):
-        ph = placeholder("T")
+        ph = var("T")
         child = LeafCarrier(ANY, 0).child(INT, ph)
         self.assertIsInstance(child, LeafCarrier)
         self.assertIs(child.fetch(), ph)

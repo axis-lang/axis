@@ -5,7 +5,7 @@ from typing import cast
 
 from protomorph import (
     Builtin,
-    Placeholder, placeholder,
+    Placeholder, var,
     LeafCarrier, Option, Result, Spec, Tuple,
     VaryingType,
     wrap,
@@ -70,7 +70,7 @@ class TestDeepMap(unittest.TestCase):
 
 class TestSubst(unittest.TestCase):
     def test_varying_type_subst(self):
-        T = placeholder("T")
+        T = var("T")
         vt = VaryingType.of(INT, T, STR)
         c = wrap(vt)
         ph_carrier = next(leaf for leaf in c.deep_iter() if leaf.fetch() is T)

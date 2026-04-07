@@ -187,17 +187,3 @@ def _slot_by_placeholder(goal: CanonicalGoal) -> dict[pm.Placeholder, int]:
             slot_by_placeholder[value] = index
     return slot_by_placeholder
 
-
-__all__ = [
-    "CanonicalGoal",
-    "StoredAnswer",
-    "apply_stored_answer",
-    "canonicalize_goal",
-    "extract_branch_subst",
-    "extract_stored_subst",
-    "ground_goal",
-    "instantiate_goal_slots",
-    "is_logic_var",
-    "ordered_placeholders",
-    "public_answer",
-]

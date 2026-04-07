@@ -3,8 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Builtin, HOST, Id, IndexedType, NATIVE_REALM, NativeHost, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, Spec, current_realm, placeholder, wrap, spec_name
-from protomorph.reasoning import Rule
+from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, current_realm, var, wrap, spec_name
 
 
 INT = cast(Spec, wrap(int).fetch())
@@ -48,7 +47,7 @@ class TestWrap(unittest.TestCase):
 class TestNativeHostSchemaFor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.host = NativeHost()
+        cls.host = NativeRealm()
 
     def test_unknown_spec_returns_none(self):
         self.assertIsNone(self.host.schema_for(Spec.of("unknown.Thing")))
@@ -76,11 +75,11 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 class TestDelegation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.token = HOST.set(NativeHost())
+        cls.token = REALM.set(NativeRealm())
 
     @classmethod
     def tearDownClass(cls):
-        HOST.reset(cls.token)
+        REALM.reset(cls.token)
 
     def test_spec_item_access_delegates_to_host(self):
         spec = Spec.of(spec_name(Point))
@@ -94,22 +93,11 @@ class TestDelegation(unittest.TestCase):
             qual.item_at(0)
 
 
-class TestRealmAliases(unittest.TestCase):
-    def test_native_host_alias_points_to_native_realm(self):
-        self.assertIs(NativeHost, NativeRealm)
-
+class TestRealmContext(unittest.TestCase):
     def test_realm_context_manager_sets_current_realm(self):
         realm = NativeRealm()
         with realm:
             self.assertIs(current_realm(), realm)
-
-    def test_native_realm_with_rules_builds_overlay(self):
-        x = placeholder("X")
-        rule = Rule(Spec.of("test.edge", x), ())
-        overlay = NATIVE_REALM.with_rules(rule)
-
-        self.assertEqual(overlay.rules_for_anchor("test.edge"), (rule,))
-        self.assertIsNone(overlay.schema_for(Spec.of("unknown.Thing")))
 
 
 if __name__ == "__main__":

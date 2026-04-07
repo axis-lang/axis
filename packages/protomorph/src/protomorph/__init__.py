@@ -1,172 +1,83 @@
 from __future__ import annotations
+
 from typing import Any, cast
 
-from protobase import flux as protobase_flux
+from protobase import flux 
 
+from . import match
 from .abstract import contract
-
-# ── Layer 0: Foundation ──────────────────────────────────────────
-from .foundation import (
-    Id,
-    Anchor,
-    Builtin,
-    Datum,
-)
-
-from .constraint import Constraint
-
-# ── Layer 1: Type ────────────────────────────────────────────────
 from .abstract.contract import Item
+from .domain import *
 
-from .type_ import (
-    Field,
-    Type,
-    Placeholder,
-    PlaceholderMetatype,
-    Var,
-    Mark,
-    WildcardMark,
-    EllipsisMark,
-    SelfMark,
-    SimpleVar,
-    WILDCARD,
-    ELLIPSIS,
-    SELF,
-    placeholder,
-    placeholder_name,
-    placeholder_context,
-    placeholder_slot,
-    placeholder_label,
-)
-
-from .realm import (
-    Realm,
-    OverlayRealm,
-    current_realm,
-)
-
-# ── Layer 4: Concrete types ──────────────────────────────────────
-from .domain import (
-    TupleLikeType,
-    UniformType,
-    UnionType,
-    VaryingType,
-    IndexedType,
-    Spread,
-    Spec,
-    Qual,
-)
-
-# ── Layer 2: Val ─────────────────────────────────────────────
-from .carrier import (
-    Carrier,
-    NativeObjectCarrier,
-    LeafCarrier,
-    Tuple,
-    Index,
-    Ok,
-    Err,
-    Some,
-    None_,
-    Result,
-    Option,
-    ResultUnwrapError,
-    OptionUnwrapError,
-)
-
-# ── Layer 3: Spreads ──────────────────────────────────────────────
+from .carriers import *
+from .constraint import Constraint
+from .native import *
+#from .native import _bootstrap_defaults
+from .realm import *
+from .traversal import *
+from .unification import *
 
 
-# ── Layer 5: Traversal & Unification ─────────────────────────────
-from .traversal import (
-    deep_zip,
-    ZipWalker,
-)
+NATIVE_REALM = NativeRealm()
+REALM = flux.contextvar("pm.REALM", default=NATIVE_REALM)
 
-from .unification import (
-    UnionFind,
-    unify,
-)
-
-from .matching import (
-    MatchNode,
-    MatchBinding,
-    MatchEnv,
-    MatchDefaultPlan,
-    MatchSolution,
-    MatchResult,
-    MatchPathStep,
-    MatchPath,
-    MatchBucket,
-    MatchAmbiguity,
-    MatchShapeSummary,
-    MatchCaseSummary,
-    MatchCase,
-    MatchDispatch,
-    MatchLeaf,
-    MatchMany,
-    MatchGuardShape,
-    MatchSwitchDescriptors,
-    MatchSwitchFieldDescriptors,
-    MatchSwitchNominalDescriptors,
-    MatchTree,
-    MatchWalker,
-    match,
-    compile,
-    diagnose,
-)
-
-# ── Layer 7: Native host ───────────────────────────────────────
-from .native import (
-    spec_name,
-    NativeVar,
-    NativeRealm,
-    register_native_spec,
-    register_python_transform,
-    _project_type,
-    wrap,
-    _bootstrap_defaults,
-)
+#_bootstrap_defaults()
 
 
 assert issubclass(Type, contract.Descriptor)
 
 
+VaryingType.Empty = VaryingType(())
+Tuple.Empty = Tuple._new(pm.VaryingType.Empty, ())
 
 
 
-NATIVE_REALM = NativeRealm()
-REALM = cast(Any, protobase_flux.contextvar("pm.REALM", default=NATIVE_REALM))
+register_native_spec(int, protomorph.Spec.of("std.types.Integer"))
+register_native_spec(str, protomorph.Spec.of("std.types.Text"))
+register_native_spec(float, protomorph.Spec.of("std.types.Decimal"))
+register_native_spec(Decimal, protomorph.Spec.of("std.types.Decimal"))
+register_native_spec(bool, protomorph.Spec.of("std.types.Boolean"))
+register_native_spec(NoneType, protomorph.Spec.of("std.types.Empty"))
+register_native_spec(Id, protomorph.Spec.of("std.types.Id"))
+register_native_spec(Anchor, protomorph.Spec.of("std.types.Anchor"))
 
-Host = Realm
-current_host = current_realm
-NATIVE_HOST = NATIVE_REALM
-HOST = REALM
-NativeHost = NativeRealm
+
+def _set_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Set")))
 
 
-def _make_carrier(tp: Type, dt: Any) -> Carrier:
-    if isinstance(tp, (Placeholder, UnionType)):
-        return LeafCarrier(tp, dt)
-    if isinstance(tp, Qual):
-        qualifier = tp.last_qualifier
-        if qualifier is not None and qualifier.anchor == Anchor("std.qualifiers.Result"):
-            if not isinstance(dt, (Ok, Err)):
-                raise TypeError("Result-qualified types require explicit Ok(...) or Err(...)")
-            return Result(tp, dt)
-        if qualifier is not None and qualifier.anchor == Anchor("std.qualifiers.Optional"):
-            if not isinstance(dt, (Some, None_)):
-                raise TypeError("Optional-qualified types require explicit Some(...) or None_()")
-            return Option(tp, dt)
-        return _make_carrier(tp.underlying, dt)
-    if isinstance(tp, UniformType):
-        return Index(tp, dt) if tp.unique else Tuple(tp, dt)
-    if isinstance(tp, (IndexedType, VaryingType)):
-        return Tuple(cast(TupleLikeType, tp), dt)
-    if isinstance(tp, Spec):
-        if REALM.get().schema_for(tp) is None:
-            return LeafCarrier(tp, dt)
-        return NativeObjectCarrier(tp, dt)
-    raise NotImplementedError(f"No carrier factory for type {type(tp).__name__}")
+def _map_transform(key_type: protomorph.Type, value_type: protomorph.Type) -> protomorph.Type:
+    return cast(
+        protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Map", key_type))
+    )
 
-_bootstrap_defaults()
+
+def _list_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.List")))
+
+
+def _frozenset_transform(value_type: protomorph.Type) -> protomorph.Type:
+    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.FrozenSet")))
+
+
+def _tuple_transform(*types: protomorph.Type | object) -> protomorph.Type:
+    if len(types) == 2 and types[1] is Ellipsis:
+        return cast(protomorph.Type, protomorph.UniformType(cast(protomorph.Type, types[0])))
+    if any(type_ is Ellipsis for type_ in types):
+        raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
+    return cast(protomorph.Type, protomorph.VaryingType(cast(tuple[protomorph.Type, ...], types)))
+
+
+def _result_transform(err_type: protomorph.Type, ok_type: protomorph.Type) -> protomorph.Type:
+    return cast(
+        protomorph.Type,
+        protomorph.Qual.of(ok_type, protomorph.Spec.of("std.qualifiers.Result", err_type)),
+    )
+
+
+register_python_transform(dict, _map_transform)
+register_python_transform(list, _list_transform)
+register_python_transform(set, _set_transform)
+register_python_transform(frozenset, _frozenset_transform)
+register_python_transform(tuple, _tuple_transform)
+register_python_transform(protomorph.Result, _result_transform)

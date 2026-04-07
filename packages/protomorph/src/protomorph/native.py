@@ -1,31 +1,21 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from types import NoneType, UnionType as PEP604Union
-from typing import (
-    Any,
-    Callable,
-    TypeAliasType,
-    TypeVar,
-    TypeVarTuple,
-    Union,
-    Unpack,
-    cast,
-    get_args,
-    get_origin,
-)
-
-from protobase import Consed, attr_info_of, flux, frozendict
+from types import NoneType
+from types import UnionType as PEP604Union
+from typing import (Any, Callable, TypeAliasType, TypeVar, TypeVarTuple, Union,
+                    Unpack, cast, get_args, get_origin)
 
 import protomorph
-from .foundation import _ALL_BUILTINS, Anchor, Id
+from protobase import Consed, attr_info_of, flux, frozendict
+
+from .domain import ALL_BUILTINS, Anchor, Id, Var
 from .realm import OverlayRealm, Realm
 
 type PythonTransform = Callable[..., protomorph.Type]
 
 _NATIVE_SPECS: dict[Any, protomorph.Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
-_BOOTSTRAPPED = False
 
 
 def spec_name(cls: type[protomorph.Builtin]) -> str:
@@ -35,7 +25,7 @@ def spec_name(cls: type[protomorph.Builtin]) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-class NativeVar(protomorph.Var):
+class NativeVar(Var):
     ctx: str | None
     id: str
 
@@ -70,7 +60,7 @@ def _resolve_type_alias(annotation: Any) -> Any:
 class NativeRealm(Realm, Consed):
     @flux.property
     def all_builtins(self) -> frozenset[type[protomorph.Builtin]]:
-        return frozenset(_ALL_BUILTINS)
+        return frozenset(ALL_BUILTINS)
 
     @flux.property
     def native_specs(self) -> frozendict[Any, protomorph.Spec]:
@@ -293,7 +283,7 @@ def instantiate_builtin(
     remaining = iter(arg_values)
     for name in attrs:
         info = attr_info_of(builtin_cls)[name]
-        wants_carrier = info.type is protomorph.Carrier or repr(info.type).startswith("protomorph.carrier.Carrier")
+        wants_carrier = info.type is protomorph.Carrier or repr(info.type).startswith("protomorph.carriers.base.Carrier")
         if name in arg_nominal:
             kwargs[name] = tuple_args.attr(protomorph.Id(name)) if wants_carrier else arg_nominal[name]
             continue
@@ -309,7 +299,7 @@ def instantiate_builtin(
         return None
 
 
-def _project_type(
+def project_type(
     annotation: Any,
     *,
     template: Any | None = None,
@@ -358,17 +348,17 @@ def _project_type(
 
     if origin is Union or isinstance(annotation, PEP604Union):
         return protomorph.UnionType.of(
-            *(_project_type(arg, template=template) for arg in args)
+            *(project_type(arg, template=template) for arg in args)
         )
 
     if origin is Unpack and len(args) == 1:
-        return _project_type(args[0], template=template)
+        return project_type(args[0], template=template)
 
     if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
-        return protomorph.UniformType(_project_type(args[0], template=template))
+        return protomorph.UniformType(project_type(args[0], template=template))
 
     if origin is tuple and args:
-        converted = tuple(_project_type(arg, template=template) for arg in args)
+        converted = tuple(project_type(arg, template=template) for arg in args)
         if (
             len(converted) == 1
             and isinstance(converted[0], protomorph.Placeholder)
@@ -383,7 +373,7 @@ def _project_type(
         if transform is not None:
             converted = tuple(
                 (
-                    _project_type(arg, template=template)
+                    project_type(arg, template=template)
                     if arg is not Ellipsis
                     else arg
                 )
@@ -392,7 +382,7 @@ def _project_type(
             return transform(*converted)
 
         if issubclass(typed_origin, protomorph.Builtin):
-            arg_types = tuple(_project_type(arg, template=template) for arg in args)
+            arg_types = tuple(project_type(arg, template=template) for arg in args)
             return protomorph.Spec.of(spec_name(typed_origin), *arg_types)
 
     if isinstance(annotation, type) and issubclass(annotation, protomorph.Builtin):
@@ -405,17 +395,20 @@ def _project_type(
 
 
 def wrap(*args, **kwargs) -> protomorph.Carrier:
+    values = cast(tuple[object, ...], args)
 
-    if not args and not kwargs:
+    if not values and not kwargs:
         raise TypeError("wrap() requires at least one argument")
 
-    if len(args) > 1 or kwargs:
+    if len(values) > 1 or kwargs:
         return protomorph.VaryingType.new(
-            *(wrap(arg) for arg in args),
+            *(wrap(arg) for arg in values),
             **{key: wrap(value) for key, value in kwargs.items()},
         )
 
-    obj = args[0] # type: ignore
+    if len(values) != 1:
+        raise AssertionError("wrap() expected exactly one value after variadic handling")
+    obj = values[0]
 
     if isinstance(obj, protomorph.Carrier):
         return obj
@@ -426,71 +419,19 @@ def wrap(*args, **kwargs) -> protomorph.Carrier:
         return obj.metatype().make(obj)
 
     if isinstance(obj, type):
-        return _project_type(obj).metatype().make(_project_type(obj))
+        return project_type(obj).metatype().make(project_type(obj))
 
     if get_origin(obj) is not None or isinstance(obj, PEP604Union):
-        descriptor = _project_type(obj)
+        descriptor = project_type(obj)
         return descriptor.metatype().make(descriptor)
 
     if isinstance(obj, protomorph.Builtin):
-        descriptor = _project_type(type(obj))
+        descriptor = project_type(type(obj))
         return descriptor.make(obj)
 
     descriptor = cast(protomorph.Type, wrap(type(obj)).fetch())
     return descriptor.make(obj)
 
 
-def _set_transform(value_type: protomorph.Type) -> protomorph.Type:
-    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Set")))
+_project_type = project_type
 
-
-def _map_transform(key_type: protomorph.Type, value_type: protomorph.Type) -> protomorph.Type:
-    return cast(
-        protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.Map", key_type))
-    )
-
-
-def _list_transform(value_type: protomorph.Type) -> protomorph.Type:
-    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.List")))
-
-
-def _frozenset_transform(value_type: protomorph.Type) -> protomorph.Type:
-    return cast(protomorph.Type, protomorph.Qual.of(value_type, protomorph.Spec.of("std.qualifiers.FrozenSet")))
-
-
-def _tuple_transform(*types: protomorph.Type | object) -> protomorph.Type:
-    if len(types) == 2 and types[1] is Ellipsis:
-        return cast(protomorph.Type, protomorph.UniformType(cast(protomorph.Type, types[0])))
-    if any(type_ is Ellipsis for type_ in types):
-        raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
-    return cast(protomorph.Type, protomorph.VaryingType(cast(tuple[protomorph.Type, ...], types)))
-
-
-def _result_transform(err_type: protomorph.Type, ok_type: protomorph.Type) -> protomorph.Type:
-    return cast(
-        protomorph.Type,
-        protomorph.Qual.of(ok_type, protomorph.Spec.of("std.qualifiers.Result", err_type)),
-    )
-
-
-def _bootstrap_defaults() -> None:
-    global _BOOTSTRAPPED
-    if _BOOTSTRAPPED:
-        return
-
-    register_native_spec(int, protomorph.Spec.of("std.types.Integer"))
-    register_native_spec(str, protomorph.Spec.of("std.types.Text"))
-    register_native_spec(float, protomorph.Spec.of("std.types.Decimal"))
-    register_native_spec(Decimal, protomorph.Spec.of("std.types.Decimal"))
-    register_native_spec(bool, protomorph.Spec.of("std.types.Boolean"))
-    register_native_spec(NoneType, protomorph.Spec.of("std.types.Empty"))
-    register_native_spec(Id, protomorph.Spec.of("std.types.Id"))
-    register_native_spec(Anchor, protomorph.Spec.of("std.types.Anchor"))
-    register_python_transform(dict, _map_transform)
-    register_python_transform(list, _list_transform)
-    register_python_transform(set, _set_transform)
-    register_python_transform(frozenset, _frozenset_transform)
-    register_python_transform(tuple, _tuple_transform)
-    register_python_transform(protomorph.Result, _result_transform)
-
-    _BOOTSTRAPPED = True
