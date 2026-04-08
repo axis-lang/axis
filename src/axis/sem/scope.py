@@ -57,7 +57,7 @@ class Scope(Consed):
             scope = _find_scope(self, sym.at)
             if scope is None:
                 report = log.error(f"Scope not found: {sym.at}").label(origin, "unknown scope").build()
-                return pm.Result.err(pm.wrap(report))
+                return pm.Result.err(pm.val(report))
             return scope._lookup_name(sym.name, origin=origin)
         return self._lookup_name(sym.name, origin=origin)
 
@@ -72,17 +72,17 @@ class Scope(Consed):
             scope = _find_scope(self, at)
             if scope is None:
                 report = log.error(f"Scope not found: {at}").label(origin, "unknown scope").build()
-                return pm.Result.err(pm.wrap(report))
+                return pm.Result.err(pm.val(report))
             return scope._lookup_name(name, origin=origin)
         return self._lookup_name(name, origin=origin)
 
     def _lookup_name(self, name: str, origin: syn.Node) -> ScopeLookupResult:
         if name in self.bindings:
-            return pm.Result.ok(pm.wrap(self.bindings[name]))
+            return pm.Result.ok(pm.val(self.bindings[name]))
         if self.parent is not None:
             return self.parent._lookup_name(name, origin=origin)
         report = log.error(f"Unbound symbol: {name}").label(origin, "unbound symbol").build()
-        return pm.Result.err(pm.wrap(report))
+        return pm.Result.err(pm.val(report))
 
 
 def _find_scope(current: Scope | None, name: str) -> Optional["Scope"]:

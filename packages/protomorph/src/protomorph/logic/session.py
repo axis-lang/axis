@@ -16,14 +16,14 @@ else:
 
 class Session(Consed):
     solver: Solver
-    local_facts: frozenset[pm.Carrier] = frozenset()
+    local_facts: frozenset[pm.Val] = frozenset()
     label: str = ""
 
-    def with_local_facts(self, *facts: pm.Carrier | pm.Datum) -> Session:
-        coerced = frozenset(fact if isinstance(fact, pm.Carrier) else pm.wrap(fact) for fact in facts)
+    def with_local_facts(self, *facts: pm.Val | pm.Datum) -> Session:
+        coerced = frozenset(fact if isinstance(fact, pm.Val) else pm.val(fact) for fact in facts)
         return Session(self.solver, self.local_facts | coerced, self.label)
 
-    def queryset(self, *goals: pm.Carrier | pm.Datum) -> QuerySet:
+    def queryset(self, *goals: pm.Val | pm.Datum) -> QuerySet:
         from .queryset import QuerySet
 
         queryset = QuerySet(self)
@@ -53,7 +53,7 @@ class Session(Consed):
                 self.solver.head_key(fact)
                 for fact in queryset.session.local_facts ^ self.local_facts
             }
-            dirty: set[pm.Carrier] = set()
+            dirty: set[pm.Val] = set()
             dirty.update(
                 key
                 for key, table in state.tables_by_key.items()

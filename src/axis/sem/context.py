@@ -62,7 +62,7 @@ class Context[P: "Context"](syn.SegregatedItem[P], abstract=True):
 
             heads = tuple(self._facts) + tuple(rule.head for rule in self._rules)
             body_goals = tuple(
-                cast(pm.Spec, goal.fetch()) if isinstance(goal, pm.Carrier) else cast(pm.Spec, goal)
+                cast(pm.Spec, goal.fetch()) if isinstance(goal, pm.Val) else cast(pm.Spec, goal)
                 for rule in self._rules
                 for goal in rule.body
             )

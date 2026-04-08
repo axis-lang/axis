@@ -10,14 +10,14 @@ from ..domain import Builtin
 
 P = _TypeVar("P")
 
-type Frame = tuple[pm.Carrier, pm.Carrier]
+type Frame = tuple[pm.Val, pm.Val]
 
 
-def _default_is_var(carrier: pm.Carrier) -> bool:
+def _default_is_var(carrier: pm.Val) -> bool:
     return isinstance(carrier.fetch(), pm.Var)
 
 
-def _default_var_merge(var: pm.Carrier, binding: Binding) -> pm.Carrier:
+def _default_var_merge(var: pm.Val, binding: Binding) -> pm.Val:
     captures = binding.captures
     if len(captures) != 1:
         raise ValueError(f"Cannot merge captures for {var!r}: {captures!r}")
@@ -28,8 +28,8 @@ class Node(Builtin, abstract=True):
     def match_step(
         self,
         *,
-        pattern: pm.Carrier,
-        subject: pm.Carrier,
+        pattern: pm.Val,
+        subject: pm.Val,
         walker: Walker[_Any],
         state: _State[_Any],
         pending: list[_State[_Any]],
@@ -39,19 +39,19 @@ class Node(Builtin, abstract=True):
 
 
 class Binding(Builtin):
-    captures: frozenset[pm.Carrier] = frozenset()
+    captures: frozenset[pm.Val] = frozenset()
 
 
 class Env(Builtin):
-    values: frozendict[pm.Carrier, Binding] = frozendict()
+    values: frozendict[pm.Val, Binding] = frozendict()
 
     def merge(
         self,
         *,
-        is_var: _Callable[[pm.Carrier], bool],
-        var_merge: _Callable[[pm.Carrier, Binding], pm.Carrier],
-    ) -> dict[pm.Carrier, pm.Carrier]:
-        merged: dict[pm.Carrier, pm.Carrier] = {}
+        is_var: _Callable[[pm.Val], bool],
+        var_merge: _Callable[[pm.Val, Binding], pm.Val],
+    ) -> dict[pm.Val, pm.Val]:
+        merged: dict[pm.Val, pm.Val] = {}
         errors: list[Exception] = []
         for var, binding in self.values.items():
             if not is_var(var):
@@ -109,7 +109,7 @@ class ShapeSummary(Builtin):
 
 
 class CaseSummary(Builtin):
-    pattern: pm.Carrier
+    pattern: pm.Val
     shape: ShapeSummary
     prefix_descriptors: tuple[pm.Type | None, ...] = ()
     suffix_descriptors: tuple[pm.Type | None, ...] = ()
@@ -173,8 +173,8 @@ class Tree(_Generic[P], Node):
     def match_step(
         self,
         *,
-        pattern: pm.Carrier,
-        subject: pm.Carrier,
+        pattern: pm.Val,
+        subject: pm.Val,
         walker: Walker[_Any],
         state: _State[_Any],
         pending: list[_State[_Any]],
@@ -199,7 +199,7 @@ class _State(_Generic[P]):
         self,
         *,
         frames: list[Frame] | None = None,
-        env: dict[pm.Carrier, set[pm.Carrier]] | None = None,
+        env: dict[pm.Val, set[pm.Val]] | None = None,
         payloads: set[P] | None = None,
         case_ids: set[int] | None = None,
         defaults: list[DefaultPlan] | None = None,
@@ -224,16 +224,16 @@ class Walker(_Generic[P]):
     def __init__(
         self,
         *,
-        is_var: _Callable[[pm.Carrier], bool] | None = None,
+        is_var: _Callable[[pm.Val], bool] | None = None,
         meta_levels: int = 0,
-        var_merge: _Callable[[pm.Carrier, Binding], pm.Carrier] | None = None,
+        var_merge: _Callable[[pm.Val, Binding], pm.Val] | None = None,
     ):
         self._results: list[Solution[P]] = []
         self.is_var = _default_is_var if is_var is None else is_var
         self.meta_levels = meta_levels
         self.var_merge = _default_var_merge if var_merge is None else var_merge
 
-    def run(self, pattern: pm.Carrier, subject: pm.Carrier) -> Result[P] | None:
+    def run(self, pattern: pm.Val, subject: pm.Val) -> Result[P] | None:
         pending = [_State[P](frames=[(pattern, subject)])]
         while pending:
             state = pending.pop()
@@ -266,26 +266,26 @@ class Walker(_Generic[P]):
             return None
         return Result(solutions=tuple(self.merge_solutions(self._results)))
 
-    def freeze_env(self, env: dict[pm.Carrier, set[pm.Carrier]]) -> Env:
+    def freeze_env(self, env: dict[pm.Val, set[pm.Val]]) -> Env:
         return Env(frozendict({key: Binding(frozenset(values)) for key, values in env.items()}))
 
     def merge_envs(
         self,
-        left: dict[pm.Carrier, set[pm.Carrier]],
-        right: dict[pm.Carrier, set[pm.Carrier]],
-    ) -> dict[pm.Carrier, set[pm.Carrier]]:
+        left: dict[pm.Val, set[pm.Val]],
+        right: dict[pm.Val, set[pm.Val]],
+    ) -> dict[pm.Val, set[pm.Val]]:
         merged = {key: set(values) for key, values in left.items()}
         for key, values in right.items():
             merged.setdefault(key, set()).update(values)
         return merged
 
-    def thaw_env(self, env: Env) -> dict[pm.Carrier, set[pm.Carrier]]:
+    def thaw_env(self, env: Env) -> dict[pm.Val, set[pm.Val]]:
         return {key: set(binding.captures) for key, binding in env.values.items()}
 
     def step_placeholder(
         self,
-        pattern: pm.Carrier,
-        subject: pm.Carrier,
+        pattern: pm.Val,
+        subject: pm.Val,
         state: _State[P],
         pending: list[_State[P]],
     ) -> None:
@@ -305,12 +305,12 @@ class Walker(_Generic[P]):
         if subject.is_leaf and subject.fetch() == value:
             pending.append(state)
 
-    def _structurally_compatible(self, pattern: pm.Carrier, subject: pm.Carrier) -> bool:
+    def _structurally_compatible(self, pattern: pm.Val, subject: pm.Val) -> bool:
         if pattern.descriptor == subject.descriptor:
             return True
         if not pattern.is_leaf and not subject.is_leaf and type(pattern) is type(subject):
             return True
-        if pm.wrap(pattern.descriptor).is_pattern:
+        if pm.val(pattern.descriptor).is_pattern:
             return True
         pattern_value = pattern.fetch()
         subject_value = subject.fetch()
@@ -318,7 +318,7 @@ class Walker(_Generic[P]):
             return type(pattern_value) is type(subject_value)
         return False
 
-    def _reify_pattern_with_env(self, pattern: pm.Carrier, env: Env) -> pm.Carrier:
+    def _reify_pattern_with_env(self, pattern: pm.Val, env: Env) -> pm.Val:
         subst = env.merge(is_var=self.is_var, var_merge=self.var_merge)
         reified_type = pattern.type.subst(subst)
         reified_descriptor = _cast(pm.Type, reified_type.fetch())
@@ -326,8 +326,8 @@ class Walker(_Generic[P]):
 
     def step_structural(
         self,
-        pattern: pm.Carrier,
-        subject: pm.Carrier,
+        pattern: pm.Val,
+        subject: pm.Val,
         state: _State[P],
         pending: list[_State[P]],
     ) -> None:
@@ -382,7 +382,7 @@ class Walker(_Generic[P]):
             else:
                 pending.append(subbranch)
 
-    def _subject_shape(self, subject: pm.Carrier) -> tuple[int, frozenset[pm.Id]]:
+    def _subject_shape(self, subject: pm.Val) -> tuple[int, frozenset[pm.Id]]:
         positional_count = 0
         keys: set[pm.Id] = set()
         if subject.is_leaf:
@@ -395,7 +395,7 @@ class Walker(_Generic[P]):
                 keys.add(_cast(pm.Id, item.key))
         return positional_count, frozenset(keys)
 
-    def _accepts_shape(self, subject: pm.Carrier, shape: ShapeSummary) -> bool:
+    def _accepts_shape(self, subject: pm.Val, shape: ShapeSummary) -> bool:
         positional_count, keys = self._subject_shape(subject)
         if positional_count < shape.min_arity:
             return False
@@ -409,7 +409,7 @@ class Walker(_Generic[P]):
 
     def _field_descriptor_key(
         self,
-        subject: pm.Carrier,
+        subject: pm.Val,
         *,
         path: Path,
         prefix_len: int,
@@ -431,7 +431,7 @@ class Walker(_Generic[P]):
 
     def _nominal_descriptor_key(
         self,
-        subject: pm.Carrier,
+        subject: pm.Val,
         *,
         path: Path,
         keys: tuple[pm.Id, ...],
@@ -447,7 +447,7 @@ class Walker(_Generic[P]):
                 return None
         return tuple(result)
 
-    def select_cases(self, root: Dispatch, subject: pm.Carrier) -> frozenset[int]:
+    def select_cases(self, root: Dispatch, subject: pm.Val) -> frozenset[int]:
         pending = [root]
         selected: set[int] = set()
         while pending:
@@ -489,7 +489,7 @@ class Walker(_Generic[P]):
             raise TypeError(f"Unsupported Dispatch: {type(node).__name__}")
         return frozenset(selected)
 
-    def resolve_path(self, subject: pm.Carrier, path: Path) -> pm.Carrier:
+    def resolve_path(self, subject: pm.Val, path: Path) -> pm.Val:
         current = subject
         for step in path.steps:
             current = current.attr(step.key) if step.key is not None else current[step.offset]
@@ -497,7 +497,7 @@ class Walker(_Generic[P]):
 
     def merge_solutions(self, solutions: list[Solution[P]]) -> tuple[Solution[P], ...]:
         merged: dict[
-            tuple[frozenset[tuple[pm.Carrier, frozenset[pm.Carrier]]], tuple[DefaultPlan, ...], frozenset[int]],
+            tuple[frozenset[tuple[pm.Val, frozenset[pm.Val]]], tuple[DefaultPlan, ...], frozenset[int]],
             Solution[P],
         ] = {}
         for solution in solutions:
@@ -696,7 +696,7 @@ def _compile_dispatch[P](cases: tuple[Case[P], ...], path: Path = Path()) -> tup
     return (Many(case_ids=frozenset(case.id for case in cases), children=tuple(children)), tuple(ambiguities))
 
 
-def compile[P](cases: _Mapping[CaseSummary, frozenset[P] | P]) -> pm.Carrier:
+def compile[P](cases: _Mapping[CaseSummary, frozenset[P] | P]) -> pm.Val:
     if not cases:
         raise ValueError("match.compile requires at least one case summary")
     merged: dict[CaseSummary, set[P]] = {}
@@ -706,19 +706,19 @@ def compile[P](cases: _Mapping[CaseSummary, frozenset[P] | P]) -> pm.Carrier:
     compiled_cases = tuple(Case(id=index, summary=summary, payloads=frozenset(payloads)) for index, (summary, payloads) in enumerate(merged.items()))
     root, ambiguities = _compile_dispatch(compiled_cases)
     numbered_ambiguities = tuple(Bucket(id=index, case_ids=bucket.case_ids, path=bucket.path, kind=bucket.kind) for index, bucket in enumerate(ambiguities))
-    return pm.wrap(Tree(root=root, cases=compiled_cases, ambiguities=numbered_ambiguities))
+    return pm.val(Tree(root=root, cases=compiled_cases, ambiguities=numbered_ambiguities))
 
 
 def match(
     pattern: _Any,
     subject: _Any,
     *,
-    is_var: _Callable[[pm.Carrier], bool] | None = None,
+    is_var: _Callable[[pm.Val], bool] | None = None,
     meta_levels: int = 0,
-    var_merge: _Callable[[pm.Carrier, Binding], pm.Carrier] | None = None,
+    var_merge: _Callable[[pm.Val, Binding], pm.Val] | None = None,
 ) -> Result[_Any] | None:
-    pattern_carrier = pattern if isinstance(pattern, pm.Carrier) else pm.wrap(pattern)
-    subject_carrier = subject if isinstance(subject, pm.Carrier) else pm.wrap(subject)
+    pattern_carrier = pattern if isinstance(pattern, pm.Val) else pm.val(pattern)
+    subject_carrier = subject if isinstance(subject, pm.Val) else pm.val(subject)
     return Walker[_Any](is_var=is_var, meta_levels=meta_levels, var_merge=var_merge).run(pattern_carrier, subject_carrier)
 
 

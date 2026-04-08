@@ -10,7 +10,7 @@ import protomorph as pm
 _RECONSTRUCT = object()
 
 
-class Carrier[T](Consed, abstract=True):
+class Val[T](Consed, abstract=True):
     descriptor: pm.Type[T]
     content: T
 
@@ -19,20 +19,20 @@ class Carrier[T](Consed, abstract=True):
 
         return repr_any(self)
 
-    def child(self, tp: pm.Type, dt: _Any) -> Carrier:
-        if isinstance(dt, Carrier):
+    def child(self, tp: pm.Type, dt: _Any) -> Val:
+        if isinstance(dt, Val):
             return dt
         if isinstance(dt, pm.Var | pm.Mark):
             if isinstance(tp, pm.Spec) and pm.REALM.get().schema_for(tp) is not None:
-                return pm.carrier(tp, dt)
+                return pm.make_value(tp, dt)
             return LeafCarrier(tp, dt)
         if isinstance(dt, pm.Type):
             return dt.metatype().make(dt)
-        return pm.carrier(tp, dt)
+        return pm.make_value(tp, dt)
 
     @property
-    def type(self) -> Carrier[pm.Type[T]]:
-        return _cast(Carrier[pm.Type[T]], pm.wrap(self.descriptor))
+    def type(self) -> Val[pm.Type[T]]:
+        return _cast(Val[pm.Type[T]], pm.val(self.descriptor))
 
     def fetch(self) -> T:
         return self.content
@@ -42,10 +42,10 @@ class Carrier[T](Consed, abstract=True):
 
         return match(self, subject, **kwargs)
 
-    def attr(self, id: pm.Id) -> Carrier:
+    def attr(self, id: pm.Id) -> Val:
         raise NotImplementedError(f"attr() not implemented for {type(self).__name__}")
 
-    def __getitem__(self, offset: int) -> Carrier:
+    def __getitem__(self, offset: int) -> Val:
         raise NotImplementedError(f"__getitem__ not implemented for {type(self).__name__}")
 
     @property
@@ -58,16 +58,16 @@ class Carrier[T](Consed, abstract=True):
             return arity
         raise NotImplementedError(f"__len__ for unbounded type: override in {type(self).__name__}")
 
-    def __iter__(self) -> _Iterator[Carrier]:
+    def __iter__(self) -> _Iterator[Val]:
         for offset in range(len(self)):
             yield self[offset]
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         raise NotImplementedError(f"reconstruct() not implemented for {type(self).__name__}")
 
-    def deep_iter(self, is_leaf: _Callable[[Carrier], bool] | None = None) -> _Iterator[Carrier]:
+    def deep_iter(self, is_leaf: _Callable[[Val], bool] | None = None) -> _Iterator[Val]:
         is_leaf_fn = is_leaf or (lambda carrier: carrier.is_leaf)
-        stack: list[Carrier] = [self]
+        stack: list[Val] = [self]
         while stack:
             node = stack.pop()
             if is_leaf_fn(node):
@@ -78,12 +78,12 @@ class Carrier[T](Consed, abstract=True):
 
     def deep_map(
         self,
-        f: _Callable[[Carrier], Carrier],
-        is_leaf: _Callable[[Carrier], bool] | None = None,
-    ) -> Carrier:
+        f: _Callable[[Val], Val],
+        is_leaf: _Callable[[Val], bool] | None = None,
+    ) -> Val:
         is_leaf_fn = is_leaf or (lambda carrier: carrier.is_leaf)
         stack: list[_Any] = [self]
-        results: list[Carrier] = []
+        results: list[Val] = []
         while stack:
             item = stack.pop()
             if item is _RECONSTRUCT:
@@ -101,40 +101,40 @@ class Carrier[T](Consed, abstract=True):
             stack.extend(reversed(children))
         return results[0]
 
-    def subst(self, mapping: _Mapping[Carrier, Carrier]) -> Carrier:
+    def subst(self, mapping: _Mapping[Val, Val]) -> Val:
         return self.deep_map(lambda carrier: mapping.get(carrier, carrier), is_leaf=lambda carrier: carrier in mapping or carrier.is_leaf)
 
     def subst_where(
         self,
-        pred: _Callable[[Carrier], bool],
-        replace: _Callable[[Carrier], Carrier],
-    ) -> Carrier:
-        mapping: dict[Carrier, Carrier] = {}
+        pred: _Callable[[Val], bool],
+        replace: _Callable[[Val], Val],
+    ) -> Val:
+        mapping: dict[Val, Val] = {}
         for leaf in self.deep_iter():
             if pred(leaf):
                 mapping[leaf] = replace(leaf)
         return self if not mapping else self.subst(mapping)
 
-    def subst_marks(self, mapping: _Mapping[pm.Mark, Carrier | pm.Datum]) -> Carrier:
-        def pred(leaf: Carrier) -> bool:
+    def subst_marks(self, mapping: _Mapping[pm.Mark, Val | pm.Datum]) -> Val:
+        def pred(leaf: Val) -> bool:
             value = leaf.fetch()
             return isinstance(value, pm.Mark) and value in mapping
 
-        def replace(leaf: Carrier) -> Carrier:
+        def replace(leaf: Val) -> Val:
             value = _cast(pm.Mark, leaf.fetch())
             replacement = mapping[value]
-            if isinstance(replacement, Carrier):
+            if isinstance(replacement, Val):
                 return replacement
-            return pm.wrap(replacement)
+            return pm.val(replacement)
 
         return self.subst_where(pred, replace)
 
-    def subst_self(self, subject: Carrier | pm.Datum) -> Carrier:
-        replacement = subject if isinstance(subject, Carrier) else pm.wrap(subject)
+    def subst_self(self, subject: Val | pm.Datum) -> Val:
+        replacement = subject if isinstance(subject, Val) else pm.val(subject)
         return self.subst_marks({pm.SELF: replacement})
 
-    def search(self, target: Carrier) -> bool:
-        stack: list[Carrier] = [self]
+    def search(self, target: Val) -> bool:
+        stack: list[Val] = [self]
         while stack:
             node = stack.pop()
             if node == target:
@@ -147,7 +147,7 @@ class Carrier[T](Consed, abstract=True):
     def is_pattern(self) -> bool:
         from ..match import Node
 
-        stack: list[Carrier] = [self]
+        stack: list[Val] = [self]
         while stack:
             node = stack.pop()
             value = node.fetch()
@@ -158,31 +158,31 @@ class Carrier[T](Consed, abstract=True):
         return False
 
 
-class NativeObjectCarrier[T](Carrier[T]):
-    def attr(self, id: pm.Id) -> Carrier:
+class NativeObjectCarrier[T](Val[T]):
+    def attr(self, id: pm.Id) -> Val:
         field = self.descriptor.item(id)
         return self.child(field.value, getattr(self.content, id))
 
-    def __getitem__(self, offset: int) -> Carrier:
+    def __getitem__(self, offset: int) -> Val:
         field = self.descriptor.item_at(offset)
         assert field.key is not None
         return self.child(field.value, getattr(self.content, field.key))
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         values: dict[str, _Any] = {}
         for item, child in zip(self.descriptor.items(), children):
             assert item.key is not None
             original = getattr(self.content, item.key)
-            values[str(item.key)] = child if isinstance(original, Carrier) else child.fetch()
+            values[str(item.key)] = child if isinstance(original, Val) else child.fetch()
         return _cast(Self, type(self)(self.descriptor, type(self.content)(**values)))
 
 
-class LeafCarrier[T](Carrier[T]):
+class LeafCarrier[T](Val[T]):
     @property
     def is_leaf(self) -> bool:
         return True
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         assert not children
         return self
 

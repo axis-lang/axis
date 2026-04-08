@@ -63,17 +63,17 @@ class EntityView(ContributionSet):
         def spec_binding_ir(self) -> sem.BindingIR:
             return sem.build_binding_ir(self.lowered_spec_bindings)
 
-        def _spec_subject_template(self, field: sem.BindingStruct.Field) -> pm.Carrier | None:
+        def _spec_subject_template(self, field: sem.BindingStruct.Field) -> pm.Val | None:
             if field.binder_name is None:
                 return None
             if field.is_nominal and field.slot_key is not None:
-                return pm.wrap(urs.AttrOperator.of(pm.SELF, field.slot_key))
+                return pm.val(urs.AttrOperator.of(pm.SELF, field.slot_key))
             positional = [item for item in self.spec_bindings.fields if item.is_positional]
             try:
                 offset = positional.index(field)
             except ValueError:
                 return None
-            return pm.wrap(urs.AttrOperator.of(pm.SELF, offset))
+            return pm.val(urs.AttrOperator.of(pm.SELF, offset))
 
         @flux.property
         def spec_constraint_scope(self) -> sem.Scope:
@@ -95,7 +95,7 @@ class EntityView(ContributionSet):
                 subject_for_binding=lambda field: (
                     None
                     if self._spec_subject_template(field) is None
-                    else pm.Result.ok(cast(pm.Carrier, self._spec_subject_template(field)))
+                    else pm.Result.ok(cast(pm.Val, self._spec_subject_template(field)))
                 ),
                 origin_label="spec",
                 allow_defaults=True,
@@ -109,7 +109,7 @@ class EntityView(ContributionSet):
                 subject_for_binding=lambda field: (
                     None
                     if self._spec_subject_template(field) is None
-                    else pm.Result.ok(cast(pm.Carrier, self._spec_subject_template(field)))
+                    else pm.Result.ok(cast(pm.Val, self._spec_subject_template(field)))
                 ),
                 origin_label="spec",
                 allow_defaults=True,
@@ -172,7 +172,7 @@ class EntityView(ContributionSet):
                 subject_for_binding=lambda field: (
                     None
                     if self._param_binder(field) is None
-                    else pm.Result.ok(pm.wrap(cast(pm.Var, self._param_binder(field))))
+                    else pm.Result.ok(pm.val(cast(pm.Var, self._param_binder(field))))
                 ),
                 origin_label="parameter",
                 allow_defaults=True,
@@ -199,7 +199,7 @@ class EntityView(ContributionSet):
         result_bound_expr: syn.Expr | None = _
 
         @flux.property
-        def result_bound(self) -> pm.Carrier | None:
+        def result_bound(self) -> pm.Val | None:
             return sem.build_bound(self.result_bound_expr, self.overload_scope)
 
         @flux.property
@@ -227,7 +227,7 @@ class EntityView(ContributionSet):
             )
 
         @flux.property
-        def underlying_bound(self) -> pm.Carrier | None:
+        def underlying_bound(self) -> pm.Val | None:
             return sem.build_bound(self.underlying_bound_expr, self.spec_scope)
 
         @flux.property
@@ -312,7 +312,7 @@ class EntityView(ContributionSet):
         return tuple(cases)
 
     @flux.property
-    def _spec_match_tree(self) -> pm.Carrier:
+    def _spec_match_tree(self) -> pm.Val:
         cases = self._spec_match_cases
         if not cases:
             raise ValueError(f"EntityView for {self.anchor!r} has no spec contributions")
@@ -356,7 +356,7 @@ class EntityView(ContributionSet):
         return tuple(clusters)
 
     @flux.method
-    def spec_pattern_for(self, cls: type[SpecContribution]) -> pm.Carrier | None:
+    def spec_pattern_for(self, cls: type[SpecContribution]) -> pm.Val | None:
         try:
             return self.for_(facet=cls)._spec_match_tree
         except ValueError:

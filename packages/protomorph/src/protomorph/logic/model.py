@@ -3,11 +3,11 @@ from __future__ import annotations
 from protobase import frozendict
 
 import protomorph as pm
-from protomorph.foundation import Builtin
+from protomorph.domain import Builtin
 
-type Goal = pm.Carrier
+type Goal = pm.Val
 type KeyValue = pm.Anchor | pm.Type | pm.Spec
-type Key = pm.Carrier[KeyValue]
+type Key = pm.Val[KeyValue]
 type TableKey = Goal
 
 
@@ -287,7 +287,7 @@ class QuerySetState(Builtin):
     tables_by_binding_key: frozendict[Key, tuple[TableKey, ...]] = frozendict()
     open_keys: tuple[TableKey, ...] = ()
     dirty_keys: tuple[TableKey, ...] = ()
-    promoted_answers_by_key: frozendict[Key, frozenset[pm.Carrier]] = frozendict()
+    promoted_answers_by_key: frozendict[Key, frozenset[pm.Val]] = frozendict()
     epoch: int = 0
     binding_epoch: int = 0
     binding_epochs_by_key: frozendict[Key, int] = frozendict()
@@ -313,9 +313,9 @@ class SolverTables(Builtin):
         return component_id in self.closed_components
 
 
-COINDUCTIVE_CYCLE_KEY = pm.wrap(pm.Spec.of(CoinductiveCycle.SPEC_NAME))
-COINDUCTIVE_EDGE_KEY = pm.wrap(pm.Spec.of(CoinductiveEdge.SPEC_NAME))
-REDUCIBLE_KEY = pm.wrap(pm.Spec.of(Reducible.SPEC_NAME))
+COINDUCTIVE_CYCLE_KEY = pm.val(pm.Spec.of(CoinductiveCycle.SPEC_NAME))
+COINDUCTIVE_EDGE_KEY = pm.val(pm.Spec.of(CoinductiveEdge.SPEC_NAME))
+REDUCIBLE_KEY = pm.val(pm.Spec.of(Reducible.SPEC_NAME))
 
 
 class SolverResult(Builtin, abstract=True):

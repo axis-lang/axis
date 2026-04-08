@@ -40,7 +40,7 @@ class Solver(Consed):
 
     @flux.property
     def ctrl_type(self) -> pm.Type:
-        return cast(pm.Type, pm.wrap(Ctrl).fetch())
+        return cast(pm.Type, pm.val(Ctrl).fetch())
 
     @flux.property
     def all_assertions(self) -> frozenset[Assertion]:
@@ -54,8 +54,8 @@ class Solver(Consed):
         return frozendict((key, frozenset(items)) for key, items in sorted(buckets.items(), key=lambda item: repr(item[0])))
 
     @flux.property
-    def seed_facts_by_key(self) -> frozendict[Key, frozenset[pm.Carrier]]:
-        buckets: dict[Key, set[pm.Carrier]] = {}
+    def seed_facts_by_key(self) -> frozendict[Key, frozenset[pm.Val]]:
+        buckets: dict[Key, set[pm.Val]] = {}
         for assertion in self.all_assertions:
             if not assertion.is_fact:
                 continue
@@ -82,11 +82,11 @@ class Solver(Consed):
     def global_tables(self) -> SolverTables:
         return _compute_global_tables(self)
 
-    def head_key(self, x: pm.Carrier) -> Key:
+    def head_key(self, x: pm.Val) -> Key:
         value = x.fetch()
         if isinstance(value, pm.Spec):
-            return cast(Key, pm.wrap(value.anchor))
-        return pm.wrap(x.descriptor)
+            return cast(Key, pm.val(value.anchor))
+        return pm.val(x.descriptor)
 
     def is_coinductive(self, cycle: Cycle[TableKey]) -> bool:
         if cycle.is_negative:
@@ -94,14 +94,14 @@ class Solver(Consed):
 
         coinductive_cycle = self._project_coinductive_cycle(cycle)
         cycle_facts = self.global_tables.facts_by_key.get(COINDUCTIVE_CYCLE_KEY, frozenset())
-        if pm.wrap(coinductive_cycle) in cycle_facts:
+        if pm.val(coinductive_cycle) in cycle_facts:
             return True
 
         edge_facts = self.global_tables.facts_by_key.get(COINDUCTIVE_EDGE_KEY, frozenset())
         if not cycle.edges:
             return False
         return all(
-            pm.wrap(CoinductiveEdge(self.head_key(edge.from_), self.head_key(edge.to))) in edge_facts
+            pm.val(CoinductiveEdge(self.head_key(edge.from_), self.head_key(edge.to))) in edge_facts
             for edge in cycle.edges
             if edge.affirmative
         )
@@ -121,71 +121,71 @@ class Solver(Consed):
             for premise in assertion.premises
         )
 
-    def _dependencies_for_graph(self, item: Assertion | pm.Carrier):
+    def _dependencies_for_graph(self, item: Assertion | pm.Val):
         if isinstance(item, Assertion):
             return self.dependencies_of(item)
-        return self.head_key(cast(pm.Carrier, item))
+        return self.head_key(cast(pm.Val, item))
 
-    def is_reducible(self, x: pm.Carrier) -> bool:
+    def is_reducible(self, x: pm.Val) -> bool:
         reducible_facts = self.global_tables.facts_by_key.get(REDUCIBLE_KEY, frozenset())
-        return pm.wrap(Reducible(x.descriptor)) in reducible_facts
+        return pm.val(Reducible(x.descriptor)) in reducible_facts
 
-    def eval_as_ctrl(self, x: pm.Carrier) -> pm.Carrier:
+    def eval_as_ctrl(self, x: pm.Val) -> pm.Val:
         try:
             result = self.realm.eval(x, to=self.ctrl_type)
         except Exception as exc:
-            return pm.wrap(Failed(f"evaluation error: {exc}"))
+            return pm.val(Failed(f"evaluation error: {exc}"))
 
         carrier = _coerce_eval_result(result)
         if carrier is not None and isinstance(carrier.fetch(), Ctrl):
             return carrier
         if carrier is None:
-            return pm.wrap(Failed("evaluation error: realm.eval returned no value"))
-        return pm.wrap(Failed("realm.eval did not return pm.logic.Ctrl", carrier))
+            return pm.val(Failed("evaluation error: realm.eval returned no value"))
+        return pm.val(Failed("realm.eval did not return pm.logic.Ctrl", carrier))
 
-    def facts_for(self, key: Key) -> frozenset[pm.Carrier]:
+    def facts_for(self, key: Key) -> frozenset[pm.Val]:
         return self.global_tables.facts_by_key.get(key, frozenset())
 
     def assertions_for(self, key: Key) -> frozenset[Assertion]:
         return self.assertions_by_key.get(key, frozenset())
 
-    def facts_for_component(self, component_id: int) -> frozenset[pm.Carrier]:
+    def facts_for_component(self, component_id: int) -> frozenset[pm.Val]:
         return self.global_tables.facts_by_component.get(component_id, frozenset())
 
-    def derived_facts_for_component(self, component_id: int) -> frozenset[pm.Carrier]:
+    def derived_facts_for_component(self, component_id: int) -> frozenset[pm.Val]:
         return self.global_tables.derived_facts_by_component.get(component_id, frozenset())
 
-    def session(self, *, local_facts: tuple[pm.Carrier, ...] = (), label: str = "") -> Session:
+    def session(self, *, local_facts: tuple[pm.Val, ...] = (), label: str = "") -> Session:
         return Session(self, frozenset(local_facts), label)
 
 
-def _coerce_eval_result(value: Any) -> pm.Carrier | None:
+def _coerce_eval_result(value: Any) -> pm.Val | None:
     if value is None:
         return None
-    carrier = value if isinstance(value, pm.Carrier) else pm.wrap(value)
+    carrier = value if isinstance(value, pm.Val) else pm.val(value)
     if isinstance(carrier, pm.Result):
         if carrier.is_err:
-            return pm.wrap(Failed("evaluation error", carrier.error_carrier()))
-        return cast(pm.Carrier, carrier.unwrap())
+            return pm.val(Failed("evaluation error", carrier.error_carrier()))
+        return cast(pm.Val, carrier.unwrap())
     if isinstance(carrier, pm.Option):
         if carrier.is_none:
             return None
-        return cast(pm.Carrier, carrier.unwrap())
+        return cast(pm.Val, carrier.unwrap())
     return carrier
 
 
-def _is_logic_var(carrier: pm.Carrier) -> bool:
+def _is_logic_var(carrier: pm.Val) -> bool:
     return isinstance(carrier.fetch(), (pm.Placeholder, pm.Var))
 
 
-def _contains_logic_vars(carrier: pm.Carrier) -> bool:
+def _contains_logic_vars(carrier: pm.Val) -> bool:
     for leaf in carrier.deep_iter():
         if _is_logic_var(leaf):
             return True
     return False
 
 
-def _matches_any_fact(goal: pm.Carrier, facts: frozenset[pm.Carrier] | set[pm.Carrier]) -> bool:
+def _matches_any_fact(goal: pm.Val, facts: frozenset[pm.Val] | set[pm.Val]) -> bool:
     for fact in facts:
         uf = pm.UnionFind(_is_logic_var)
         if pm.unify(goal, fact, subst=uf) is not None:
@@ -193,8 +193,8 @@ def _matches_any_fact(goal: pm.Carrier, facts: frozenset[pm.Carrier] | set[pm.Ca
     return False
 
 
-def _is_reducible_with_facts(goal: Goal, reducible_facts: frozenset[pm.Carrier] | set[pm.Carrier]) -> bool:
-    return pm.wrap(Reducible(goal.descriptor)) in reducible_facts
+def _is_reducible_with_facts(goal: Goal, reducible_facts: frozenset[pm.Val] | set[pm.Val]) -> bool:
+    return pm.val(Reducible(goal.descriptor)) in reducible_facts
 
 
 def _apply_public_answer(target: Goal, answer: Answer, uf: pm.UnionFind) -> bool:
@@ -218,11 +218,11 @@ def _apply_public_answer(target: Goal, answer: Answer, uf: pm.UnionFind) -> bool
 def _derive_ground_facts(
     solver: Solver,
     assertion: Assertion,
-    known: dict[Key, set[pm.Carrier]],
+    known: dict[Key, set[pm.Val]],
     current_stratum: int,
-    reducible_facts: frozenset[pm.Carrier] | set[pm.Carrier],
-) -> frozenset[pm.Carrier]:
-    answers: list[pm.Carrier] = []
+    reducible_facts: frozenset[pm.Val] | set[pm.Val],
+) -> frozenset[pm.Val]:
+    answers: list[pm.Val] = []
     uf = pm.UnionFind(_is_logic_var)
 
     def proof_state_for_goal(goal: Goal) -> str:
@@ -376,11 +376,11 @@ def _derive_ground_facts(
 
 
 def _compute_global_tables(solver: Solver) -> SolverTables:
-    known: dict[Key, set[pm.Carrier]] = {
+    known: dict[Key, set[pm.Val]] = {
         key: set(values)
         for key, values in solver.seed_facts_by_key.items()
     }
-    derived: dict[Key, set[pm.Carrier]] = {key: set() for key in (*solver.assertions_by_key.keys(), *solver.seed_facts_by_key.keys())}
+    derived: dict[Key, set[pm.Val]] = {key: set() for key in (*solver.assertions_by_key.keys(), *solver.seed_facts_by_key.keys())}
     closed_components: set[int] = set()
     closed_strata: set[int] = set()
 
@@ -415,8 +415,8 @@ def _compute_global_tables(solver: Solver) -> SolverTables:
             closed_components.add(component.id)
         closed_strata.add(stratum)
 
-    facts_by_component: dict[int, frozenset[pm.Carrier]] = {}
-    derived_by_component: dict[int, frozenset[pm.Carrier]] = {}
+    facts_by_component: dict[int, frozenset[pm.Val]] = {}
+    derived_by_component: dict[int, frozenset[pm.Val]] = {}
     for component in solver.sccs:
         if component.id not in closed_components:
             continue

@@ -23,23 +23,23 @@ class UnionFind:
 
     def __init__(
         self,
-        is_var: Callable[[protomorph.Carrier], bool],
+        is_var: Callable[[protomorph.Val], bool],
         *,
-        info_for: Callable[[protomorph.Carrier], Any | None] | None = None,
+        info_for: Callable[[protomorph.Val], Any | None] | None = None,
         merge_info: Callable[[Any | None, Any | None], Any | None] | None = None,
     ):
-        self._parent: dict[protomorph.Carrier, protomorph.Carrier] = {}
-        self._rank: dict[protomorph.Carrier, int] = {}
+        self._parent: dict[protomorph.Val, protomorph.Val] = {}
+        self._rank: dict[protomorph.Val, int] = {}
         self._trail: list[tuple] = []
-        self._var_info: dict[protomorph.Carrier, Any] = {}
-        self._class_info: dict[protomorph.Carrier, Any] = {}
+        self._var_info: dict[protomorph.Val, Any] = {}
+        self._class_info: dict[protomorph.Val, Any] = {}
         self.is_var = is_var
         self.info_for = _default_info_for if info_for is None else info_for
         self.merge_info = _default_merge_info if merge_info is None else merge_info
 
     # ── core operations ───────────────────────────────────────────
 
-    def find(self, x: protomorph.Carrier) -> protomorph.Carrier:
+    def find(self, x: protomorph.Val) -> protomorph.Val:
         """Follow parent chain to canonical representative (with path compression)."""
         if x not in self._parent:
             self._ensure_class_info(x)
@@ -57,7 +57,7 @@ class UnionFind:
         self._ensure_class_info(root)
         return root
 
-    def bind(self, var: protomorph.Carrier, term: protomorph.Carrier, *, occurs_check: bool = True) -> bool:
+    def bind(self, var: protomorph.Val, term: protomorph.Val, *, occurs_check: bool = True) -> bool:
         """Bind *var* to *term*. Returns False if occurs check fails."""
         rv = self.find(var)
         rt = self.find(term)
@@ -69,7 +69,7 @@ class UnionFind:
         self._link(rv, rt)
         return True
 
-    def _link(self, a: protomorph.Carrier, b: protomorph.Carrier) -> None:
+    def _link(self, a: protomorph.Val, b: protomorph.Val) -> None:
         """Make *a* point to *b*, preferring non-vars as root."""
         if self.is_var(b) and not self.is_var(a):
             a, b = b, a
@@ -85,7 +85,7 @@ class UnionFind:
             self._trail.append(("r", b, rb))
             self._rank[b] = rb + 1
 
-    def _occurs(self, var: protomorph.Carrier, term: protomorph.Carrier) -> bool:
+    def _occurs(self, var: protomorph.Val, term: protomorph.Val) -> bool:
         """Return True if *var* appears anywhere inside *term*."""
         term = self.find(term)
         if var is term:
@@ -120,7 +120,7 @@ class UnionFind:
                 else:
                     self._parent[node] = old
 
-    def variable_info(self, var: protomorph.Carrier) -> Any | None:
+    def variable_info(self, var: protomorph.Val) -> Any | None:
         if var in self._var_info:
             return self._var_info[var]
         info = self.info_for(var)
@@ -128,12 +128,12 @@ class UnionFind:
             self._var_info[var] = info
         return info
 
-    def class_info(self, carrier: protomorph.Carrier) -> Any | None:
+    def class_info(self, carrier: protomorph.Val) -> Any | None:
         root = self.find(carrier)
         self._ensure_class_info(root)
         return self._class_info.get(root)
 
-    def set_class_info(self, carrier: protomorph.Carrier, info: Any | None) -> None:
+    def set_class_info(self, carrier: protomorph.Val, info: Any | None) -> None:
         root = self.find(carrier)
         self._trail.append(("i", root, self._class_info.get(root, _MISSING)))
         if info is None:
@@ -143,7 +143,7 @@ class UnionFind:
 
     # ── reification ───────────────────────────────────────────────
 
-    def reify(self, carrier: protomorph.Carrier, _seen: set | None = None) -> protomorph.Carrier:
+    def reify(self, carrier: protomorph.Val, _seen: set | None = None) -> protomorph.Val:
         """Deep-substitute all bound variables in *carrier*."""
         if self.is_var(carrier):
             root = self.find(carrier)
@@ -157,7 +157,7 @@ class UnionFind:
         if carrier.is_leaf:
             return carrier
         changed = False
-        children: list[protomorph.Carrier] = []
+        children: list[protomorph.Val] = []
         for child in carrier:
             reified = self.reify(child, _seen)
             if reified is not child:
@@ -167,7 +167,7 @@ class UnionFind:
             return carrier
         return carrier.reconstruct(tuple(children))
 
-    def _ensure_class_info(self, root: protomorph.Carrier) -> None:
+    def _ensure_class_info(self, root: protomorph.Val) -> None:
         if root in self._class_info:
             return
         if not self.is_var(root):
@@ -176,7 +176,7 @@ class UnionFind:
         if info is not None:
             self._class_info[root] = info
 
-    def _merge_class_info(self, a: protomorph.Carrier, b: protomorph.Carrier) -> None:
+    def _merge_class_info(self, a: protomorph.Val, b: protomorph.Val) -> None:
         self._ensure_class_info(a)
         self._ensure_class_info(b)
         merged = self.merge_info(self._class_info.get(a), self._class_info.get(b))
@@ -195,8 +195,8 @@ class UnionFind:
 
 
 def _walk(
-    a: protomorph.Carrier,
-    b: protomorph.Carrier,
+    a: protomorph.Val,
+    b: protomorph.Val,
     uf: UnionFind,
     occurs_check: bool,
 ) -> bool:
@@ -242,14 +242,14 @@ def _walk(
 
 
 def unify(
-    a: protomorph.Carrier,
-    b: protomorph.Carrier,
+    a: protomorph.Val,
+    b: protomorph.Val,
     *,
-    is_var: Callable[[protomorph.Carrier], bool] | None = None,
+    is_var: Callable[[protomorph.Val], bool] | None = None,
     subst: UnionFind | None = None,
     occurs_check: bool = True,
     op: Callable | None = None,  # backward compat, ignored
-) -> protomorph.Carrier | None:
+) -> protomorph.Val | None:
     """Unify two carrier trees.
 
     Accepts either an ``is_var`` predicate (creates a fresh UnionFind) or
@@ -270,7 +270,7 @@ def unify(
     return uf.reify(a)
 
 
-def _default_info_for(_: protomorph.Carrier) -> Any | None:
+def _default_info_for(_: protomorph.Val) -> Any | None:
     return None
 
 

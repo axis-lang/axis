@@ -41,15 +41,15 @@ class Index(syn.Expr):
                 positional.extend(args.content)
 
         if isinstance(origin_val, pm.Anchor):
-            return cast(pm.Result[log.Report, Any], pm.Result.ok(pm.wrap(pm.Spec.of(origin_val, *positional, **nominal))))
+            return cast(pm.Result[log.Report, Any], pm.Result.ok(pm.val(pm.Spec.of(origin_val, *positional, **nominal))))
         if isinstance(origin_val, pm.Spec):
             return cast(
                 pm.Result[log.Report, Any],
-                pm.Result.ok(pm.wrap(pm.Spec.of(origin_val.anchor, *positional, **nominal))),
+                pm.Result.ok(pm.val(pm.Spec.of(origin_val.anchor, *positional, **nominal))),
             )
 
         report = log.error("Unsupported bound expression").label(
             self,
             f"specialization requires an Anchor base, got {val_type_name(origin_val)}",
         ).build()
-        return cast(pm.Result[log.Report, Any], pm.Result.err(pm.wrap(report)))
+        return cast(pm.Result[log.Report, Any], pm.Result.err(pm.val(report)))

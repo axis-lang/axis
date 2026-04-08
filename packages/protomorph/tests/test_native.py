@@ -3,11 +3,11 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, current_realm, var, wrap, spec_name
+from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, current_realm, var, val, spec_name
 
 
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
 
 
 class Point(Builtin):
@@ -29,16 +29,16 @@ class Pair[A, B](Builtin):
 
 class TestWrap(unittest.TestCase):
     def test_wrap_builtin_class_returns_type_carrier(self):
-        carrier = wrap(Point)
+        carrier = val(Point)
         self.assertIsInstance(carrier.fetch(), Spec)
         self.assertEqual(carrier.fetch(), Spec.of(spec_name(Point)))
 
     def test_wrap_scalar_annotation_returns_type_carrier(self):
-        carrier = wrap(int)
+        carrier = val(int)
         self.assertEqual(carrier.fetch(), Spec.of("std.types.Integer"))
 
     def test_wrap_runtime_builtin_returns_native_carrier(self):
-        carrier = wrap(Point(1, 2))
+        carrier = val(Point(1, 2))
         self.assertIsInstance(carrier, NativeObjectCarrier)
         self.assertEqual(carrier.attr(Id("x")).fetch(), 1)
         self.assertEqual(carrier.attr(Id("y")).fetch(), 2)

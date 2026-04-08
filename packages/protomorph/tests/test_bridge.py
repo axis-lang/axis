@@ -4,26 +4,26 @@ from typing import TypeVar
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, UniformType, UnionType, Var, VaryingType, project_type, wrap
+from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, UniformType, UnionType, Var, VaryingType, project_type, val
 
 
-INT = wrap(int).fetch()
-STR = wrap(str).fetch()
-FLOAT = wrap(float).fetch()
-BOOL = wrap(bool).fetch()
-NONE = wrap(type(None)).fetch()
+INT = val(int).fetch()
+STR = val(str).fetch()
+FLOAT = val(float).fetch()
+BOOL = val(bool).fetch()
+NONE = val(type(None)).fetch()
 
 
 class TestWrapProjection(unittest.TestCase):
     def test_scalars(self):
-        self.assertEqual(wrap(int).fetch(), INT)
-        self.assertEqual(wrap(str).fetch(), STR)
-        self.assertEqual(wrap(float).fetch(), FLOAT)
-        self.assertEqual(wrap(bool).fetch(), BOOL)
-        self.assertEqual(wrap(type(None)).fetch(), NONE)
+        self.assertEqual(val(int).fetch(), INT)
+        self.assertEqual(val(str).fetch(), STR)
+        self.assertEqual(val(float).fetch(), FLOAT)
+        self.assertEqual(val(bool).fetch(), BOOL)
+        self.assertEqual(val(type(None)).fetch(), NONE)
 
     def test_type_passthrough(self):
-        self.assertIs(wrap(INT).fetch(), INT)
+        self.assertIs(val(INT).fetch(), INT)
 
     def test_tuple_uniform(self):
         result = cast(UniformType, project_type(tuple[int, ...]))
@@ -67,10 +67,10 @@ class TestWrapProjection(unittest.TestCase):
 
 class TestWrap(unittest.TestCase):
     def test_wrap_annotation_returns_type_carrier(self):
-        self.assertEqual(wrap(int).fetch(), INT)
+        self.assertEqual(val(int).fetch(), INT)
 
     def test_wrap_tuple_annotation_returns_type_carrier(self):
-        self.assertIsInstance(wrap(tuple[int, ...]).fetch(), UniformType)
+        self.assertIsInstance(val(tuple[int, ...]).fetch(), UniformType)
 
     def test_wrap_tuple_varying_annotation_returns_type_value(self):
         descriptor = cast(VaryingType, cast(object, project_type(tuple[int, str, float])))
@@ -82,11 +82,11 @@ class TestWrap(unittest.TestCase):
             SPEC_NAME = "test.bridge.Point2"
             x: int
 
-        carrier = wrap(Pt(5))
+        carrier = val(Pt(5))
         self.assertEqual(carrier.attr(Id("x")).fetch(), 5)
 
     def test_wrap_scalar_value_returns_leaf_carrier(self):
-        carrier = wrap(7)
+        carrier = val(7)
         self.assertEqual(carrier.fetch(), 7)
         self.assertIs(carrier.descriptor, INT)
 

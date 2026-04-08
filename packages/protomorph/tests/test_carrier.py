@@ -3,11 +3,11 @@ from __future__ import annotations
 import unittest
 from typing import Any, cast
 
-from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, wrap
+from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, val
 
 
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
 ANY = Spec.of("std.types.Any")
 
 
@@ -59,7 +59,7 @@ class TestNativeObjectCarrier(unittest.TestCase):
             x: int
             y: int
 
-        carrier = wrap(Pt(3, 4))
+        carrier = val(Pt(3, 4))
         self.assertEqual(carrier.attr(Id("x")).fetch(), 3)
         self.assertEqual(carrier.attr(Id("y")).fetch(), 4)
 
@@ -69,7 +69,7 @@ class TestNativeObjectCarrier(unittest.TestCase):
             x: int
             y: int
 
-        carrier = wrap(Pt(1, 2))
+        carrier = val(Pt(1, 2))
         rebuilt = carrier.reconstruct((LeafCarrier(ANY, 10), LeafCarrier(ANY, 20)))
         self.assertEqual(rebuilt.fetch(), Pt(10, 20))
 

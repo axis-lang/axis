@@ -32,6 +32,7 @@ from .model import (
     ExpectedBinding,
     Failed,
     Goal,
+    GoalVar,
     GoalOutcome,
     InductiveCycleIssue,
     InsufficientBindings,
@@ -63,7 +64,7 @@ class QuerySet(Consed):
     session: Session
     state: QuerySetState = QuerySetState()
 
-    def add(self, *goals: pm.Carrier | pm.Datum) -> QuerySet:
+    def add(self, *goals: pm.Val | pm.Datum) -> QuerySet:
         roots = list(self.state.roots)
         tables = dict(self.state.tables_by_key)
         open_keys = list(self.state.open_keys)
@@ -71,7 +72,7 @@ class QuerySet(Consed):
         seen_root_goals = {root.goal for root in roots}
 
         for goal in goals:
-            carrier = goal if isinstance(goal, pm.Carrier) else pm.wrap(goal)
+            carrier = goal if isinstance(goal, pm.Val) else pm.val(goal)
             canonical = canonicalize_goal(carrier)
             if carrier not in seen_root_goals:
                 roots.append(QueryRoot(carrier, canonical.key, ordered_placeholders(carrier)))
@@ -102,15 +103,15 @@ class QuerySet(Consed):
             ),
         )
 
-    def query(self, goal: pm.Carrier | pm.Datum) -> Query:
+    def query(self, goal: pm.Val | pm.Datum) -> Query:
         from .query import Query
 
-        carrier = goal if isinstance(goal, pm.Carrier) else pm.wrap(goal)
+        carrier = goal if isinstance(goal, pm.Val) else pm.val(goal)
         queryset = self if any(root.goal == carrier for root in self.state.roots) else self.add(carrier)
         return Query(queryset, carrier)
 
-    def table(self, goal: pm.Carrier | pm.Datum) -> QueryTable:
-        carrier = goal if isinstance(goal, pm.Carrier) else pm.wrap(goal)
+    def table(self, goal: pm.Val | pm.Datum) -> QueryTable:
+        carrier = goal if isinstance(goal, pm.Val) else pm.val(goal)
         for root in self.state.roots:
             if root.goal == carrier:
                 canonical = canonicalize_goal(carrier)
@@ -218,7 +219,7 @@ def _solve_table(
         for branch in table.pending:
             resumed = _resume_pending_branch(queryset, canonical, branch, tables, promoted, binding_epoch)
             if resumed is None:
-                failures.append(Judgment(branch.blocked_goal, pm.wrap(Failed("invalid pending branch state")), branch.subjudgments))
+                failures.append(Judgment(branch.blocked_goal, pm.val(Failed("invalid pending branch state")), branch.subjudgments))
                 continue
             child_answers, child_pending, child_failures, child_cycle, child_dependencies = resumed
             answers.extend(child_answers)
@@ -480,7 +481,7 @@ def _solve_table_goal(
         if cycle.is_negative:
             return canonical, (), (), (), NegativeCycleIssue(cycle, _cycle_judgment(subgoal, cycle, True)), TableDependencies()
         if queryset.session.solver.is_coinductive(cycle):
-            answer = StoredAnswer((), pm.wrap(_coinductive_cycle(cycle)), _coinduction_judgment(subgoal, cycle))
+            answer = StoredAnswer((), pm.val(_coinductive_cycle(cycle)), _coinduction_judgment(subgoal, cycle))
             return canonical, (answer,), (), (), None, TableDependencies()
         return canonical, (), (), (), InductiveCycleIssue(cycle, _cycle_judgment(subgoal, cycle, False)), TableDependencies()
 
@@ -547,7 +548,7 @@ def _solve_goals(
         if queryset.session.solver.is_coinductive(cycle):
             answer = StoredAnswer(
                 extract_stored_subst(root_goal, uf),
-                evidence=pm.wrap(_coinductive_cycle(cycle)),
+                evidence=pm.val(_coinductive_cycle(cycle)),
                 judgment=_coinduction_judgment(current, cycle),
             )
             return [answer], [], [], None, TableDependencies()
@@ -556,7 +557,6 @@ def _solve_goals(
         return [], [], [], issue, TableDependencies()
 
     outcome = _empty_goal_outcome()
-    outcome = _goal_outcome_with_positive_dependency(outcome, queryset.session.solver.head_key(current))
     next_stack = (*stack, ActiveFrame(current_table_key, False))
 
     for fact in _candidate_facts(queryset, current, promoted):
@@ -627,7 +627,7 @@ def _solve_goals(
     if outcome.matched:
         return _unpack_goal_outcome(outcome)
 
-    return [], [], [Judgment(current, pm.wrap(Failed("no matching proof")))], None, TableDependencies()
+    return [], [], [Judgment(current, pm.val(Failed("no matching proof")))], None, TableDependencies()
 
 
 def _solve_assertion(
@@ -766,7 +766,7 @@ def _solve_assertion_state(
                 dependencies = _merge_table_dependencies(dependencies, table_dependencies)
                 return
             if table_answers:
-                failures.append(Judgment(subgoal, pm.wrap(Failed("negated goal succeeded")), subjudgments))
+                failures.append(Judgment(subgoal, pm.val(Failed("negated goal succeeded")), subjudgments))
                 dependencies = _merge_table_dependencies(dependencies, table_dependencies)
                 return
             solve_premise(index + 1, (*subjudgments, Judgment(subgoal)))
@@ -806,7 +806,7 @@ def _solve_assertion_state(
             if table_failures:
                 failures.extend(table_failures)
             else:
-                failures.append(Judgment(subgoal, pm.wrap(Failed("no matching proof")), subjudgments))
+                failures.append(Judgment(subgoal, pm.val(Failed("no matching proof")), subjudgments))
 
     solve_premise(premise_index, initial_subjudgments)
     return answers, pending, failures, cycle_issue, dependencies
@@ -835,12 +835,12 @@ def _active_cycle(
 
 
 def _cycle_judgment(goal: Goal, cycle: Cycle[TableKey], negative: bool) -> Judgment:
-    evidence = pm.wrap(NegativeCycleIssue(cycle)) if negative else pm.wrap(InductiveCycleIssue(cycle))
+    evidence = pm.val(NegativeCycleIssue(cycle)) if negative else pm.val(InductiveCycleIssue(cycle))
     return Judgment(goal, evidence)
 
 
 def _coinduction_judgment(goal: Goal, cycle: Cycle[TableKey]) -> Judgment:
-    evidence = pm.wrap(_coinductive_cycle(cycle))
+    evidence = pm.val(_coinductive_cycle(cycle))
     return Judgment(goal, evidence)
 
 
@@ -891,11 +891,11 @@ def _changed_promoted_keys(
     return frozenset(changed)
 
 
-def _is_logic_var(carrier: pm.Carrier) -> bool:
+def _is_logic_var(carrier: pm.Val) -> bool:
     return is_logic_var(carrier)
 
 
-def _contains_logic_vars(carrier: pm.Carrier) -> bool:
+def _contains_logic_vars(carrier: pm.Val) -> bool:
     for leaf in carrier.deep_iter():
         if _is_logic_var(leaf):
             return True
@@ -959,9 +959,9 @@ def _dedupe_answers(items: list[StoredAnswer]) -> tuple[StoredAnswer, ...]:
 def _dedupe_pending(items: list[PendingBranch]) -> tuple[PendingBranch, ...]:
     deduped: dict[
         tuple[
-            pm.Carrier,
-            pm.Carrier,
-            tuple[pm.Carrier, ...],
+            pm.Val,
+            pm.Val,
+            tuple[pm.Val, ...],
             object,
             int,
             tuple[tuple[int, Goal], ...],
@@ -1152,7 +1152,11 @@ def _stored_answer_from_public(
         slot_map = _placeholder_slot_map(current, owner)
         items: list[tuple[int, Goal]] = []
         for placeholder, value in answer.subst.items():
-            slot = slot_map.get(placeholder)
+            slot = None
+            if isinstance(placeholder, GoalVar) and placeholder.ctx == owner.ctx:
+                slot = placeholder.slot
+            elif isinstance(placeholder, pm.Placeholder):
+                slot = slot_map.get(placeholder)
             if slot is None:
                 return None
             items.append((slot, value))

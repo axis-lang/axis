@@ -29,9 +29,9 @@ def __():
     import protomorph
     from protomorph import (
         Spec, VaryingType, UniformType, UnionType, IndexedType, Qual,
-        LeafCarrier, wrap, var, Id,
+        LeafCarrier, val, var, Id,
     )
-    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, var, protomorph, wrap
+    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, var, protomorph, val
 
 
 @app.cell

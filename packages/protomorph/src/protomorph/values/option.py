@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
-from .base import Carrier, UnwrapError
+from .base import Val, UnwrapError
 from .result import Result, Ok, Err, _result_descriptor
 from ..native import _project_type as _native_project_type
 from ..domain import Builtin
@@ -30,7 +30,7 @@ def _optional_descriptor(value_descriptor: pm.Type) -> pm.Qual:
 
 
 def _descriptor_from_annotation(annotation: _Any) -> pm.Type:
-    if isinstance(annotation, Carrier):
+    if isinstance(annotation, Val):
         return annotation.descriptor
     return _cast(pm.Type, _native_project_type(annotation))
 
@@ -44,7 +44,7 @@ class None_(Builtin):
     SPEC_NAME = "std.types.Optional.None"
 
 
-class Option[V](Carrier):
+class Option[V](Val):
     descriptor: pm.Qual
     content: Some[V] | None_
 
@@ -67,17 +67,17 @@ class Option[V](Carrier):
             return 0
         return len(self.value_carrier())
 
-    def __getitem__(self, offset: int) -> Carrier:
+    def __getitem__(self, offset: int) -> Val:
         if isinstance(self.content, None_):
             raise IndexError(offset)
         return self.value_carrier()[offset]
 
-    def attr(self, id: pm.Id) -> Carrier:
+    def attr(self, id: pm.Id) -> Val:
         if isinstance(self.content, None_):
             raise KeyError(id)
         return self.value_carrier().attr(id)
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         if isinstance(self.content, None_):
             assert not children
             return self
@@ -96,44 +96,44 @@ class Option[V](Carrier):
         if isinstance(self.content, Some):
             self.child(_some_descriptor_of(self.descriptor), self.content.value)
 
-    def value_carrier(self) -> Carrier:
+    def value_carrier(self) -> Val:
         assert isinstance(self.content, Some)
         return self.child(_some_descriptor_of(self.descriptor), self.content.value)
 
-    def unwrap(self) -> Carrier[V]:
+    def unwrap(self) -> Val[V]:
         if isinstance(self.content, Some):
             return self.value_carrier()
         raise UnwrapError()
 
-    def unwrap_or(self, default: Carrier[V]) -> Carrier[V]:
-        if not isinstance(default, Carrier):
+    def unwrap_or(self, default: Val[V]) -> Val[V]:
+        if not isinstance(default, Val):
             raise TypeError("Option.unwrap_or() expects a Carrier default")
         if isinstance(self.content, Some):
             return self.value_carrier()
         return default
 
-    def unwrap_or_else(self, f: _Callable[[], Carrier[V]]) -> Carrier[V]:
+    def unwrap_or_else(self, f: _Callable[[], Val[V]]) -> Val[V]:
         if isinstance(self.content, Some):
             return self.value_carrier()
         value = f()
-        if not isinstance(value, Carrier):
+        if not isinstance(value, Val):
             raise TypeError("Option.unwrap_or_else() callback must return a Carrier")
         return value
 
-    def expect(self, message: str) -> Carrier[V]:
+    def expect(self, message: str) -> Val[V]:
         if isinstance(self.content, Some):
             return self.value_carrier()
         raise UnwrapError(message=message)
 
-    def map(self, f: _Callable[[Carrier[V]], Carrier]) -> Option[_Any]:
+    def map(self, f: _Callable[[Val[V]], Val]) -> Option[_Any]:
         if isinstance(self.content, None_):
             return self
         value = f(self.value_carrier())
-        if not isinstance(value, Carrier):
+        if not isinstance(value, Val):
             raise TypeError("Option.map() callback must return a Carrier")
         return self._with_some(value)
 
-    def and_then(self, f: _Callable[[Carrier[V]], _Any]) -> Option[_Any]:
+    def and_then(self, f: _Callable[[Val[V]], _Any]) -> Option[_Any]:
         if isinstance(self.content, None_):
             return self
         result = f(self.value_carrier())
@@ -141,8 +141,8 @@ class Option[V](Carrier):
             raise TypeError("Option.and_then() callback must return an Option")
         return result
 
-    def ok_or(self, error: Carrier) -> Result[_Any, V]:
-        if not isinstance(error, Carrier):
+    def ok_or(self, error: Val) -> Result[_Any, V]:
+        if not isinstance(error, Val):
             raise TypeError("Option.ok_or() expects a Carrier")
         descriptor = _result_descriptor(_some_descriptor_of(self.descriptor), error.descriptor)
         if isinstance(self.content, Some):
@@ -150,8 +150,8 @@ class Option[V](Carrier):
         return Result(descriptor, Err(error.content))
 
     @classmethod
-    def some(cls, value: Carrier) -> Option:
-        if not isinstance(value, Carrier):
+    def some(cls, value: Val) -> Option:
+        if not isinstance(value, Val):
             raise TypeError("Option.some() expects a Carrier")
         return cls(_optional_descriptor(value.descriptor), Some(value.content))
 
@@ -159,5 +159,5 @@ class Option[V](Carrier):
     def none(cls, annotation: _Any) -> Option:
         return cls(_optional_descriptor(pm.project_type(annotation)), None_())
 
-    def _with_some(self, value: Carrier) -> Option[_Any]:
+    def _with_some(self, value: Val) -> Option[_Any]:
         return type(self)(_optional_descriptor(value.descriptor), Some(value.content))

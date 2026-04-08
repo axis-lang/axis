@@ -215,7 +215,7 @@ class BindingIR(Consed):
     admission: pm.MatchCaseSummary
 
     @property
-    def pattern(self) -> pm.Carrier:
+    def pattern(self) -> pm.Val:
         return self.admission.pattern
 
 
@@ -309,15 +309,15 @@ def _required_nominal_descriptors(
     )
 
 
-def _binding_value(field: LoweredBindingStruct.Field) -> pm.Carrier:
+def _binding_value(field: LoweredBindingStruct.Field) -> pm.Val:
     if field.binder is not None:
-        return pm.wrap(field.binder)
+        return pm.val(field.binder)
     if field.match_expr is not None:
         value = _bound_carrier(field.match_expr, origin=field.origin)
         assert value is not None
         return value
     if field.is_placeholder:
-        return pm.wrap(pm.var("_"))
+        return pm.val(pm.var("_"))
     raise ValueError(f"Binding field {field.origin!r} cannot be lowered to a matching value")
 
 
@@ -325,7 +325,7 @@ def _bound_carrier(
     result: LoweredBoundResult | None,
     *,
     origin: syn.Node,
-) -> pm.Carrier | None:
+) -> pm.Val | None:
     if result is None:
         return None
     if result.is_err:
@@ -336,9 +336,9 @@ def _bound_carrier(
     return result.unwrap()
 
 
-def _binding_pattern(bindings: LoweredBindingStruct) -> pm.Carrier:
-    positional: list[pm.Carrier] = []
-    nominal: dict[str, pm.Carrier] = {}
+def _binding_pattern(bindings: LoweredBindingStruct) -> pm.Val:
+    positional: list[pm.Val] = []
+    nominal: dict[str, pm.Val] = {}
     for field in bindings.fields:
         if field.is_optional:
             continue

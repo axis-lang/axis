@@ -8,14 +8,14 @@ from protomorph import (
     Placeholder, var,
     LeafCarrier, Option, Result, Spec, Tuple,
     VaryingType,
-    wrap,
+    val,
     deep_zip,
 )
 
 
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
-FLOAT = cast(Spec, wrap(float).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
+FLOAT = cast(Spec, val(float).fetch())
 
 
 class TestDeepIter(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestDeepIter(unittest.TestCase):
             x: int
             y: int
 
-        c = wrap(Pt(1, 2))
+        c = val(Pt(1, 2))
         values = [leaf.fetch() for leaf in c.deep_iter() if isinstance(leaf.fetch(), int)]
         self.assertIn(1, values)
         self.assertIn(2, values)
@@ -72,7 +72,7 @@ class TestSubst(unittest.TestCase):
     def test_varying_type_subst(self):
         T = var("T")
         vt = VaryingType.of(INT, T, STR)
-        c = wrap(vt)
+        c = val(vt)
         ph_carrier = next(leaf for leaf in c.deep_iter() if leaf.fetch() is T)
         replacement = LeafCarrier(ph_carrier.descriptor, FLOAT)
         result = c.subst({ph_carrier: replacement}).fetch()

@@ -17,7 +17,7 @@ type TupleResult = pm.Result[log.Report, pm.Tuple]
 
 class _TupleElementBound(pm.Builtin):
     key: str | None
-    value: pm.Carrier
+    value: pm.Val
 
 
 def build_compound_bound(
@@ -161,8 +161,8 @@ def build_binding_pattern(bindings: BindingStruct, scope: syn.ScopeLike) -> Boun
             "spread/open-tail binding patterns are not implemented yet",
         )
 
-    positional: list[pm.Carrier] = []
-    nominal: dict[str, pm.Carrier] = {}
+    positional: list[pm.Val] = []
+    nominal: dict[str, pm.Val] = {}
     for field in bindings.fields:
         built = build_tuple_element_bound(field.origin, scope)
         if built is None:
@@ -190,7 +190,7 @@ def bound_as_type(
         return bound
     if isinstance(bound, pm.Anchor):
         return pm.Spec.of(bound)
-    if isinstance(bound, pm.Carrier):
+    if isinstance(bound, pm.Val):
         value = bound.fetch()
         if isinstance(value, pm.Type):
             return value
@@ -207,8 +207,8 @@ def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> TupleResult
             elements=(expr_module.Tuple.Positional(value=indices_expr),)
         )
 
-    positional: list[pm.Carrier] = []
-    nominal: dict[str, pm.Carrier] = {}
+    positional: list[pm.Val] = []
+    nominal: dict[str, pm.Val] = {}
     for element in indices_expr.elements:
         built = build_tuple_element_bound(element, scope)
         if built is None:
@@ -232,8 +232,8 @@ def build_tuple_bound(
     elements: tuple[syn.Node, ...],
     scope: syn.ScopeLike,
 ) -> BoundResult:
-    positional: list[pm.Carrier] = []
-    nominal: dict[str, pm.Carrier] = {}
+    positional: list[pm.Val] = []
+    nominal: dict[str, pm.Val] = {}
     for element in elements:
         built = build_tuple_element_bound(element, scope)
         if built is None:
@@ -288,7 +288,7 @@ def literal_to_bound(literal: object, origin: syn.Expr) -> BoundResult:
         return _ok_result(pm.ELLIPSIS)
     if not isinstance(literal, (int, float, str, bool, type(None))):
         return _error_result(origin, f"unsupported literal type {type(literal).__name__}")
-    return _ok_result(pm.wrap(literal))
+    return _ok_result(pm.val(literal))
 
 
 def as_qualifier_ref(
@@ -299,7 +299,7 @@ def as_qualifier_ref(
         return _ok_result(bound_val)
     if isinstance(bound_val, pm.Anchor):
         return _ok_result(pm.Spec.of(bound_val))
-    if isinstance(bound_val, pm.Carrier):
+    if isinstance(bound_val, pm.Val):
         fetched = bound_val.fetch()
         if isinstance(fetched, pm.Spec):
             return _ok_result(fetched)
@@ -347,8 +347,8 @@ def _fact_target_term(term: object) -> object:
 
 def _error_result(origin: syn.Node | None, message: str) -> pm.Result[log.Report, Any]:
     report = log.error("Unsupported bound expression").label(origin, message).build()
-    return pm.Result.err(pm.wrap(report))
+    return pm.Result.err(pm.val(report))
 
 
 def _ok_result[T](value: T) -> pm.Result[log.Report, T]:
-    return pm.Result.ok(pm.wrap(value))
+    return pm.Result.ok(pm.val(value))

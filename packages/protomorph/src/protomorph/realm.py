@@ -179,12 +179,12 @@ def _logic_assertion(item: Builtin):
 
     if isinstance(item, logic.Assertion):
         return item
-    if isinstance(item, pm.Carrier):
+    if isinstance(item, pm.Val):
         return logic.Assertion(item)
     value = cast(Any, item)
     if hasattr(value, "head") and hasattr(value, "body"):
         raise TypeError("Realm.logic_assertions no longer adapts legacy Rule-like objects; provide pm.logic.Assertion values explicitly")
-    return logic.Assertion(item if isinstance(item, pm.Carrier) else pm.wrap(item))
+    return logic.Assertion(item if isinstance(item, pm.Val) else pm.val(item))
 
 
 def current_realm() -> Realm:

@@ -40,12 +40,12 @@ class Member(syn.Expr):
             return of_result
         of_val = of_result.unwrap().fetch()
         if isinstance(of_val, pm.Anchor):
-            return pm.Result.ok(pm.wrap(of_val.child(pm.Id(self.name))))
+            return pm.Result.ok(pm.val(of_val.child(pm.Id(self.name))))
         report = log.error("Unsupported bound expression").label(
             self,
             f"member access requires an Anchor base, got {val_type_name(of_val)}",
         ).build()
-        return pm.Result.err(pm.wrap(report))
+        return pm.Result.err(pm.val(report))
 
     def to_anchor(self, scope_ref: pm.Anchor | None) -> pm.Anchor:
         return self.of.to_anchor(scope_ref).child(pm.Id(self.name))

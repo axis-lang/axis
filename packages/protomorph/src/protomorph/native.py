@@ -208,8 +208,8 @@ class NativeRealm(Realm, Consed):
                         )
                     )
                     continue
-            field_carrier = wrap(field_type)
-            carrier_mapping: dict[protomorph.Carrier, protomorph.Carrier] = {}
+            field_carrier = val(field_type)
+            carrier_mapping: dict[protomorph.Val, protomorph.Val] = {}
             for leaf in field_carrier.deep_iter():
                 data = leaf.fetch()
                 if data in mapping:
@@ -283,7 +283,7 @@ def instantiate_builtin(
     remaining = iter(arg_values)
     for name in attrs:
         info = attr_info_of(builtin_cls)[name]
-        wants_carrier = info.type is protomorph.Carrier or repr(info.type).startswith("protomorph.carriers.base.Carrier")
+        wants_carrier = info.type is protomorph.Val or repr(info.type).startswith("protomorph.carriers.base.Carrier")
         if name in arg_nominal:
             kwargs[name] = tuple_args.attr(protomorph.Id(name)) if wants_carrier else arg_nominal[name]
             continue
@@ -312,13 +312,13 @@ def project_type(
     if annotation is protomorph.Type:
         return protomorph.Spec.of("std.metas.Type")
 
-    if annotation is protomorph.Carrier:
+    if annotation is protomorph.Val:
         return protomorph.Spec.of("std.types.Any")
 
     origin = get_origin(annotation)
     args = get_args(annotation)
 
-    if origin is protomorph.Carrier:
+    if origin is protomorph.Val:
         return protomorph.Spec.of("std.types.Any")
 
     if origin is protomorph.Type:
@@ -394,7 +394,7 @@ def project_type(
     raise ValueError(f"Unsupported annotation: {annotation!r}")
 
 
-def wrap(*args, **kwargs) -> protomorph.Carrier:
+def val(*args, **kwargs) -> protomorph.Val:
     values = cast(tuple[object, ...], args)
 
     if not values and not kwargs:
@@ -402,15 +402,15 @@ def wrap(*args, **kwargs) -> protomorph.Carrier:
 
     if len(values) > 1 or kwargs:
         return protomorph.VaryingType.new(
-            *(wrap(arg) for arg in values),
-            **{key: wrap(value) for key, value in kwargs.items()},
+            *(val(arg) for arg in values),
+            **{key: val(value) for key, value in kwargs.items()},
         )
 
     if len(values) != 1:
         raise AssertionError("wrap() expected exactly one value after variadic handling")
     obj = values[0]
 
-    if isinstance(obj, protomorph.Carrier):
+    if isinstance(obj, protomorph.Val):
         return obj
 
     if isinstance(obj, protomorph.Type):
@@ -429,7 +429,7 @@ def wrap(*args, **kwargs) -> protomorph.Carrier:
         descriptor = project_type(type(obj))
         return descriptor.make(obj)
 
-    descriptor = cast(protomorph.Type, wrap(type(obj)).fetch())
+    descriptor = cast(protomorph.Type, val(type(obj)).fetch())
     return descriptor.make(obj)
 
 

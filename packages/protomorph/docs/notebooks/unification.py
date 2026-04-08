@@ -30,8 +30,8 @@ def __(mo):
 @app.cell
 def __():
     import protomorph
-    from protomorph import var, wrap, unify, UnionFind, Spec, LeafCarrier, VaryingType
-    return LeafCarrier, Spec, UnionFind, VaryingType, var, protomorph, unify, wrap
+    from protomorph import var, val, unify, UnionFind, Spec, LeafCarrier, VaryingType
+    return LeafCarrier, Spec, UnionFind, VaryingType, var, protomorph, unify, val
 
 
 @app.cell

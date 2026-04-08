@@ -10,10 +10,10 @@ from protobase import frozendict
 
 
 from ..domain import Id
-from .base import Carrier
+from .base import Val
 
 
-class Tuple[*T](Carrier[tuple[*T]]):
+class Tuple[*T](Val[tuple[*T]]):
     Empty: _ClassVar[Tuple[tuple[()]]]
 
     descriptor: pm.Type[tuple[*T]]
@@ -22,11 +22,11 @@ class Tuple[*T](Carrier[tuple[*T]]):
         for offset in range(len(self)):
             yield self.descriptor.item_at(offset)
 
-    def __getitem__(self, offset: int) -> Carrier:
+    def __getitem__(self, offset: int) -> Val:
         field = self.descriptor.item_at(offset)
         return self.child(field.value, self.content[offset])
 
-    def attr(self, id: Id) -> Carrier:
+    def attr(self, id: Id) -> Val:
         field = self.descriptor.item(id)
         return self.child(field.value, self.content[field.offset])
 
@@ -38,7 +38,7 @@ class Tuple[*T](Carrier[tuple[*T]]):
         return arity if arity is not None else len(self.content)
 
     @property
-    def head(self) -> Carrier:
+    def head(self) -> Val:
         return self[0]
 
     @property
@@ -69,7 +69,7 @@ class Tuple[*T](Carrier[tuple[*T]]):
         descriptor = _cast(pm.TupleLikeType, self.descriptor).splice()
         return _cast(Self, self._new(_cast(pm.Type[tuple[*T]], descriptor), tuple(new_values)))
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         return _cast(Self, self._new(self.descriptor, tuple(child.fetch() for child in children)))
 
     @classmethod

@@ -168,7 +168,7 @@ class Claim(Item):
             )
             if goal_result is None:
                 report = log.error("Claim condition must be a fact-like expression").label(clause.expr).build()
-                return pm.Result.err(pm.wrap(report))
+                return pm.Result.err(pm.val(report))
             if goal_result.is_err:
                 return cast(GoalTupleResult, goal_result)
             goals.append(cast(pm.Spec, goal_result.unwrap().fetch()))
@@ -225,10 +225,10 @@ def _build_claim_spec(
     return expr.build_fact(expr_node, scope, scope_ref=scope_ref)
 
 
-def _tuple_carrier(*values: object) -> pm.Carrier:
+def _tuple_carrier(*values: object) -> pm.Val:
     if not values:
         return pm.Tuple.Empty
-    carriers = tuple(pm.wrap(value) for value in values)
+    carriers = tuple(pm.val(value) for value in values)
     return pm.Tuple(
         pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
         tuple(carrier.fetch() for carrier in carriers),
@@ -279,7 +279,7 @@ def _collect_logic_vars(value: object, claim: Claim, found: set[str]) -> None:
                 _collect_logic_vars(item, claim, found)
         return
 
-    if isinstance(value, pm.Carrier):
+    if isinstance(value, pm.Val):
         if not value.is_leaf:
             for item in value:
                 _collect_logic_vars(item, claim, found)

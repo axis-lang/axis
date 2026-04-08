@@ -8,13 +8,13 @@ from protomorph import (
     Placeholder, var,
     LeafCarrier, NativeObjectCarrier, Tuple,
     VaryingType, Spec,
-    UnionFind, unify, wrap,
+    UnionFind, unify, val,
 )
 
 ANY = Spec.of("std.types.Any")
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
-FLOAT = cast(Spec, wrap(float).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
+FLOAT = cast(Spec, val(float).fetch())
 
 
 def is_var(carrier) -> bool:

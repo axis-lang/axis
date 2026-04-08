@@ -14,13 +14,13 @@ from protomorph import (
     Spec,
     VaryingType,
     var,
-    wrap,
+    val,
 )
 
 
 ANY = Spec.of("std.types.Any")
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
 
 
 class Point(Builtin):
@@ -31,7 +31,7 @@ class Point(Builtin):
 
 class TestCarrierPatternFlag(unittest.TestCase):
     def test_plain_value_is_not_pattern(self):
-        self.assertFalse(wrap(Point(1, 2)).is_pattern)
+        self.assertFalse(val(Point(1, 2)).is_pattern)
 
     def test_placeholder_leaf_is_pattern(self):
         T = var("T")
@@ -48,7 +48,7 @@ class TestSimpleMatching(unittest.TestCase):
     def test_leaf_var_captures_subject(self):
         T = var("T")
         pattern = LeafCarrier(ANY, T)
-        subject = wrap(42)
+        subject = val(42)
 
         result = pm.match.match(pattern, subject)
 
@@ -85,8 +85,8 @@ class TestSimpleMatching(unittest.TestCase):
         env = pm.match.Env(
             frozendict(
                 {
-                    T: pm.match.Binding(frozenset({wrap(1), wrap(2)})),
-                    U: pm.match.Binding(frozenset({wrap("a"), wrap("b")})),
+                    T: pm.match.Binding(frozenset({val(1), val(2)})),
+                    U: pm.match.Binding(frozenset({val("a"), val("b")})),
                 }
             )
         )
@@ -102,12 +102,12 @@ class TestSimpleMatching(unittest.TestCase):
         self.assertEqual(len(ctx.exception.exceptions), 2)
 
     def test_structural_builtin_match(self):
-        result = pm.match.match(wrap(Point(1, 2)), wrap(Point(1, 2)))
+        result = pm.match.match(val(Point(1, 2)), val(Point(1, 2)))
         self.assertIsNotNone(result)
 
     def test_wildcard_mark_matches_without_capture(self):
         pattern = LeafCarrier(ANY, WILDCARD)
-        subject = wrap(42)
+        subject = val(42)
 
         result = pm.match.match(pattern, subject)
 
@@ -119,7 +119,7 @@ class TestSimpleMatching(unittest.TestCase):
 class TestSummaryCompile(unittest.TestCase):
     def test_compile_wraps_tree(self):
         summary = pm.match.CaseSummary(
-            pattern=wrap(1),
+            pattern=val(1),
             shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})
@@ -127,7 +127,7 @@ class TestSummaryCompile(unittest.TestCase):
 
     def test_shape_groups_compile_to_matchmany(self):
         no_args = pm.match.CaseSummary(
-            pattern=wrap(1),
+            pattern=val(1),
             shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
         one_arg = pm.match.CaseSummary(
@@ -142,7 +142,7 @@ class TestSummaryCompile(unittest.TestCase):
 
     def test_same_shape_is_guarded(self):
         summary = pm.match.CaseSummary(
-            pattern=wrap(1),
+            pattern=val(1),
             shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})

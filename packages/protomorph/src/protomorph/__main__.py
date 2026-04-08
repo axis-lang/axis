@@ -11,7 +11,7 @@ def main() -> None:
         list[int],
     ]
     for sample in samples:
-        carrier = protomorph.wrap(sample)
+        carrier = protomorph.val(sample)
         print(f"{sample!r} -> {carrier}")
 
 

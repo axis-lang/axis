@@ -7,16 +7,18 @@ from typing import Iterator as _Iterator
 from typing import cast as _cast
 
 import protomorph as pm
-from protobase import Consed, flux, frozendict
+from protobase import Consed, flux, frozendict, _
 
 
 class Id(str):
     """Typed string for field/attribute identifiers."""
+
     __slots__ = ()
 
 
 class Anchor(str):
     """Typed string for type system anchor paths (e.g. 'std.types.Text')."""
+
     __slots__ = ()
 
     @property
@@ -44,6 +46,7 @@ ALL_BUILTINS: set[type["Builtin"]] = set()
 class Builtin(Consed, abstract=True):
     def __repr__(self) -> str:
         from ..display import repr_any
+
         return repr_any(self)
 
     def __init_subclass__(cls, abstract: bool = False, **kwargs) -> None:
@@ -79,7 +82,7 @@ class Type[T](Builtin, abstract=True):
         raise NotImplementedError(f"Metatype not implemented for {self!r}")
 
     def make(self, data: T):
-        return pm.carrier(self, data)
+        return pm.make_value(self, data)
 
     @flux.property
     def schema(self) -> TupleLikeType | None:
@@ -108,7 +111,9 @@ class Type[T](Builtin, abstract=True):
     def __len__(self) -> int:
         arity = self.arity
         if arity is None:
-            raise TypeError(f"Unbounded type has no finite length: {type(self).__name__}")
+            raise TypeError(
+                f"Unbounded type has no finite length: {type(self).__name__}"
+            )
         return arity
 
     def __iter__(self) -> _Iterator:
@@ -162,15 +167,23 @@ class PlaceholderMetatype(Placeholder):
 
 
 class SimpleVar[C: Builtin, I: Datum = str](Var):
-    ctx: C
-    id: I
+    ctx: C | None = None
+    id: I = _
+    bound: Type = _
 
-    def display_label(self) -> str | None:
+    def metatype(self):
+        return self.bound
+
+    def display_label(self) -> str:
         return str(self.id)
 
 
-def var(id: str, context: _Any = None) -> Placeholder:
-    return SimpleVar(context, id)
+def var[C: Builtin, I: Datum](
+    id: I, bound: Type | _Any, ctx: C | None = None
+) -> SimpleVar[C, I]:
+    if not isinstance(bound, Type):
+        bound = pm.project_type(bound)
+    return SimpleVar(id=id, bound=bound, ctx=ctx)
 
 
 WILDCARD = WildcardMark()
@@ -278,15 +291,20 @@ class VaryingType[T: tuple[_Any, ...]](TupleLikeType):
 
     @classmethod
     def of(cls, *args: Type) -> VaryingType:
-        normalized = tuple(_cast(Type, arg.fetch()) if isinstance(arg, pm.Carrier) else arg for arg in args)
+        normalized = tuple(
+            _cast(Type, arg.fetch()) if isinstance(arg, pm.Val) else arg for arg in args
+        )
         return cls(normalized)
 
     @classmethod
-    def new(cls, *vals: pm.Carrier, **kwvals: pm.Carrier) -> pm.Tuple:
+    def new(cls, *vals: pm.Val, **kwvals: pm.Val) -> pm.Tuple:
         if kwvals:
             indexed_type = getattr(pm, "IndexedType")
             return pm.Tuple(
-                indexed_type.of(*(val.descriptor for val in vals), **{key: value.descriptor for key, value in kwvals.items()}),
+                indexed_type.of(
+                    *(val.descriptor for val in vals),
+                    **{key: value.descriptor for key, value in kwvals.items()},
+                ),
                 tuple(_chain(vals, kwvals.values())),
             )
         return pm.Tuple(cls.of(*(val.descriptor for val in vals)), tuple(vals))
@@ -331,14 +349,18 @@ class IndexedType[T](TupleLikeType):
 
     @classmethod
     def of(cls, *args: Type, **kwargs: Type) -> IndexedType:
-        positional = tuple(_cast(Type, arg.fetch()) if isinstance(arg, pm.Carrier) else arg for arg in args)
+        positional = tuple(
+            _cast(Type, arg.fetch()) if isinstance(arg, pm.Val) else arg for arg in args
+        )
         nominal = {
-            key: (_cast(Type, value.fetch()) if isinstance(value, pm.Carrier) else value)
+            key: (_cast(Type, value.fetch()) if isinstance(value, pm.Val) else value)
             for key, value in kwargs.items()
         }
         values = positional + tuple(nominal.values())
         keys = (None,) * len(positional) + tuple(Id(key) for key in nominal)
-        return _cast(IndexedType, cls(_cast(Type, VaryingType(values)), pm.Index.of(*keys)))
+        return _cast(
+            IndexedType, cls(_cast(Type, VaryingType(values)), pm.Index.of(*keys))
+        )
 
 
 class Spec(Type):
@@ -374,12 +396,22 @@ class Spec(Type):
         values = args + tuple(kwargs.values())
         descriptors = tuple(_value_descriptor(value) for value in values)
         indexed_type = _cast(_Any, getattr(pm, "IndexedType"))
-        descriptor = indexed_type.of(*descriptors[: len(args)], **{key: descriptors[len(args) + index] for index, key in enumerate(kwargs)}) if kwargs else pm.VaryingType(descriptors)
+        descriptor = (
+            indexed_type.of(
+                *descriptors[: len(args)],
+                **{
+                    key: descriptors[len(args) + index]
+                    for index, key in enumerate(kwargs)
+                },
+            )
+            if kwargs
+            else pm.VaryingType(descriptors)
+        )
         tuple_args = _cast(pm.Tuple, pm.Tuple(_cast(Type[tuple], descriptor), values))
         return _cast(Spec, cls(Anchor(anchor), tuple_args))
 
     @classmethod
-    def new(cls, anchor: Anchor | str, *vals: pm.Carrier, **kwvals: pm.Carrier) -> Spec:
+    def new(cls, anchor: Anchor | str, *vals: pm.Val, **kwvals: pm.Val) -> Spec:
         return _cast(Spec, cls(Anchor(anchor), pm.VaryingType.new(*vals, **kwvals)))
 
 
@@ -429,12 +461,20 @@ class Qual(Type):
     def of(cls, underlying: Type, *qualifiers: Spec) -> Qual:
         if isinstance(underlying, Qual):
             nested = _cast(Qual, underlying)
-            return _cast(Qual, cls(nested.underlying, pm.Tuple.extends(nested.qualifiers, _normalize_tuple_values(tuple(qualifiers)))))
+            return _cast(
+                Qual,
+                cls(
+                    nested.underlying,
+                    pm.Tuple.extends(
+                        nested.qualifiers, _normalize_tuple_values(tuple(qualifiers))
+                    ),
+                ),
+            )
         return _cast(Qual, cls(underlying, _normalize_tuple_values(tuple(qualifiers))))
 
 
 def _value_descriptor(value: _Any) -> Type:
-    if isinstance(value, pm.Carrier):
+    if isinstance(value, pm.Val):
         return value.descriptor
     if isinstance(value, Type):
         return value.metatype()
@@ -442,7 +482,7 @@ def _value_descriptor(value: _Any) -> Type:
 
 
 def _project_runtime_type(value: _Any) -> Type:
-    return _cast(Type, pm.wrap(type(value)).fetch())
+    return _cast(Type, pm.val(type(value)).fetch())
 
 
 def _normalize_tuple_values(values: tuple[_Any, ...]) -> pm.Tuple:

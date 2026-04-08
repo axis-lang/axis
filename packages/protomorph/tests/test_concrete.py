@@ -3,12 +3,12 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Id, Index, IndexedType, LeafCarrier, Spec, Tuple, UniformType, UnionType, VaryingType, wrap
+from protomorph import Id, Index, IndexedType, LeafCarrier, Spec, Tuple, UniformType, UnionType, VaryingType, val
 
 
-INT = cast(Spec, wrap(int).fetch())
-STR = cast(Spec, wrap(str).fetch())
-FLOAT = cast(Spec, wrap(float).fetch())
+INT = cast(Spec, val(int).fetch())
+STR = cast(Spec, val(str).fetch())
+FLOAT = cast(Spec, val(float).fetch())
 
 
 class TestAtomicSpecs(unittest.TestCase):

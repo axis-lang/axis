@@ -50,7 +50,7 @@ class TestPlaceholder(unittest.TestCase):
         class C(Builtin):
             x: int
         ctx = C(1)
-        self.assertIsNot(var("T"), var("T", context=ctx))
+        self.assertIsNot(var("T"), var("T", ctx=ctx))
 
     # def test_metatype_is_metadata_spec(self):
     #     self.assertEqual(placeholder("T").metatype(), ("T"))

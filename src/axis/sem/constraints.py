@@ -17,7 +17,7 @@ type GoalTupleResult = pm.Result[log.Report]
 type ScopeLookupResult = sem.ScopeLookupResult
 
 
-def constraint_from_term(subject: pm.Carrier | pm.Datum, term: pm.Carrier | pm.Datum) -> Constraint:
+def constraint_from_term(subject: pm.Val | pm.Datum, term: pm.Val | pm.Datum) -> Constraint:
     subject_carrier = _carrier_of(subject)
     term_carrier = _carrier_of(term)
     target = _constraint_target_term(term_carrier)
@@ -29,7 +29,7 @@ def constraint_from_term(subject: pm.Carrier | pm.Datum, term: pm.Carrier | pm.D
 
 
 def constraint_for(
-    subject: pm.Carrier | pm.Datum,
+    subject: pm.Val | pm.Datum,
     bound_expr: syn.Expr | None,
     scope: syn.ScopeLike,
 ) -> ConstraintResult | None:
@@ -43,12 +43,12 @@ def constraint_for(
         return cast(ConstraintResult, term_result)
     return cast(
         ConstraintResult,
-        pm.Result.ok(pm.wrap(constraint_from_term(subject, term_result.unwrap()))),
+        pm.Result.ok(pm.val(constraint_from_term(subject, term_result.unwrap()))),
     )
 
 
 def constraint_goal_for(
-    subject: pm.Carrier | pm.Datum,
+    subject: pm.Val | pm.Datum,
     bound_expr: syn.Expr | None,
     scope: syn.ScopeLike,
 ) -> GoalResult | None:
@@ -59,7 +59,7 @@ def constraint_goal_for(
         return cast(GoalResult, constraint_result)
     return cast(
         GoalResult,
-        pm.Result.ok(pm.wrap(cast(Constraint, constraint_result.unwrap().fetch()).goal)),
+        pm.Result.ok(pm.val(cast(Constraint, constraint_result.unwrap().fetch()).goal)),
     )
 
 
@@ -77,7 +77,7 @@ def binding_constraints(
             report = log.error(
                 f"Claim {origin_label} bindings do not support defaults yet"
             ).label(binding.origin).build()
-            return pm.Result.err(pm.wrap(report))
+            return pm.Result.err(pm.val(report))
 
         subject_result = subject_for_binding(binding)
         if subject_result is None:
@@ -115,26 +115,26 @@ def binding_constraint_goals(
     return pm.Result.ok(_tuple_result(*(constraint.goal for constraint in constraints)))
 
 
-def _tuple_result(*values: object) -> pm.Carrier:
+def _tuple_result(*values: object) -> pm.Val:
     if not values:
         return pm.Tuple.Empty
-    carriers = tuple(pm.wrap(value) for value in values)
+    carriers = tuple(pm.val(value) for value in values)
     return pm.Tuple(
         pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
         tuple(carrier.fetch() for carrier in carriers),
     )
 
 
-def _carrier_of(value: pm.Carrier | pm.Datum) -> pm.Carrier:
-    return value if isinstance(value, pm.Carrier) else pm.wrap(value)
+def _carrier_of(value: pm.Val | pm.Datum) -> pm.Val:
+    return value if isinstance(value, pm.Val) else pm.val(value)
 
 
-def _constraint_target_term(term: pm.Carrier) -> pm.Carrier:
+def _constraint_target_term(term: pm.Val) -> pm.Val:
     type_ = sem.bound_as_type(term)
-    return term if type_ is None else pm.wrap(type_)
+    return term if type_ is None else pm.val(type_)
 
 
-def _constraint_subject_term(subject: pm.Carrier, target: pm.Carrier) -> pm.Carrier:
+def _constraint_subject_term(subject: pm.Val, target: pm.Val) -> pm.Val:
     if isinstance(target.fetch(), pm.Type):
-        return pm.wrap(urs.TypeOfOperator.of(subject))
+        return pm.val(urs.TypeOfOperator.of(subject))
     return subject

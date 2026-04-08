@@ -4,7 +4,7 @@ from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
 from ..domain import Builtin, Id
-from .base import Carrier, UnwrapError
+from .base import Val, UnwrapError
 
 
 _RESULT_QUALIFIER = pm.Anchor("std.qualifiers.Result")
@@ -39,7 +39,7 @@ def _result_descriptor(ok_descriptor: pm.Type, err_descriptor: pm.Type) -> pm.Qu
 
 
 def _descriptor_from_annotation(annotation: _Any) -> pm.Type:
-    if isinstance(annotation, Carrier):
+    if isinstance(annotation, Val):
         return annotation.descriptor
     return _cast(pm.Type, pm.project_type(annotation))
 
@@ -63,7 +63,7 @@ class _ResultVarCtx(Builtin):
 _RESULT_VAR_CTX = _ResultVarCtx()
 
 
-class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
+class Result[E, V = pm.Datum](Val[Ok[V] | Err[E]]):
     """Carrier for Result[E, V] — holds either Ok[V] or Err[E]."""
 
     descriptor: pm.Qual
@@ -88,17 +88,17 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
             return 0
         return len(self.value_carrier())
 
-    def __getitem__(self, offset: int) -> Carrier:
+    def __getitem__(self, offset: int) -> Val:
         if isinstance(self.content, Err):
             raise IndexError(offset)
         return self.value_carrier()[offset]
 
-    def attr(self, id: Id) -> Carrier:
+    def attr(self, id: Id) -> Val:
         if isinstance(self.content, Err):
             raise KeyError(id)
         return self.value_carrier().attr(id)
 
-    def reconstruct(self, children: tuple[Carrier, ...]) -> Self:
+    def reconstruct(self, children: tuple[Val, ...]) -> Self:
         if isinstance(self.content, Err):
             assert not children
             return self
@@ -119,72 +119,72 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
         else:
             self.child(_err_descriptor_of(self.descriptor), self.content.error)
 
-    def value_carrier(self) -> Carrier:
+    def value_carrier(self) -> Val:
         """Inner value carrier. Only valid when is_ok."""
         assert isinstance(self.content, Ok)
         return self.child(_ok_descriptor_of(self.descriptor), self.content.value)
 
-    def error_carrier(self) -> Carrier:
+    def error_carrier(self) -> Val:
         """Inner error carrier. Only valid when is_err."""
         assert isinstance(self.content, Err)
         return self.child(_err_descriptor_of(self.descriptor), self.content.error)
 
-    def unwrap(self) -> Carrier[V]:
+    def unwrap(self) -> Val[V]:
         if isinstance(self.content, Ok):
             return self.value_carrier()
         assert isinstance(self.content, Err)
         raise UnwrapError(self.error_carrier())
 
-    def unwrap_or(self, default: Carrier[V]) -> Carrier[V]:
-        if not isinstance(default, Carrier):
+    def unwrap_or(self, default: Val[V]) -> Val[V]:
+        if not isinstance(default, Val):
             raise TypeError("Result.unwrap_or() expects a Carrier default")
         if isinstance(self.content, Ok):
             return self.value_carrier()
         return default
 
-    def unwrap_or_else(self, f: _Callable[[Carrier[E]], Carrier[V]]) -> Carrier[V]:
+    def unwrap_or_else(self, f: _Callable[[Val[E]], Val[V]]) -> Val[V]:
         if isinstance(self.content, Ok):
             return self.value_carrier()
         value = f(self.error_carrier())
-        if not isinstance(value, Carrier):
+        if not isinstance(value, Val):
             raise TypeError("Result.unwrap_or_else() callback must return a Carrier")
         return value
 
-    def unwrap_err(self) -> Carrier[E]:
+    def unwrap_err(self) -> Val[E]:
         if isinstance(self.content, Err):
             return self.error_carrier()
         assert isinstance(self.content, Ok)
         raise UnwrapError(self.value_carrier())
 
-    def expect(self, message: str) -> Carrier[V]:
+    def expect(self, message: str) -> Val[V]:
         if isinstance(self.content, Ok):
             return self.value_carrier()
         assert isinstance(self.content, Err)
         raise UnwrapError(self.error_carrier(), message)
 
-    def expect_err(self, message: str) -> Carrier[E]:
+    def expect_err(self, message: str) -> Val[E]:
         if isinstance(self.content, Err):
             return self.error_carrier()
         assert isinstance(self.content, Ok)
         raise UnwrapError(self.value_carrier(), message)
 
-    def map(self, f: _Callable[[Carrier[V]], Carrier]) -> Result[E, _Any]:
+    def map(self, f: _Callable[[Val[V]], Val]) -> Result[E, _Any]:
         if isinstance(self.content, Err):
             return self
         value = f(self.value_carrier())
-        if not isinstance(value, Carrier):
+        if not isinstance(value, Val):
             raise TypeError("Result.map() callback must return a Carrier")
         return self._with_ok(value)
 
-    def map_err(self, f: _Callable[[Carrier[E]], Carrier]) -> Result[_Any, V]:
+    def map_err(self, f: _Callable[[Val[E]], Val]) -> Result[_Any, V]:
         if isinstance(self.content, Ok):
             return self
         error = f(self.error_carrier())
-        if not isinstance(error, Carrier):
+        if not isinstance(error, Val):
             raise TypeError("Result.map_err() callback must return a Carrier")
         return self._with_err(error)
 
-    def and_then(self, f: _Callable[[Carrier[V]], _Any]) -> Result[_Any, _Any]:
+    def and_then(self, f: _Callable[[Val[V]], _Any]) -> Result[_Any, _Any]:
         if isinstance(self.content, Err):
             return self
         result = f(self.value_carrier())
@@ -193,28 +193,28 @@ class Result[E, V = pm.Datum](Carrier[Ok[V] | Err[E]]):
         return result
 
     @classmethod
-    def ok(cls, value: Carrier) -> Result:
-        if not isinstance(value, Carrier):
+    def ok(cls, value: Val) -> Result:
+        if not isinstance(value, Val):
             raise TypeError("Result.ok() expects a Carrier")
         err_type = _cast(pm.Type, pm.SimpleVar(_RESULT_VAR_CTX, "E"))
         descriptor = _result_descriptor(value.descriptor, err_type)
         return _cast(Result, cls(descriptor, Ok(value.content)))
 
     @classmethod
-    def err(cls, error: Carrier) -> Result:
-        if not isinstance(error, Carrier):
+    def err(cls, error: Val) -> Result:
+        if not isinstance(error, Val):
             raise TypeError("Result.err() expects a Carrier")
         ok_type = _cast(pm.Type, pm.SimpleVar(_RESULT_VAR_CTX, "V"))
         descriptor = _result_descriptor(ok_type, error.descriptor)
         return _cast(Result, cls(descriptor, Err(error.content)))
 
-    def _with_ok(self, value: Carrier) -> Result[_Any, _Any]:
+    def _with_ok(self, value: Val) -> Result[_Any, _Any]:
         return type(self)(
             _result_descriptor(value.descriptor, _err_descriptor_of(self.descriptor)),
             Ok(value.content),
         )
 
-    def _with_err(self, error: Carrier) -> Result[_Any, _Any]:
+    def _with_err(self, error: Val) -> Result[_Any, _Any]:
         return type(self)(
             _result_descriptor(_ok_descriptor_of(self.descriptor), error.descriptor),
             Err(error.content),

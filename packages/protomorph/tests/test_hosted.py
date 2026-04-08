@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, var, unify, wrap
+from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, var, unify, val
 
 
-INT = wrap(int).fetch()
-STR = wrap(str).fetch()
-FLOAT = wrap(float).fetch()
+INT = val(int).fetch()
+STR = val(str).fetch()
+FLOAT = val(float).fetch()
 
 
 def is_var(carrier) -> bool:
@@ -32,13 +32,13 @@ class TestSpecCreation(unittest.TestCase):
 
 class TestSpecWrap(unittest.TestCase):
     def test_wrap_spec_exposes_anchor_and_args(self):
-        carrier = wrap(Spec.of("std.List", INT))
+        carrier = val(Spec.of("std.List", INT))
         self.assertEqual(carrier[0].fetch(), "std.List")
         self.assertEqual(carrier[1][0].fetch(), INT)
 
     def test_subst_wrapped_spec(self):
         T = var("T")
-        carrier = wrap(Spec.of("std.List", T))
+        carrier = val(Spec.of("std.List", T))
         ph_leaf = next(leaf for leaf in carrier.deep_iter() if leaf.fetch() is T)
         result = carrier.subst({ph_leaf: LeafCarrier(ph_leaf.descriptor, INT)}).fetch()
         self.assertEqual(repr(result), repr(Spec.of("std.List", INT)))
@@ -52,7 +52,7 @@ class TestQual(unittest.TestCase):
 
     def test_wrap_qual_is_traversable(self):
         qual = Qual.of(Spec.of("std.Integer"), Spec.of("std.List", INT))
-        leaves = [leaf.fetch() for leaf in wrap(qual).deep_iter()]
+        leaves = [leaf.fetch() for leaf in val(qual).deep_iter()]
         self.assertIn(Spec.of("std.Integer"), leaves)
         self.assertIn(Spec.of("std.List", INT), leaves)
 

@@ -12,8 +12,8 @@ class _ZipMismatch(Exception):
 
 
 def _deep_zip_gen(
-    master: protomorph.Carrier, slave: protomorph.Carrier,
-) -> Generator[tuple[protomorph.Carrier, protomorph.Carrier], object, None]:
+    master: protomorph.Val, slave: protomorph.Val,
+) -> Generator[tuple[protomorph.Val, protomorph.Val], object, None]:
     stack = [(master, slave)]
     while stack:
         left, right = stack.pop()
@@ -34,14 +34,14 @@ def _deep_zip_gen(
 class ZipWalker:
     __slots__ = ("_gen", "_ctrl")
 
-    def __init__(self, master: protomorph.Carrier, slave: protomorph.Carrier):
+    def __init__(self, master: protomorph.Val, slave: protomorph.Val):
         self._gen = _deep_zip_gen(master, slave)
         self._ctrl = None
 
     def __iter__(self):
         return self
 
-    def __next__(self) -> tuple[protomorph.Carrier, protomorph.Carrier]:
+    def __next__(self) -> tuple[protomorph.Val, protomorph.Val]:
         try:
             return self._gen.send(self._ctrl)
         finally:
@@ -51,7 +51,7 @@ class ZipWalker:
         self._ctrl = _SKIP
 
 
-def deep_zip(master: protomorph.Carrier, slave: protomorph.Carrier) -> ZipWalker:
+def deep_zip(master: protomorph.Val, slave: protomorph.Val) -> ZipWalker:
     """Paired depth-first traversal of two carrier trees.
 
     Yields (left, right) pairs. Call walker.skip() to prevent

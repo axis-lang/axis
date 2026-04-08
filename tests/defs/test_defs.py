@@ -234,9 +234,9 @@ class FactFacetTest(StdPackageTestCase):
 class ConstraintGoalTest(StdPackageTestCase):
     def test_constraint_goal_uses_it_template_and_substitutes_subject(self):
         constraint = sem.Constraint(
-            subject=pm.wrap(pm.Anchor("std.types.Text")),
-            term=pm.wrap(pm.Spec.of("std.types.Type")),
-            target=pm.wrap(pm.Spec.of("std.types.Type")),
+            subject=pm.val(pm.Anchor("std.types.Text")),
+            term=pm.val(pm.Spec.of("std.types.Type")),
+            target=pm.val(pm.Spec.of("std.types.Type")),
         )
 
         self.assertEqual(constraint.template_goal.anchor, expr.CONFORMS_FACT)

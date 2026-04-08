@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from typing import cast
+from typing import Any, cast
 
 from protobase import flux, frozendict
 
@@ -10,58 +10,108 @@ from protomorph import logic
 from protomorph.logic import queryset as logic_queryset
 
 
+REL_TYPES: dict[tuple[str, int], type[pm.Builtin]] = {}
+REL_TYPES_BY_NAME: dict[str, set[type[pm.Builtin]]] = {}
+
+
+def _rel_type(name: str, arity: int) -> type[pm.Builtin]:
+    key = (name, arity)
+    cls = REL_TYPES.get(key)
+    if cls is not None:
+        return cls
+
+    annotations = {f"arg_{index}": pm.Val for index in range(arity)}
+    cls_name = f"{name.title().replace('_', '').replace('-', '')}{arity}"
+    cls = type(cls_name, (pm.Builtin,), {"__module__": __name__, "__annotations__": annotations})
+    REL_TYPES[key] = cls
+    REL_TYPES_BY_NAME.setdefault(name, set()).add(cls)
+    return cls
+
+
+class Unary(pm.Builtin):
+    name: pm.Val
+    value: pm.Val
+
+
+def rel(name: Any, *args: Any) -> pm.Val:
+    if not isinstance(name, str):
+        raise TypeError(f"rel() expects a string predicate name, got {type(name).__name__}")
+    cls = _rel_type(name, len(args))
+    return pm.val(cls(*(pm.val(arg) for arg in args)))
+
+
+def tup(*items: Any) -> pm.Val:
+    return pm.val(*items)
+
+
+def unary(name: Any, value: Any) -> pm.Val:
+    return pm.val(Unary(pm.val(name), pm.val(value)))
+
+
+def ctrl(name: str, *args: Any) -> pm.Val:
+    if not args:
+        return rel("ctrl", name)
+    return rel("ctrl", tup(name, *args))
+
+
+def is_rel_goal(carrier: pm.Val, name: str) -> bool:
+    return type(carrier.fetch()) in REL_TYPES_BY_NAME.get(name, set())
+
+
+def reducible_assertion(goal: pm.Val) -> logic.Assertion:
+    return logic.Assertion(pm.val(logic.Reducible(goal.descriptor)))
+
+
 class IdentityRealm(pm.Realm):
-    facts: tuple[pm.Spec, ...] = ()
+    facts: tuple[pm.Val, ...] = ()
     assertions: frozenset[logic.Assertion] = frozenset()
 
     @flux.property
     def logic_assertions(self):
-        return frozenset(logic.Assertion(pm.wrap(fact)) for fact in self.facts) | self.assertions
-
-    @flux.property
-    def anchors(self) -> frozenset[pm.Anchor]:
-        return frozenset(fact.anchor for fact in self.facts)
-
-    def facts_by_anchor(self, anchor: pm.Anchor) -> tuple[pm.Spec, ...]:
-        return tuple(fact for fact in self.facts if fact.anchor == anchor)
-
-    def rules_for_anchor(self, anchor: pm.Anchor):
-        _ = anchor
-        return ()
+        return frozenset(logic.Assertion(fact) for fact in self.facts) | self.assertions
 
     def eval(self, carrier, *, to):
         _ = to
         value = carrier.fetch()
-        if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.ctrl.identity"):
-            return pm.wrap(logic.Reduced(pm.wrap(pm.Spec.of("test.fact", pm.Spec.of("test.alice")))))
+        if is_rel_goal(carrier, "ctrl") and value.arg_0.fetch() == "identity":
+            return pm.val(logic.Reduced(rel("fact", 1)))
         raise NotImplementedError("unsupported")
-
-
-def reducible_assertion(goal: pm.Spec) -> logic.Assertion:
-    return logic.Assertion(pm.wrap(logic.Reducible(pm.wrap(goal).descriptor)))
 
 
 class TestLogicQuerySet(unittest.TestCase):
     def test_queryset_answers_from_local_facts(self):
         engine = logic.Solver(pm.OverlayRealm(base=pm.NATIVE_REALM))
-        session = engine.session().with_local_facts(pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), pm.Spec.of("test.bob"))))
+        session = engine.session().with_local_facts(rel("parent", 1, 2))
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), who))
+        goal = rel("parent", 1, who)
 
         queryset = session.queryset(goal).continue_()
         query = queryset.query(goal)
 
         self.assertTrue(query.is_closed)
         self.assertEqual(len(query.answers), 1)
-        self.assertEqual(query.answers[0].subst[who].fetch(), pm.Spec.of("test.bob"))
+        self.assertEqual(query.answers[0].subst[who].fetch(), 2)
+
+    def test_queryset_answers_from_local_varying_tuple_facts(self):
+        engine = logic.Solver(pm.OverlayRealm(base=pm.NATIVE_REALM))
+        session = engine.session().with_local_facts(rel("pair", tup(1, 2)))
+        who = pm.var("Who")
+        goal = rel("pair", tup(1, who))
+
+        queryset = session.queryset(goal).continue_()
+        query = queryset.query(goal)
+
+        self.assertTrue(query.is_closed)
+        self.assertEqual(len(query.answers), 1)
+        self.assertEqual(query.answers[0].subst[who].fetch(), 2)
 
     def test_queryset_reduces_ctrl_goals(self):
         realm = IdentityRealm(
-            facts=(pm.Spec.of("test.fact", pm.Spec.of("test.alice")),),
-            assertions=frozenset((reducible_assertion(pm.Spec.of("test.ctrl.identity")),)),
+            facts=(rel("fact", 1),),
+            assertions=frozenset((reducible_assertion(ctrl("identity")),)),
         )
         engine = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.ctrl.identity"))
+        goal = ctrl("identity")
 
         queryset = engine.session().queryset(goal).continue_()
         query = queryset.query(goal)
@@ -75,102 +125,92 @@ class TestLogicQuerySet(unittest.TestCase):
                 _ = (carrier, to)
                 raise RuntimeError("boom")
 
-        engine = logic.Solver(
-            FailingRealm(assertions=frozenset((reducible_assertion(pm.Spec.of("test.ctrl.identity")),)))
-        )
-        ctrl = engine.eval_as_ctrl(pm.wrap(pm.Spec.of("test.ctrl.identity")))
+        engine = logic.Solver(FailingRealm(assertions=frozenset((reducible_assertion(ctrl("identity")),))))
+        ctrl_value = engine.eval_as_ctrl(ctrl("identity"))
 
-        self.assertIsInstance(ctrl.fetch(), logic.Failed)
+        self.assertIsInstance(ctrl_value.fetch(), logic.Failed)
 
     def test_queryset_reduction_is_additive_with_normal_facts(self):
         class ChoiceRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
                 value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.ctrl.choice"):
-                    placeholder = value.args.content[0]
-                    if not isinstance(placeholder, pm.Placeholder):
-                        raise NotImplementedError("unsupported")
-                    return pm.wrap(
-                        logic.Answers(
-                            (
-                                logic.Answer(
-                                    carrier,
-                                    frozendict(((placeholder, pm.wrap(pm.Spec.of("test.alice"))),)),
-                                ),
+                if is_rel_goal(carrier, "ctrl") and isinstance(value.arg_0.fetch(), tuple):
+                    payload = value.arg_0.fetch()
+                    if len(payload) == 2 and payload[0] == "choice":
+                        placeholder = cast(pm.Placeholder, payload[1].fetch())
+                        return pm.val(
+                            logic.Answers(
+                                (
+                                    logic.Answer(carrier, frozendict(((placeholder, pm.val(1)),))),
+                                )
                             )
                         )
-                    )
                 raise NotImplementedError("unsupported")
 
         who = pm.var("Who")
-        realm = ChoiceRealm(assertions=frozenset((reducible_assertion(pm.Spec.of("test.ctrl.choice", who)),)))
+        realm = ChoiceRealm(assertions=frozenset((reducible_assertion(ctrl("choice", who)),)))
         solver = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.ctrl.choice", who))
-        queryset = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.ctrl.choice", pm.Spec.of("test.bob")))).queryset(goal).continue_()
+        goal = ctrl("choice", who)
+        queryset = solver.session().with_local_facts(ctrl("choice", 2)).queryset(goal).continue_()
 
         values = {answer.subst[who].fetch() for answer in queryset.query(goal).answers}
-        self.assertEqual(values, {pm.Spec.of("test.alice"), pm.Spec.of("test.bob")})
+        self.assertEqual(values, {1, 2})
 
     def test_queryset_failed_reducible_does_not_hide_normal_proof(self):
         class FailedRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.ctrl.choice"):
-                    return pm.wrap(logic.Failed("no builtin answer"))
+                if is_rel_goal(carrier, "ctrl"):
+                    return pm.val(logic.Failed("no builtin answer"))
                 raise NotImplementedError("unsupported")
 
         who = pm.var("Who")
-        realm = FailedRealm(assertions=frozenset((reducible_assertion(pm.Spec.of("test.ctrl.choice", who)),)))
+        realm = FailedRealm(assertions=frozenset((reducible_assertion(ctrl("choice", who)),)))
         solver = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.ctrl.choice", who))
-        queryset = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.ctrl.choice", pm.Spec.of("test.bob")))).queryset(goal).continue_()
+        goal = ctrl("choice", who)
+        queryset = solver.session().with_local_facts(ctrl("choice", 2)).queryset(goal).continue_()
 
         query = queryset.query(goal)
         self.assertTrue(query.is_closed)
         self.assertEqual(len(query.answers), 1)
-        self.assertEqual(query.answers[0].subst[who].fetch(), pm.Spec.of("test.bob"))
+        self.assertEqual(query.answers[0].subst[who].fetch(), 2)
 
     def test_queryset_blocked_reducible_does_not_hide_normal_proof(self):
         class BlockingChoiceRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.ctrl.choice"):
-                    return pm.wrap(logic.Blocked(logic.PendingReduction(carrier, carrier)))
+                if is_rel_goal(carrier, "ctrl"):
+                    return pm.val(logic.Blocked(logic.PendingReduction(carrier, carrier)))
                 raise NotImplementedError("unsupported")
 
         who = pm.var("Who")
-        realm = BlockingChoiceRealm(assertions=frozenset((reducible_assertion(pm.Spec.of("test.ctrl.choice", who)),)))
+        realm = BlockingChoiceRealm(assertions=frozenset((reducible_assertion(ctrl("choice", who)),)))
         solver = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.ctrl.choice", who))
-        queryset = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.ctrl.choice", pm.Spec.of("test.bob")))).queryset(goal).continue_()
+        goal = ctrl("choice", who)
+        queryset = solver.session().with_local_facts(ctrl("choice", 2)).queryset(goal).continue_()
 
         query = queryset.query(goal)
         self.assertTrue(query.is_blocked)
         self.assertEqual(len(query.answers), 1)
-        self.assertEqual(query.answers[0].subst[who].fetch(), pm.Spec.of("test.bob"))
+        self.assertEqual(query.answers[0].subst[who].fetch(), 2)
 
     def test_queryset_reduction_is_additive_with_assertions(self):
         class ChoiceRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
                 value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.ctrl.choice"):
-                    placeholder = value.args.content[0]
-                    if not isinstance(placeholder, pm.Placeholder):
-                        raise NotImplementedError("unsupported")
-                    return pm.wrap(
-                        logic.Answers(
-                            (
-                                logic.Answer(
-                                    carrier,
-                                    frozendict(((placeholder, pm.wrap(pm.Spec.of("test.alice"))),)),
-                                ),
+                if is_rel_goal(carrier, "ctrl") and isinstance(value.arg_0.fetch(), tuple):
+                    payload = value.arg_0.fetch()
+                    if len(payload) == 2 and payload[0] == "choice":
+                        placeholder = cast(pm.Placeholder, payload[1].fetch())
+                        return pm.val(
+                            logic.Answers(
+                                (
+                                    logic.Answer(carrier, frozendict(((placeholder, pm.val(1)),))),
+                                )
                             )
                         )
-                    )
                 raise NotImplementedError("unsupported")
 
         who = pm.var("Who")
@@ -178,21 +218,21 @@ class TestLogicQuerySet(unittest.TestCase):
         realm = ChoiceRealm(
             assertions=frozenset(
                 (
-                    reducible_assertion(pm.Spec.of("test.ctrl.choice", who)),
-                    logic.Assertion(pm.wrap(pm.Spec.of("test.ctrl.choice", pm.Spec.of("test.bob")))),
+                    reducible_assertion(ctrl("choice", who)),
+                    logic.Assertion(ctrl("choice", 2)),
                     logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.result", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.ctrl.choice", x))),),
+                        rel("result", x),
+                        (logic.Premise(ctrl("choice", x)),),
                     ),
                 )
             )
         )
         solver = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.result", who))
+        goal = rel("result", who)
         queryset = solver.session().queryset(goal).continue_()
 
         values = {answer.subst[who].fetch() for answer in queryset.query(goal).answers}
-        self.assertEqual(values, {pm.Spec.of("test.alice"), pm.Spec.of("test.bob")})
+        self.assertEqual(values, {1, 2})
 
     def test_queryset_solves_assertions_against_local_facts(self):
         x = pm.var("X")
@@ -202,10 +242,10 @@ class TestLogicQuerySet(unittest.TestCase):
             assertions=frozenset(
                 (
                     logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.grandparent", x, y)),
+                        rel("grandparent", x, y),
                         (
-                            logic.Premise(pm.wrap(pm.Spec.of("test.parent", x, z))),
-                            logic.Premise(pm.wrap(pm.Spec.of("test.parent", z, y))),
+                            logic.Premise(rel("parent", x, z)),
+                            logic.Premise(rel("parent", z, y)),
                         ),
                     ),
                 )
@@ -213,18 +253,15 @@ class TestLogicQuerySet(unittest.TestCase):
         )
         solver = logic.Solver(realm)
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.grandparent", pm.Spec.of("test.alice"), who))
-        session = solver.session().with_local_facts(
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), pm.Spec.of("test.bob"))),
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.bob"), pm.Spec.of("test.carol"))),
-        )
+        goal = rel("grandparent", 1, who)
+        session = solver.session().with_local_facts(rel("parent", 1, 2), rel("parent", 2, 3))
 
         queryset = session.queryset(goal).continue_()
         query = queryset.query(goal)
 
         self.assertTrue(query.is_closed)
         self.assertEqual(len(query.answers), 1)
-        self.assertEqual(query.answers[0].subst[who].fetch(), pm.Spec.of("test.carol"))
+        self.assertEqual(query.answers[0].subst[who].fetch(), 3)
 
     def test_queryset_creates_internal_tables_for_recursive_assertions(self):
         x = pm.var("X")
@@ -233,69 +270,44 @@ class TestLogicQuerySet(unittest.TestCase):
         realm = IdentityRealm(
             assertions=frozenset(
                 (
+                    logic.Assertion(rel("ancestor", x, y), (logic.Premise(rel("parent", x, y)),)),
                     logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.ancestor", x, y)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.parent", x, y))),),
-                    ),
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.ancestor", x, y)),
+                        rel("ancestor", x, y),
                         (
-                            logic.Premise(pm.wrap(pm.Spec.of("test.parent", x, z))),
-                            logic.Premise(pm.wrap(pm.Spec.of("test.ancestor", z, y))),
+                            logic.Premise(rel("parent", x, z)),
+                            logic.Premise(rel("ancestor", z, y)),
                         ),
                     ),
                 )
             )
         )
-        solver = logic.Solver(realm)
+        solver = logic.Solver(realm=realm)
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.ancestor", pm.Spec.of("test.alice"), who))
-        session = solver.session().with_local_facts(
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), pm.Spec.of("test.bob"))),
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.bob"), pm.Spec.of("test.carol"))),
-        )
+        goal = rel("ancestor", 1, who)
+        session = solver.session().with_local_facts(rel("parent", 1, 2), rel("parent", 2, 3))
 
         queryset = session.queryset(goal).continue_()
         query = queryset.query(goal)
 
         values = {answer.subst[who].fetch() for answer in query.answers}
-        self.assertEqual(values, {pm.Spec.of("test.bob"), pm.Spec.of("test.carol")})
+        self.assertEqual(values, {2, 3})
         self.assertGreater(len(queryset.state.tables_by_key), len(queryset.state.roots))
-        self.assertTrue(
-            any(
-                isinstance(table.goal.fetch(), pm.Spec)
-                and table.goal.fetch().anchor == pm.Anchor("test.ancestor")
-                and pm.Spec.of("test.bob") in table.goal.fetch().args.content
-                for table in queryset.state.tables_by_key.values()
-            )
-        )
+        self.assertTrue(any(is_rel_goal(table.goal, "ancestor") for table in queryset.state.tables_by_key.values()))
 
     def test_pending_branch_is_owned_by_table(self):
         class BlockingRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.wait"):
-                    return pm.wrap(logic.Blocked(logic.PendingReduction(carrier, carrier)))
+                if isinstance(carrier.fetch(), Unary) and carrier.fetch().name.fetch() == "wait":
+                    return pm.val(logic.Blocked(logic.PendingReduction(carrier, carrier)))
                 raise NotImplementedError("unsupported")
 
         x = pm.var("X")
         realm = BlockingRealm(
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.root", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.wait", x))),),
-                    ),
-                )
-            )
+            assertions=frozenset((logic.Assertion(rel("root", x), (logic.Premise(unary("wait", x)),)),))
         )
-        solver = logic.Solver(
-            BlockingRealm(
-                assertions=realm.assertions | frozenset((reducible_assertion(pm.Spec.of("test.wait", x)),)),
-            )
-        )
-        goal = pm.wrap(pm.Spec.of("test.root", pm.Spec.of("test.alice")))
+        solver = logic.Solver(BlockingRealm(assertions=realm.assertions | frozenset((reducible_assertion(unary("wait", x)),))))
+        goal = rel("root", 1)
 
         queryset = solver.session().queryset(goal).continue_()
         table = queryset.table(goal)
@@ -303,19 +315,17 @@ class TestLogicQuerySet(unittest.TestCase):
         self.assertTrue(table.pending)
         branch = table.pending[0]
         self.assertEqual(branch.table_key, table.key)
-        self.assertEqual(repr(branch.blocked_goal.fetch()), repr(pm.Spec.of("test.wait", pm.Spec.of("test.alice"))))
+        self.assertEqual(branch.blocked_goal.fetch(), Unary(pm.val("wait"), pm.val(1)))
         self.assertEqual(len(branch.active_frames), 1)
         self.assertEqual(branch.active_frames[0].table_key, table.key)
 
     def test_equivalent_roots_share_canonical_table(self):
         engine = logic.Solver(pm.OverlayRealm(base=pm.NATIVE_REALM))
-        session = engine.session().with_local_facts(
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), pm.Spec.of("test.bob")))
-        )
+        session = engine.session().with_local_facts(rel("parent", 1, 2))
         who = pm.var("Who")
         child = pm.var("Child")
-        goal_one = pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), who))
-        goal_two = pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), child))
+        goal_one = rel("parent", 1, who)
+        goal_two = rel("parent", 1, child)
 
         queryset = session.queryset(goal_one, goal_two).continue_()
         root_one = next(root for root in queryset.state.roots if root.goal == goal_one)
@@ -329,41 +339,21 @@ class TestLogicQuerySet(unittest.TestCase):
 
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.wait"):
+                if isinstance(carrier.fetch(), Unary) and carrier.fetch().name.fetch() == "wait":
                     if self.should_block:
-                        return pm.wrap(logic.Blocked(logic.PendingReduction(carrier, carrier)))
-                    return pm.wrap(logic.Reduced(pm.wrap(pm.Spec.of("test.done", pm.Spec.of("test.alice")))))
+                        return pm.val(logic.Blocked(logic.PendingReduction(carrier, carrier)))
+                    return pm.val(logic.Reduced(rel("done", 1)))
                 raise NotImplementedError("unsupported")
 
         x = pm.var("X")
-        realm = FlippingRealm(
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.root", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.wait", x))),),
-                    ),
-                )
-            )
-        )
-        solver = logic.Solver(
-            FlippingRealm(
-                assertions=realm.assertions | frozenset((reducible_assertion(pm.Spec.of("test.wait", x)),)),
-                should_block=realm.should_block,
-            )
-        )
-        goal = pm.wrap(pm.Spec.of("test.root", pm.Spec.of("test.alice")))
+        realm = FlippingRealm(assertions=frozenset((logic.Assertion(rel("root", x), (logic.Premise(unary("wait", x)),)),)))
+        solver = logic.Solver(FlippingRealm(assertions=realm.assertions | frozenset((reducible_assertion(unary("wait", x)),)), should_block=True))
+        goal = rel("root", 1)
 
         blocked = solver.session().queryset(goal).continue_()
         self.assertTrue(blocked.query(goal).is_blocked)
 
-        resumed_solver = logic.Solver(
-            FlippingRealm(
-                assertions=realm.assertions | frozenset((reducible_assertion(pm.Spec.of("test.wait", x)),)),
-                should_block=False,
-            )
-        )
+        resumed_solver = logic.Solver(FlippingRealm(assertions=realm.assertions | frozenset((reducible_assertion(unary("wait", x)),)), should_block=False))
         resumed = resumed_solver.session().continue_(blocked)
 
         self.assertTrue(resumed.query(goal).is_closed)
@@ -372,21 +362,13 @@ class TestLogicQuerySet(unittest.TestCase):
         class BlockingRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.wait"):
-                    return pm.wrap(logic.Blocked(logic.PendingReduction(carrier, carrier)))
+                if is_rel_goal(carrier, "wait"):
+                    return pm.val(logic.Blocked(logic.PendingReduction(carrier, carrier)))
                 raise NotImplementedError("unsupported")
 
-        assertion = logic.Assertion(
-            pm.wrap(pm.Spec.of("test.root")),
-            (logic.Premise(pm.wrap(pm.Spec.of("test.wait")), False),),
-        )
-        solver = logic.Solver(
-            BlockingRealm(
-                assertions=frozenset((assertion, reducible_assertion(pm.Spec.of("test.wait")))),
-            ),
-        )
-        goal = pm.wrap(pm.Spec.of("test.root"))
+        assertion = logic.Assertion(rel("root"), (logic.Premise(rel("wait"), False),))
+        solver = logic.Solver(BlockingRealm(assertions=frozenset((assertion, reducible_assertion(rel("wait"))))))
+        goal = rel("root")
 
         blocked = solver.session().queryset(goal).continue_()
         self.assertTrue(blocked.query(goal).is_blocked)
@@ -402,31 +384,18 @@ class TestLogicQuerySet(unittest.TestCase):
         class BlockingRealm(IdentityRealm):
             def eval(self, carrier, *, to):
                 _ = to
-                value = carrier.fetch()
-                if isinstance(value, pm.Spec) and value.anchor == pm.Anchor("test.wait"):
-                    return pm.wrap(logic.Blocked(logic.PendingReduction(carrier, carrier)))
+                if is_rel_goal(carrier, "wait"):
+                    return pm.val(logic.Blocked(logic.PendingReduction(carrier, carrier)))
                 raise NotImplementedError("unsupported")
 
-        assertion = logic.Assertion(
-            pm.wrap(pm.Spec.of("test.root")),
-            (logic.Premise(pm.wrap(pm.Spec.of("test.wait")), False),),
-        )
-        solver = logic.Solver(
-            BlockingRealm(
-                assertions=frozenset((assertion, reducible_assertion(pm.Spec.of("test.wait")))),
-            ),
-        )
-        goal = pm.wrap(pm.Spec.of("test.root"))
+        assertion = logic.Assertion(rel("root"), (logic.Premise(rel("wait"), False),))
+        solver = logic.Solver(BlockingRealm(assertions=frozenset((assertion, reducible_assertion(rel("wait"))))))
+        goal = rel("root")
 
         blocked = solver.session().queryset(goal).continue_()
         self.assertTrue(blocked.query(goal).is_blocked)
 
-        resumed_solver = logic.Solver(
-            IdentityRealm(
-                facts=(pm.Spec.of("test.wait"),),
-                assertions=frozenset((assertion,)),
-            )
-        )
+        resumed_solver = logic.Solver(IdentityRealm(facts=(rel("wait"),), assertions=frozenset((assertion,))))
         resumed = resumed_solver.session().continue_(blocked)
         query = resumed.query(goal)
 
@@ -436,64 +405,44 @@ class TestLogicQuerySet(unittest.TestCase):
     def test_continue_with_new_local_facts_retries_closed_tables(self):
         solver = logic.Solver(pm.OverlayRealm(base=pm.NATIVE_REALM))
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), who))
+        goal = rel("parent", 1, who)
 
         initial = solver.session().queryset(goal).continue_()
         self.assertTrue(initial.query(goal).is_closed)
         self.assertEqual(len(initial.query(goal).answers), 0)
 
-        resumed = solver.session().with_local_facts(
-            pm.wrap(pm.Spec.of("test.parent", pm.Spec.of("test.alice"), pm.Spec.of("test.bob")))
-        ).continue_(initial)
+        resumed = solver.session().with_local_facts(rel("parent", 1, 2)).continue_(initial)
 
         self.assertTrue(resumed.query(goal).is_closed)
         self.assertEqual(len(resumed.query(goal).answers), 1)
-        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), pm.Spec.of("test.bob"))
+        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), 2)
         self.assertGreater(resumed.state.binding_epoch, initial.state.binding_epoch)
 
     def test_continue_reopens_closed_positive_dependency_on_changed_local_fact(self):
         x = pm.var("X")
-        realm = IdentityRealm(
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.p", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.q", x))),),
-                    ),
-                )
-            )
-        )
+        realm = IdentityRealm(assertions=frozenset((logic.Assertion(rel("p", x), (logic.Premise(rel("q", x)),)),)))
         solver = logic.Solver(realm)
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.p", who))
+        goal = rel("p", who)
 
         initial = solver.session().queryset(goal).continue_()
         self.assertEqual(len(initial.query(goal).answers), 0)
 
-        resumed = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.q", pm.Spec.of("test.alice")))).continue_(initial)
+        resumed = solver.session().with_local_facts(rel("q", 1)).continue_(initial)
 
         self.assertEqual(len(resumed.query(goal).answers), 1)
-        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), pm.Spec.of("test.alice"))
+        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), 1)
 
     def test_continue_reopens_closed_negative_dependency_on_changed_local_fact(self):
         x = pm.var("X")
-        realm = IdentityRealm(
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.safe", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.blocked", x)), False),),
-                    ),
-                )
-            )
-        )
+        realm = IdentityRealm(assertions=frozenset((logic.Assertion(rel("safe", x), (logic.Premise(rel("blocked", x), False),)),)))
         solver = logic.Solver(realm)
-        goal = pm.wrap(pm.Spec.of("test.safe", pm.Spec.of("test.alice")))
+        goal = rel("safe", 1)
 
         initial = solver.session().queryset(goal).continue_()
         self.assertEqual(len(initial.query(goal).answers), 1)
 
-        resumed = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.blocked", pm.Spec.of("test.alice")))).continue_(initial)
+        resumed = solver.session().with_local_facts(rel("blocked", 1)).continue_(initial)
 
         self.assertEqual(len(resumed.query(goal).answers), 0)
 
@@ -502,113 +451,60 @@ class TestLogicQuerySet(unittest.TestCase):
         realm = IdentityRealm(
             assertions=frozenset(
                 (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.q", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.r", x))),),
-                    ),
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.p", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.q", x))),),
-                    ),
+                    logic.Assertion(rel("q", x), (logic.Premise(rel("r", x)),)),
+                    logic.Assertion(rel("p", x), (logic.Premise(rel("q", x)),)),
                 )
             )
         )
         solver = logic.Solver(realm)
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.p", who))
+        goal = rel("p", who)
 
         initial = solver.session().queryset(goal).continue_()
         self.assertEqual(len(initial.query(goal).answers), 0)
 
-        resumed = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.r", pm.Spec.of("test.alice")))).continue_(initial)
+        resumed = solver.session().with_local_facts(rel("r", 1)).continue_(initial)
 
         self.assertEqual(len(resumed.query(goal).answers), 1)
-        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), pm.Spec.of("test.alice"))
+        self.assertEqual(resumed.query(goal).answers[0].subst[who].fetch(), 1)
 
     def test_irrelevant_local_fact_change_does_not_reopen_unrelated_tables(self):
         x = pm.var("X")
-        realm = IdentityRealm(
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.p", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.q", x))),),
-                    ),
-                )
-            )
-        )
+        realm = IdentityRealm(assertions=frozenset((logic.Assertion(rel("p", x), (logic.Premise(rel("q", x)),)),)))
         solver = logic.Solver(realm)
         who = pm.var("Who")
-        goal = pm.wrap(pm.Spec.of("test.p", who))
+        goal = rel("p", who)
 
         initial = solver.session().queryset(goal).continue_()
-        resumed = solver.session().with_local_facts(pm.wrap(pm.Spec.of("test.z", pm.Spec.of("test.alice")))).continue_(initial)
+        resumed = solver.session().with_local_facts(rel("z", 1)).continue_(initial)
 
         self.assertEqual(len(resumed.query(goal).answers), 0)
 
     def test_pending_table_retry_waits_for_new_table_state(self):
-        key = pm.wrap(pm.Spec.of("test.wait", pm.Spec.of("test.alice")))
-        branch = logic.PendingBranch(
-            table_key=key,
-            blocked_goal=key,
-            blocker=logic.PendingTable(key, key),
-        )
+        key = rel("wait", 1)
+        branch = logic.PendingBranch(table_key=key, blocked_goal=key, blocker=logic.PendingTable(key, key))
 
-        self.assertFalse(
-            logic_queryset._should_retry_branch(
-                branch,
-                {key: logic.QueryTable(key=key, goal=key, active=True, closed=False)},
-                {},
-                {},
-            )
-        )
-        self.assertTrue(
-            logic_queryset._should_retry_branch(
-                branch,
-                {key: logic.QueryTable(key=key, goal=key, active=False, closed=True)},
-                {},
-                {},
-            )
-        )
+        self.assertFalse(logic_queryset._should_retry_branch(branch, {key: logic.QueryTable(key=key, goal=key, active=True, closed=False)}, {}, {}))
+        self.assertTrue(logic_queryset._should_retry_branch(branch, {key: logic.QueryTable(key=key, goal=key, active=False, closed=True)}, {}, {}))
 
     def test_pending_negation_retry_waits_for_table_to_close(self):
-        key = pm.wrap(pm.Spec.of("test.negated", pm.Spec.of("test.alice")))
-        branch = logic.PendingBranch(
-            table_key=key,
-            blocked_goal=key,
-            blocker=logic.PendingNegation(key, key, key),
-        )
+        key = rel("negated", 1)
+        branch = logic.PendingBranch(table_key=key, blocked_goal=key, blocker=logic.PendingNegation(key, key, key))
 
-        self.assertFalse(
-            logic_queryset._should_retry_branch(
-                branch,
-                {key: logic.QueryTable(key=key, goal=key, active=True, closed=False)},
-                {},
-                {},
-            )
-        )
-        self.assertTrue(
-            logic_queryset._should_retry_branch(
-                branch,
-                {key: logic.QueryTable(key=key, goal=key, active=False, closed=True)},
-                {},
-                {},
-            )
-        )
+        self.assertFalse(logic_queryset._should_retry_branch(branch, {key: logic.QueryTable(key=key, goal=key, active=True, closed=False)}, {}, {}))
+        self.assertTrue(logic_queryset._should_retry_branch(branch, {key: logic.QueryTable(key=key, goal=key, active=False, closed=True)}, {}, {}))
 
     def test_insufficient_bindings_retry_waits_for_relevant_binding_key(self):
-        goal = pm.wrap(pm.Spec.of("test.wait", pm.var("X")))
-        relevant = pm.wrap(pm.Anchor("test.binds"))
-        other = pm.wrap(pm.Anchor("test.other"))
+        goal = rel("wait", pm.var("X"))
+        relevant = pm.val(pm.Anchor("test.binds"))
+        other = pm.val(pm.Anchor("test.other"))
         branch = logic.PendingBranch(
             table_key=goal,
             blocked_goal=goal,
             blocker=logic.InsufficientBindings(
                 goal=goal,
                 subject=goal,
-                expected_bindings=frozenset(
-                    (logic.ExpectedBinding(subject=goal, role="table", detail=relevant),)
-                ),
+                expected_bindings=frozenset((logic.ExpectedBinding(subject=goal, role="table", detail=relevant),)),
             ),
             binding_epoch=2,
         )
@@ -618,7 +514,7 @@ class TestLogicQuerySet(unittest.TestCase):
         self.assertTrue(logic_queryset._should_retry_branch(branch, {}, {}, {relevant: 3}))
 
     def test_insufficient_bindings_without_dependency_key_stays_asleep(self):
-        goal = pm.wrap(pm.Spec.of("test.wait", pm.var("X")))
+        goal = rel("wait", pm.var("X"))
         branch = logic.PendingBranch(
             table_key=goal,
             blocked_goal=goal,
@@ -630,22 +526,15 @@ class TestLogicQuerySet(unittest.TestCase):
             binding_epoch=2,
         )
 
-        self.assertFalse(logic_queryset._should_retry_branch(branch, {}, {}, {pm.wrap(pm.Anchor("test.binds")): 3}))
+        self.assertFalse(logic_queryset._should_retry_branch(branch, {}, {}, {pm.val(pm.Anchor("test.binds")): 3}))
 
     def test_positive_cycle_without_coinduction_is_no_solution_with_cycle_cause(self):
         x = pm.var("X")
         solver = logic.Solver(
             pm.OverlayRealm(base=pm.NATIVE_REALM),
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.loop", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.loop", x))),),
-                    ),
-                )
-            ),
+            assertions=frozenset((logic.Assertion(rel("loop", x), (logic.Premise(rel("loop", x)),)),)),
         )
-        goal = pm.wrap(pm.Spec.of("test.loop", pm.Spec.of("test.alice")))
+        goal = rel("loop", 1)
 
         result = solver.session().queryset(goal).continue_().query(goal).result
 
@@ -656,21 +545,18 @@ class TestLogicQuerySet(unittest.TestCase):
         self.assertFalse(cycle.is_negative)
 
     def test_positive_cycle_with_coinduction_succeeds(self):
-        left = pm.wrap(pm.Anchor("test.loop"))
+        loop_key = pm.val(rel("loop", 1).descriptor)
         x = pm.var("X")
         solver = logic.Solver(
             pm.OverlayRealm(base=pm.NATIVE_REALM),
             assertions=frozenset(
                 (
-                    logic.Assertion(pm.wrap(logic.CoinductiveCycle.new(left))),
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.loop", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.loop", x))),),
-                    ),
+                    logic.Assertion(pm.val(logic.CoinductiveCycle.new(loop_key))),
+                    logic.Assertion(rel("loop", x), (logic.Premise(rel("loop", x)),)),
                 )
             ),
         )
-        goal = pm.wrap(pm.Spec.of("test.loop", pm.Spec.of("test.alice")))
+        goal = rel("loop", 1)
 
         query = solver.session().queryset(goal).continue_().query(goal)
 
@@ -681,16 +567,9 @@ class TestLogicQuerySet(unittest.TestCase):
         x = pm.var("X")
         solver = logic.Solver(
             pm.OverlayRealm(base=pm.NATIVE_REALM),
-            assertions=frozenset(
-                (
-                    logic.Assertion(
-                        pm.wrap(pm.Spec.of("test.loop", x)),
-                        (logic.Premise(pm.wrap(pm.Spec.of("test.loop", x)), False),),
-                    ),
-                )
-            ),
+            assertions=frozenset((logic.Assertion(rel("loop", x), (logic.Premise(rel("loop", x), False),)),)),
         )
-        goal = pm.wrap(pm.Spec.of("test.loop", pm.Spec.of("test.alice")))
+        goal = rel("loop", 1)
 
         result = solver.session().queryset(goal).continue_().query(goal).result
 

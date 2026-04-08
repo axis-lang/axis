@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from protobase import frozendict
 
-from protomorph.foundation import Builtin
+import protomorph as pm
 
 from .model import Assertion, Key
 
 
-class DependencyGraph(Builtin):
+class DependencyGraph(pm.Builtin):
     keys: frozenset[Key] = frozenset()
     positive: frozendict[Key, frozenset[Key]] = frozendict()
     negative: frozendict[Key, frozenset[Key]] = frozendict()
@@ -22,12 +22,12 @@ class DependencyGraph(Builtin):
         return self.positive_of(key) | self.negative_of(key)
 
 
-class Scc(Builtin):
+class Scc(pm.Builtin):
     id: int
     keys: frozenset[Key] = frozenset()
 
 
-class StratificationPlan(Builtin):
+class StratificationPlan(pm.Builtin):
     graph: DependencyGraph
     components: tuple[Scc, ...] = ()
     component_by_key: frozendict[Key, int] = frozendict()

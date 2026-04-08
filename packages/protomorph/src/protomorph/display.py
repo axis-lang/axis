@@ -25,7 +25,7 @@ def repr_any(obj: Any) -> str:
     from .domain import Placeholder, placeholder_label
     from .domain import UniformType, UnionType, VaryingType, IndexedType
     from .domain import Spread, Spec, Qual
-    from .carriers import Carrier, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
+    from .values import Val, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
 
     # ── Hosted (check before Val and Type) ──
     if isinstance(obj, Qual):
@@ -58,7 +58,7 @@ def repr_any(obj: Any) -> str:
         return _repr_index(obj)
     if isinstance(obj, Tuple):
         return _repr_tuple_carrier(obj)
-    if isinstance(obj, Carrier):
+    if isinstance(obj, Val):
         return f"{type(obj).__name__}(...)"
 
     # ── Spread ──
@@ -83,9 +83,9 @@ def repr_any(obj: Any) -> str:
 
 def _format(value: Any) -> str:
     """Universal formatter — delegates to repr_any for core objects."""
-    from .carriers import Carrier
+    from .values import Val
 
-    if isinstance(value, (Builtin, Carrier)):
+    if isinstance(value, (Builtin, Val)):
         return repr_any(value)
     return repr(value)
 

@@ -7,16 +7,16 @@ import protomorph as pm
 
 
 class Constraint(pm.Builtin):
-    subject: pm.Carrier
-    term: pm.Carrier
-    target: pm.Carrier
+    subject: pm.Val
+    term: pm.Val
+    target: pm.Val
 
     @property
-    def template_goal_carrier(self) -> pm.Carrier:
-        return pm.wrap(pm.Spec.of("std.facts.Conforms", self.subject.fetch(), to=self.target.fetch()))
+    def template_goal_carrier(self) -> pm.Val:
+        return pm.val(pm.Spec.of("std.facts.Conforms", self.subject.fetch(), to=self.target.fetch()))
 
     @property
-    def goal_carrier(self) -> pm.Carrier:
+    def goal_carrier(self) -> pm.Val:
         return self.template_goal_carrier
 
     @property
@@ -27,19 +27,19 @@ class Constraint(pm.Builtin):
     def goal(self) -> pm.Spec:
         return cast(pm.Spec, self.goal_carrier.fetch())
 
-    def subst(self, mapping: Mapping[pm.Carrier, pm.Carrier]) -> Constraint:
+    def subst(self, mapping: Mapping[pm.Val, pm.Val]) -> Constraint:
         return type(self)(
             subject=self.subject.subst(mapping),
             term=self.term.subst(mapping),
             target=self.target.subst(mapping),
         )
 
-    def subst_self(self, spec: pm.Carrier | pm.Datum) -> Constraint:
+    def subst_self(self, spec: pm.Val | pm.Datum) -> Constraint:
         return type(self)(
             subject=self.subject.subst_self(spec),
             term=self.term.subst_self(spec),
             target=self.target.subst_self(spec),
         )
 
-    def goal_for(self, spec: pm.Carrier | pm.Datum) -> pm.Spec:
+    def goal_for(self, spec: pm.Val | pm.Datum) -> pm.Spec:
         return self.subst_self(spec).goal

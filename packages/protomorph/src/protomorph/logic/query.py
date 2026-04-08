@@ -41,7 +41,7 @@ else:
 
 class Query(Consed):
     queryset: QuerySet
-    goal: pm.Carrier
+    goal: pm.Val
 
     @property
     def root(self) -> QueryRoot:
@@ -62,7 +62,7 @@ class Query(Consed):
         answers = tuple(public_answer(self.goal, self.root.placeholders, answer) for answer in self.table.answers)
         if self.root.placeholders:
             answers = tuple(answer for answer in answers if answer.subst)
-        deduped: dict[tuple[tuple[pm.Placeholder, pm.Carrier], ...], Answer] = {}
+        deduped: dict[tuple[tuple[pm.Placeholder, pm.Val], ...], Answer] = {}
         for answer in answers:
             deduped[tuple(answer.subst.items())] = answer
         return tuple(deduped.values())

@@ -4,7 +4,7 @@ from .result import *
 from .option import *
 
 
-def carrier(tp, dt):
+def make_value(tp, dt):
     import protomorph as pm
 
     if isinstance(tp, (pm.Placeholder, pm.UnionType)):
@@ -19,7 +19,7 @@ def carrier(tp, dt):
             if not isinstance(dt, (Some, None_)):
                 raise TypeError("Optional-qualified types require explicit Some(...) or None_()")
             return Option(tp, dt)
-        return carrier(tp.underlying, dt)
+        return make_value(tp.underlying, dt)
     if isinstance(tp, pm.UniformType):
         return Index(tp, dt) if tp.unique else Tuple(tp, dt)
     if isinstance(tp, (pm.IndexedType, pm.VaryingType)):
