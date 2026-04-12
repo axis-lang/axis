@@ -1,19 +1,21 @@
 # Protomorph
 
-**Protomorph** is a Python library for modelling structured data using an algebraic type system, paired with a logic reasoning engine. It is a subsystem of [Axis](https://github.com/axis).
+**Protomorph** is a Python library for modelling structured data using an algebraic type system, structural carriers, unification, and canonical forms. It is a subsystem of [Axis](https://github.com/axis).
 
 ## What it does
 
-Protomorph provides two complementary systems:
+Protomorph provides a structural toolkit built around:
 
-- **Type algebra** — compose types structurally (`VaryingType`, `UniformType`, `UnionType`, `Spec`, `Qual`) and navigate values through *carriers*, typed wrappers that know how to traverse and reconstruct data.
-- **Logic reasoning** — define rules, query them through an `Engine`/`Session` interface, and get back verified answers with stratified negation, tabling, and coinduction support.
+- **Type algebra** — compose types structurally (`VaryingType`, `UniformType`, `UnionType`, `Spec`, `Qual`).
+- **Carriers and traversal** — wrap values into traversable carriers and transform them structurally.
+- **Unification** — match and merge structural terms with shared substitutions.
+- **Canonical algebra** — project values into `Shape`, `Pattern`, and `Morph` for structural analysis.
 
 ## Design goals
 
 - **Didactic** — every algorithm is explained with references. This library is as much a learning resource as a production tool.
-- **Host-agnostic** — the core type system is independent of Python's own type machinery; `NativeHost` bridges the gap.
-- **Compositional** — types, carriers, and rules compose cleanly without global state.
+- **Host-agnostic** — the core type system is independent of Python's own type machinery.
+- **Compositional** — types, carriers, and canonical projections compose cleanly.
 
 ## Quick navigation
 
@@ -21,13 +23,7 @@ Protomorph provides two complementary systems:
 |---|---|
 | Install and run a first example | [Quick Start](getting-started/quick-start.md) |
 | Understand the type system layer by layer | [Manual](manual/layer-0-foundation.md) |
-| Follow the Axis migration plan | [PM / Axis Clean-Cut Roadmap](manual/pm-axis-roadmap.md) |
-| Use the reasoning engine | [Reasoning Overview](manual/reasoning/overview.md) |
-| Review the active solver redesign | [RFC 1 - Operators And Constraints](manual/reasoning/rfc-1-operators-and-constraints.md) |
-| Review assertion and scheduling design | [RFC 2 - Assertions, Contexts, And Scheduling](manual/reasoning/rfc-2-assertions-contexts-and-scheduling.md) |
-| Review solver/session composition | [RFC 3 - Solvers, Sessions, Queries, And Overlays](manual/reasoning/rfc-3-solvers-sessions-queries-and-overlays.md) |
-| Review concurrent premise convergence | [RFC 3.5 - Concurrent Premise Driver And Partials](manual/reasoning/rfc-3-5-concurrent-premise-driver-and-partials.md) |
-| Review runtime engine design | [RFC 4A - Engine Runtime](manual/reasoning/rfc-4a-engine-runtime.md) |
-| Review rows and partial query state | [RFC 4B - Rows, Partials, And Query Observation](manual/reasoning/rfc-4b-rows-partials-and-query-observation.md) |
-| Look up a class or function | [API Reference](reference/pm.md) |
-| Run interactive examples | [Notebooks](notebooks/types-and-carriers.html) |
+| Understand canonicalization | [Canonical Forms notebook](notebooks/canonical-forms.html) |
+| Look up the current public API | [API Reference](reference/pm.md) |
+| Inspect canonical APIs directly | [Canonical API Reference](reference/canonical.md) |
+| Run interactive examples | [Notebooks](notebooks/canonical-forms.html) |

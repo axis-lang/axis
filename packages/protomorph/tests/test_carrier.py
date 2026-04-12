@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import Any, cast
 
-from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, None_, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Some, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, val
+from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, val
 
 
 INT = cast(Spec, val(int).fetch())
@@ -316,7 +316,7 @@ class TestOptionCarrier(unittest.TestCase):
     def test_optional_make_accepts_some(self):
         optional_int = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
 
-        carrier = cast(Option, optional_int.make(Some(1)))
+        carrier = cast(Option, optional_int.make(1))
 
         self.assertTrue(carrier.is_some)
         self.assertEqual(carrier.unwrap().fetch(), 1)
@@ -324,7 +324,7 @@ class TestOptionCarrier(unittest.TestCase):
     def test_optional_make_accepts_none(self):
         optional_int = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
 
-        carrier = cast(Option, optional_int.make(None_()))
+        carrier = cast(Option, optional_int.make(None))
 
         self.assertTrue(carrier.is_none)
 

@@ -189,10 +189,7 @@ print(result)   # g(b)
 
 ## API reference
 
-::: pm.deep_zip
-
-::: pm.ZipWalker
-
-::: pm.UnionFind
-
-::: pm.unify
+- [`protomorph.deep_zip`](../reference/pm.md#protomorph.deep_zip)
+- [`protomorph.ZipWalker`](../reference/pm.md#protomorph.ZipWalker)
+- [`protomorph.UnionFind`](../reference/pm.md#protomorph.UnionFind)
+- [`protomorph.unify`](../reference/pm.md#protomorph.unify)

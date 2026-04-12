@@ -54,5 +54,39 @@ class TestIndexedType(unittest.TestCase):
         self.assertEqual(spliced.item_at(3).key, Id("c"))
 
 
+class TestIndexElementDescriptor(unittest.TestCase):
+    def test_dense_element_descriptor_is_id(self):
+        idx = Index.of(Id("x"), Id("y"))
+        id_spec = Spec.of("std.types.Id")
+        self.assertIs(idx[0].descriptor, id_spec)
+        self.assertIs(idx[1].descriptor, id_spec)
+
+    def test_dense_element_fetch(self):
+        idx = Index.of(Id("x"))
+        self.assertEqual(idx[0].fetch(), Id("x"))
+
+    def test_sparse_element_descriptor_is_optional_id(self):
+        from protomorph import Qual, Option
+        optional_id = Qual.of(Spec.of("std.types.Id"), Spec.of("std.qualifiers.Optional"))
+        idx = Index.of(Id("x"), None, Id("z"))
+        self.assertEqual(idx[0].descriptor, optional_id)
+        self.assertEqual(idx[1].descriptor, optional_id)
+        self.assertEqual(idx[2].descriptor, optional_id)
+
+    def test_sparse_none_slot_is_none_option(self):
+        from protomorph import Option
+        idx = Index.of(Id("x"), None)
+        self.assertIsInstance(idx[1], Option)
+        self.assertTrue(idx[1].is_none)
+
+    def test_sparse_key_slot_is_some_option(self):
+        from protomorph import Option
+        idx = Index.of(Id("x"), None)
+        carrier = idx[0]
+        self.assertIsInstance(carrier, Option)
+        self.assertTrue(carrier.is_some)
+        self.assertEqual(carrier.unwrap().fetch(), Id("x"))
+
+
 if __name__ == "__main__":
     unittest.main()

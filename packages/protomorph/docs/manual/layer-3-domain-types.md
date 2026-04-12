@@ -188,18 +188,11 @@ This section reflects the current structural projection model implemented by
 
 ## API reference
 
-::: pm.Spread
-
-::: pm.TupleLikeType
-
-::: pm.VaryingType
-
-::: pm.UniformType
-
-::: pm.UnionType
-
-::: pm.IndexedType
-
-::: pm.Spec
-
-::: pm.Qual
+- [`protomorph.Spread`](../reference/pm.md#protomorph.Spread)
+- [`protomorph.TupleLikeType`](../reference/pm.md#protomorph.TupleLikeType)
+- [`protomorph.VaryingType`](../reference/pm.md#protomorph.VaryingType)
+- [`protomorph.UniformType`](../reference/pm.md#protomorph.UniformType)
+- [`protomorph.UnionType`](../reference/pm.md#protomorph.UnionType)
+- [`protomorph.IndexedType`](../reference/pm.md#protomorph.IndexedType)
+- [`protomorph.Spec`](../reference/pm.md#protomorph.Spec)
+- [`protomorph.Qual`](../reference/pm.md#protomorph.Qual)

@@ -1,5 +1,5 @@
 site_name: Protomorph
-site_description: Host-agnostic morphological data model and logic reasoning engine
+site_description: Host-agnostic morphological data model and structural canonicalization toolkit
 site_author: jdluque
 repo_url: https://github.com/axis/protomorph
 docs_dir: docs
@@ -85,18 +85,10 @@ nav:
     - Layer 2 — Carriers: manual/layer-2-carriers.md
     - Layer 3 — Domain Types: manual/layer-3-domain-types.md
     - Layer 4 — Traversal & Unification: manual/layer-4-traversal-unification.md
-    - Layer 5 — Host Interface: manual/layer-5-host-interface.md
-    - Layer 6 — Native Host: manual/layer-6-native-host.md
-    - Reasoning:
-      - Overview: manual/reasoning/overview.md
-      - Model & Variables: manual/reasoning/model-vars.md
-      - Database & Rules: manual/reasoning/database-rules.md
-      - Engine & Session: manual/reasoning/engine-session.md
-      - Queries & Results: manual/reasoning/queries-results.md
   - API Reference:
-    - pm: reference/pm.md
-    - pm.reasoning: reference/pm-reasoning.md
+    - protomorph: reference/pm.md
+    - protomorph.canonical: reference/canonical.md
   - Notebooks:
+    - Canonical Forms: notebooks/canonical-forms.html
     - Types & Carriers: notebooks/types-and-carriers.html
     - Unification: notebooks/unification.html
-    - Reasoning Basics: notebooks/reasoning-basics.html

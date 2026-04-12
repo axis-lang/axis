@@ -39,7 +39,7 @@ class TestSpecWrap(unittest.TestCase):
     def test_subst_wrapped_spec(self):
         T = var("T")
         carrier = val(Spec.of("std.List", T))
-        ph_leaf = next(leaf for leaf in carrier.deep_iter() if leaf.fetch() is T)
+        ph_leaf = next(leaf for leaf in carrier.iter_leafs() if leaf.fetch() is T)
         result = carrier.subst({ph_leaf: LeafCarrier(ph_leaf.descriptor, INT)}).fetch()
         self.assertEqual(repr(result), repr(Spec.of("std.List", INT)))
 
@@ -52,7 +52,7 @@ class TestQual(unittest.TestCase):
 
     def test_wrap_qual_is_traversable(self):
         qual = Qual.of(Spec.of("std.Integer"), Spec.of("std.List", INT))
-        leaves = [leaf.fetch() for leaf in val(qual).deep_iter()]
+        leaves = [leaf.fetch() for leaf in val(qual).iter_leafs()]
         self.assertIn(Spec.of("std.Integer"), leaves)
         self.assertIn(Spec.of("std.List", INT), leaves)
 

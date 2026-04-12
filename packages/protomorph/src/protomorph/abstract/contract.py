@@ -25,7 +25,7 @@ Structure
 
 Design notes
 ------------
-- ``deep_iter`` can be defined over ``Foundation``.
+- ``iter`` can be defined over ``Foundation``.
 - ``deep_zip`` requires ``Structural`` because it needs item alignment.
 - Concrete families may define descriptors such as ``Type``.
 - Concrete encodings may define carriers over native objects, JSON-like

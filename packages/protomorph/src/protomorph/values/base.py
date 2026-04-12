@@ -52,6 +52,14 @@ class Val[T](Consed, abstract=True):
     def is_leaf(self) -> bool:
         return self.descriptor.arity == 0
 
+    @property
+    def is_var(self) -> bool:
+        return isinstance(self.content, pm.Var)
+
+    @property
+    def is_wildcard(self) -> bool:
+        return self.is_leaf and self.content is pm.WILDCARD
+
     def __len__(self) -> int:
         arity = self.descriptor.arity
         if arity is not None:
@@ -65,16 +73,19 @@ class Val[T](Consed, abstract=True):
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         raise NotImplementedError(f"reconstruct() not implemented for {type(self).__name__}")
 
-    def deep_iter(self, is_leaf: _Callable[[Val], bool] | None = None) -> _Iterator[Val]:
-        is_leaf_fn = is_leaf or (lambda carrier: carrier.is_leaf)
+    def iter(self) -> _Iterator[Val]:
         stack: list[Val] = [self]
         while stack:
             node = stack.pop()
-            if is_leaf_fn(node):
-                yield node
-                continue
-            children = list(node)
-            stack.extend(reversed(children))
+            yield node
+            if not node.is_leaf:
+                stack.extend(reversed(list(node)))
+
+    def iter_leafs(self) -> _Iterator[Val]:
+        return (node for node in self.iter() if node.is_leaf)
+
+    def iter_branches(self) -> _Iterator[Val]:
+        return (node for node in self.iter() if not node.is_leaf)
 
     def deep_map(
         self,
@@ -102,6 +113,8 @@ class Val[T](Consed, abstract=True):
         return results[0]
 
     def subst(self, mapping: _Mapping[Val, Val]) -> Val:
+        if not mapping:
+            return self
         return self.deep_map(lambda carrier: mapping.get(carrier, carrier), is_leaf=lambda carrier: carrier in mapping or carrier.is_leaf)
 
     def subst_where(
@@ -110,7 +123,7 @@ class Val[T](Consed, abstract=True):
         replace: _Callable[[Val], Val],
     ) -> Val:
         mapping: dict[Val, Val] = {}
-        for leaf in self.deep_iter():
+        for leaf in self.iter_leafs():
             if pred(leaf):
                 mapping[leaf] = replace(leaf)
         return self if not mapping else self.subst(mapping)

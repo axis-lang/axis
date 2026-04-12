@@ -29,9 +29,9 @@ def __():
     import protomorph
     from protomorph import (
         Spec, VaryingType, UniformType, UnionType, IndexedType, Qual,
-        LeafCarrier, val, var, Id,
+        LeafCarrier, val, var, Id, project_type,
     )
-    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, var, protomorph, val
+    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, project_type, var, protomorph, val
 
 
 @app.cell
@@ -97,34 +97,32 @@ def __(mo):
 
 
 @app.cell
-def __():
-    from protomorph import _project_type
-
+def __(project_type):
     for annotation, tp in [
-        ("int",           _project_type(int)),
-        ("list[int]",     _project_type(list[int])),
-        ("dict[str,int]", _project_type(dict[str, int])),
-        ("int | str",     _project_type(int | str)),
+        ("int",           project_type(int)),
+        ("list[int]",     project_type(list[int])),
+        ("dict[str,int]", project_type(dict[str, int])),
+        ("int | str",     project_type(int | str)),
     ]:
         print(f"  {annotation:<18} → {tp}")
-    return (_project_type,)
-
-
-@app.cell
-def __(mo):
-    mo.md("## 5 — Carriers\n\nA carrier holds a value under a type. Use `type.make(data)` or `wrap(value)`.")
     return
 
 
 @app.cell
-def __(VaryingType, int_t, str_t, wrap):
+def __(mo):
+    mo.md("## 5 — Carriers\n\nA carrier holds a value under a type. Use `type.make(data)` or `val(value)`.")
+    return
+
+
+@app.cell
+def __(VaryingType, int_t, str_t, val):
     c1     = int_t.make(42)
     c2     = str_t.make("hello")
     c_pair = VaryingType.new(c1, c2)
 
     print(type(c1).__name__, c1.fetch())
     print(c_pair[0].fetch(), c_pair[1].fetch())
-    print(wrap(99).descriptor, wrap(99).fetch())
+    print(val(99).descriptor, val(99).fetch())
     return c1, c2, c_pair
 
 
@@ -135,10 +133,10 @@ def __(mo):
 
 
 @app.cell
-def __(VaryingType, c_pair, wrap):
-    nested = VaryingType.new(c_pair, wrap(True))
+def __(VaryingType, c_pair, val):
+    nested = VaryingType.new(c_pair, val(True))
     print("Leaves:")
-    for leaf in nested.deep_iter():
+    for leaf in nested.iter_leafs():
         print("  ", leaf.descriptor, "→", leaf.fetch())
     return (nested,)
 
@@ -150,13 +148,16 @@ def __(mo):
 
 
 @app.cell
-def __(LeafCarrier, VaryingType, int_t, placeholder, pm, wrap):
-    x      = placeholder("X")
+def __(LeafCarrier, VaryingType, protomorph, val, var):
+    x      = var("X", int)
     c_x    = LeafCarrier(x, x)
-    c_w    = VaryingType.new(wrap(1), c_x)
-    target = next(l for l in c_w.deep_iter() if isinstance(l.fetch(), pm.Placeholder))
-    result = c_w.subst({target: wrap(99)})
-    print([leaf.fetch() for leaf in result.deep_iter()])
+    c_w    = VaryingType.new(val(1), c_x)
+    target = next(
+        l for l in c_w.iter_leafs()
+        if isinstance(l.fetch(), protomorph.Placeholder)
+    )
+    result = c_w.subst({target: val(99)})
+    print([leaf.fetch() for leaf in result.iter_leafs()])
     return c_w, c_x, result, target, x
 
 

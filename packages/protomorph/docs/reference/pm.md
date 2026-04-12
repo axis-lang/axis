@@ -1,105 +1,77 @@
-# API Reference — `pm`
+# API Reference — `protomorph`
 
-Complete reference for all public symbols exported from the `pm` package.
+Complete reference for the current public symbols exported from `protomorph`.
 
 ---
 
 ## Foundation
 
-::: pm.Id
+::: protomorph.Id
 
-::: pm.Anchor
+::: protomorph.Anchor
 
-::: pm.Builtin
+::: protomorph.Builtin
 
 ---
 
 ## Type System
 
-::: pm.Field
+::: protomorph.Type
 
-::: pm.Type
+::: protomorph.Placeholder
 
-::: pm.Placeholder
+::: protomorph.Var
 
-::: pm.Var
+::: protomorph.SimpleVar
 
-::: pm.SimpleVar
+::: protomorph.placeholder_name
 
-::: pm.placeholder
+::: protomorph.placeholder_context
 
-::: pm.placeholder_name
+::: protomorph.placeholder_slot
 
-::: pm.placeholder_context
-
-::: pm.placeholder_slot
-
-::: pm.placeholder_label
+::: protomorph.placeholder_label
 
 ---
 
 ## Domain Types
 
-::: pm.Spread
+::: protomorph.Spread
 
-::: pm.TupleLikeType
+::: protomorph.TupleLikeType
 
-::: pm.VaryingType
+::: protomorph.VaryingType
 
-::: pm.UniformType
+::: protomorph.UniformType
 
-::: pm.UnionType
+::: protomorph.UnionType
 
-::: pm.IndexedType
+::: protomorph.IndexedType
 
-::: pm.Spec
+::: protomorph.Spec
 
-::: pm.Qual
+::: protomorph.Qual
 
 ---
 
 ## Carriers
 
-::: pm.Carrier
+::: protomorph.LeafCarrier
 
-::: pm.LeafCarrier
+::: protomorph.NativeObjectCarrier
 
-::: pm.NativeObjectCarrier
+::: protomorph.Tuple
 
-::: pm.Tuple
-
-::: pm.Index
+::: protomorph.Index
 
 ---
 
 ## Traversal & Unification
 
-::: pm.deep_zip
+::: protomorph.deep_zip
 
-::: pm.ZipWalker
+::: protomorph.ZipWalker
 
-::: pm.UnionFind
+::: protomorph.UnionFind
 
-::: pm.unify
-
----
-
-## Host Interface
-
-::: pm.Host
-
-::: pm.current_host
-
----
-
-## Native Host
-
-::: pm.NativeHost
-
-::: pm.NativeVar
-
-::: pm.wrap
-
-::: pm.register_native_spec
-
-::: pm.register_python_transform
+::: protomorph.unify

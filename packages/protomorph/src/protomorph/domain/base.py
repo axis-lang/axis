@@ -15,6 +15,8 @@ class Id(str):
 
     __slots__ = ()
 
+type Path = tuple[Id, ...]
+
 
 class Anchor(str):
     """Typed string for type system anchor paths (e.g. 'std.types.Text')."""
@@ -136,6 +138,9 @@ class Var(Placeholder, abstract=True):
 class Mark(Placeholder, abstract=True):
     pass
 
+
+class Op(Placeholder, abstract=True):
+    pass
 
 class WildcardMark(Mark):
     def display_label(self) -> str | None:

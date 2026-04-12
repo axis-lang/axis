@@ -210,7 +210,7 @@ class NativeRealm(Realm, Consed):
                     continue
             field_carrier = val(field_type)
             carrier_mapping: dict[protomorph.Val, protomorph.Val] = {}
-            for leaf in field_carrier.deep_iter():
+            for leaf in field_carrier.iter_leafs():
                 data = leaf.fetch()
                 if data in mapping:
                     carrier_mapping[leaf] = protomorph.LeafCarrier(
@@ -346,10 +346,21 @@ def project_type(
     if scalar_spec is not None:
         return scalar_spec
 
-    if origin is Union or isinstance(annotation, PEP604Union):
-        return protomorph.UnionType.of(
-            *(project_type(arg, template=template) for arg in args)
-        )
+    if origin is Union:
+        # typing.Optional[T] == Union[T, None] with exactly two args → Optional qualifier
+        if len(args) == 2 and NoneType in args:
+            inner = next(a for a in args if a is not NoneType)
+            return cast(
+                protomorph.Type,
+                protomorph.Qual.of(
+                    project_type(inner, template=template),
+                    protomorph.Spec.of("std.qualifiers.Optional"),
+                ),
+            )
+        return protomorph.UnionType.of(*(project_type(arg, template=template) for arg in args))
+
+    if isinstance(annotation, PEP604Union):
+        return protomorph.UnionType.of(*(project_type(arg, template=template) for arg in args))
 
     if origin is Unpack and len(args) == 1:
         return project_type(args[0], template=template)

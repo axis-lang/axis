@@ -28,12 +28,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "protoMorph/Meta data duality.md",
+                "file": "protoSolver/Structural recurrence and explosion.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Meta data duality"
+              "title": "Structural recurrence and explosion"
             }
           }
         ],
@@ -220,6 +220,7 @@
   "lastOpenFiles": [
     "protoSolver/protoSolver.md",
     "protoMorph/Meta data duality.md",
+    "protoSolver/Structural recurrence and explosion.md",
     "protoMorph",
     "protoSolver"
   ]

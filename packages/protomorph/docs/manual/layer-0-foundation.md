@@ -19,7 +19,7 @@ Both are thin `NewType` wrappers around `str`. They carry no runtime overhead bu
 | `Anchor` | Nominal type identifiers in `Spec` |
 
 ```python
-from pm import Id, Anchor
+from protomorph import Id, Anchor
 
 field = Id("name")
 spec_name = Anchor("std.types.Integer")
@@ -38,7 +38,7 @@ It extends `protobase.Consed`, which provides:
 - **Declarative fields** — subclasses declare attributes as class-level annotations; `Consed` generates `__init__`, `__eq__`, and `__hash__` automatically.
 
 ```python
-from pm import Builtin, Spec
+from protomorph import Builtin, Spec
 
 # Two calls with the same arguments return the *same* object
 a = Spec.of("std.types.Integer")
@@ -81,8 +81,6 @@ This is the reason `Type` instances can be used directly as mapping keys in `Uni
 
 ## API reference
 
-::: pm.Id
-
-::: pm.Anchor
-
-::: pm.Builtin
+- [`protomorph.Id`](../reference/pm.md#protomorph.Id)
+- [`protomorph.Anchor`](../reference/pm.md#protomorph.Anchor)
+- [`protomorph.Builtin`](../reference/pm.md#protomorph.Builtin)

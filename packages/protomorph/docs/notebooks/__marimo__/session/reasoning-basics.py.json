@@ -1,7 +1,7 @@
 {
   "version": "1",
   "metadata": {
-    "marimo_version": "0.21.1",
+    "marimo_version": "0.23.0",
     "script_metadata_hash": null
   },
   "cells": [
@@ -33,16 +33,23 @@
     },
     {
       "id": "vblA",
-      "code_hash": "4ba7cdaa55d525e21227e4b250fb0149",
+      "code_hash": "b3868003f1965cec7622a7eaa44100ad",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "No module named 'protomorph.reasoning'",
+          "traceback": null
         }
       ],
-      "console": []
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/tmp/marimo_570678/__marimo__cell_vblA_.py&quot;</span>, line <span class=\"m\">3</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"kn\">from</span><span class=\"w\"> </span><span class=\"nn\">protomorph.reasoning</span><span class=\"w\"> </span><span class=\"kn\">import</span> <span class=\"p\">(</span>\n<span class=\"w\">    </span><span class=\"o\">...&lt;</span><span class=\"mi\">4</span> <span class=\"n\">lines</span><span class=\"o\">&gt;...</span>\n<span class=\"w\">    </span><span class=\"p\">)</span>\n<span class=\"gr\">ModuleNotFoundError</span>: <span class=\"n\">No module named &#39;protomorph.reasoning&#39;</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
     },
     {
       "id": "bkHC",
@@ -62,20 +69,13 @@
       "code_hash": "aed3cf147001a1ab2f16e6070081f83d",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "Unique \u2192 test.bob\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "PKri",
@@ -95,20 +95,13 @@
       "code_hash": "3e4dc36b50d3ae08b618f7b61711244b",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "Ambiguous\nancestors: [test.bob, test.carol]\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "SFPL",
@@ -128,20 +121,13 @@
       "code_hash": "922cb454f08c3a8f7bf563ea11f17af6",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "NoSolution no matching proof\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "RGSE",
@@ -161,20 +147,13 @@
       "code_hash": "5310eb81c34b03542cf5c6d7549402df",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "safe(alice): NoSolution\nsafe(bob)  : Unique\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "emfo",
@@ -194,20 +173,13 @@
       "code_hash": "e96e892eddf34e2ac026fe77d8bbe657",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "Floundered\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "nWHF",
@@ -227,20 +199,13 @@
       "code_hash": "15da7be83b50147afbcc977e1a10aee9",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "coinductive: Unique\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "ZHCJ",
@@ -260,20 +225,13 @@
       "code_hash": "dde6026ece666c0a28631f7ec677bad4",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "  test.blocked: stratum 0\n  test.safe: stratum 1\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     },
     {
       "id": "qnkX",
@@ -293,20 +251,13 @@
       "code_hash": "94565affd54c873fdd3a7b63c580b4f3",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/plain": ""
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (ModuleNotFoundError): ",
+          "traceback": null
         }
       ],
-      "console": [
-        {
-          "type": "stream",
-          "name": "stdout",
-          "text": "rel       : test.ancestor[test.alice, $g0]\nevidence  : logic.ByRule[test.ancestor[$X, $Y], Judgment(rel=test.parent[test.alice, $g0], evidence=logic.ByRule[test.parent[test.alice, test.bob]], subjudgments=(), trace=None)]\n",
-          "mimetype": "text/plain"
-        }
-      ]
+      "console": []
     }
   ]
 }

@@ -73,6 +73,23 @@ class Tuple[*T](Val[tuple[*T]]):
         return _cast(Self, self._new(self.descriptor, tuple(child.fetch() for child in children)))
 
     @classmethod
+    def new(cls, *vals: Val, **kwvals: Val) -> Tuple:
+        """Build a Tuple from Val children.
+
+        Positional-only → unindexed (VaryingType).
+        Any keyword argument → indexed (IndexedType), with positional slots
+        getting ``None`` keys and keyword slots getting named Id keys.
+        """
+        if kwvals:
+            all_vals = vals + tuple(kwvals.values())
+            keys: tuple[Id | None, ...] = (None,) * len(vals) + tuple(Id(k) for k in kwvals)
+            inner = pm.VaryingType(tuple(v.descriptor for v in all_vals))
+            descriptor = pm.IndexedType(inner, Index.of(*keys))
+            return cls(descriptor, tuple(v.content for v in all_vals))
+        descriptor = pm.VaryingType(tuple(v.descriptor for v in vals))
+        return cls(descriptor, tuple(v.content for v in vals))
+
+    @classmethod
     def empty(cls) -> Tuple[tuple[()]]:
         return _cast(Tuple[tuple[()]], cls.Empty)
 
@@ -118,9 +135,20 @@ class Tuple[*T](Val[tuple[*T]]):
             assert len(self.content) == arity, "Tuple content must match descriptor arity"
 
 
-class Index(Tuple):
-    descriptor: pm.UniformType[Id | None]
-    content: tuple[Id | None, ...]
+def _id_type() -> pm.Type:
+    return pm.Spec.of("std.types.Id")
+
+
+def _optional_id_type() -> pm.Type:
+    return _cast(pm.Type, pm.Qual.of(
+        pm.Spec.of("std.types.Id"),
+        pm.Spec.of("std.qualifiers.Optional"),
+    ))
+
+
+class Index[K : Id](Tuple[*tuple[K | None, ...]]):
+    descriptor: pm.UniformType[K | None]
+    #content: tuple[K | None, ...]
 
     @property
     def arity(self) -> int:
@@ -131,37 +159,49 @@ class Index(Tuple):
         return self.arity > 0 and any(key is None for key in self.content)
 
     @property
-    def keys(self) -> tuple[Id | None, ...]:
+    def keys(self) -> tuple[K | None, ...]:
         return self.content
 
     @property
-    def offsets(self) -> frozendict[Id, int]:
+    def offsets(self) -> frozendict[K, int]:
         return frozendict({key: offset for offset, key in enumerate(self.content) if key is not None})
 
-    def key_at(self, offset: int) -> Id | None:
+    def key_at(self, offset: int) -> K | None:
         return self.content[offset]
 
-    def offset_of(self, id: Id) -> int:
+    def offset_of(self, id: K) -> int:
         return self.offsets[id]
 
     def splice(self) -> Index:
         if not any(isinstance(value, pm.Spread) for value in self.content):
             return self
-        new_values: list[Id | None] = []
+        new_values: list[K | None] = []
         for value in self.content:
             if isinstance(value, pm.Spread):
-                new_values.extend(_cast(tuple[Id | None, ...], value.values))
+                new_values.extend(_cast(tuple[K | None, ...], value.values))
                 continue
-            new_values.append(_cast(Id | None, value))
+            new_values.append(_cast(K | None, value))
         return type(self).of(*new_values)
 
     @classmethod
-    def of(cls, *keys: Id | None) -> Index:
-        return _cast(Index, cls(pm.UniformType(_index_key_type(), unique=True), keys))
+    def of(cls, *keys: K | None) -> Index[K]:
+        sparse = any(k is None for k in keys)
+        element_type = _optional_id_type() if sparse else _id_type()
+        return _cast(Index[K], cls(pm.UniformType(element_type, unique=True), keys))
+    
+    @classmethod
+    def new(cls, *keys: Val[K]):
+        """Build an Index, accepting Val keys."""
+        return cls.of(*(_cast(K, key.content) for key in keys))
+
+    # @classmethod
+    # def new(cls, *keys: K | None, **kwargs) -> Index[K]:
+    #     """Build an Index, accepting bare strings as shorthand for ``Id``."""
+    #     return cls.of(*(Id(k) if isinstance(k, str) else k for k in keys))
 
     @classmethod
-    def concat(cls, *indices: Index) -> Index:
-        values: list[Id | None] = []
+    def concat(cls, *indices: Index[K]) -> Index[K]:
+        values: list[K | None] = []
         for index in indices:
             values.extend(index.content)
         return cls.of(*values)
@@ -180,9 +220,5 @@ def _tail_inner(inner: pm.Type) -> pm.Type:
         indexed_inner = _cast(_Any, inner)
         return indexed_type(_tail_inner(indexed_inner.inner), indexed_inner.index.tail)
     return inner
-
-
-def _index_key_type() -> pm.Type:
-    return pm.UnionType.of(pm.Spec.of("std.types.Id"), pm.Spec.of("std.types.Empty"))
 
 

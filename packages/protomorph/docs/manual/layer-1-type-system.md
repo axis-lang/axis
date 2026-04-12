@@ -111,7 +111,7 @@ ctx_b = RuleAppCtx(rule=..., application_id=2)
 | `Placeholder` | Stand-in for unknown type or value; leaf in traversal |
 | `Var` | Named logic variable |
 | `SimpleVar(ctx, id)` | Default concrete variable |
-| `placeholder(id)` | Factory for `SimpleVar` |
+| `var(id)` | Factory for `SimpleVar` |
 | `placeholder_name/context/slot/label` | Attribute extractors with safe fallbacks |
 | `Field` / `Item` | `NamedTuple(offset, key, value)` — one child descriptor |
 
@@ -119,20 +119,11 @@ ctx_b = RuleAppCtx(rule=..., application_id=2)
 
 ## API reference
 
-::: pm.Type
-
-::: pm.Placeholder
-
-::: pm.Var
-
-::: pm.SimpleVar
-
-::: pm.placeholder
-
-::: pm.placeholder_name
-
-::: pm.placeholder_context
-
-::: pm.placeholder_slot
-
-::: pm.placeholder_label
+- [`protomorph.Type`](../reference/pm.md#protomorph.Type)
+- [`protomorph.Placeholder`](../reference/pm.md#protomorph.Placeholder)
+- [`protomorph.Var`](../reference/pm.md#protomorph.Var)
+- [`protomorph.SimpleVar`](../reference/pm.md#protomorph.SimpleVar)
+- [`protomorph.placeholder_name`](../reference/pm.md#protomorph.placeholder_name)
+- [`protomorph.placeholder_context`](../reference/pm.md#protomorph.placeholder_context)
+- [`protomorph.placeholder_slot`](../reference/pm.md#protomorph.placeholder_slot)
+- [`protomorph.placeholder_label`](../reference/pm.md#protomorph.placeholder_label)

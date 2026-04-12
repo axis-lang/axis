@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import cast
 
 from protobase import flux as _flux
-
-from . import match
 from .abstract import contract
 from .abstract.contract import Item
 from .domain import *
@@ -13,6 +11,10 @@ from .realm import *
 from .traversal import *
 from .unification import *
 from .values import *
+from .canonical import *
+from . import canonical
+from . import match
+from . import logic
 from .constraint import Constraint
 
 assert issubclass(Type, contract.Descriptor)
@@ -60,7 +62,7 @@ def _list_transform(value_type: Type) -> Type:
 def _frozenset_transform(value_type: Type) -> Type:
     return cast(
         Type,
-        Qual.of(value_type, Spec.of("std.qualifiers.FrozenSet")),
+        Qual.of(value_type, Spec.of("std.qualifiers.Set")),
     )
 
 
@@ -88,3 +90,6 @@ register_python_transform(set, _set_transform)
 register_python_transform(frozenset, _frozenset_transform)
 register_python_transform(tuple, _tuple_transform)
 register_python_transform(Result, _result_transform)
+
+
+Wildcard = val(WILDCARD)

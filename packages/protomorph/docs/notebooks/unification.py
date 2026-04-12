@@ -41,14 +41,15 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, placeholder, pm, unify, wrap):
-    is_var = lambda c: isinstance(c.fetch(), pm.Placeholder)
-    x = placeholder("X")
-    y = placeholder("Y")
+def __(Spec, protomorph, unify, val, var):
+    is_var = lambda c: isinstance(c.fetch(), protomorph.Placeholder)
+    any_bound_basic = Spec.of("std.types.Any")
+    x = var("X", any_bound_basic)
+    y = var("Y", any_bound_basic)
 
     result = unify(
-        wrap(Spec.of("test.f", x, Spec.of("test.b"))),
-        wrap(Spec.of("test.f", Spec.of("test.a"), y)),
+        val(Spec.of("test.f", x, Spec.of("test.b"))),
+        val(Spec.of("test.f", Spec.of("test.a"), y)),
         is_var=is_var,
     )
     print(result)   # test.f(test.a, test.b)
@@ -62,10 +63,10 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, is_var, unify, wrap):
+def __(Spec, is_var, unify, val):
     fail = unify(
-        wrap(Spec.of("test.f", Spec.of("test.a"))),
-        wrap(Spec.of("test.f", Spec.of("test.b"))),
+        val(Spec.of("test.f", Spec.of("test.a"))),
+        val(Spec.of("test.f", Spec.of("test.b"))),
         is_var=is_var,
     )
     print(fail)   # None
@@ -79,12 +80,12 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, UnionFind, is_var, unify, wrap, x, y):
+def __(Spec, UnionFind, is_var, unify, val, x, y):
     subst = UnionFind(is_var)
-    unify(wrap(x), wrap(Spec.of("test.a")), subst=subst)
+    unify(val(x), val(Spec.of("test.a")), subst=subst)
     result2 = unify(
-        wrap(Spec.of("test.f", x, y)),
-        wrap(Spec.of("test.f", Spec.of("test.a"), Spec.of("test.b"))),
+        val(Spec.of("test.f", x, y)),
+        val(Spec.of("test.f", Spec.of("test.a"), Spec.of("test.b"))),
         subst=subst,
     )
     print(result2)   # test.f(test.a, test.b)
@@ -98,16 +99,17 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, UnionFind, is_var, placeholder, unify, wrap):
+def __(Spec, UnionFind, is_var, unify, val, var):
     uf2  = UnionFind(is_var)
-    z    = placeholder("Z")
+    z_bound = Spec.of("std.types.Any")
+    z    = var("Z", z_bound)
     snap = uf2.snapshot()
 
-    unify(wrap(z), wrap(Spec.of("test.a")), subst=uf2)
-    print("before rollback:", uf2.find(wrap(z)).fetch())   # test.a
+    unify(val(z), val(Spec.of("test.a")), subst=uf2)
+    print("before rollback:", uf2.find(val(z)).fetch())   # test.a
 
     uf2.rollback(snap)
-    print("after rollback: ", uf2.find(wrap(z)).fetch())   # SimpleVar — unbound
+    print("after rollback: ", uf2.find(val(z)).fetch())   # SimpleVar — unbound
     return snap, uf2, z
 
 
@@ -118,10 +120,11 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, is_var, placeholder, unify, wrap):
-    w      = placeholder("W")
-    safe   = unify(wrap(w), wrap(Spec.of("test.f", w)), is_var=is_var, occurs_check=True)
-    unsafe = unify(wrap(w), wrap(Spec.of("test.f", w)), is_var=is_var, occurs_check=False)
+def __(Spec, is_var, unify, val, var):
+    w_bound = Spec.of("std.types.Any")
+    w      = var("W", w_bound)
+    safe   = unify(val(w), val(Spec.of("test.f", w)), is_var=is_var, occurs_check=True)
+    unsafe = unify(val(w), val(Spec.of("test.f", w)), is_var=is_var, occurs_check=False)
 
     print("with occurs check   :", safe)    # None — rejected
     print("without occurs check:", unsafe)  # cyclic binding allowed
@@ -135,12 +138,13 @@ def __(mo):
 
 
 @app.cell
-def __(Spec, UnionFind, is_var, placeholder, wrap):
+def __(Spec, UnionFind, is_var, val, var):
     uf3   = UnionFind(is_var)
-    a_var = wrap(placeholder("A"))
-    b_var = wrap(placeholder("B"))
-    c_var = wrap(placeholder("C"))
-    gnd   = wrap(Spec.of("test.ground"))
+    any_bound_chain = Spec.of("std.types.Any")
+    a_var = val(var("A", any_bound_chain))
+    b_var = val(var("B", any_bound_chain))
+    c_var = val(var("C", any_bound_chain))
+    gnd   = val(Spec.of("test.ground"))
 
     uf3.bind(a_var, b_var)
     uf3.bind(b_var, c_var)

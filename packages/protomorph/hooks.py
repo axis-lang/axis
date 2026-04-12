@@ -10,7 +10,11 @@ log = logging.getLogger("mkdocs.hooks")
 
 def on_pre_build(config) -> None:
     notebooks_dir = pathlib.Path(config["docs_dir"]) / "notebooks"
+    excluded = {"logic-graph.py", "solver-cycles.py", "reasoning-basics.py"}
     for nb in sorted(notebooks_dir.glob("*.py")):
+        if nb.name in excluded:
+            log.info("Skipping notebook export: %s", nb.name)
+            continue
         output = nb.with_suffix(".html")
         log.info("Exporting marimo notebook: %s", nb.name)
         result = subprocess.run(

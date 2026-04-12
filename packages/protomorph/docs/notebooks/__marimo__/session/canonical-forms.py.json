@@ -1,0 +1,338 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.23.0",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "d02df52135f4861a425e9c5d8b0420e8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"canonical-forms\">Canonical Forms</h1>\n<span class=\"paragraph\">This notebook introduces Protomorph's current canonical algebra:</span>\n<ul>\n<li><code>Shape</code>: pure structural form</li>\n<li><code>Pattern</code>: canonical shape with internal slots</li>\n<li><code>Morph</code>: pattern plus external bindings</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "40b26ff4a5aa712390a40b8eaf096b20",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "089bb98368078434131f1f883e95bcdf",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "cycle",
+          "evalue": "This cell is in a cycle",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "a0f0605514eb3b5401c35275d44e4b0f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-sample-value\">1 \u2014 Sample value</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "ba85580292bce2750c868ddc98df59cf",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'pm' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'x' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'y' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "d1229c226933f87dad09499dd11dff1e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-shape-pattern-morph\">2 \u2014 Shape, Pattern, Morph</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "a8034752526594e11a287366a720d084",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "Name `sample` is not defined. It was expected to be defined in ",
+          "traceback": null
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/tmp/marimo_597573/__marimo__cell_SFPL_.py&quot;</span>, line <span class=\"m\">1</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">sample_shape</span> <span class=\"o\">=</span> <span class=\"n\">Shape</span><span class=\"o\">.</span><span class=\"n\">from_val</span><span class=\"p\">(</span><span class=\"n\">sample</span><span class=\"p\">)</span>\n<span class=\"w\">                                  </span><span class=\"pm\">^^^^^^</span>\n<span class=\"gr\">NameError</span>: <span class=\"n\">name &#39;sample&#39; is not defined</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "2f781f6d63bac5f0962f7280291a43e7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"3-structural-relation-and-meet\">3 \u2014 Structural relation and meet</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "8d944fac4e9d45e47619e21f9e56de4c",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'pm' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "cycle",
+          "evalue": "This cell is in a cycle",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "c8af05bb49ca4bba6b637bcbc8aa70da",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"4-match-playground\">4 \u2014 Match Playground</h2>\n<span class=\"paragraph\">These cells are an executable playground for <code>pm.canonical.match(...)</code>.\nEach scenario prints the full <code>Match</code> and uses assertions as regression checks.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "8af4cd073ab64df8394f864796e731db",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (MarimoExceptionRaisedError): ",
+          "traceback": null
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "581a18c3657ce445fb0cf0bfab1f05ff",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"41-helper\">4.1 \u2014 Helper</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "a4cf256df235aced0e40e35ebe92fdac",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (MarimoExceptionRaisedError): ",
+          "traceback": null
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "4f9e4cc3d9b65134ca1e9f854b45409a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"42-basic-variable-vs-concrete\">4.2 \u2014 Basic variable vs concrete</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "27f8f597ed2a2b539a8a47f99d9657dc",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'any_type' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "9c4dfb634d4b806fbc48ee15187ec460",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"43-projection-case\">4.3 \u2014 Projection case</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "6701559950af21b3f0829c3269600f3e",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'any_type' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'x' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'y' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "09cec5f077065015102bb87ad173289c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"44-incompatibility\">4.4 \u2014 Incompatibility</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "4e02179a8931ccb5f9311d265a662c48",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'any_type' was defined by another cell",
+          "traceback": []
+        },
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'x' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "7c24c91cd49331aa7f7a548001c517c9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-unnesting\">5 \u2014 Unnesting</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "ef03022472c5e9e36597d940c8386cd6",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'pm' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    }
+  ]
+}

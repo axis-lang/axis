@@ -35,7 +35,7 @@ def repr_any(obj: Any) -> str:
 
     # ── Concrete Types (check before generic Type) ──
     if isinstance(obj, Placeholder):
-        return f"${placeholder_label(obj)}"
+        return placeholder_label(obj)
     if isinstance(obj, VaryingType):
         return _repr_varying(obj)
     if isinstance(obj, IndexedType):

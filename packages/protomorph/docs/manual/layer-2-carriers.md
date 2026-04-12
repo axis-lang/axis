@@ -30,7 +30,9 @@ carrier.fetch()       # extract content
 ### Deep operations
 
 ```python
-carrier.deep_iter()          # depth-first iterator over all leaves
+carrier.iter()               # depth-first pre-order iterator over every node
+carrier.iter_leafs()         # filter of .iter(): only leaves
+carrier.iter_branches()      # filter of .iter(): only containers (non-leaves)
 carrier.deep_map(fn)         # map fn over every leaf, return rebuilt carrier
 carrier.search(pred)         # first leaf matching predicate
 carrier.subst(mapping)       # replace specific sub-carriers by identity
@@ -123,26 +125,21 @@ x     = pm.placeholder("X")
 # A pair where the second element is a variable
 pair = pm.VaryingType.of(int_t, x).make((pm.LeafCarrier(int_t, 1), pm.LeafCarrier(x, x)))
 
-leaves = list(pair.deep_iter())
+leaves = list(pair.iter_leafs())
 print([l.fetch() for l in leaves])   # [1, SimpleVar(None, 'X')]
 
 # Substitute X → 99
 replacement = pm.LeafCarrier(int_t, 99)
 subst_map   = {leaves[1]: replacement}
 new_pair    = pair.subst(subst_map)
-print([c.fetch() for c in new_pair.deep_iter()])  # [1, 99]
+print([c.fetch() for c in new_pair.iter_leafs()])  # [1, 99]
 ```
 
 ---
 
 ## API reference
 
-::: pm.Carrier
-
-::: pm.LeafCarrier
-
-::: pm.NativeObjectCarrier
-
-::: pm.Tuple
-
-::: pm.Index
+- [`protomorph.LeafCarrier`](../reference/pm.md#protomorph.LeafCarrier)
+- [`protomorph.NativeObjectCarrier`](../reference/pm.md#protomorph.NativeObjectCarrier)
+- [`protomorph.Tuple`](../reference/pm.md#protomorph.Tuple)
+- [`protomorph.Index`](../reference/pm.md#protomorph.Index)

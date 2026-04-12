@@ -1,7 +1,7 @@
 {
   "version": "1",
   "metadata": {
-    "marimo_version": "0.21.1",
+    "marimo_version": "0.23.0",
     "script_metadata_hash": null
   },
   "cells": [
@@ -33,7 +33,7 @@
     },
     {
       "id": "vblA",
-      "code_hash": "de28fb6bba0e65772b75d83005f467d1",
+      "code_hash": "afbac3a90061e04cfeddecf33acbb185",
       "outputs": [
         {
           "type": "data",
@@ -59,7 +59,7 @@
     },
     {
       "id": "lEQa",
-      "code_hash": "b772d63a070456c42c2ef11f4cbc7e19",
+      "code_hash": "2dc2ab747c9ed140e1a1a0db8940f1c3",
       "outputs": [
         {
           "type": "data",
@@ -92,7 +92,7 @@
     },
     {
       "id": "Xref",
-      "code_hash": "dbd86a24f5b00e39fe232c8eac235db7",
+      "code_hash": "5395a78e40c8b836cafa97c1b429a703",
       "outputs": [
         {
           "type": "data",
@@ -125,7 +125,7 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "b51ce8969bc6d2bb23c5ff22d79547e4",
+      "code_hash": "6bca1829f7abb6cd7978f6ac18dfc033",
       "outputs": [
         {
           "type": "data",
@@ -158,7 +158,7 @@
     },
     {
       "id": "Kclp",
-      "code_hash": "f0de26201957e07a4bd3879b37a52204",
+      "code_hash": "00c8eb9676a3cc69a81b904a0702e924",
       "outputs": [
         {
           "type": "data",
@@ -171,7 +171,7 @@
         {
           "type": "stream",
           "name": "stdout",
-          "text": "before rollback: test.a\nafter rollback:  $Z\n",
+          "text": "before rollback: test.a\nafter rollback:  Z\n",
           "mimetype": "text/plain"
         }
       ]
@@ -191,7 +191,7 @@
     },
     {
       "id": "Hstk",
-      "code_hash": "0bda0f3b601bb315f745f9a7e6d92da3",
+      "code_hash": "b472b35a6c9df703f284fcbedfcfd0d9",
       "outputs": [
         {
           "type": "data",
@@ -204,7 +204,7 @@
         {
           "type": "stream",
           "name": "stdout",
-          "text": "with occurs check   : None\nwithout occurs check: Spec(anchor='test.f', args=($W))\n",
+          "text": "with occurs check   : None\nwithout occurs check: Spec(anchor='test.f', args=(W))\n",
           "mimetype": "text/plain"
         }
       ]
@@ -224,7 +224,7 @@
     },
     {
       "id": "iLit",
-      "code_hash": "276480937bb5f0c916e7f076fc706dcd",
+      "code_hash": "feb9906bfb9b42feeb5937f5015c8ec2",
       "outputs": [
         {
           "type": "data",

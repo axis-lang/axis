@@ -151,6 +151,59 @@ This distinction matters because a premise needs two different things:
 - a public child table shape that can be indexed and shared
 - a compiled bridge that moves information between parent and child spaces
 
+### Variable Identity And Frontier Roles
+
+All solver variables are `pm.Var` values.
+
+Their semantic identity is structured.
+At minimum, it comes from:
+
+- variable family
+- variable context
+- local identifier within that context, typically an `id` or a `slot`
+
+So two variables with the same printed name are still distinct if their contexts
+or families differ.
+
+RFC 3.5 cares about variable roles at one compiled premise frontier more than
+about the final concrete subclass layout.
+
+For one assertion contribution and one compiled premise, the relevant roles are:
+
+- `HeadVar`: an assertion variable that appears in the assertion head
+- `BodyVar`: an assertion variable that does not appear in the head, but must
+  persist across premise interactions inside the same contribution
+- `PrivateVar`: a variable whose meaning is local to one premise frontier only
+- `SlotVar`: a canonical table-boundary variable in one `GoalTable`
+
+Their intended semantics are:
+
+- `HeadVar` lives in the parent contribution space and may survive to the parent
+  row if solving completes
+- `BodyVar` also lives in the parent contribution space, but is never exported
+  directly as part of the parent row boundary
+- `PrivateVar` does not require a parent-side runtime identity and never crosses
+  back to the parent as a named variable
+- `SlotVar` lives in a table slot space and is the key by which row and partial
+  information is stored or exported at a table boundary
+
+This gives the parent/child frontier its asymmetry:
+
+- parent contribution space is keyed by `HeadVar` and `BodyVar`
+- child table space is keyed by `SlotVar`
+- `PrivateVar` may affect child solving, but it does not create a transport key
+  on the parent side
+
+So instantiation and refinement are not variable-sharing by identity across the
+frontier.
+They are transports between two different keyed spaces.
+
+In RFC 2 terms:
+
+- `HeadVar` and `BodyVar` are roles played by assertion-instance variables
+- `SlotVar` is the role played by canonical goal-shape or table-slot variables
+- `PrivateVar` is a semantic role, not necessarily a required concrete subclass
+
 ### `EqSet`
 
 `EqSet` is the semantic representation of established equality/binding
@@ -188,7 +241,7 @@ Minimal semantic operations:
 - `empty() -> EqSet`
 - `merge(eqset1, eqset2) -> EqSet | conflict`
 - `normalize(eqset) -> EqSet | conflict`
-- `project(eqset, mapping) -> EqSet`
+- `project(eqset, onto) -> EqSet`
 - `reify(eqset, skeleton) -> Goal`
 
 Minimal semantic laws:
@@ -317,7 +370,82 @@ RFC 3.5 does not require a concrete representation for that bridge.
 It may be modeled as an `EqSet`, a mapping, or another compiled object, as long
 as it supports those two directional uses.
 
+This is why `interface_eqs` is not the same thing as `child_table_space`.
+
+`child_table_space` contains all child boundary slots.
+`interface_eqs` only captures how some of those child boundary slots relate to
+parent `HeadVar`s and `BodyVar`s.
+
+Some child slots may therefore be frontier-private relative to the parent:
+
+- they belong to `child_table_space`
+- they participate in child rows and child partials
+- but they have no named parent counterpart
+
 This is the key to algebraic instantiation at runtime.
+
+### Premise Interface Semantics
+
+Semantically, a compiled premise induces a boundary between two spaces:
+
+- the parent contribution space
+- the canonical `child_table_space`
+
+The compiled interface must support two derived transports:
+
+```python
+premise.forward_eqs(parent_eqs) -> EqSet[child_table_space] | conflict
+premise.backward_eqs(child_eqs) -> EqSet[parent_space] | conflict
+```
+
+Their intended reading is:
+
+- `forward_eqs` extracts the child table information implied by the current
+  parent contribution state
+- `backward_eqs` transports child table information back into the parent
+  contribution space
+
+RFC 3.5 does not require those operations to be primitive methods on the object.
+It only requires that the compiled premise semantics behave as if those
+operations existed.
+
+One valid mental model is relational:
+
+- the interface is represented on a joint parent-plus-child space
+- forward transport means merge, normalize, then project onto
+  `child_table_space`
+- backward transport means merge, normalize, then project onto the parent space
+
+The RFC cares about the induced transports, not about whether the bridge is
+stored literally as equations, as a mapping, or as another compiled form.
+
+The key transport rule is:
+
+- parent refinement may only mention parent `HeadVar`s and `BodyVar`s
+- child export is keyed only by child `SlotVar`s
+- child frontier-private variables never cross the frontier as variables
+
+So `forward_eqs` and `backward_eqs` do not identify parent and child variables
+directly.
+They derive target-space equalities from source-space equalities.
+
+### Frontier Terminology
+
+For one compiled premise, RFC 3.5 uses the following names:
+
+- parent/child frontier: the boundary between parent contribution space and
+  `child_table_space`
+- instantiation: forward transport from parent contribution state to child table
+  state
+- total refinement: backward transport from a child `Row`
+- partial refinement: backward transport from the exported boundary of a child
+  `Partial`
+
+The difference between total and partial refinement is semantic, not merely
+procedural:
+
+- total refinement discharges the corresponding positive need
+- partial refinement keeps that positive need pending
 
 ## Head Matching
 
@@ -356,10 +484,8 @@ where:
 Operationally, `instantiate(...)`:
 
 1. resolves `path`
-2. combines the parent `EqSet` with the compiled premise interface
-3. projects the result onto `child_table_space`
-4. normalizes that projected `EqSet`
-5. reifies the premise's `subgoal_skeleton` in the child table space
+2. computes `child_eqs = premise.forward_eqs(parent.eqs)`
+3. reifies the premise's `subgoal_skeleton` in the child table space using `child_eqs`
 6. canonicalizes the result to an owner-local `GoalShape`
 7. packages that with the resolved dispatch path as `TableRef(path, goal_shape)`
 8. returns either:
@@ -368,6 +494,13 @@ Operationally, `instantiate(...)`:
    - or `conflict`
 
 This makes subgoal instantiation algebraic rather than recursive-by-structure at runtime.
+
+The intended variable behavior during instantiation is:
+
+- parent `HeadVar`s and `BodyVar`s may constrain corresponding child `SlotVar`s
+- child slots with no parent counterpart remain symbolic child-side slots
+- no parent variable is copied into child space by identity
+- the resulting child goal is keyed entirely by child `SlotVar`s and rigid terms
 
 ## Positive Premise Semantics
 
@@ -380,7 +513,7 @@ The table may contribute two things back to the parent partial:
 - `Row`
 - `Partial`
 
-### `consume_row`
+### `consume_row` (Total Refinement)
 
 Conceptually:
 
@@ -390,14 +523,20 @@ premise.consume_row(parent: Partial, child: Row) -> Partial | Row | conflict
 
 This operation:
 
-1. reads the child row's `EqSet` in `child_table_space`
-2. transports that information back into the parent contribution space through
-   the compiled premise interface
-3. merges it with the parent `EqSet`
+1. computes `parent_delta = premise.backward_eqs(child.eqs)`
+2. merges that with the parent `EqSet`
 4. removes the satisfied `PositiveNeed`
 5. returns a refined entry or a conflict
 
-### `refine_from_partial`
+Its intended variable behavior is:
+
+- child `SlotVar` information is translated back into consequences over parent
+  `HeadVar`s and `BodyVar`s
+- child frontier-private slots are forgotten unless they imply an equality over
+  mapped parent variables
+- the child `Row` is complete enough to discharge the need
+
+### `refine_from_partial` (Partial Refinement)
 
 This operation is deliberately narrower.
 
@@ -426,10 +565,9 @@ with the following rule:
 
 Operationally, when such exported information is available, the operation:
 
-1. projects the child partial's `EqSet` onto `child_table_space`
-2. transports that exported information back into the parent contribution space
-   through the compiled premise interface
-3. merges it with the parent `EqSet`
+1. computes `child_export = project(normalize(child.eqs), onto=child_table_space)`
+2. computes `parent_delta = premise.backward_eqs(child_export)`
+3. merges that with the parent `EqSet`
 4. keeps the `PositiveNeed` pending
 5. returns a refined partial or a conflict
 
@@ -438,6 +576,16 @@ This means:
 - a positive need is satisfied only by `Row`
 - `Partial` only refines the parent, it does not close the need
 - engines may conservatively skip `refine_from_partial` and remain correct
+- the refined parent entry remains conditional on the same unresolved child need
+- if the child contribution later dies, the refined parent may die as well;
+  soundness is preserved because no `Row` was emitted prematurely
+
+Its intended variable behavior is:
+
+- only the child boundary projection participates in transport
+- parent refinement may mention only parent `HeadVar`s and `BodyVar`s
+- child frontier-private variables are existentially forgotten
+- no new parent variable identity is created by partial refinement
 
 ## Negative Premise Semantics
 

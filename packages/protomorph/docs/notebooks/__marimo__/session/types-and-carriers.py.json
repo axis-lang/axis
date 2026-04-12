@@ -1,7 +1,7 @@
 {
   "version": "1",
   "metadata": {
-    "marimo_version": "0.21.1",
+    "marimo_version": "0.23.0",
     "script_metadata_hash": null
   },
   "cells": [
@@ -33,7 +33,7 @@
     },
     {
       "id": "vblA",
-      "code_hash": "71762afb58e19727bb2ef8ac47393547",
+      "code_hash": "26934512e503060344e32ae4fbf3f810",
       "outputs": [
         {
           "type": "data",
@@ -105,7 +105,7 @@
         {
           "type": "stream",
           "name": "stdout",
-          "text": "pair arity : 2\nlist arity : None  (None = unbounded)\nunion      : frozenset({Text, Integer})\npoint.x    : Item(offset=0, key='x', value=Integer)\n",
+          "text": "pair arity : 2\nlist arity : None  (None = unbounded)\nunion      : frozenset({Integer, Text})\npoint.x    : Item(offset=0, key='x', value=Integer)\n",
           "mimetype": "text/plain"
         }
       ]
@@ -158,7 +158,7 @@
     },
     {
       "id": "Kclp",
-      "code_hash": "5b92b2ce1f1254f9e767ef86f2c771b8",
+      "code_hash": "730c49983bd03e565b2b81b48e489956",
       "outputs": [
         {
           "type": "data",
@@ -171,19 +171,19 @@
         {
           "type": "stream",
           "name": "stdout",
-          "text": "  int                \u2192 Integer\n  list[int]          \u2192 List Integer\n  dict[str,int]      \u2192 Map[Id] Integer\n  int | str          \u2192 Id | Integer\n",
+          "text": "  int                \u2192 Integer\n  list[int]          \u2192 List Integer\n  dict[str,int]      \u2192 Map[Text] Integer\n  int | str          \u2192 Integer | Text\n",
           "mimetype": "text/plain"
         }
       ]
     },
     {
       "id": "emfo",
-      "code_hash": "8d5e853e75958584837932d99de1e9f8",
+      "code_hash": "4fa0a0b4b7f6f5e689e5c1873a0a4c64",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-carriers\">5 \u2014 Carriers</h2>\n<span class=\"paragraph\">A carrier holds a value under a type. Use <code>type.make(data)</code> or <code>wrap(value)</code>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-carriers\">5 \u2014 Carriers</h2>\n<span class=\"paragraph\">A carrier holds a value under a type. Use <code>type.make(data)</code> or <code>val(value)</code>.</span></span>"
           }
         }
       ],
@@ -191,7 +191,7 @@
     },
     {
       "id": "Hstk",
-      "code_hash": "02ed808ec876850056c4b088911ad335",
+      "code_hash": "99d5bc1db966002536e1c2840ee899f1",
       "outputs": [
         {
           "type": "data",
@@ -224,7 +224,7 @@
     },
     {
       "id": "iLit",
-      "code_hash": "fcb17a52c9c8203772a0c1ec3e071ee7",
+      "code_hash": "cf3edd760de9c9a06a4af963136003ae",
       "outputs": [
         {
           "type": "data",
@@ -257,7 +257,7 @@
     },
     {
       "id": "ROlb",
-      "code_hash": "fc3f46813572d57a341d1ba67f8c2a57",
+      "code_hash": "f741a4ed626b78be68e74c6ffc0d77d1",
       "outputs": [
         {
           "type": "data",

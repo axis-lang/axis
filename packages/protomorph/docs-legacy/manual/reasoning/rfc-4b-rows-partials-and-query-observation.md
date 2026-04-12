@@ -29,6 +29,7 @@ RFC 4B exists to clarify:
 4. `Evidence` and `Judgment` only remain first-class if they add real explanatory value beyond what `Row` and `Partial` already provide.
 5. `Partial` exposes monotone established information plus unresolved `Need`s, not an arbitrary snapshot of transient engine queues.
 6. `Partial` may refine while its table remains open, but at local fixpoint the remaining `Partial` values are themselves the stable unfinished snapshots for that session state.
+7. Public observation is table-boundary oriented: child-private variables are not exposed as stable query-level identities.
 
 ## Non-Goals
 
@@ -62,3 +63,4 @@ Those belong in RFC 4A or later RFCs.
 5. How should `Partial` explain unresolved subgoals and unmet needs?
 6. How much of `EqSet` should be shown directly versus reified into slot/value views?
 7. Should public partial observation expose `TableRef(path, goal_shape)` directly, or a more user-facing rendering of unresolved targets?
+8. How should observation distinguish parent-visible variables from child-private frontier variables that were existentially forgotten during refinement?

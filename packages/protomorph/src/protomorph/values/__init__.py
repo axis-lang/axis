@@ -1,4 +1,5 @@
 from .base import *
+from .set_ import *
 from .tuple_ import *
 from .result import *
 from .option import *
@@ -7,6 +8,8 @@ from .option import *
 def make_value(tp, dt):
     import protomorph as pm
 
+    if isinstance(dt, pm.Placeholder):
+        return LeafCarrier(tp, dt)
     if isinstance(tp, (pm.Placeholder, pm.UnionType)):
         return LeafCarrier(tp, dt)
     if isinstance(tp, pm.Qual):
@@ -16,9 +19,13 @@ def make_value(tp, dt):
                 raise TypeError("Result-qualified types require explicit Ok(...) or Err(...)")
             return Result(tp, dt)
         if qualifier is not None and qualifier.anchor == pm.Anchor("std.qualifiers.Optional"):
-            if not isinstance(dt, (Some, None_)):
-                raise TypeError("Optional-qualified types require explicit Some(...) or None_()")
             return Option(tp, dt)
+        if qualifier is not None and qualifier.anchor == pm.Anchor("std.qualifiers.Set"):
+            if isinstance(dt, set):
+                dt = frozenset(dt)
+            if not isinstance(dt, frozenset):
+                raise TypeError("Set-qualified values require set(...) or frozenset(...)")
+            return Set(tp, dt)
         return make_value(tp.underlying, dt)
     if isinstance(tp, pm.UniformType):
         return Index(tp, dt) if tp.unique else Tuple(tp, dt)
