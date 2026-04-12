@@ -41,7 +41,7 @@ class Assertion(Builtin):
         return frozendict({
             slot: binding
             for canonical in (self.term, *(premise.term for premise in self.premises))
-            for slot, binding in canonical.bindings.items()
+            for slot, binding in canonical.binding_items()
             if binding.is_var
         })
 

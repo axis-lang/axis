@@ -143,9 +143,9 @@ def cell_cycles(cycle_solver, logic):
     for _cycle in cycle_solver.cycles:
         for _edge in _cycle.edges:
             if isinstance(_edge, logic.Solver.InternalEdge):
-                print(_edge.assertion.term.pattern, "->", _edge.premise.term.pattern)
+                print(_edge.assertion.term.descriptor.pattern, "->", _edge.premise.term.descriptor.pattern)
             elif isinstance(_edge, logic.Solver.ExternalEdge):
-                print(_edge.premise.term.pattern, "->", _edge.assertion.term.pattern)
+                print(_edge.premise.term.descriptor.pattern, "->", _edge.assertion.term.descriptor.pattern)
         print("---")
 
     return

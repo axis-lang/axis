@@ -38,13 +38,18 @@ class Fuse(pm.Op):
     parts: frozenset[pm.Val]
 
 
+class Proj(pm.Op):
+    value: pm.Val
+    path: tuple[int, ...] = ()
+
+
 class Shape(Base):
     @classmethod
     def from_val(cls, value: pm.Val | Base) -> Shape:
         return shape(value)
 
 
-class Pattern[Ctx](Base):
+class Pattern[Ctx](Base, pm.Type[tuple[pm.Val, ...]]):
     class Slot[_C](pm.Var):
         ctx: _C
         id: int
@@ -68,6 +73,26 @@ class Pattern[Ctx](Base):
     def slot_count(self) -> int:
         return len(self.slots)
 
+    @property
+    def arity(self) -> int:
+        return self.slot_count
+
+    def item_at(self, offset: int) -> pm.Item:
+        slot = self.slots[offset]
+        return pm.Item(offset, None, slot.descriptor)
+
+    def metatype(self) -> pm.Type:
+        return pm.Spec.of("std.metas.Type")
+
+    def make(self, data: tuple[pm.Val | object, ...]) -> Morph[Ctx]:
+        return Morph(
+            descriptor=self,
+            content=tuple(value if isinstance(value, pm.Val) else pm.val(value) for value in data),
+        )
+
+    def bind(self, *bindings: pm.Val) -> Morph[Ctx]:
+        return self.make(bindings)
+
     @slot_cached_property
     def branches(self) -> frozendict[pm.Val[Base.Nest[Ctx]], pm.Val]:
         return unnest(self, ctx=self.ctx)
@@ -85,7 +110,7 @@ class Pattern[Ctx](Base):
         return shape(self)
 
 
-class Morph[Ctx](Builtin):
+class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
 
     @classmethod
     def from_val(
@@ -94,73 +119,104 @@ class Morph[Ctx](Builtin):
         ctx: Ctx = None,
     ) -> Morph[Ctx]:
         pattern_value, slot_by_val = _make_pattern_with_bindings(value, ctx=ctx)
+        val_by_slot = {
+            slot: node
+            for node, slot in slot_by_val.items()
+        }
         return cls(
-            pattern=pattern_value,
-            bindings=frozendict({
-                slot: node
-                for node, slot in slot_by_val.items()
-            }),
+            descriptor=pattern_value,
+            content=tuple(val_by_slot[slot] for slot in pattern_value.slots),
         )
 
-    pattern: Pattern[Ctx]
-    bindings: frozendict[pm.Val[Pattern.Slot[Ctx]], pm.Val]
+    descriptor: Pattern[Ctx]
+    content: tuple[pm.Val, ...]
+
+    def __len__(self) -> int:
+        return self.descriptor.slot_count
+
+    def __getitem__(self, offset: int) -> pm.Val:
+        return self.content[offset]
+
+    def reconstruct(self, children: tuple[pm.Val, ...]) -> Morph[Ctx]:
+        return type(self)(descriptor=self.descriptor, content=children)
+
+    def __invariants__(self) -> None:
+        assert isinstance(self.descriptor, Pattern), "Morph descriptor must be a Pattern"
+        assert len(self.content) == self.descriptor.slot_count, (
+            "Morph content must match descriptor slot count"
+        )
+        assert all(isinstance(binding, pm.Val) for binding in self.content), (
+            "Morph content must contain Carrier values"
+        )
 
     @property
     def shape(self) -> Shape:
-        return self.pattern.shape
+        return self.descriptor.shape
 
     @property
     def slots(self) -> tuple[pm.Val[Pattern.Slot[Ctx]], ...]:
-        return self.pattern.slots
+        return self.descriptor.slots
 
     @property
     def slot_count(self) -> int:
-        return self.pattern.slot_count
+        return self.descriptor.slot_count
 
     @property
     def ctx(self) -> Ctx:
-        return self.pattern.ctx
+        return self.descriptor.ctx
 
     @property
     def branches(self) -> frozendict[pm.Val[Base.Nest[Ctx]], pm.Val]:
-        return self.pattern.branches
+        return self.descriptor.branches
 
     @property
     def nests(self) -> tuple[pm.Val[Base.Nest[Ctx]], ...]:
-        return self.pattern.nests
+        return self.descriptor.nests
 
     @property
     def nest_count(self) -> int:
         return len(self.nests)
 
-    def filter_bindings(
+    def binding_at(
+        self,
+        slot_or_offset: int | pm.Val[Pattern.Slot[Ctx]],
+    ) -> pm.Val:
+        if isinstance(slot_or_offset, int):
+            return self.content[slot_or_offset]
+
+        slot = slot_or_offset
+        offset = slot.fetch().id
+        assert self.slots[offset] == slot, "Binding slot does not belong to Morph descriptor"
+        return self.content[offset]
+
+    def binding_items(self) -> tuple[tuple[pm.Val[Pattern.Slot[Ctx]], pm.Val], ...]:
+        return tuple(zip(self.slots, self.content, strict=True))
+
+    def filter_content(
         self,
         keep_if: _Callable[[pm.Val], bool],
     ) -> Morph[Ctx]:
         return Morph(
-            pattern=self.pattern,
-            bindings=frozendict({
-                slot: binding if keep_if(binding) else pm.Wildcard
-                for slot, binding in self.bindings.items()
-            }),
+            descriptor=self.descriptor,
+            content=tuple(
+                binding if keep_if(binding) else pm.Wildcard
+                for binding in self.content
+            ),
         )
 
     def materialize(
         self,
         keep_if: _Callable[[pm.Val], bool] = lambda _: True,
     ) -> pm.Val:
-        return self.pattern.pattern.subst({
+        return self.descriptor.pattern.subst({
             slot: binding
-            for slot, binding in self.bindings.items()
+            for slot, binding in self.binding_items()
             if keep_if(binding)
         })
 
     @slot_cached_property
     def value(self) -> pm.Val:
         return self.materialize()
-
-    def match(self, other: Morph) -> Match | None:
-        return match(self, other)
 
     def compatible_with(self, other: Morph) -> bool:
         return match(self, other) is not None
@@ -192,7 +248,10 @@ class Match[BuiltinCtx](Builtin):
 
 
 def shape(value: pm.Val | Base) -> Shape:
-    pattern_value = value.pattern if isinstance(value, Base) else value
+    if isinstance(value, Morph):
+        pattern_value = value.materialize()
+    else:
+        pattern_value = value.pattern if isinstance(value, Base) else value
     return Shape(pattern=_skeletonize(pattern_value))
 
 
@@ -268,7 +327,10 @@ def unnest[Ctx](
     value: pm.Val | Base,
     ctx: Ctx = None,
 ) -> frozendict[pm.Val[Base.Nest[Ctx]], pm.Val]:
-    pattern_value = value.pattern if isinstance(value, Base) else value
+    if isinstance(value, Morph):
+        pattern_value = value.descriptor.pattern
+    else:
+        pattern_value = value.pattern if isinstance(value, Base) else value
     branches = list(pattern_value.iter_branches())
     branch_to_var: dict[pm.Val, pm.Val[Base.Nest[Ctx]]] = {
         branch: pm.LeafCarrier(branch.descriptor, Base.Nest(ctx=ctx, id=index))
@@ -378,9 +440,9 @@ class _MatchBuilder:
     ]:
         common = self._merge(
             self.left.value,
-            self.left.pattern.pattern,
+            self.left.descriptor.pattern,
             self.right.value,
-            self.right.pattern.pattern,
+            self.right.descriptor.pattern,
         )
         if common is None:
             return (None, frozendict(), frozendict())
@@ -603,7 +665,7 @@ def _project_match_side(
             return None
 
         nodes = frozenset(matched)
-        binding = morph.bindings[slot]
+        binding = morph.binding_at(slot)
         if not _is_symbolic_leaf(binding) and len(nodes) > 1:
             return None
 
@@ -618,7 +680,10 @@ def _project_match_side(
 
         bindings[slot] = pm.val(Fuse(parts=frozenset(resolved_refs)))
 
-    return Morph(pattern=morph.pattern, bindings=frozendict(bindings))
+    return Morph(
+        descriptor=morph.descriptor,
+        content=tuple(bindings[slot] for slot in morph.slots),
+    )
 
 
 def _is_symbolic_leaf(node: pm.Val) -> bool:

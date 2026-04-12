@@ -94,7 +94,7 @@ def cell_shape_views(Morph, Pattern, Shape, sample):
     print("shape.pattern  :", sample_shape.pattern)
     print("pattern.pattern:", sample_pattern.pattern)
     print("pattern.slots  :", sample_pattern.slots)
-    print("morph.bindings :", sample_morph.bindings)
+    print("morph.content  :", sample_morph.content)
     return sample_morph, sample_pattern, sample_shape
 
 
@@ -167,8 +167,8 @@ def cell_show_match(pm):
             return None
 
         print("common      :", matched.common.pattern)
-        print("left map    :", matched.left.bindings)
-        print("right map   :", matched.right.bindings)
+        print("left map    :", matched.left.content)
+        print("right map   :", matched.right.content)
         print("common unnest:")
         for nest, branch in pm.canonical.unnest(matched.common).items():
             print(" ", nest, "->", branch)
@@ -203,7 +203,7 @@ def cell_match_projection_section(mo):
 
 
 @app.cell
-def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, frozendict, pm, show_match, val, var):
+def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, pm, show_match, val, var):
     _any_type = pm.Spec.of("std.types.Any")
     _proj_x = var("X", _any_type)
     _proj_y = var("Y", _any_type)
@@ -218,20 +218,20 @@ def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, frozendict, pm
     )
 
     left_projection_morph = Morph(
-        pattern=left_projection_pattern,
-        bindings=frozendict({
-            left_projection_pattern.slots[0]: val(_proj_x),
-            left_projection_pattern.slots[1]: val(_proj_y),
-            left_projection_pattern.slots[2]: val(MatchB(val(_proj_u), val(_proj_v))),
-        }),
+        descriptor=left_projection_pattern,
+        content=(
+            val(_proj_x),
+            val(_proj_y),
+            val(MatchB(val(_proj_u), val(_proj_v))),
+        ),
     )
     right_projection_morph = Morph(
-        pattern=right_projection_pattern,
-        bindings=frozendict({
-            right_projection_pattern.slots[0]: val(MatchA(val(_proj_x), val(_proj_y))),
-            right_projection_pattern.slots[1]: val(_proj_u),
-            right_projection_pattern.slots[2]: val(_proj_v),
-        }),
+        descriptor=right_projection_pattern,
+        content=(
+            val(MatchA(val(_proj_x), val(_proj_y))),
+            val(_proj_u),
+            val(_proj_v),
+        ),
     )
 
     projection_match = show_match(
@@ -245,11 +245,11 @@ def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, frozendict, pm
         "MatchQ(left=MatchA(left=#0, right=#1), right=MatchB(left=#2, right=#3))"
     )
     assert [
-        repr(projection_match.left.bindings[slot])
+        repr(projection_match.left.binding_at(slot))
         for slot in left_projection_pattern.slots
     ] == ["#0", "#1", "@2"]
     assert [
-        repr(projection_match.right.bindings[slot])
+        repr(projection_match.right.binding_at(slot))
         for slot in right_projection_pattern.slots
     ] == ["@1", "#2", "#3"]
     return left_projection_morph, projection_match, right_projection_morph

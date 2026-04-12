@@ -4,7 +4,6 @@ import unittest
 from typing import Any, cast
 
 import protomorph as pm
-from protobase import frozendict
 
 from protomorph import (
     Builtin,
@@ -251,20 +250,20 @@ class TestCanonicalMatch(unittest.TestCase):
         )
 
         left = Morph(
-            pattern=left_pattern,
-            bindings=frozendict({
-                left_pattern.slots[0]: val(x),
-                left_pattern.slots[1]: val(y),
-                left_pattern.slots[2]: val(MatchB(val(u), val(v))),
-            }),
+            descriptor=left_pattern,
+            content=(
+                val(x),
+                val(y),
+                val(MatchB(val(u), val(v))),
+            ),
         )
         right = Morph(
-            pattern=right_pattern,
-            bindings=frozendict({
-                right_pattern.slots[0]: val(MatchA(val(x), val(y))),
-                right_pattern.slots[1]: val(u),
-                right_pattern.slots[2]: val(v),
-            }),
+            descriptor=right_pattern,
+            content=(
+                val(MatchA(val(x), val(y))),
+                val(u),
+                val(v),
+            ),
         )
 
         matched = pm.canonical.match(left, right)
@@ -278,11 +277,11 @@ class TestCanonicalMatch(unittest.TestCase):
             "MatchQ(left=MatchA(left=#0, right=#1), right=MatchB(left=#2, right=#3))",
         )
         self.assertEqual(
-            [repr(matched.left.bindings[slot]) for slot in left_pattern.slots],
+            [repr(matched.left.binding_at(slot)) for slot in left_pattern.slots],
             ["#0", "#1", "@2"],
         )
         self.assertEqual(
-            [repr(matched.right.bindings[slot]) for slot in right_pattern.slots],
+            [repr(matched.right.binding_at(slot)) for slot in right_pattern.slots],
             ["@1", "#2", "#3"],
         )
 
@@ -308,7 +307,7 @@ class TestCanonicalMatch(unittest.TestCase):
         assert matched is not None
         self.assertEqual(repr(matched.common.pattern), "MatchPair(left=#0, right=#0)")
         self.assertEqual(
-            [repr(matched.right.bindings[slot]) for slot in right.pattern.slots],
+            [repr(matched.right.binding_at(slot)) for slot in right.descriptor.slots],
             ["#0", "#0"],
         )
 
