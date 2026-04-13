@@ -15,6 +15,7 @@ from .canonical import *
 from . import canonical
 from . import match
 from . import logic
+from .logic.match import Match
 from .constraint import Constraint
 
 assert issubclass(Type, contract.Descriptor)

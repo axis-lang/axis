@@ -3,7 +3,7 @@ from __future__ import annotations
 from protobase import _, slot_cached_property
 
 import protomorph as pm
-from protomorph import canonical as canon
+from .match import Match, match as logic_match
 
 from ..graphutils import graph_cycles
 from .assertion import Assertion, Premise
@@ -18,7 +18,7 @@ class Solver(pm.Builtin):
     class ExternalEdge(pm.Builtin):
         premise: Premise
         assertion: Assertion
-        match: pm.Match = _
+        match: Match = _
 
     class Cycle(pm.Builtin):
         edges: tuple[Solver.InternalEdge | Solver.ExternalEdge, ...] = _
@@ -67,7 +67,7 @@ class Solver(pm.Builtin):
             for premise in outer.premises
             for assertion in self.assertions
             if assertion is not outer
-            if (match := canon.match(premise.term, assertion.term))
+            if (match := logic_match(premise.term, assertion.term))
         )
 
     @slot_cached_property

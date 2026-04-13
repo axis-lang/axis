@@ -12,7 +12,7 @@ Convention:
 from __future__ import annotations
 
 from typing import Any, cast
-from .domain import Builtin
+from .domain import Builtin, Op
 
 _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 
@@ -25,7 +25,16 @@ def repr_any(obj: Any) -> str:
     from .domain import Placeholder, placeholder_label
     from .domain import UniformType, UnionType, VaryingType, IndexedType
     from .domain import Spread, Spec, Qual
+    from .canonical import Morph, Fuse, Proj
+    from .logic.match import Match
     from .values import Val, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
+
+    if isinstance(obj, Fuse):
+        return _repr_fuse(obj)
+    if isinstance(obj, Proj):
+        return _repr_proj(obj)
+    if isinstance(obj, Match):
+        return _repr_match(obj)
 
     # ── Hosted (check before Val and Type) ──
     if isinstance(obj, Qual):
@@ -46,6 +55,8 @@ def repr_any(obj: Any) -> str:
         return _repr_union(obj)
 
     # ── Carriers (check before generic fallback) ──
+    if isinstance(obj, Morph):
+        return _repr_morph(obj)
     if isinstance(obj, Result):
         return _repr_result_carrier(obj)
     if isinstance(obj, Option):
@@ -66,15 +77,9 @@ def repr_any(obj: Any) -> str:
         return f"..({', '.join(_format(v) for v in obj.values)})"
 
     # ── Builtin (must check before Consed fallback to avoid wrong class name) ──
-
     if isinstance(obj, Builtin):
         return _repr_builtin(obj)
 
-    # ── Fallback: Consed default ──
-    from protobase import Consed
-
-    if isinstance(obj, Consed):
-        return Consed.__repr__(obj)
     return repr(obj)
 
 
@@ -95,6 +100,47 @@ def _repr_builtin(value: Any) -> str:
     for key, attr in value.__class__.__annotations__.items():
         attrs.append(f"{key}={_format(getattr(value, key))}")
     return f"{type(value).__name__}({', '.join(attrs)})"
+
+
+def _repr_morph(morph) -> str:
+    reified = morph.descriptor.pattern.subst({
+        slot: binding
+        for slot, binding in morph.binding_items()
+        if _is_simple_morph_binding(binding)
+    })
+    rendered = repr_any(reified)
+
+    expanded = [
+        f"{repr_any(slot)}={repr_any(binding)}"
+        for slot, binding in morph.binding_items()
+        if not _is_simple_morph_binding(binding)
+    ]
+    if not expanded:
+        return rendered
+
+    return f"<{rendered}; {', '.join(expanded)}>"
+
+
+def _repr_match(match) -> str:
+    return (
+        f"{repr_any(match.left.pattern)} ==[{repr_any(match.fw_template)} | {repr_any(match.bw_template)}]== "
+        f"{repr_any(match.right.pattern)}"
+    )
+
+
+def _repr_fuse(fuse) -> str:
+    parts = sorted((repr_any(part) for part in fuse.parts))
+    if not parts:
+        return f"{{ -> {repr_any(fuse.known)} }}"
+    return f"{{ {' | '.join(parts)} -> {repr_any(fuse.known)} }}"
+
+
+def _repr_proj(proj) -> str:
+    return f"{repr_any(proj.value)}[{repr_any(proj.target)}]"
+
+
+def _is_simple_morph_binding(binding) -> bool:
+    return binding.is_leaf and not isinstance(binding.fetch(), Op)
 
 
 def _trim_anchor(anchor: str) -> str:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable as _Callable
 from enum import Enum
+from typing import cast as _cast
 
 import protomorph as pm
 from protobase import _, frozendict, slot_cached_property
@@ -9,9 +10,15 @@ from protomorph.domain import Builtin
 
 
 class Base(Builtin, abstract=True):
-    class Nest[_C](pm.Var):
+    class Node[_C](pm.Var, abstract=True):
         ctx: _C
         id: int
+        bound: pm.Type = _
+
+        def metatype(self) -> pm.Type:
+            return self.bound
+
+    class Nest[_C](Node[_C]):
 
         def display_label(self) -> str | None:
             return f"@{self.id}"
@@ -35,12 +42,13 @@ class Base(Builtin, abstract=True):
 
 
 class Fuse(pm.Op):
+    known: Morph
     parts: frozenset[pm.Val]
 
 
 class Proj(pm.Op):
     value: pm.Val
-    path: tuple[int, ...] = ()
+    target: pm.Val
 
 
 class Shape(Base):
@@ -50,9 +58,7 @@ class Shape(Base):
 
 
 class Pattern[Ctx](Base, pm.Type[tuple[pm.Val, ...]]):
-    class Slot[_C](pm.Var):
-        ctx: _C
-        id: int
+    class Slot[_C](Base.Node[_C]):
 
         def display_label(self) -> str | None:
             return f"#{self.id}"
@@ -118,14 +124,10 @@ class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
         value: pm.Val,
         ctx: Ctx = None,
     ) -> Morph[Ctx]:
-        pattern_value, slot_by_val = _make_pattern_with_bindings(value, ctx=ctx)
-        val_by_slot = {
-            slot: node
-            for node, slot in slot_by_val.items()
-        }
+        pattern_value, bindings = _make_pattern_with_bindings(value, ctx=ctx)
         return cls(
             descriptor=pattern_value,
-            content=tuple(val_by_slot[slot] for slot in pattern_value.slots),
+            content=bindings,
         )
 
     descriptor: Pattern[Ctx]
@@ -192,6 +194,16 @@ class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
     def binding_items(self) -> tuple[tuple[pm.Val[Pattern.Slot[Ctx]], pm.Val], ...]:
         return tuple(zip(self.slots, self.content, strict=True))
 
+    def project(
+        self,
+        target: pm.Val[Pattern.Slot[Ctx]] | pm.Val[Base.Nest[Ctx]],
+    ) -> pm.Val:
+        _assert_projection_target(self, target)
+        return _cast(
+            pm.Val,
+            pm.LeafCarrier(_cast(pm.Type, target.descriptor), _cast(object, Proj(value=self, target=target))),
+        )
+
     def filter_content(
         self,
         keep_if: _Callable[[pm.Val], bool],
@@ -211,7 +223,7 @@ class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
         return self.descriptor.pattern.subst({
             slot: binding
             for slot, binding in self.binding_items()
-            if keep_if(binding)
+            if keep_if(binding) and not binding.is_wildcard
         })
 
     @slot_cached_property
@@ -219,17 +231,17 @@ class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
         return self.materialize()
 
     def compatible_with(self, other: Morph) -> bool:
-        return match(self, other) is not None
+        return pm.logic.match(self, other) is not None
 
     def meet(self, other: Morph) -> Pattern | None:
         met = meet(self, other)
         return met if isinstance(met, Pattern) else None
 
     def unify(self, other: Morph) -> pm.Val | None:
-        matched = match(self, other)
-        if matched is None:
+        met = meet(self, other)
+        if not isinstance(met, Pattern):
             return None
-        return matched.common.pattern
+        return met.pattern
 
 
 class Relation(str, Enum):
@@ -238,13 +250,6 @@ class Relation(str, Enum):
     CONTRACTS = "contracts"
     REFRAMES = "reframes"
     DISJOINT = "disjoint"
-
-
-class Match[BuiltinCtx](Builtin):
-    common: Pattern
-    left: Morph
-    right: Morph
-
 
 
 def shape(value: pm.Val | Base) -> Shape:
@@ -261,6 +266,29 @@ def pattern[Ctx](value: pm.Val, ctx: Ctx = None) -> Pattern[Ctx]:
 
 def morph[Ctx](value: pm.Val, ctx: Ctx = None) -> Morph[Ctx]:
     return Morph.from_val(value, ctx=ctx)
+
+
+def project[Ctx](
+    source: Morph[Ctx],
+    target: pm.Val[Pattern.Slot[Ctx]] | pm.Val[Base.Nest[Ctx]],
+) -> pm.Val:
+    return source.project(target)
+
+
+def normalize(value: pm.Val) -> pm.Val:
+    if isinstance(value, Morph):
+        return _normalize_morph(value)
+    if _is_fuse_value(value):
+        return _normalize_fuse(value)
+    if _is_proj_value(value):
+        return _normalize_proj(value)
+    if value.is_leaf:
+        return value
+
+    children = tuple(normalize(child) for child in value)
+    if all(child is original for child, original in zip(children, value, strict=True)):
+        return value
+    return value.reconstruct(children)
 
 
 def meet(left: Base | Morph, right: Base | Morph) -> Shape | Pattern | None:
@@ -296,33 +324,6 @@ def compatible(left: Base | Morph, right: Base | Morph) -> bool:
     return meet(left, right) is not None
 
 
-def match(left: Morph, right: Morph) -> Match | None:
-    common_value, left_occurrences, right_occurrences = _match_common_value(left, right)
-    if common_value is None:
-        return None
-
-    common = Pattern.from_val(common_value)
-    common_refs = _common_refs(common_value, common)
-
-    _left = _project_match_side(
-        morph=left,
-        occurrences=left_occurrences,
-        common_refs=common_refs,
-    )
-    if _left is None:
-        return None
-
-    _right = _project_match_side(
-        morph=right,
-        occurrences=right_occurrences,
-        common_refs=common_refs,
-    )
-    if _right is None:
-        return None
-
-    return Match(common=common, left=_left, right=_right)
-
-
 def unnest[Ctx](
     value: pm.Val | Base,
     ctx: Ctx = None,
@@ -333,7 +334,10 @@ def unnest[Ctx](
         pattern_value = value.pattern if isinstance(value, Base) else value
     branches = list(pattern_value.iter_branches())
     branch_to_var: dict[pm.Val, pm.Val[Base.Nest[Ctx]]] = {
-        branch: pm.LeafCarrier(branch.descriptor, Base.Nest(ctx=ctx, id=index))
+        branch: pm.LeafCarrier(
+            branch.descriptor,
+            Base.Nest(ctx=ctx, id=index, bound=branch.descriptor),
+        )
         for index, branch in enumerate(branches)
     }
     result: dict[pm.Val[Base.Nest[Ctx]], pm.Val] = {}
@@ -356,33 +360,56 @@ def _skeletonize(
 def _make_pattern_with_bindings[C](
     value: pm.Val,
     ctx: C = None,
-) -> tuple[Pattern[C], dict[pm.Val, pm.Val[Pattern.Slot[C]]]]:
+) -> tuple[Pattern[C], tuple[pm.Val, ...]]:
     slot_by_value: dict[pm.Val, pm.Val[Pattern.Slot[C]]] = {}
+    slots: list[pm.Val[Pattern.Slot[C]]] = []
+    bindings: list[pm.Val] = []
+
+    def new_slot(node: pm.Val) -> pm.Val[Pattern.Slot[C]]:
+        slot_descriptor = pm.Spec.of("std.types.Any") if node.is_wildcard else node.descriptor
+        slot = pm.LeafCarrier(
+            slot_descriptor,
+            Pattern.Slot(ctx=ctx, id=len(slots), bound=slot_descriptor),
+        )
+        slots.append(slot)
+        bindings.append(node)
+        return slot
 
     def replace(node: pm.Val) -> pm.Val:
+        if not _is_extractable_pattern_leaf(node):
+            return node
+
+        if node.is_wildcard:
+            return new_slot(node)
+
         existing = slot_by_value.get(node)
         if existing is not None:
             return existing
 
-        slot = pm.LeafCarrier(
-            node.descriptor,
-            Pattern.Slot(ctx=ctx, id=len(slot_by_value)),
-        )
+        slot = new_slot(node)
         slot_by_value[node] = slot
         return slot
 
     return (
         Pattern(
             pattern=value.deep_map(replace),
-            slots=tuple(slot_by_value.values()),
+            slots=tuple(slots),
             ctx=ctx,
         ),
-        slot_by_value,
+        tuple(bindings),
     )
 
 
 def _is_wildcard(node: pm.Val) -> bool:
     return node.is_wildcard
+
+
+def _is_extractable_pattern_leaf(node: pm.Val) -> bool:
+    return node.is_leaf and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+
+
+def _is_match_hole(node: pm.Val) -> bool:
+    return node.is_leaf and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
 
 
 def _shape_specializes(left: pm.Val, right: pm.Val) -> bool:
@@ -470,7 +497,7 @@ class _MatchBuilder:
         return root
 
     def _resolve(self, node: pm.Val) -> pm.Val:
-        if not _is_symbolic_leaf(node):
+        if not _is_match_hole(node):
             return node
         root = self._find(node)
         bound = self.bounds.get(root)
@@ -483,7 +510,7 @@ class _MatchBuilder:
 
     def _reify(self, node: pm.Val, seen: set[int] | None = None) -> pm.Val:
         resolved = self._resolve(node)
-        if _is_symbolic_leaf(resolved) or resolved.is_leaf:
+        if _is_match_hole(resolved) or resolved.is_leaf:
             return resolved
 
         node_id = id(resolved)
@@ -518,7 +545,7 @@ class _MatchBuilder:
         symbol = self._find(symbol)
         term = self._resolve(term)
 
-        if _is_symbolic_leaf(term):
+        if _is_match_hole(term):
             return self._union_symbols(symbol, term)
         if not _descriptors_compatible(symbol.descriptor, term.descriptor):
             return False
@@ -564,7 +591,7 @@ class _MatchBuilder:
 
     def _occurs(self, symbol: pm.Val, node: pm.Val) -> bool:
         node = self._resolve(node)
-        if _is_symbolic_leaf(node):
+        if _is_match_hole(node):
             return self._find(node) is self._find(symbol)
         if node.is_leaf:
             return False
@@ -580,11 +607,11 @@ class _MatchBuilder:
         left_value = self._resolve(left_value)
         right_value = self._resolve(right_value)
 
-        if _is_symbolic_leaf(left_value):
+        if _is_match_hole(left_value):
             if not self._bind_symbol(left_value, right_value):
                 return None
             common = self._resolve(left_value)
-        elif _is_symbolic_leaf(right_value):
+        elif _is_match_hole(right_value):
             if not self._bind_symbol(right_value, left_value):
                 return None
             common = self._resolve(right_value)
@@ -630,68 +657,25 @@ def _match_common_value(
     return _MatchBuilder(left, right).build()
 
 
-def _common_refs(common_value: pm.Val, common: Pattern) -> frozendict[pm.Val, pm.Val]:
-    branch_refs = _pattern_branch_refs(common)
-    refs: dict[pm.Val, pm.Val] = {}
-
-    stack = [(common_value, common.pattern)]
-    while stack:
-        raw_node, pattern_node = stack.pop()
-        if _is_pattern_slot(pattern_node):
-            refs[raw_node] = pattern_node
-            continue
-
-        branch_ref = branch_refs.get(pattern_node)
-        if branch_ref is not None:
-            refs[raw_node] = branch_ref
-
-        if raw_node.is_leaf or pattern_node.is_leaf:
-            continue
-
-        stack.extend(zip(raw_node, pattern_node, strict=True))
-
-    return frozendict(refs)
-
-
-def _project_match_side(
-    morph: Morph,
-    occurrences: frozendict[pm.Val, tuple[pm.Val, ...]],
-    common_refs: frozendict[pm.Val, pm.Val],
-) -> Morph | None:
-    bindings: dict[pm.Val, pm.Val] = {}
-    for slot in morph.slots:
-        matched = occurrences.get(slot)
-        if matched is None or not matched:
-            return None
-
-        nodes = frozenset(matched)
-        binding = morph.binding_at(slot)
-        if not _is_symbolic_leaf(binding) and len(nodes) > 1:
-            return None
-
-        refs = frozenset(common_refs.get(node) for node in nodes)
-        if None in refs:
-            return None
-
-        resolved_refs = tuple(ref for ref in refs if ref is not None)
-        if len(resolved_refs) == 1:
-            bindings[slot] = resolved_refs[0]
-            continue
-
-        bindings[slot] = pm.val(Fuse(parts=frozenset(resolved_refs)))
-
-    return Morph(
-        descriptor=morph.descriptor,
-        content=tuple(bindings[slot] for slot in morph.slots),
-    )
-
-
-def _is_symbolic_leaf(node: pm.Val) -> bool:
-    return node.is_leaf and isinstance(node.fetch(), pm.Placeholder)
-
-
 def _is_pattern_slot(node: pm.Val) -> bool:
     return node.is_leaf and isinstance(node.fetch(), Pattern.Slot)
+
+
+def _is_pattern_nest(node: pm.Val) -> bool:
+    return node.is_leaf and isinstance(node.fetch(), Base.Nest)
+
+
+def _assert_projection_target(
+    source: Morph,
+    target: pm.Val,
+) -> None:
+    if _is_pattern_slot(target):
+        assert target in source.slots, "Projection slot does not belong to Morph descriptor"
+        return
+    if _is_pattern_nest(target):
+        assert target in source.nests, "Projection nest does not belong to Morph descriptor"
+        return
+    raise TypeError("Projection target must be a Pattern slot or Nest")
 
 
 def _child_repr(node: pm.Val | None, index: int) -> pm.Val | None:
@@ -710,9 +694,158 @@ def _pick_symbol_roots(left: pm.Val, right: pm.Val) -> tuple[pm.Val, pm.Val]:
     return (left, right)
 
 
-def _pattern_branch_refs(common: Pattern) -> frozendict[pm.Val, pm.Val]:
-    branch_to_ref: dict[pm.Val, pm.Val] = {
-        branch: pm.LeafCarrier(branch.descriptor, Base.Nest(ctx=common.ctx, id=index))
-        for index, branch in enumerate(common.pattern.iter_branches())
-    }
-    return frozendict(branch_to_ref)
+def _build_branch_view_data(
+    common: Pattern,
+) -> tuple[
+    frozendict[pm.Val[Base.Nest], Morph],
+    frozendict[tuple[pm.Val[Base.Nest], pm.Val], pm.Val[Pattern.Slot]],
+]:
+    branch_views: dict[pm.Val[Base.Nest], Morph] = {}
+    branch_slot_by_common: dict[tuple[pm.Val[Base.Nest], pm.Val], pm.Val[Pattern.Slot]] = {}
+
+    for nest, branch in common.branches.items():
+        local_by_common: dict[pm.Val, pm.Val[Pattern.Slot]] = {}
+        local_slots: list[pm.Val[Pattern.Slot]] = []
+        local_content: list[pm.Val] = []
+
+        def replace(node: pm.Val) -> pm.Val:
+            if not (_is_pattern_slot(node) or _is_pattern_nest(node)):
+                return node
+
+            existing = local_by_common.get(node)
+            if existing is not None:
+                return existing
+
+            local_slot = pm.LeafCarrier(
+                node.descriptor,
+                Pattern.Slot(ctx=nest, id=len(local_slots), bound=node.descriptor),
+            )
+            local_by_common[node] = local_slot
+            local_slots.append(local_slot)
+            local_content.append(node)
+            branch_slot_by_common[(nest, node)] = local_slot
+            return local_slot
+
+        local_pattern = Pattern(
+            pattern=branch.deep_map(replace),
+            slots=tuple(local_slots),
+            ctx=nest,
+        )
+        branch_views[nest] = Morph(
+            descriptor=local_pattern,
+            content=tuple(local_content),
+        )
+
+    return (frozendict(branch_views), frozendict(branch_slot_by_common))
+
+
+def _slot_known(descriptor: pm.Type) -> Morph:
+    slot = pm.LeafCarrier(
+        descriptor,
+        Pattern.Slot(ctx=None, id=0, bound=descriptor),
+    )
+    pattern = Pattern(pattern=slot, slots=(slot,), ctx=None)
+    return Morph(descriptor=pattern, content=(pm.Wildcard,))
+
+
+def _is_fuse_value(node: pm.Val) -> bool:
+    return node.is_leaf and isinstance(node.fetch(), Fuse)
+
+
+def _is_proj_value(node: pm.Val) -> bool:
+    return node.is_leaf and isinstance(node.fetch(), Proj)
+
+
+def _normalize_morph(value: Morph) -> pm.Val:
+    content = tuple(normalize(binding) for binding in value.content)
+    if all(binding is original for binding, original in zip(content, value.content, strict=True)):
+        return value
+    return Morph(descriptor=value.descriptor, content=content)
+
+
+def _normalize_fuse(value: pm.Val[Fuse]) -> pm.Val:
+    fuse = value.fetch()
+    known = normalize(fuse.known)
+    if not isinstance(known, Morph):
+        raise TypeError(f"Fuse.known must normalize to Morph, got {known!r}")
+
+    parts: set[pm.Val] = set()
+    for part in fuse.parts:
+        normalized_part = normalize(part)
+        if _is_fuse_value(normalized_part):
+            inner = normalized_part.fetch()
+            if inner.known == known:
+                parts.update(inner.parts)
+            else:
+                parts.add(normalized_part)
+            continue
+
+        if normalized_part != known:
+            parts.add(normalized_part)
+
+    if not parts:
+        return known
+
+    normalized_parts = frozenset(parts)
+    if known == fuse.known and normalized_parts == fuse.parts:
+        return value
+
+    return pm.val(Fuse(known=known, parts=normalized_parts))
+
+
+def _normalize_proj(value: pm.Val[Proj]) -> pm.Val:
+    proj = value.fetch()
+    normalized_value = normalize(proj.value)
+
+    if isinstance(normalized_value, Morph):
+        return _project_from_morph_result(normalized_value, proj.target)
+
+    if _is_fuse_value(normalized_value):
+        fuse = normalized_value.fetch()
+        projected_known = _project_from_morph_known(fuse.known, proj.target)
+        projected_parts = frozenset(
+            normalize(pm.val(Proj(value=part, target=proj.target)))
+            for part in fuse.parts
+        )
+        return normalize(pm.val(Fuse(known=projected_known, parts=projected_parts)))
+
+    if normalized_value == proj.value:
+        return value
+
+    return pm.val(Proj(value=normalized_value, target=proj.target))
+
+
+def _project_from_morph_result(source: Morph, target: pm.Val) -> pm.Val:
+    _assert_projection_target(source, target)
+
+    if _is_pattern_slot(target):
+        return source.binding_at(_cast(pm.Val[Pattern.Slot], target))
+
+    branch_views, _ = _build_branch_view_data(source.descriptor)
+    view = branch_views.get(_cast(pm.Val[Base.Nest], target))
+    if view is None:
+        raise TypeError(f"Nest {target!r} does not belong to Morph descriptor")
+
+    content: list[pm.Val] = []
+    for ref in view.content:
+        if _is_pattern_slot(ref):
+            content.append(source.binding_at(_cast(pm.Val[Pattern.Slot], ref)))
+            continue
+        if _is_pattern_nest(ref):
+            content.append(_project_from_morph_result(source, ref))
+            continue
+        raise TypeError(f"Unsupported branch view ref {ref!r}")
+
+    return Morph(descriptor=view.descriptor, content=tuple(content))
+
+
+def _project_from_morph_known(source: Morph, target: pm.Val) -> Morph:
+    _assert_projection_target(source, target)
+
+    if _is_pattern_slot(target):
+        return _slot_known(target.descriptor)
+
+    projected = _project_from_morph_result(source, target)
+    if not isinstance(projected, Morph):
+        raise TypeError(f"Projected known must be Morph, got {projected!r}")
+    return projected

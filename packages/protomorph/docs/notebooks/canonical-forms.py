@@ -19,7 +19,7 @@ def cell_imports():
     from protobase import frozendict
     from protomorph import Builtin, Morph, Pattern, Shape, Val, val, var
 
-    return Builtin, Morph, Pattern, Shape, Val, cast, frozendict, pm, val, var
+    return Builtin, Morph, Pattern, Shape, Val, cast, pm, val, var
 
 
 @app.cell
@@ -32,7 +32,7 @@ def cell_intro(mo):
     - `Shape`: pure structural form
     - `Pattern`: canonical shape with internal slots
     - `Morph`: pattern plus external bindings
-    - `Match`: a common pattern plus left/right projections
+    - `Match`: compiled bidirectional templates between two patterns
     """)
     return
 
@@ -54,7 +54,9 @@ def cell_shape_model(Builtin, Val):
 
 @app.cell
 def cell_sample_section(mo):
-    mo.md("## 1 — Sample value")
+    mo.md("""
+    ## 1 — Sample value
+    """)
     return
 
 
@@ -76,12 +78,14 @@ def cell_sample(Builtin, cast, val, var):
     _sample_y = var("Y", int)
     sample = val(Edge(Point(cast(int, _sample_x), 2), Weight(1), cast(int, _sample_y)))
     print(sample)
-    return Edge, Point, Weight, sample
+    return (sample,)
 
 
 @app.cell
 def cell_shape_section(mo):
-    mo.md("## 2 — Shape, Pattern, Morph")
+    mo.md("""
+    ## 2 — Shape, Pattern, Morph
+    """)
     return
 
 
@@ -100,12 +104,21 @@ def cell_shape_views(Morph, Pattern, Shape, sample):
 
 @app.cell
 def cell_relation_section(mo):
-    mo.md("## 3 — Structural relation and meet")
+    mo.md("""
+    ## 3 — Structural relation and meet
+    """)
     return
 
 
 @app.cell
-def cell_relation_examples(Shape, ShapeBranchA, ShapeBranchB, ShapeNode, pm, val):
+def cell_relation_examples(
+    Shape,
+    ShapeBranchA,
+    ShapeBranchB,
+    ShapeNode,
+    pm,
+    val,
+):
     general_shape = Shape.from_val(val(ShapeNode(val(1), val(2))))
     left_specific_shape = Shape.from_val(val(ShapeNode(val(ShapeBranchA(1)), val(2))))
     right_specific_shape = Shape.from_val(val(ShapeNode(val(1), val(ShapeBranchB(2)))))
@@ -113,7 +126,7 @@ def cell_relation_examples(Shape, ShapeBranchA, ShapeBranchB, ShapeNode, pm, val
     print("relation(left, general):", pm.canonical.relation(left_specific_shape, general_shape))
     print("compatible            :", pm.canonical.compatible(left_specific_shape, right_specific_shape))
     print("meet                  :", pm.canonical.meet(left_specific_shape, right_specific_shape))
-    return general_shape, left_specific_shape, right_specific_shape
+    return
 
 
 @app.cell
@@ -121,7 +134,7 @@ def cell_match_intro(mo):
     mo.md(r"""
     ## 4 — Match Playground
 
-    These cells are an executable playground for `pm.canonical.match(...)`.
+    These cells are an executable playground for `pm.logic.match(...)`.
     Each scenario prints the full `Match` and uses assertions as regression checks.
     """)
     return
@@ -150,14 +163,16 @@ def cell_match_model(Builtin, Val):
 
 @app.cell
 def cell_match_helper(mo):
-    mo.md("### 4.1 — Helper")
+    mo.md("""
+    ### 4.1 — Helper
+    """)
     return
 
 
 @app.cell
 def cell_show_match(pm):
-    def show_match(label: str, left: pm.Morph, right: pm.Morph) -> pm.Match | None:
-        matched = pm.canonical.match(left, right)
+    def show_match(label: str, left: pm.Morph, right: pm.Morph) -> pm.logic.Match | None:
+        matched = pm.logic.match(left, right)
 
         print(label)
         print("left input  :", left)
@@ -166,12 +181,10 @@ def cell_show_match(pm):
         if matched is None:
             return None
 
-        print("common      :", matched.common.pattern)
-        print("left map    :", matched.left.content)
-        print("right map   :", matched.right.content)
-        print("common unnest:")
-        for nest, branch in pm.canonical.unnest(matched.common).items():
-            print(" ", nest, "->", branch)
+        print("fw   :", matched.fw_template)
+        print("bw   :", matched.bw_template)
+        print("L    :", matched.left.pattern)
+        print("R    :", matched.right.pattern)
 
         return matched
 
@@ -180,7 +193,9 @@ def cell_show_match(pm):
 
 @app.cell
 def cell_match_basic_section(mo):
-    mo.md("### 4.2 — Basic variable vs concrete")
+    mo.md("""
+    ### 4.2 — Basic variable vs concrete
+    """)
     return
 
 
@@ -192,29 +207,42 @@ def cell_match_basic(Morph, ShapeBranchA, ShapeNode, pm, show_match, val, var):
     basic_match = show_match("basic variable vs concrete", basic_variable, basic_concrete)
 
     assert basic_match is not None
-    assert repr(basic_match.common.pattern) == "ShapeNode(left=ShapeBranchA(value=#0), right=#1)"
-    return basic_concrete, basic_match, basic_variable
-
-
-@app.cell
-def cell_match_projection_section(mo):
-    mo.md("### 4.3 — Projection case")
+    assert repr(basic_match.fw_template) == "ShapeNode(left=ShapeBranchA(value=1), right=2)"
     return
 
 
 @app.cell
-def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, pm, show_match, val, var):
+def cell_match_projection_section(mo):
+    mo.md("""
+    ### 4.3 — Projection case
+    """)
+    return
+
+
+@app.cell
+def cell_match_projection(
+    MatchA,
+    MatchB,
+    MatchQ,
+    Morph,
+    Pattern,
+    pm,
+    show_match,
+    val,
+    var,
+):
     _any_type = pm.Spec.of("std.types.Any")
     _proj_x = var("X", _any_type)
     _proj_y = var("Y", _any_type)
+    _proj_z = var("Z", _any_type)
     _proj_u = var("U", _any_type)
     _proj_v = var("V", _any_type)
 
     left_projection_pattern = Pattern.from_val(
-        val(MatchQ(val(MatchA(val(1), val(2))), val(3)))
+        val(MatchQ(val(MatchA(pm.Wildcard, pm.Wildcard)), pm.Wildcard))
     )
     right_projection_pattern = Pattern.from_val(
-        val(MatchQ(val(1), val(MatchB(val(2), val(3)))))
+        val(MatchQ(pm.Wildcard, val(MatchB(pm.Wildcard, pm.Wildcard))))
     )
 
     left_projection_morph = Morph(
@@ -222,7 +250,7 @@ def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, pm, show_match
         content=(
             val(_proj_x),
             val(_proj_y),
-            val(MatchB(val(_proj_u), val(_proj_v))),
+            val(_proj_z),
         ),
     )
     right_projection_morph = Morph(
@@ -241,23 +269,17 @@ def cell_match_projection(MatchA, MatchB, MatchQ, Morph, Pattern, pm, show_match
     )
 
     assert projection_match is not None
-    assert repr(projection_match.common.pattern) == (
-        "MatchQ(left=MatchA(left=#0, right=#1), right=MatchB(left=#2, right=#3))"
+    assert repr(projection_match.fw_template) == (
+        "<MatchQ(left=#0, right=MatchB(left=#1, right=#2)); #0=MatchA(left=#0, right=#1), #1={ #2 -> MatchB(left=_, right=_) }[#0], #2={ #2 -> MatchB(left=_, right=_) }[#1]>"
     )
-    assert [
-        repr(projection_match.left.binding_at(slot))
-        for slot in left_projection_pattern.slots
-    ] == ["#0", "#1", "@2"]
-    assert [
-        repr(projection_match.right.binding_at(slot))
-        for slot in right_projection_pattern.slots
-    ] == ["@1", "#2", "#3"]
     return left_projection_morph, projection_match, right_projection_morph
 
 
 @app.cell
 def cell_match_conflict_section(mo):
-    mo.md("### 4.4 — Incompatibility")
+    mo.md("""
+    ### 4.4 — Incompatibility
+    """)
     return
 
 
@@ -275,17 +297,64 @@ def cell_match_conflict(MatchPair, Morph, pm, show_match, val, var):
     )
 
     assert conflict_match is None
-    return conflict_match, conflicting_right_morph, repeated_left_morph
-
-
-@app.cell
-def cell_unnest_section(mo):
-    mo.md("## 5 — Unnesting")
     return
 
 
 @app.cell
-def cell_unnest(sample_pattern, sample_shape, pm):
+def cell_match_transform_section(mo):
+    mo.md("""
+    ### 4.5 — Match transform
+    """)
+    return
+
+
+@app.cell
+def cell_match_transform(
+    left_projection_morph,
+    pm,
+    projection_match,
+    right_projection_morph,
+):
+    fw = projection_match.forward(left_projection_morph)
+    bw = projection_match.backward(right_projection_morph)
+
+    print("forward raw       :", fw)
+    print("forward normalized:", pm.canonical.normalize(fw))
+    print("backward raw      :", bw)
+    print("backward normalized:", pm.canonical.normalize(bw))
+    return
+
+
+@app.cell
+def cell_projection_section(mo):
+    mo.md("""
+    ### 4.6 — Direct projection over a Morph
+    """)
+    return
+
+
+@app.cell
+def cell_projection(sample_morph):
+    slot_projection = sample_morph.project(sample_morph.slots[0])
+    nest_projection = sample_morph.project(sample_morph.nests[1])
+
+    print("slot projection:", slot_projection)
+    print("nest projection:", nest_projection)
+    print("slot op:", slot_projection.fetch())
+    print("nest op:", nest_projection.fetch())
+    return
+
+
+@app.cell
+def cell_unnest_section(mo):
+    mo.md("""
+    ## 5 — Unnesting
+    """)
+    return
+
+
+@app.cell
+def cell_unnest(pm, sample_pattern, sample_shape):
     print("pattern unnest:")
     for branch, expr in pm.canonical.unnest(sample_pattern).items():
         print(" ", branch, "->", expr)
