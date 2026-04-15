@@ -1,4 +1,7 @@
+from protobase import frozendict
+
 from .base import *
+from .map_ import *
 from .set_ import *
 from .tuple_ import *
 from .result import *
@@ -13,7 +16,7 @@ def make_value(tp, dt):
     if isinstance(tp, (pm.Placeholder, pm.UnionType)):
         return LeafCarrier(tp, dt)
     if isinstance(tp, pm.Qual):
-        qualifier = tp.last_qualifier
+        qualifier = tp.qualifier
         if qualifier is not None and qualifier.anchor == pm.Anchor("std.qualifiers.Result"):
             if not isinstance(dt, (Ok, Err)):
                 raise TypeError("Result-qualified types require explicit Ok(...) or Err(...)")
@@ -26,13 +29,19 @@ def make_value(tp, dt):
             if not isinstance(dt, frozenset):
                 raise TypeError("Set-qualified values require set(...) or frozenset(...)")
             return Set(tp, dt)
-        return make_value(tp.underlying, dt)
+        if qualifier is not None and qualifier.anchor == pm.Anchor("std.qualifiers.Map"):
+            if isinstance(dt, dict):
+                dt = frozendict(dt)
+            if not isinstance(dt, frozendict):
+                raise TypeError("Map-qualified values require dict(...) or frozendict(...)")
+            return Map(tp, dt)
+        return make_value(tp.qualified, dt)
     if isinstance(tp, pm.UniformType):
         return Index(tp, dt) if tp.unique else Tuple(tp, dt)
     if isinstance(tp, (pm.IndexedType, pm.VaryingType)):
         return Tuple(tp, dt)
     if isinstance(tp, pm.Spec):
-        if pm.REALM.get().schema_for(tp) is None:
+        if tp.schema is None:
             return LeafCarrier(tp, dt)
         return NativeObjectCarrier(tp, dt)
     raise NotImplementedError(f"No carrier factory for type {type(tp).__name__}")

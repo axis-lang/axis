@@ -6,7 +6,7 @@ from typing import Any, Self, cast
 from weakref import WeakKeyDictionary
 
 from protobase import flux, frozendict, cached_property
-
+import protomorph as pm
 from .domain import Anchor, Builtin
 
 
@@ -15,9 +15,13 @@ class Realm(Builtin, abstract=True):
         _ = (carrier, to)
         raise NotImplementedError(f"{type(self).__name__}.eval() is not implemented")
 
-    def schema_for(self, spec: Any) -> Any | None:
+    @flux.method
+    def schema_for(self, spec: pm.Spec) -> pm.Schema | None:
         _ = spec
         return None
+
+    def compatible_structure(self, left: Any, right: Any) -> bool:
+        return left == right
 
     def eval_logic_op(
         self,
@@ -61,7 +65,7 @@ class Realm(Builtin, abstract=True):
         import protomorph
 
         tokens = _REALM_TOKENS.setdefault(self, [])
-        tokens.append(protomorph.REALM.set(self))
+        tokens.append(cast(Token[Any], protomorph.REALM.set(self)))
         return self
 
     def __exit__(
@@ -107,17 +111,22 @@ class OverlayRealm(Realm):
 
     @flux.property
     def anchors(self) -> frozenset[Anchor]:
-        return frozenset((*self.base.anchors, *self.rule_index.keys(), *self.fact_index.keys()))
+        return frozenset(
+            (*self.base.anchors, *self.rule_index.keys(), *self.fact_index.keys())
+        )
 
     @flux.property
     def logic_assertions(self):
         return self.base.logic_assertions | frozenset(
-            _logic_assertion(item)
-            for item in (*self.facts, *self.rules)
+            _logic_assertion(item) for item in (*self.facts, *self.rules)
         )
 
-    def schema_for(self, spec: Any) -> Any | None:
+    @flux.method
+    def schema_for(self, spec: Any) -> Any | None:  # pyright: ignore[reportIncompatibleVariableOverride]
         return self.base.schema_for(spec)
+
+    def compatible_structure(self, left: Any, right: Any) -> bool:
+        return self.base.compatible_structure(left, right)
 
     def val_is_leaf(self, meta: Any, data: Any) -> bool:
         return self.base.val_is_leaf(meta, data)
@@ -183,7 +192,9 @@ def _logic_assertion(item: Builtin):
         return logic.Assertion(item)
     value = cast(Any, item)
     if hasattr(value, "head") and hasattr(value, "body"):
-        raise TypeError("Realm.logic_assertions no longer adapts legacy Rule-like objects; provide pm.logic.Assertion values explicitly")
+        raise TypeError(
+            "Realm.logic_assertions no longer adapts legacy Rule-like objects; provide pm.logic.Assertion values explicitly"
+        )
     return logic.Assertion(item if isinstance(item, pm.Val) else pm.val(item))
 
 

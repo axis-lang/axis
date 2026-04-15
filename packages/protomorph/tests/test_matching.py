@@ -120,7 +120,7 @@ class TestSummaryCompile(unittest.TestCase):
     def test_compile_wraps_tree(self):
         summary = pm.match.CaseSummary(
             pattern=val(1),
-            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=0, max_positional_count=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})
         self.assertIsInstance(tree.fetch(), pm.match.Tree)
@@ -128,11 +128,11 @@ class TestSummaryCompile(unittest.TestCase):
     def test_shape_groups_compile_to_matchmany(self):
         no_args = pm.match.CaseSummary(
             pattern=val(1),
-            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=0, max_positional_count=0, allowed_keys=frozenset()),
         )
         one_arg = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=1, max_positional_count=1, allowed_keys=frozenset()),
         )
 
         tree = pm.match.compile({no_args: "zero", one_arg: "one"})
@@ -143,7 +143,7 @@ class TestSummaryCompile(unittest.TestCase):
     def test_same_shape_is_guarded(self):
         summary = pm.match.CaseSummary(
             pattern=val(1),
-            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=0, max_positional_count=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})
         tree_val = cast(pm.match.Tree, tree.fetch())
@@ -152,12 +152,12 @@ class TestSummaryCompile(unittest.TestCase):
     def test_prefix_descriptor_switch_selected_first(self):
         int_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=1, max_positional_count=1, allowed_keys=frozenset()),
             prefix_descriptors=(INT,),
         )
         str_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=1, max_positional_count=1, allowed_keys=frozenset()),
             prefix_descriptors=(STR,),
         )
 
@@ -169,12 +169,22 @@ class TestSummaryCompile(unittest.TestCase):
         text_key = pm.Id("text")
         int_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
+            shape=pm.match.ShapeSummary(
+                min_positional_count=0,
+                max_positional_count=0,
+                required_keys=frozenset({text_key}),
+                allowed_keys=frozenset({text_key}),
+            ),
             required_nominal_descriptors=frozendict({text_key: INT}),
         )
         str_summary = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, 1),
-            shape=pm.match.ShapeSummary(min_arity=0, max_arity=0, required_keys=frozenset({text_key}), allowed_keys=frozenset({text_key})),
+            shape=pm.match.ShapeSummary(
+                min_positional_count=0,
+                max_positional_count=0,
+                required_keys=frozenset({text_key}),
+                allowed_keys=frozenset({text_key}),
+            ),
             required_nominal_descriptors=frozendict({text_key: STR}),
         )
 
@@ -185,12 +195,12 @@ class TestSummaryCompile(unittest.TestCase):
     def test_ambiguity_residual_leaf(self):
         a = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, var("T")),
-            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=1, max_positional_count=1, allowed_keys=frozenset()),
             prefix_descriptors=(None,),
         )
         b = pm.match.CaseSummary(
             pattern=LeafCarrier(ANY, var("U")),
-            shape=pm.match.ShapeSummary(min_arity=1, max_arity=1, allowed_keys=frozenset()),
+            shape=pm.match.ShapeSummary(min_positional_count=1, max_positional_count=1, allowed_keys=frozenset()),
             prefix_descriptors=(None,),
         )
         tree = pm.match.compile({a: "left", b: "right"})

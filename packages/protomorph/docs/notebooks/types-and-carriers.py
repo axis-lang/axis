@@ -65,10 +65,10 @@ def __(Id, IndexedType, UniformType, UnionType, VaryingType, int_t, str_t):
     union_type = UnionType.of(int_t, str_t)
     point_type = IndexedType.of(x=int_t, y=int_t)
 
-    print("pair arity :", pair_type.arity)
-    print("list arity :", int_list.arity, " (None = unbounded)")
+    print("pair slots :", len(pair_type))
+    print("list slots :", len(int_list))
     print("union      :", union_type.variants)
-    print("point.x    :", point_type.item(Id("x")))
+    print("point.x    :", point_type.schema.attr(Id("x")))
     return int_list, pair_type, point_type, union_type
 
 

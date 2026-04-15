@@ -22,13 +22,15 @@ class TestAtomicSpecs(unittest.TestCase):
 
 
 class TestUniformType(unittest.TestCase):
-    def test_arity_none(self):
-        self.assertIsNone(UniformType(INT).arity)
+    def test_leaf_element_schema_is_none(self):
+        self.assertIsNone(UniformType(INT).schema)
 
-    def test_item_at(self):
-        item = UniformType(STR).item_at(5)
-        self.assertEqual(item.offset, 5)
-        self.assertIs(item.value, STR)
+    def test_schema_projects_structured_element(self):
+        schema = UniformType(cast(VaryingType, VaryingType.of(INT, STR))).schema
+
+        assert schema is not None
+        self.assertEqual(schema[0].fetch(), UniformType(INT))
+        self.assertEqual(schema[1].fetch(), UniformType(STR))
 
     def test_make(self):
         carrier = UniformType(INT).make((1, 2))
@@ -51,7 +53,7 @@ class TestVaryingType(unittest.TestCase):
 
     def test_indexed(self):
         vt = cast(IndexedType, IndexedType.of(x=INT, y=STR))
-        self.assertIs(vt.item(Id("x")).value, INT)
+        self.assertIs(vt.schema.attr(Id("x")).fetch(), INT)
 
     def test_carrier(self):
         vt = cast(VaryingType, VaryingType.of(INT))

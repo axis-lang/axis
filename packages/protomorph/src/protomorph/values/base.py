@@ -23,7 +23,7 @@ class Val[T](Consed, abstract=True):
         if isinstance(dt, Val):
             return dt
         if isinstance(dt, pm.Var | pm.Mark):
-            if isinstance(tp, pm.Spec) and pm.REALM.get().schema_for(tp) is not None:
+            if isinstance(tp, pm.Spec) and tp.schema is not None:
                 return pm.make_value(tp, dt)
             return LeafCarrier(tp, dt)
         if isinstance(dt, pm.Type):
@@ -48,9 +48,8 @@ class Val[T](Consed, abstract=True):
     def __getitem__(self, offset: int) -> Val:
         raise NotImplementedError(f"__getitem__ not implemented for {type(self).__name__}")
 
-    @property
-    def is_leaf(self) -> bool:
-        return self.descriptor.arity == 0
+    def payload_item_at(self, offset: int) -> pm.Item:
+        raise NotImplementedError(f"payload_item_at() not implemented for {type(self).__name__}")
 
     @property
     def is_var(self) -> bool:
@@ -58,41 +57,49 @@ class Val[T](Consed, abstract=True):
 
     @property
     def is_wildcard(self) -> bool:
-        return self.is_leaf and self.content is pm.WILDCARD
+        return not self._has_structural_children() and self.content is pm.WILDCARD
 
     def __len__(self) -> int:
-        arity = self.descriptor.arity
-        if arity is not None:
-            return arity
-        raise NotImplementedError(f"__len__ for unbounded type: override in {type(self).__name__}")
+        return len(self._structural_children())
 
     def __iter__(self) -> _Iterator[Val]:
-        for offset in range(len(self)):
-            yield self[offset]
+        yield from self._structural_children()
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         raise NotImplementedError(f"reconstruct() not implemented for {type(self).__name__}")
+
+    def _structural_children(self) -> tuple[Val, ...]:
+        return tuple(self[i] for i in range(self._structural_child_count()))
+
+    def _structural_child_count(self) -> int:
+        raise NotImplementedError(f"_structural_child_count() not implemented for {type(self).__name__}")
+
+    def _has_structural_children(self) -> bool:
+        try:
+            return self._structural_child_count() > 0
+        except (NotImplementedError, TypeError):
+            return False
 
     def iter(self) -> _Iterator[Val]:
         stack: list[Val] = [self]
         while stack:
             node = stack.pop()
             yield node
-            if not node.is_leaf:
-                stack.extend(reversed(list(node)))
+            if node._has_structural_children():
+                stack.extend(reversed(node._structural_children()))
 
     def iter_leafs(self) -> _Iterator[Val]:
-        return (node for node in self.iter() if node.is_leaf)
+        return (node for node in self.iter() if not node._has_structural_children())
 
     def iter_branches(self) -> _Iterator[Val]:
-        return (node for node in self.iter() if not node.is_leaf)
+        return (node for node in self.iter() if node._has_structural_children())
 
     def deep_map(
         self,
         f: _Callable[[Val], Val],
         is_leaf: _Callable[[Val], bool] | None = None,
     ) -> Val:
-        is_leaf_fn = is_leaf or (lambda carrier: carrier.is_leaf)
+        is_leaf_fn = is_leaf or (lambda carrier: not carrier._has_structural_children())
         stack: list[_Any] = [self]
         results: list[Val] = []
         while stack:
@@ -106,7 +113,7 @@ class Val[T](Consed, abstract=True):
             if is_leaf_fn(item):
                 results.append(f(item))
                 continue
-            children = list(item)
+            children = list(item._structural_children())
             stack.append((item, len(children)))
             stack.append(_RECONSTRUCT)
             stack.extend(reversed(children))
@@ -115,7 +122,10 @@ class Val[T](Consed, abstract=True):
     def subst(self, mapping: _Mapping[Val, Val]) -> Val:
         if not mapping:
             return self
-        return self.deep_map(lambda carrier: mapping.get(carrier, carrier), is_leaf=lambda carrier: carrier in mapping or carrier.is_leaf)
+        return self.deep_map(
+            lambda carrier: mapping.get(carrier, carrier),
+            is_leaf=lambda carrier: carrier in mapping or not carrier._has_structural_children(),
+        )
 
     def subst_where(
         self,
@@ -152,8 +162,8 @@ class Val[T](Consed, abstract=True):
             node = stack.pop()
             if node == target:
                 return True
-            if not node.is_leaf:
-                stack.extend(list(node))
+            if node._has_structural_children():
+                stack.extend(node._structural_children())
         return False
 
     @slot_cached_property
@@ -166,24 +176,41 @@ class Val[T](Consed, abstract=True):
             value = node.fetch()
             if isinstance(value, Node | pm.Placeholder | pm.Var):
                 return True
-            if not node.is_leaf:
-                stack.extend(list(node))
+            if node._has_structural_children():
+                stack.extend(node._structural_children())
         return False
 
 
 class NativeObjectCarrier[T](Val[T]):
+    def _schema(self) -> pm.Schema:
+        structure = self.descriptor.schema
+        if structure is None:
+            raise TypeError(f"{type(self).__name__} requires a structured descriptor")
+        return structure
+
+    def _structural_child_count(self) -> int:
+        return len(self._schema())
+
+    def payload_item_at(self, offset: int) -> pm.Item:
+        schema = self._schema()
+        child = schema[offset]
+        key = None
+        if isinstance(schema.descriptor, pm.IndexedType):
+            key = schema.descriptor.index.key_at(offset)
+        return pm.Item(offset, key, child.fetch())
+
     def attr(self, id: pm.Id) -> Val:
-        field = self.descriptor.item(id)
-        return self.child(field.value, getattr(self.content, id))
+        schema = self._schema()
+        return self.child(_schema_attr(schema, id).fetch(), getattr(self.content, id))
 
     def __getitem__(self, offset: int) -> Val:
-        field = self.descriptor.item_at(offset)
-        assert field.key is not None
-        return self.child(field.value, getattr(self.content, field.key))
+        item = self.payload_item_at(offset)
+        assert item.key is not None
+        return self.child(item.value, getattr(self.content, item.key))
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         values: dict[str, _Any] = {}
-        for item, child in zip(self.descriptor.items(), children):
+        for item, child in zip(_schema_items(self._schema()), children):
             assert item.key is not None
             original = getattr(self.content, item.key)
             values[str(item.key)] = child if isinstance(original, Val) else child.fetch()
@@ -191,13 +218,31 @@ class NativeObjectCarrier[T](Val[T]):
 
 
 class LeafCarrier[T](Val[T]):
-    @property
-    def is_leaf(self) -> bool:
-        return True
+    def _structural_child_count(self) -> int:
+        return 0
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         assert not children
         return self
+
+
+def _schema_items(schema: pm.Schema) -> tuple[pm.Item, ...]:
+    keys: tuple[pm.Id | None, ...]
+    if isinstance(schema.descriptor, pm.IndexedType):
+        keys = tuple(schema.descriptor.index.content)
+    else:
+        keys = (None,) * len(schema.content)
+    return tuple(
+        pm.Item(offset, key, child.fetch())
+        for offset, (key, child) in enumerate(zip(keys, schema, strict=True))
+    )
+
+
+def _schema_attr(schema: pm.Schema, id: pm.Id) -> pm.Val[pm.Type]:
+    if not isinstance(schema.descriptor, pm.IndexedType):
+        raise KeyError(id)
+    offset = schema.descriptor.index.offset_of(id)
+    return _cast(pm.Val[pm.Type], schema[offset])
 
 
 class UnwrapError(Exception):

@@ -53,23 +53,33 @@ class TestNativeHostSchemaFor(unittest.TestCase):
         self.assertIsNone(self.host.schema_for(Spec.of("unknown.Thing")))
 
     def test_simple_class_schema(self):
-        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Point))))
-        self.assertEqual(schema.item_at(0).value, INT)
-        self.assertEqual(schema.item_at(1).value, INT)
+        schema = self.host.schema_for(Spec.of(spec_name(Point)))
+
+        assert schema is not None
+        self.assertIsInstance(schema.descriptor, IndexedType)
+        self.assertEqual(schema.payload_item_at(0).value, INT)
+        self.assertEqual(schema.payload_item_at(1).value, INT)
 
     def test_generic_unspecialized(self):
-        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container))))
-        self.assertIsInstance(schema.item_at(0).value, Placeholder)
-        self.assertIsInstance(schema.item_at(0).value, NativeVar)
+        schema = self.host.schema_for(Spec.of(spec_name(Container)))
+
+        assert schema is not None
+        field_type = schema[0].fetch()
+        self.assertIsInstance(field_type, Placeholder)
+        self.assertIsInstance(field_type, NativeVar)
 
     def test_generic_specialized(self):
-        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Container), INT)))
-        self.assertIs(schema.item_at(0).value, INT)
+        schema = self.host.schema_for(Spec.of(spec_name(Container), INT))
+
+        assert schema is not None
+        self.assertIs(schema.attr(Id("value")).fetch(), INT)
 
     def test_pair_specialized(self):
-        schema = cast(IndexedType, self.host.schema_for(Spec.of(spec_name(Pair), INT, STR)))
-        self.assertIs(schema.item_at(0).value, INT)
-        self.assertIs(schema.item_at(1).value, STR)
+        schema = self.host.schema_for(Spec.of(spec_name(Pair), INT, STR))
+
+        assert schema is not None
+        self.assertIs(schema.attr(Id("first")).fetch(), INT)
+        self.assertIs(schema.attr(Id("second")).fetch(), STR)
 
 
 class TestDelegation(unittest.TestCase):
@@ -81,16 +91,23 @@ class TestDelegation(unittest.TestCase):
     def tearDownClass(cls):
         REALM.reset(cls.token)
 
-    def test_spec_item_access_delegates_to_host(self):
+    def test_spec_schema_delegates_to_host(self):
         spec = Spec.of(spec_name(Point))
-        self.assertEqual(spec.item_at(0).key, "x")
-        self.assertEqual(spec.item(Id("y")).value, INT)
 
-    def test_qual_item_access_is_opaque_without_derived_schema(self):
+        schema = spec.schema
+        assert schema is not None
+        self.assertEqual(schema.attr(Id("y")).fetch(), INT)
+
+    def test_qual_schema_projects_one_level(self):
         spec = Spec.of(spec_name(Point))
         qual = Qual.of(spec, Spec.of("std.qualifiers.List"))
-        with self.assertRaises(IndexError):
-            qual.item_at(0)
+
+        schema = qual.schema
+        assert schema is not None
+        self.assertEqual(
+            schema.attr(Id("y")).fetch(),
+            Qual.of(INT, Spec.of("std.qualifiers.List")),
+        )
 
 
 class TestRealmContext(unittest.TestCase):

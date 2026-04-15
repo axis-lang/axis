@@ -53,9 +53,9 @@ class IRWild:
 
 @dataclass(frozen=True)
 class IRCtor:
-    """Verifica tag y aridad del Term actual."""
+    """Verifica tag y cantidad de hijos del Term actual."""
     tag: str
-    arity: int
+    child_count: int
 
 @dataclass(frozen=True)
 class IREnter:
@@ -131,12 +131,14 @@ def compile_pattern(pat) -> tuple:
         return (IRWild(),)
 
     # Literal atómico
-    if isinstance(pat, (str, int, float)) and not pat.startswith('?'):
+    if isinstance(pat, str) and not pat.startswith('?'):
+        return (IRLit(pat),)
+    if isinstance(pat, (int, float)):
         return (IRLit(pat),)
 
     # Término estructural
     if isinstance(pat, Term):
-        instrs = [IRCtor(pat.tag, len(pat.children))]
+        instrs: list[IRNode] = [IRCtor(pat.tag, len(pat.children))]
         for i, child in enumerate(pat.children):
             instrs.append(IREnter(i))
             instrs.extend(compile_pattern(child))
@@ -230,9 +232,9 @@ def run_ir(instrs: tuple, subject, env: Env) -> Env:
                 raise MatchFailure(f"Esperaba Term, encontré {type(node).__name__}")
             if node.tag != instr.tag:
                 raise MatchFailure(f"Tag: esperaba '{instr.tag}', encontré '{node.tag}'")
-            if len(node.children) != instr.arity:
+            if len(node.children) != instr.child_count:
                 raise MatchFailure(
-                    f"Aridad de {instr.tag}: esperaba {instr.arity}, "
+                    f"Cantidad de hijos de {instr.tag}: esperaba {instr.child_count}, "
                     f"encontré {len(node.children)}"
                 )
 

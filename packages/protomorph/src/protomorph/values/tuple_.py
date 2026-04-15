@@ -18,24 +18,29 @@ class Tuple[*T](Val[tuple[*T]]):
 
     descriptor: pm.Type[tuple[*T]]
 
-    def items(self):
-        for offset in range(len(self)):
-            yield self.descriptor.item_at(offset)
-
     def __getitem__(self, offset: int) -> Val:
-        field = self.descriptor.item_at(offset)
-        return self.child(field.value, self.content[offset])
+        return self.child(_slot_descriptor_at(self.descriptor, offset), self.content[offset])
+
+    def _structural_child_count(self) -> int:
+        if isinstance(self.descriptor, pm.UniformType):
+            return len(self.content)
+        return len(self.content)
+
+    def payload_item_at(self, offset: int) -> pm.Item:
+        return pm.Item(
+            offset,
+            _slot_key_at(self.descriptor, offset),
+            _slot_descriptor_at(self.descriptor, offset),
+        )
 
     def attr(self, id: Id) -> Val:
-        field = self.descriptor.item(id)
-        return self.child(field.value, self.content[field.offset])
+        if not isinstance(self.descriptor, pm.IndexedType):
+            raise KeyError(id)
+        offset = self.descriptor.index.offset_of(id)
+        return self.child(_slot_descriptor_at(self.descriptor, offset), self.content[offset])
 
     def __contains__(self, value: _Any) -> bool:
         return value in self.content
-
-    def __len__(self) -> int:
-        arity = self.descriptor.arity
-        return arity if arity is not None else len(self.content)
 
     @property
     def head(self) -> Val:
@@ -71,6 +76,36 @@ class Tuple[*T](Val[tuple[*T]]):
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         return _cast(Self, self._new(self.descriptor, tuple(child.fetch() for child in children)))
+
+    def map(self, f) -> Tuple:
+        mapped = tuple(f(child) for child in self)
+        if not all(isinstance(child, Val) for child in mapped):
+            raise TypeError("Tuple.map() callback must return Carrier values")
+        carriers = _cast(tuple[Val, ...], mapped)
+        if isinstance(self.descriptor, pm.UniformType):
+            if not carriers:
+                descriptor = _cast(pm.Type[tuple], pm.VaryingType.Empty)
+            else:
+                first = carriers[0].descriptor
+                if all(child.descriptor == first for child in carriers):
+                    descriptor = _cast(
+                        pm.Type[tuple[*T]],
+                        pm.UniformType(first, unique=self.descriptor.unique and len(carriers) == len({child.fetch() for child in carriers})),
+                    )
+                else:
+                    descriptor = _cast(pm.Type[tuple[*T]], pm.VaryingType(tuple(child.descriptor for child in carriers)))
+            return _cast(Tuple, self._new(descriptor, tuple(child.fetch() for child in carriers)))
+        if isinstance(self.descriptor, pm.IndexedType):
+            descriptor = _cast(
+                pm.Type[tuple[*T]],
+                pm.IndexedType(
+                    pm.VaryingType(tuple(child.descriptor for child in carriers)),
+                    self.descriptor.index,
+                ),
+            )
+            return _cast(Tuple, self._new(descriptor, tuple(child.fetch() for child in carriers)))
+        descriptor = _cast(pm.Type[tuple[*T]], pm.VaryingType(tuple(child.descriptor for child in carriers)))
+        return _cast(Tuple, self._new(descriptor, tuple(child.fetch() for child in carriers)))
 
     @classmethod
     def new(cls, *vals: Val, **kwvals: Val) -> Tuple:
@@ -130,9 +165,15 @@ class Tuple[*T](Val[tuple[*T]]):
 
     def __invariants__(self):
         assert isinstance(self.content, tuple)
-        arity = self.descriptor.arity
-        if arity is not None:
-            assert len(self.content) == arity, "Tuple content must match descriptor arity"
+        if isinstance(self.descriptor, pm.UniformType):
+            return
+        if isinstance(self.descriptor, pm.IndexedType):
+            expected = len(self.descriptor.index)
+        elif isinstance(self.descriptor, pm.VaryingType):
+            expected = len(self.descriptor.values)
+        else:
+            expected = len(self.descriptor)
+        assert len(self.content) == expected, "Tuple content must match descriptor length"
 
 
 def _id_type() -> pm.Type:
@@ -151,12 +192,8 @@ class Index[K : Id](Tuple[*tuple[K | None, ...]]):
     #content: tuple[K | None, ...]
 
     @property
-    def arity(self) -> int:
-        return len(self.content)
-
-    @property
     def is_sparse(self) -> bool:
-        return self.arity > 0 and any(key is None for key in self.content)
+        return len(self.content) > 0 and any(key is None for key in self.content)
 
     @property
     def keys(self) -> tuple[K | None, ...]:
@@ -190,16 +227,6 @@ class Index[K : Id](Tuple[*tuple[K | None, ...]]):
         return _cast(Index[K], cls(pm.UniformType(element_type, unique=True), keys))
     
     @classmethod
-    def new(cls, *keys: Val[K]):
-        """Build an Index, accepting Val keys."""
-        return cls.of(*(_cast(K, key.content) for key in keys))
-
-    # @classmethod
-    # def new(cls, *keys: K | None, **kwargs) -> Index[K]:
-    #     """Build an Index, accepting bare strings as shorthand for ``Id``."""
-    #     return cls.of(*(Id(k) if isinstance(k, str) else k for k in keys))
-
-    @classmethod
     def concat(cls, *indices: Index[K]) -> Index[K]:
         values: list[K | None] = []
         for index in indices:
@@ -222,3 +249,20 @@ def _tail_inner(inner: pm.Type) -> pm.Type:
     return inner
 
 
+def _slot_descriptor_at(descriptor: pm.Type, offset: int) -> pm.Type:
+    if isinstance(descriptor, pm.UniformType):
+        return descriptor.element_type
+    if isinstance(descriptor, pm.IndexedType):
+        return _slot_descriptor_at(descriptor.inner, offset)
+    if isinstance(descriptor, pm.VaryingType):
+        return _cast(pm.Type, descriptor.values[offset])
+    schema = descriptor.schema
+    if schema is None:
+        raise TypeError(f"{type(descriptor).__name__} has no payload slot descriptors")
+    return _cast(pm.Type, schema[offset].fetch())
+
+
+def _slot_key_at(descriptor: pm.Type, offset: int) -> Id | None:
+    if isinstance(descriptor, pm.IndexedType):
+        return descriptor.index.key_at(offset)
+    return None

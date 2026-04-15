@@ -140,7 +140,7 @@ def _repr_proj(proj) -> str:
 
 
 def _is_simple_morph_binding(binding) -> bool:
-    return binding.is_leaf and not isinstance(binding.fetch(), Op)
+    return not binding._has_structural_children() and not isinstance(binding.fetch(), Op)
 
 
 def _trim_anchor(anchor: str) -> str:
@@ -178,8 +178,10 @@ def _repr_varying(vt) -> str:
 
 def _repr_indexed(it) -> str:
     parts = []
-    for offset in range(it.arity):
-        item = it.item_at(offset)
+    schema = it.schema
+    assert schema is not None
+    for offset in range(len(schema)):
+        item = schema.payload_item_at(offset)
         formatted = _format(item.value)
         if item.key is not None:
             parts.append(f"{item.key}: {formatted}")
@@ -212,7 +214,7 @@ def _repr_tuple_carrier(carrier) -> str:
         child = carrier[i]
         formatted = repr_any(child)
         try:
-            item = carrier.descriptor.item_at(i)
+            item = carrier.payload_item_at(i)
             if item.key is not None:
                 formatted = f"{item.key}={formatted}"
         except (IndexError, TypeError):
@@ -224,9 +226,12 @@ def _repr_tuple_carrier(carrier) -> str:
 def _repr_native_carrier(carrier) -> str:
     cls_name = type(carrier.content).__name__
     parts = []
+    structure = carrier.descriptor.schema
+    if structure is None:
+        return f"{cls_name}()"
     for i in range(len(carrier)):
         child = carrier[i]
-        item = carrier.descriptor.item_at(i)
+        item = structure.payload_item_at(i)
         parts.append(f"{item.key}={repr_any(child)}")
     return f"{cls_name}({', '.join(parts)})"
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 from typing import Any, cast
 
-from protomorph import Builtin, ELLIPSIS, Err, SELF, Id, Index, LeafCarrier, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Spec, Tuple, UniformType, VaryingType, WILDCARD, var, val
+from protobase import frozendict
+
+from protomorph import Builtin, ELLIPSIS, Err, Map, SELF, Id, Index, LeafCarrier, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Set, Spec, Tuple, UniformType, UnionType, VaryingType, WILDCARD, var, val
 
 
 INT = cast(Spec, val(int).fetch())
@@ -12,8 +14,11 @@ ANY = Spec.of("std.types.Any")
 
 
 class TestLeafCarrier(unittest.TestCase):
-    def test_is_leaf(self):
-        self.assertTrue(LeafCarrier(ANY, 42).is_leaf)
+    def test_len_zero(self):
+        carrier = LeafCarrier(ANY, 42)
+
+        self.assertEqual(len(carrier), 0)
+        self.assertEqual(list(carrier), [])
 
     def test_fetch(self):
         self.assertEqual(LeafCarrier(ANY, "hello").fetch(), "hello")
@@ -33,7 +38,7 @@ class TestTuple(unittest.TestCase):
         children = (LeafCarrier(INT, 100), LeafCarrier(INT, 200))
         self.assertEqual(carrier.reconstruct(children).fetch(), (100, 200))
 
-    def test_invalid_arity_raises(self):
+    def test_invalid_descriptor_length_raises(self):
         with self.assertRaises(AssertionError):
             Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, 2, 3))
 
@@ -96,7 +101,7 @@ class TestCarrierSubstitution(unittest.TestCase):
         carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, 2))
 
         updated = carrier.subst_where(
-            lambda leaf: leaf.is_leaf and leaf.fetch() == 2,
+            lambda leaf: leaf.fetch() == 2,
             lambda leaf: LeafCarrier(leaf.descriptor, 20),
         )
 
@@ -148,11 +153,11 @@ class TestResultCarrier(unittest.TestCase):
         self.assertEqual(carrier.value_carrier().descriptor, INT)
 
     def test_result_ok_constructor_preserves_qualified_descriptor(self):
-        value = LeafCarrier(Qual.of(INT, Spec.of("std.qualifiers.Map", STR)), 1)
+        value = cast(Map, Qual.of(INT, Spec.of("std.qualifiers.Map", STR)).make({Id("a"): 1}))
 
         carrier = Result.ok(value)
 
-        self.assertEqual(carrier.value_carrier().descriptor, INT)
+        self.assertEqual(carrier.value_carrier().descriptor, value.descriptor)
         self.assertEqual(carrier.descriptor.underlying, INT)
         self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[0].fetch()).anchor, "std.qualifiers.Map")
         self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[-1].fetch()).anchor, "std.qualifiers.Result")
@@ -307,11 +312,13 @@ class TestOptionCarrier(unittest.TestCase):
         self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[0].fetch()).anchor, "std.qualifiers.Map")
         self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[-1].fetch()).anchor, "std.qualifiers.Optional")
 
-    def test_optional_make_requires_explicit_variant(self):
+    def test_optional_make_defaults_to_some(self):
         optional_int = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
 
-        with self.assertRaises(TypeError):
-            optional_int.make(1)
+        carrier = cast(Option, optional_int.make(1))
+
+        self.assertTrue(carrier.is_some)
+        self.assertEqual(carrier.unwrap().fetch(), 1)
 
     def test_optional_make_accepts_some(self):
         optional_int = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
@@ -406,20 +413,133 @@ class TestOptionCarrier(unittest.TestCase):
 
 
 class TestQualHelpers(unittest.TestCase):
+    def test_constructor_stores_qualifier_then_qualified(self):
+        qualifier = Spec.of("std.qualifiers.Optional")
+        qual = Qual(qualifier, INT)
+
+        self.assertIs(qual.qualifier, qualifier)
+        self.assertIs(qual.qualified, INT)
+
     def test_last_qualifier_returns_last_item(self):
         qual = Qual.of(INT, Spec.of("std.qualifiers.List"), Spec.of("std.qualifiers.Optional"))
 
-        self.assertEqual(cast(Spec, qual.last_qualifier).anchor, "std.qualifiers.Optional")
+        self.assertEqual(cast(Spec, qual.qualifier).anchor, "std.qualifiers.Optional")
 
     def test_unwrap_returns_underlying_when_single_qualifier(self):
         qual = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
 
-        self.assertEqual(qual.unwrap, INT)
+        self.assertEqual(qual.qualified, INT)
 
     def test_unwrap_returns_nested_qual_when_multiple_qualifiers(self):
         qual = Qual.of(INT, Spec.of("std.qualifiers.List"), Spec.of("std.qualifiers.Optional"))
 
-        self.assertEqual(qual.unwrap, Qual.of(INT, Spec.of("std.qualifiers.List")))
+        self.assertEqual(qual.qualified, Qual.of(INT, Spec.of("std.qualifiers.List")))
+
+
+class TestTypeSchema(unittest.TestCase):
+    def test_leaf_types_have_no_schema(self):
+        self.assertTrue(ANY.is_leaf)
+        self.assertIsNone(ANY.schema)
+
+    def test_leaf_type_len_and_iter_raise(self):
+        with self.assertRaises(TypeError):
+            len(ANY)
+
+        with self.assertRaises(TypeError):
+            tuple(ANY)
+
+    def test_spec_schema_returns_known_schema(self):
+        spec = Spec.of("std.types.Result.Ok", INT)
+        schema = spec.schema
+
+        assert schema is not None
+        self.assertEqual(schema.attr(Id("value")).fetch(), INT)
+
+    def test_qual_schema_projects_one_level(self):
+        qual = Qual.of(Spec.of("std.types.Result.Ok", INT), Spec.of("std.qualifiers.Optional"))
+        schema = qual.schema
+
+        assert schema is not None
+        self.assertEqual(
+            schema.attr(Id("value")).fetch(),
+            Qual.of(INT, Spec.of("std.qualifiers.Optional")),
+        )
+
+    def test_uniform_schema_none_for_leaf_element(self):
+        self.assertIsNone(UniformType(INT).schema)
+
+    def test_uniform_schema_projects_one_level(self):
+        schema = UniformType(cast(VaryingType, VaryingType.of(INT, STR))).schema
+
+        assert schema is not None
+        self.assertEqual(schema[0].fetch(), UniformType(INT))
+        self.assertEqual(schema[1].fetch(), UniformType(STR))
+
+    def test_union_schema_is_none(self):
+        union = cast(UnionType, UnionType.of(INT, STR))
+
+        self.assertTrue(union.is_leaf)
+        self.assertIsNone(union.schema)
+
+
+class TestProjectedCarrierTraversal(unittest.TestCase):
+    def test_option_structural_traversal_is_not_implemented(self):
+        carrier = Option.some(LeafCarrier(INT, 1))
+
+        with self.assertRaises(TypeError):
+            len(carrier)
+
+    def test_result_structural_traversal_is_not_implemented(self):
+        carrier = Result.ok(LeafCarrier(INT, 1))
+
+        with self.assertRaises(TypeError):
+            len(carrier)
+
+
+class TestContainerCarriers(unittest.TestCase):
+    def test_map_make_and_iterate_values(self):
+        map_type = Qual.of(INT, Spec.of("std.qualifiers.Map", STR))
+
+        carrier = cast(Map, map_type.make({Id("a"): 1, Id("b"): 2}))
+
+        self.assertEqual({child.fetch() for child in carrier.elements()}, {1, 2})
+
+    def test_set_iterates_payload_content(self):
+        set_type = Qual.of(INT, Spec.of("std.qualifiers.Set"))
+
+        carrier = cast(Set, set_type.make({1, 2, 3}))
+
+        self.assertEqual([child.fetch() for child in carrier.elements()], [1, 2, 3])
+
+    def test_set_elements_are_deterministic(self):
+        set_type = Qual.of(INT, Spec.of("std.qualifiers.Set"))
+        left = cast(Set, set_type.make({3, 1, 2}))
+        right = cast(Set, set_type.make({2, 3, 1}))
+
+        self.assertEqual(
+            [child.fetch() for child in left.elements()],
+            [child.fetch() for child in right.elements()],
+        )
+
+
+class TestTupleMap(unittest.TestCase):
+    def test_map_updates_child_descriptors(self):
+        carrier = Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "hello"))
+
+        mapped = carrier.map(lambda child: LeafCarrier(ANY, str(child.fetch())))
+
+        self.assertEqual(mapped.fetch(), ("1", "hello"))
+        self.assertEqual(mapped.descriptor, VaryingType.of(ANY, ANY))
+
+    def test_map_degrades_uniform_to_varying_when_descriptors_diverge(self):
+        carrier = Tuple(UniformType(INT), (1, 2))
+
+        mapped = carrier.map(
+            lambda child: LeafCarrier(INT if child.fetch() == 1 else STR, child.fetch())
+        )
+
+        self.assertEqual(mapped.fetch(), (1, 2))
+        self.assertEqual(mapped.descriptor, VaryingType.of(INT, STR))
 
 
 class TestTypeProperty(unittest.TestCase):

@@ -17,6 +17,12 @@ type PythonTransform = Callable[..., protomorph.Type]
 _NATIVE_SPECS: dict[Any, protomorph.Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
 
+_OPTIONAL_QUALIFIER = Anchor("std.qualifiers.Optional")
+_RESULT_QUALIFIER = Anchor("std.qualifiers.Result")
+_SET_QUALIFIER = Anchor("std.qualifiers.Set")
+_LIST_QUALIFIER = Anchor("std.qualifiers.List")
+_MAP_QUALIFIER = Anchor("std.qualifiers.Map")
+
 
 def spec_name(cls: type[protomorph.Builtin]) -> str:
     name = getattr(cls, "SPEC_NAME", None)
@@ -57,6 +63,17 @@ def _resolve_type_alias(annotation: Any) -> Any:
     return current
 
 
+def _qualifier_arg_type(
+    qualifier: protomorph.Spec,
+    *,
+    index: int,
+    name: str,
+) -> protomorph.Type:
+    if len(qualifier.args) <= index:
+        raise TypeError(f"{name} qualifier must provide type argument {index}")
+    return cast(protomorph.Type, qualifier.args[index].fetch())
+
+
 class NativeRealm(Realm, Consed):
     @flux.property
     def all_builtins(self) -> frozenset[type[protomorph.Builtin]]:
@@ -70,17 +87,23 @@ class NativeRealm(Realm, Consed):
     def python_transforms(self) -> frozendict[type, PythonTransform]:
         return frozendict(_PYTHON_TRANSFORMS)
 
-    @flux.method  # pyright: ignore[reportIncompatibleMethodOverride]
-    def schema_template_for(self, builtin_cls: type[protomorph.Builtin]) -> protomorph.TupleLikeType:
+    @flux.method
+    def schema_template_for(self, builtin_cls: type[protomorph.Builtin]) -> protomorph.Schema:
         attrs = attr_info_of(builtin_cls)
         if not attrs:
-            return protomorph.VaryingType(())
+            return cast(protomorph.Schema, protomorph.Tuple.Empty)
 
         names = list(attrs.keys())
         types = tuple(_project_type(info.type, template=builtin_cls) for info in attrs.values())
-        indexed_type = cast(Any, getattr(protomorph, "IndexedType"))
-        return indexed_type(
-            protomorph.VaryingType(types), protomorph.Index.of(*(protomorph.Id(name) for name in names))
+        return cast(
+            protomorph.Schema,
+            protomorph.Tuple(
+                protomorph.IndexedType(
+                    protomorph.VaryingType(types),
+                    protomorph.Index.of(*(protomorph.Id(name) for name in names)),
+                ),
+                types,
+            ),
         )
 
     @flux.property
@@ -88,11 +111,11 @@ class NativeRealm(Realm, Consed):
         return frozendict({spec_name(cls): cls for cls in self.all_builtins})
 
     @flux.method
-    def schema_for(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def schema_for(self, spec: protomorph.Spec) -> protomorph.Schema | None:  # pyright: ignore[reportIncompatibleVariableOverride]
         return self._schema_for_cached(spec)
 
     @flux.method
-    def _schema_for_cached(self, spec: protomorph.Spec) -> protomorph.TupleLikeType | None:
+    def _schema_for_cached(self, spec: protomorph.Spec) -> protomorph.Schema | None:
         builtin_cls = self.builtin_by_spec_name.get(str(spec.anchor))
         if builtin_cls is None:
             return None
@@ -151,20 +174,14 @@ class NativeRealm(Realm, Consed):
 
     def _specialize_schema(
         self,
-        schema: protomorph.TupleLikeType,
+        schema: protomorph.Schema,
         mapping: dict[protomorph.Placeholder, protomorph.Type],
-    ) -> protomorph.TupleLikeType:
-        indexed_type = getattr(protomorph, "IndexedType", None)
-        if indexed_type is not None and isinstance(schema, indexed_type):
-            indexed_schema = cast(Any, schema)
-            inner = cast(
-                protomorph.TupleLikeType,
-                self._specialize_schema(
-                    cast(protomorph.TupleLikeType, indexed_schema.inner), mapping
-                ),
-            )
-            index = indexed_schema.index.splice()
-            return indexed_type(cast(protomorph.Type, inner), index)
+    ) -> protomorph.Schema:
+        descriptor = schema.descriptor
+        if isinstance(descriptor, protomorph.IndexedType):
+            index = descriptor.index.splice()
+        else:
+            index = None
 
         def _make_replacement(ph: protomorph.Placeholder) -> Any:
             replacement = mapping[ph]
@@ -173,8 +190,8 @@ class NativeRealm(Realm, Consed):
             return replacement
 
         new_types: list[protomorph.Type] = []
-        varying_schema = cast(protomorph.VaryingType, schema)
-        for field_type in varying_schema.values:
+        for field in schema:
+            field_type = cast(protomorph.Type, field.fetch())
             if isinstance(field_type, protomorph.Placeholder) and field_type in mapping:
                 new_types.append(cast(protomorph.Type, _make_replacement(field_type)))
                 continue
@@ -224,9 +241,17 @@ class NativeRealm(Realm, Consed):
                 new_types.append(cast(protomorph.Type, result))
             else:
                 new_types.append(field_type)
+        if index is None:
+            return cast(
+                protomorph.Schema,
+                protomorph.Tuple(protomorph.VaryingType(tuple(new_types)), tuple(new_types)),
+            )
         return cast(
-            protomorph.TupleLikeType,
-            protomorph.VaryingType(tuple(new_types)).splice(),
+            protomorph.Schema,
+            protomorph.Tuple(
+                protomorph.IndexedType(protomorph.VaryingType(tuple(new_types)), index),
+                tuple(new_types),
+            ),
         )
 
     def with_rules(self, *rules: protomorph.Builtin) -> OverlayRealm:
@@ -270,7 +295,7 @@ def instantiate_builtin(
     arg_values: list[object] = []
     arg_nominal: dict[str, object] = {}
     for i in range(len(tuple_args)):
-        item = tuple_args.descriptor.item_at(i)
+        item = tuple_args.payload_item_at(i)
         value = tuple_args[i].fetch()
         if item.key is None:
             arg_values.append(value)
@@ -445,4 +470,3 @@ def val(*args, **kwargs) -> protomorph.Val:
 
 
 _project_type = project_type
-

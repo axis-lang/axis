@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator as _Iterator
 from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
@@ -10,17 +11,14 @@ _OPTIONAL_QUALIFIER = pm.Anchor("std.qualifiers.Optional")
 
 
 def _optional_qualifier_of(qual: pm.Qual) -> pm.Spec | None:
-    qualifier = qual.last_qualifier
+    qualifier = qual.qualifier
     if qualifier is None or qualifier.anchor != _OPTIONAL_QUALIFIER:
         return None
     return qualifier
 
 
 def _some_descriptor_of(qual: pm.Qual) -> pm.Type:
-    qualifier = qual.last_qualifier
-    if qualifier is None or qualifier.anchor != _OPTIONAL_QUALIFIER:
-        return qual
-    return qual.unwrap
+    return qual.qualified
 
 
 def _optional_descriptor(value_descriptor: pm.Type) -> pm.Qual:
@@ -39,33 +37,37 @@ class Option[V](Val):
     def is_none(self) -> bool:
         return self.content is None
 
-    @property
-    def is_leaf(self) -> bool:
-        if self.content is None:
-            return True
-        return self.value_carrier().is_leaf
-
     def __len__(self) -> int:
-        if self.content is None:
-            return 0
-        return len(self.value_carrier())
+        raise TypeError("Option structural traversal is not implemented yet")
+
+    def __iter__(self) -> _Iterator[Val]:
+        raise TypeError("Option structural traversal is not implemented yet")
 
     def __getitem__(self, offset: int) -> Val:
-        if self.content is None:
-            raise IndexError(offset)
-        return self.value_carrier()[offset]
+        raise TypeError("Option structural traversal is not implemented yet")
+
+    def payload_item_at(self, offset: int) -> pm.Item:
+        raise TypeError("Option structural traversal is not implemented yet")
 
     def attr(self, id: pm.Id) -> Val:
         if self.content is None:
             raise KeyError(id)
         return self.value_carrier().attr(id)
 
+    def _structural_child_count(self) -> int:
+        return 0 if self.content is None else 1
+
+    def _structural_children(self) -> tuple[Val, ...]:
+        if self.content is None:
+            return ()
+        return (self.value_carrier(),)
+
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         if self.content is None:
             assert not children
             return self
-        rebuilt = self.value_carrier().reconstruct(children)
-        return _cast(Self, self._with_some(rebuilt))
+        assert len(children) == 1
+        return _cast(Self, self._with_some(children[0]))
 
     def __invariants__(self) -> None:
         super().__invariants__()

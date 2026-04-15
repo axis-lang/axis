@@ -11,6 +11,10 @@ class _ZipMismatch(Exception):
     pass
 
 
+def _zip_children(carrier: protomorph.Val) -> tuple[protomorph.Val, ...]:
+    return tuple(carrier)
+
+
 def _deep_zip_gen(
     master: protomorph.Val, slave: protomorph.Val,
 ) -> Generator[tuple[protomorph.Val, protomorph.Val], object, None]:
@@ -20,12 +24,16 @@ def _deep_zip_gen(
         ctrl = yield (left, right)
         if ctrl is _SKIP:
             continue
-        if left.is_leaf or right.is_leaf:
-            continue
-        if left.descriptor != right.descriptor:
+        left_is_leaf = not left._has_structural_children()
+        right_is_leaf = not right._has_structural_children()
+        if left_is_leaf != right_is_leaf:
             raise _ZipMismatch
-        l_ch = list(left)
-        r_ch = list(right)
+        if left_is_leaf and right_is_leaf:
+            continue
+        if not protomorph.compatible_structure(left.descriptor, right.descriptor):
+            raise _ZipMismatch
+        l_ch = _zip_children(left)
+        r_ch = _zip_children(right)
         if len(l_ch) != len(r_ch):
             raise _ZipMismatch
         stack.extend(reversed(list(zip(l_ch, r_ch))))

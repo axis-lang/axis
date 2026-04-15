@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator as _Iterator
 from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph as pm
@@ -11,24 +12,20 @@ _RESULT_QUALIFIER = pm.Anchor("std.qualifiers.Result")
 
 
 def _result_qualifier_of(qual: pm.Qual) -> pm.Spec | None:
-    qualifier = qual.last_qualifier
+    qualifier = qual.qualifier
     if qualifier is None or qualifier.anchor != _RESULT_QUALIFIER:
         return None
     return qualifier
 
 
 def _ok_descriptor_of(qual: pm.Qual) -> pm.Type:
-    qualifier = qual.last_qualifier
-    if qualifier is None or qualifier.anchor != _RESULT_QUALIFIER:
-        return qual
-    return qual.unwrap
+    return qual.qualified
 
 
 def _err_descriptor_of(qual: pm.Qual) -> pm.Type:
-    qualifier = _result_qualifier_of(qual)
-    if qualifier is None or len(qualifier.args) != 1:
-        raise TypeError("Result qualifier must have exactly one error type argument")
-    return _cast(pm.Type, qualifier.args[0].fetch())
+    if len(qual.qualifier.args) == 0:
+        raise TypeError("Result carrier requires an error type")
+    return _cast(pm.Type, qual.qualifier.args[0].fetch())
 
 
 def _result_descriptor(ok_descriptor: pm.Type, err_descriptor: pm.Type) -> pm.Qual:
@@ -77,33 +74,33 @@ class Result[E, V = pm.Datum](Val[Ok[V] | Err[E]]):
     def is_err(self) -> bool:
         return isinstance(self.content, Err)
 
-    @property
-    def is_leaf(self) -> bool:
-        if isinstance(self.content, Err):
-            return True
-        return self.value_carrier().is_leaf
-
     def __len__(self) -> int:
-        if isinstance(self.content, Err):
-            return 0
-        return len(self.value_carrier())
+        raise TypeError("Result structural traversal is not implemented yet")
+
+    def __iter__(self) -> _Iterator[Val]:
+        raise TypeError("Result structural traversal is not implemented yet")
 
     def __getitem__(self, offset: int) -> Val:
-        if isinstance(self.content, Err):
-            raise IndexError(offset)
-        return self.value_carrier()[offset]
+        raise TypeError("Result structural traversal is not implemented yet")
+
+    def payload_item_at(self, offset: int) -> pm.Item:
+        raise TypeError("Result structural traversal is not implemented yet")
 
     def attr(self, id: Id) -> Val:
-        if isinstance(self.content, Err):
-            raise KeyError(id)
-        return self.value_carrier().attr(id)
+        return self.active_carrier().attr(id)
+
+    def _structural_child_count(self) -> int:
+        return 1
+
+    def _structural_children(self) -> tuple[Val, ...]:
+        return (self.active_carrier(),)
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
-        if isinstance(self.content, Err):
-            assert not children
-            return self
-        rebuilt = self.value_carrier().reconstruct(children)
-        return _cast(Self, self._with_ok(rebuilt))
+        assert len(children) == 1
+        rebuilt = children[0]
+        if isinstance(self.content, Ok):
+            return _cast(Self, self._with_ok(rebuilt))
+        return _cast(Self, self._with_err(rebuilt))
 
     def __invariants__(self) -> None:
         super().__invariants__()
@@ -128,6 +125,11 @@ class Result[E, V = pm.Datum](Val[Ok[V] | Err[E]]):
         """Inner error carrier. Only valid when is_err."""
         assert isinstance(self.content, Err)
         return self.child(_err_descriptor_of(self.descriptor), self.content.error)
+
+    def active_carrier(self) -> Val:
+        if isinstance(self.content, Ok):
+            return self.value_carrier()
+        return self.error_carrier()
 
     def unwrap(self) -> Val[V]:
         if isinstance(self.content, Ok):

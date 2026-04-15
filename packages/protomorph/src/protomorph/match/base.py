@@ -101,8 +101,8 @@ Ambiguity = Bucket
 
 
 class ShapeSummary(Builtin):
-    min_arity: int = 0
-    max_arity: int | None = 0
+    min_positional_count: int = 0
+    max_positional_count: int | None = 0
     required_keys: frozenset[pm.Id] = frozenset()
     allowed_keys: frozenset[pm.Id] | None = frozenset()
     open_tail: bool = False
@@ -258,7 +258,7 @@ class Walker(_Generic[P]):
                     pending=_cast(list[_State[_Any]], pending),
                 )
                 continue
-            if pattern_carrier.is_leaf and isinstance(pattern_value, pm.Placeholder):
+            if not pattern_carrier._has_structural_children() and isinstance(pattern_value, pm.Placeholder):
                 self.step_placeholder(pattern_carrier, subject_carrier, state, pending)
                 continue
             self.step_structural(pattern_carrier, subject_carrier, state, pending)
@@ -299,16 +299,16 @@ class Walker(_Generic[P]):
             pending.append(state)
             return
         if isinstance(value, pm.PlaceholderMetatype):
-            if subject.is_leaf and subject.fetch() == value:
+            if not subject._has_structural_children() and subject.fetch() == value:
                 pending.append(state)
             return
-        if subject.is_leaf and subject.fetch() == value:
+        if not subject._has_structural_children() and subject.fetch() == value:
             pending.append(state)
 
     def _structurally_compatible(self, pattern: pm.Val, subject: pm.Val) -> bool:
-        if pattern.descriptor == subject.descriptor:
+        if pm.compatible_structure(pattern.descriptor, subject.descriptor):
             return True
-        if not pattern.is_leaf and not subject.is_leaf and type(pattern) is type(subject):
+        if pattern._has_structural_children() and subject._has_structural_children() and type(pattern) is type(subject):
             return True
         if pm.val(pattern.descriptor).is_pattern:
             return True
@@ -342,8 +342,8 @@ class Walker(_Generic[P]):
             if not self._structurally_compatible(pattern, subject):
                 return
             subsolutions = (Solution(env=Env(), payloads=frozenset(), case_ids=frozenset()),)
-        if pattern.is_leaf:
-            if not subject.is_leaf:
+        if not pattern._has_structural_children():
+            if subject._has_structural_children():
                 return
             if isinstance(pattern_value, pm.Type):
                 if not self._structurally_compatible(pattern, subject):
@@ -358,7 +358,7 @@ class Walker(_Generic[P]):
                 subbranch.defaults.extend(subsolution.defaults)
                 pending.append(subbranch)
             return
-        if subject.is_leaf or len(pattern) != len(subject):
+        if (not subject._has_structural_children()) or len(pattern) != len(subject):
             return
         for subsolution in subsolutions:
             subbranch = branch.clone()
@@ -372,7 +372,7 @@ class Walker(_Generic[P]):
                 if not self._structurally_compatible(active_pattern, subject):
                     continue
             for offset in reversed(range(len(active_pattern))):
-                item = active_pattern.descriptor.item_at(offset)
+                item = active_pattern.payload_item_at(offset)
                 pattern_child = active_pattern[offset]
                 try:
                     subject_child = subject.attr(item.key) if item.key is not None else subject[offset]
@@ -385,10 +385,10 @@ class Walker(_Generic[P]):
     def _subject_shape(self, subject: pm.Val) -> tuple[int, frozenset[pm.Id]]:
         positional_count = 0
         keys: set[pm.Id] = set()
-        if subject.is_leaf:
+        if not subject._has_structural_children():
             return positional_count, frozenset()
         for offset in range(len(subject)):
-            item = subject.descriptor.item_at(offset)
+            item = subject.payload_item_at(offset)
             if item.key is None:
                 positional_count += 1
             else:
@@ -397,9 +397,9 @@ class Walker(_Generic[P]):
 
     def _accepts_shape(self, subject: pm.Val, shape: ShapeSummary) -> bool:
         positional_count, keys = self._subject_shape(subject)
-        if positional_count < shape.min_arity:
+        if positional_count < shape.min_positional_count:
             return False
-        if shape.max_arity is not None and positional_count > shape.max_arity:
+        if shape.max_positional_count is not None and positional_count > shape.max_positional_count:
             return False
         if not shape.required_keys <= keys:
             return False
@@ -416,7 +416,7 @@ class Walker(_Generic[P]):
         suffix_len: int,
     ) -> tuple[pm.Type, ...] | None:
         target = self.resolve_path(subject, path)
-        if target.is_leaf:
+        if not target._has_structural_children():
             return None
         if len(target) < prefix_len + suffix_len:
             return None
@@ -437,7 +437,7 @@ class Walker(_Generic[P]):
         keys: tuple[pm.Id, ...],
     ) -> tuple[pm.Type, ...] | None:
         target = self.resolve_path(subject, path)
-        if target.is_leaf:
+        if not target._has_structural_children():
             return None
         result: list[pm.Type] = []
         for key in keys:

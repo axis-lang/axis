@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Id, Index, IndexedType, Item, Spread, Spec, Tuple, VaryingType
+from protomorph import Id, Index, IndexedType, Item, Option, Spread, Spec, Tuple, VaryingType
 
 
 INT = Spec.of("std.types.Integer")
@@ -14,7 +14,7 @@ FLOAT = Spec.of("std.types.Decimal")
 class TestIndex(unittest.TestCase):
     def test_make(self):
         idx = Index.of(Id("a"), None, Id("c"))
-        self.assertEqual(idx.arity, 3)
+        self.assertEqual(len(idx), 3)
         self.assertTrue(idx.is_sparse)
         self.assertEqual(idx.key_at(0), Id("a"))
         self.assertEqual(idx.key_at(1), None)
@@ -31,11 +31,13 @@ class TestSpread(unittest.TestCase):
 
 
 class TestIndexedType(unittest.TestCase):
-    def test_item_access(self):
+    def test_schema_access(self):
         descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
-        self.assertEqual(descriptor.item_at(0), Item(0, None, INT))
-        self.assertEqual(descriptor.item_at(1), Item(1, Id("y"), STR))
-        self.assertIs(descriptor.item(Id("y")).value, STR)
+        schema = descriptor.schema
+
+        self.assertEqual(schema.payload_item_at(0), Item(0, None, INT))
+        self.assertEqual(schema.payload_item_at(1), Item(1, Id("y"), STR))
+        self.assertIs(schema.attr(Id("y")).fetch(), STR)
 
     def test_tuple_attr(self):
         descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
@@ -48,10 +50,12 @@ class TestIndexedType(unittest.TestCase):
             Index.of(Id("a"), None, Id("c")),
         )
         spliced = cast(IndexedType, descriptor.splice())
-        self.assertEqual(spliced.item_at(0).key, Id("a"))
-        self.assertIsNone(spliced.item_at(1).key)
-        self.assertIsNone(spliced.item_at(2).key)
-        self.assertEqual(spliced.item_at(3).key, Id("c"))
+        schema = spliced.schema
+
+        self.assertEqual(schema.payload_item_at(0).key, Id("a"))
+        self.assertIsNone(schema.payload_item_at(1).key)
+        self.assertIsNone(schema.payload_item_at(2).key)
+        self.assertEqual(schema.payload_item_at(3).key, Id("c"))
 
 
 class TestIndexElementDescriptor(unittest.TestCase):
@@ -74,15 +78,13 @@ class TestIndexElementDescriptor(unittest.TestCase):
         self.assertEqual(idx[2].descriptor, optional_id)
 
     def test_sparse_none_slot_is_none_option(self):
-        from protomorph import Option
         idx = Index.of(Id("x"), None)
         self.assertIsInstance(idx[1], Option)
-        self.assertTrue(idx[1].is_none)
+        self.assertTrue(cast(Option, idx[1]).is_none)
 
     def test_sparse_key_slot_is_some_option(self):
-        from protomorph import Option
         idx = Index.of(Id("x"), None)
-        carrier = idx[0]
+        carrier = cast(Option, idx[0])
         self.assertIsInstance(carrier, Option)
         self.assertTrue(carrier.is_some)
         self.assertEqual(carrier.unwrap().fetch(), Id("x"))

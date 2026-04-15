@@ -55,8 +55,9 @@ class TestPlaceholder(unittest.TestCase):
     # def test_metatype_is_metadata_spec(self):
     #     self.assertEqual(placeholder("T").metatype(), ("T"))
 
-    def test_arity_zero(self):
-        self.assertEqual(var("T").arity, 0)
+    def test_leaf_len_raises(self):
+        with self.assertRaises(TypeError):
+            len(var("T"))
 
     def test_spread_placeholder(self):
         p = var("*T")
@@ -81,21 +82,18 @@ class TestField(unittest.TestCase):
 
 
 class TestTypeDefaults(unittest.TestCase):
-    """Type base class defaults: arity=0, item_at raises, item raises."""
+    """Type base class defaults: leaf types expose no schema."""
 
-    def test_default_arity(self):
-        self.assertEqual(Spec.of("std.types.Any").arity, 0)
+    def test_default_is_leaf(self):
+        self.assertTrue(Spec.of("std.types.Any").is_leaf)
 
-    def test_item_at_raises(self):
-        with self.assertRaises(IndexError):
-            Spec.of("std.types.Any").item_at(0)
+    def test_leaf_len_raises(self):
+        with self.assertRaises(TypeError):
+            len(Spec.of("std.types.Any"))
 
-    def test_item_raises(self):
-        with self.assertRaises(KeyError):
-            Spec.of("std.types.Any").item(Id("x"))
-
-    def test_items_empty(self):
-        self.assertEqual(list(Spec.of("std.types.Any").items()), [])
+    def test_leaf_iter_raises(self):
+        with self.assertRaises(TypeError):
+            tuple(Spec.of("std.types.Any"))
 
 
 if __name__ == "__main__":

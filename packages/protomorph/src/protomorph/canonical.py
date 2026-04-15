@@ -79,13 +79,12 @@ class Pattern[Ctx](Base, pm.Type[tuple[pm.Val, ...]]):
     def slot_count(self) -> int:
         return len(self.slots)
 
-    @property
-    def arity(self) -> int:
+    def __len__(self) -> int:
         return self.slot_count
 
-    def item_at(self, offset: int) -> pm.Item:
-        slot = self.slots[offset]
-        return pm.Item(offset, None, slot.descriptor)
+    @property
+    def schema(self) -> pm.Schema:
+        return pm.Tuple.new(*(pm.val(slot.descriptor) for slot in self.slots))
 
     def metatype(self) -> pm.Type:
         return pm.Spec.of("std.metas.Type")
@@ -282,7 +281,7 @@ def normalize(value: pm.Val) -> pm.Val:
         return _normalize_fuse(value)
     if _is_proj_value(value):
         return _normalize_proj(value)
-    if value.is_leaf:
+    if not value._has_structural_children():
         return value
 
     children = tuple(normalize(child) for child in value)
@@ -350,7 +349,7 @@ def unnest[Ctx](
 
 def _skeletonize(
     value: pm.Val,
-    is_place: _Callable[[pm.Val], bool] = lambda node: node.is_leaf,
+    is_place: _Callable[[pm.Val], bool] = lambda node: not node._has_structural_children(),
 ) -> pm.Val:
     return value.deep_map(
         lambda node: pm.Wildcard if is_place(node) else node,
@@ -405,11 +404,11 @@ def _is_wildcard(node: pm.Val) -> bool:
 
 
 def _is_extractable_pattern_leaf(node: pm.Val) -> bool:
-    return node.is_leaf and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return (not node._has_structural_children()) and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
 
 
 def _is_match_hole(node: pm.Val) -> bool:
-    return node.is_leaf and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return (not node._has_structural_children()) and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
 
 
 def _shape_specializes(left: pm.Val, right: pm.Val) -> bool:
@@ -417,9 +416,9 @@ def _shape_specializes(left: pm.Val, right: pm.Val) -> bool:
         return True
     if _is_wildcard(left):
         return False
-    if left.is_leaf or right.is_leaf:
+    if (not left._has_structural_children()) or (not right._has_structural_children()):
         return left == right
-    if left.descriptor != right.descriptor or len(left) != len(right):
+    if not pm.compatible_structure(left.descriptor, right.descriptor) or len(left) != len(right):
         return False
     return all(
         _shape_specializes(left_child, right_child)
@@ -432,9 +431,9 @@ def _shape_meet(left: pm.Val, right: pm.Val) -> pm.Val | None:
         return right
     if _is_wildcard(right):
         return left
-    if left.is_leaf or right.is_leaf:
+    if (not left._has_structural_children()) or (not right._has_structural_children()):
         return left if left == right else None
-    if left.descriptor != right.descriptor or len(left) != len(right):
+    if not pm.compatible_structure(left.descriptor, right.descriptor) or len(left) != len(right):
         return None
 
     children: list[pm.Val] = []
@@ -510,7 +509,7 @@ class _MatchBuilder:
 
     def _reify(self, node: pm.Val, seen: set[int] | None = None) -> pm.Val:
         resolved = self._resolve(node)
-        if _is_match_hole(resolved) or resolved.is_leaf:
+        if _is_match_hole(resolved) or not resolved._has_structural_children():
             return resolved
 
         node_id = id(resolved)
@@ -593,7 +592,7 @@ class _MatchBuilder:
         node = self._resolve(node)
         if _is_match_hole(node):
             return self._find(node) is self._find(symbol)
-        if node.is_leaf:
+        if not node._has_structural_children():
             return False
         return any(self._occurs(symbol, child) for child in node)
 
@@ -615,13 +614,13 @@ class _MatchBuilder:
             if not self._bind_symbol(right_value, left_value):
                 return None
             common = self._resolve(right_value)
-        elif left_value.is_leaf or right_value.is_leaf:
-            if left_value.is_leaf != right_value.is_leaf or left_value != right_value:
+        elif (not left_value._has_structural_children()) or (not right_value._has_structural_children()):
+            if left_value._has_structural_children() != right_value._has_structural_children() or left_value != right_value:
                 return None
             common = left_value
         else:
             if (
-                left_value.descriptor != right_value.descriptor
+                not pm.compatible_structure(left_value.descriptor, right_value.descriptor)
                 or len(left_value) != len(right_value)
             ):
                 return None
@@ -658,11 +657,11 @@ def _match_common_value(
 
 
 def _is_pattern_slot(node: pm.Val) -> bool:
-    return node.is_leaf and isinstance(node.fetch(), Pattern.Slot)
+    return not node._has_structural_children() and isinstance(node.fetch(), Pattern.Slot)
 
 
 def _is_pattern_nest(node: pm.Val) -> bool:
-    return node.is_leaf and isinstance(node.fetch(), Base.Nest)
+    return not node._has_structural_children() and isinstance(node.fetch(), Base.Nest)
 
 
 def _assert_projection_target(
@@ -679,7 +678,7 @@ def _assert_projection_target(
 
 
 def _child_repr(node: pm.Val | None, index: int) -> pm.Val | None:
-    if node is None or node.is_leaf:
+    if node is None or not node._has_structural_children():
         return None
     return node[index]
 
@@ -749,11 +748,11 @@ def _slot_known(descriptor: pm.Type) -> Morph:
 
 
 def _is_fuse_value(node: pm.Val) -> bool:
-    return node.is_leaf and isinstance(node.fetch(), Fuse)
+    return not node._has_structural_children() and isinstance(node.fetch(), Fuse)
 
 
 def _is_proj_value(node: pm.Val) -> bool:
-    return node.is_leaf and isinstance(node.fetch(), Proj)
+    return not node._has_structural_children() and isinstance(node.fetch(), Proj)
 
 
 def _normalize_morph(value: Morph) -> pm.Val:

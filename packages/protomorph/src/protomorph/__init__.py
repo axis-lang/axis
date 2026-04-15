@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import cast
 
 from protobase import flux as _flux
-from .abstract import contract
 from .abstract.contract import Item
 from .domain import *
 from .native import *
@@ -18,11 +17,9 @@ from . import logic
 from .logic.match import Match
 from .constraint import Constraint
 
-assert issubclass(Type, contract.Descriptor)
-
 
 NATIVE_REALM = NativeRealm()
-REALM = _flux.contextvar("pm.REALM", default=NATIVE_REALM)
+REALM = _flux.contextvar("pm.REALM", default=cast(Realm, NATIVE_REALM))
 
 
 VaryingType.Empty = VaryingType(())
