@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Any as _Any
 from typing import cast as _cast
 
-import protomorph as _pm
+import protomorph.core as _pm
 from protobase import flux as _flux
 
 from .spec import Spec as _Spec
-from .spec import _value_descriptor
 from .type_ import Type as _Type
 
 
@@ -39,9 +37,13 @@ class Qual(_Type):
         if isinstance(self.qualified, Qual):
             return _pm.Tuple.extends(
                 self.qualified.qualifiers,
-                _normalize_tuple_values((self.qualifier,)),
+                _pm.Tuple(
+                    _pm.VaryingType((self.qualifier.metatype(),)), (self.qualifier,)
+                ),
             )
-        return _normalize_tuple_values((self.qualifier,))
+        return _pm.Tuple(
+            _pm.VaryingType((self.qualifier.metatype(),)), (self.qualifier,)
+        )
 
     @classmethod
     def of(cls, underlying: _pm.Type, *qualifiers: _Spec) -> Qual:
@@ -50,12 +52,8 @@ class Qual(_Type):
                 return underlying
             raise TypeError("Qual.of() requires at least one qualifier")
 
-        result: _pm.Type = underlying
-        for qualifier in qualifiers:
+        first, *rest = qualifiers
+        result = cls(first, underlying)
+        for qualifier in rest:
             result = cls(qualifier, result)
-        return _cast(Qual, result)
-
-
-def _normalize_tuple_values(values: tuple[_Any, ...]) -> _pm.Tuple:
-    descriptors = tuple(_value_descriptor(value) for value in values)
-    return _pm.Tuple(_pm.VaryingType(descriptors), values)
+        return result

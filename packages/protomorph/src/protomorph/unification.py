@@ -63,7 +63,7 @@ class UnionFind:
         rt = self.find(term)
         if rv is rt:
             return True
-        if occurs_check and not self.is_var(rt) and rt._has_structural_children():
+        if occurs_check and not self.is_var(rt) and len(rt.children) > 0:
             if self._occurs(rv, rt):
                 return False
         self._link(rv, rt)
@@ -90,7 +90,7 @@ class UnionFind:
         term = self.find(term)
         if var is term:
             return True
-        if not term._has_structural_children():
+        if len(term.children) == 0:
             return False
         return any(self._occurs(var, child) for child in term)
 
@@ -154,7 +154,7 @@ class UnionFind:
             seen = _seen or set()
             seen.add(id(carrier))
             return self.reify(root, seen)
-        if not carrier._has_structural_children():
+        if len(carrier.children) == 0:
             return carrier
         changed = False
         children: list[protomorph.Val] = []
@@ -220,8 +220,8 @@ def _walk(
             continue
 
         # both non-var
-        left_is_leaf = not left._has_structural_children()
-        right_is_leaf = not right._has_structural_children()
+        left_is_leaf = len(left.children) == 0
+        right_is_leaf = len(right.children) == 0
         if left_is_leaf and right_is_leaf:
             if left != right:
                 return False

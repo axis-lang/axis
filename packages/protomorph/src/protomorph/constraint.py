@@ -29,16 +29,16 @@ class Constraint(pm.Builtin):
 
     def subst(self, mapping: Mapping[pm.Val, pm.Val]) -> Constraint:
         return type(self)(
-            subject=self.subject.subst(mapping),
-            term=self.term.subst(mapping),
-            target=self.target.subst(mapping),
+            subject=pm.walk_subst(self.subject, mapping),
+            term=pm.walk_subst(self.term, mapping),
+            target=pm.walk_subst(self.target, mapping),
         )
 
     def subst_self(self, spec: pm.Val | pm.Datum) -> Constraint:
         return type(self)(
-            subject=self.subject.subst_self(spec),
-            term=self.term.subst_self(spec),
-            target=self.target.subst_self(spec),
+            subject=pm.subst_self(self.subject, spec),
+            term=pm.subst_self(self.term, spec),
+            target=pm.subst_self(self.target, spec),
         )
 
     def goal_for(self, spec: pm.Val | pm.Datum) -> pm.Spec:

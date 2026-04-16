@@ -30,13 +30,6 @@ class Point(Builtin):
 
 
 class TestCarrierPatternFlag(unittest.TestCase):
-    def test_plain_value_is_not_pattern(self):
-        self.assertFalse(val(Point(1, 2)).is_pattern)
-
-    def test_placeholder_leaf_is_pattern(self):
-        T = var("T")
-        self.assertTrue(LeafCarrier(ANY, T).is_pattern)
-
     def test_placeholder_metatype_wraps_placeholder(self):
         T = var("T")
         meta = cast(PlaceholderMetatype, T.metatype())

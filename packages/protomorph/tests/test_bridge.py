@@ -4,7 +4,7 @@ from typing import TypeVar
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, UniformType, UnionType, Var, VaryingType, project_type, val
+from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, Tuple, UniformType, UnionType, Val, Var, VaryingType, project_type, val
 
 
 INT = val(int).fetch()
@@ -59,6 +59,18 @@ class TestWrapProjection(unittest.TestCase):
         self.assertIsInstance(result, Var)
         self.assertIsInstance(result, NativeVar)
         self.assertEqual(cast(NativeVar, result).id, "T")
+
+    def test_val_generic_projects_first_argument_type(self):
+        self.assertIs(project_type(Val[int]), INT)
+
+    def test_val_without_type_argument_falls_back_to_any(self):
+        self.assertIs(project_type(Val), Spec.Any)
+
+    def test_tuple_generic_projects_first_argument_type(self):
+        self.assertIs(project_type(Tuple[int]), INT)
+
+    def test_tuple_without_type_argument_falls_back_to_any(self):
+        self.assertIs(project_type(Tuple), Spec.Any)
 
     def test_unknown_annotation_raises(self):
         with self.assertRaises(ValueError):

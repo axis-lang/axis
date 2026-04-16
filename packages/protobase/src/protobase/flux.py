@@ -22,7 +22,7 @@ from protobase.inmutable import register_inmutable
 from protobase.inmutable import Inmutable
 from protobase.record import Record
 __all__ = [
-    "functions",
+    "function",
     "input",
     "contextvar",
     "method",
@@ -686,7 +686,7 @@ if TYPE_CHECKING:
 
     def method(func: Callable[Concatenate[ObjT, P], R]) -> Query[ObjT, P, R]: ...
 
-    def functions(func: Callable[P, R]) -> Query[None, P, R]: ...
+    def function(func: Callable[P, R]) -> Query[None, P, R]: ...
 
     def property(func: Callable[[ObjT], R]) -> Property[R]: ...
 
@@ -872,7 +872,7 @@ else:
         return query
 
 
-    def functions(func: Callable[..., Any]) -> Query:
+    def function(func: Callable[..., Any]) -> Query:
         return Query(func)
 
 

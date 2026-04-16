@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from protobase import frozendict
 
-from protomorph import Builtin, ELLIPSIS, Err, Map, SELF, Id, Index, LeafCarrier, Ok, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Set, Spec, Tuple, UniformType, UnionType, VaryingType, WILDCARD, var, val
+from protomorph import Builtin, ELLIPSIS, Err, Map, SELF, Id, Index, LeafCarrier, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Set, Spec, Tuple, UniformType, UnionType, VaryingType, WILDCARD, subst_marks, subst_self, subst_where, var, val
 
 
 INT = cast(Spec, val(int).fetch())
@@ -79,20 +79,20 @@ class TestNativeObjectCarrier(unittest.TestCase):
         self.assertEqual(rebuilt.fetch(), Pt(10, 20))
 
 
-class TestChildRules(unittest.TestCase):
+class TestMakeValueRules(unittest.TestCase):
     def test_placeholder_data_becomes_leaf(self):
         ph = var("T")
-        child = LeafCarrier(ANY, 0).child(INT, ph)
+        child = INT.make(ph)
         self.assertIsInstance(child, LeafCarrier)
         self.assertIs(child.fetch(), ph)
 
     def test_type_data_becomes_type_carrier(self):
-        child = LeafCarrier(ANY, 0).child(ANY, INT)
+        child = ANY.make(INT)
         self.assertEqual(child.fetch(), INT)
 
     def test_nested_carrier_is_preserved(self):
         nested = LeafCarrier(INT, 7)
-        child = LeafCarrier(ANY, 0).child(ANY, nested)
+        child = ANY.make(nested)
         self.assertIs(child, nested)
 
 
@@ -100,7 +100,8 @@ class TestCarrierSubstitution(unittest.TestCase):
     def test_subst_where_replaces_matching_leaves(self):
         carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, 2))
 
-        updated = carrier.subst_where(
+        updated = subst_where(
+            carrier,
             lambda leaf: leaf.fetch() == 2,
             lambda leaf: LeafCarrier(leaf.descriptor, 20),
         )
@@ -110,14 +111,14 @@ class TestCarrierSubstitution(unittest.TestCase):
     def test_subst_marks_replaces_it_and_wildcard(self):
         carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (SELF, WILDCARD))
 
-        updated = carrier.subst_marks({SELF: LeafCarrier(INT, 7), WILDCARD: "x"})
+        updated = subst_marks(carrier, {SELF: LeafCarrier(INT, 7), WILDCARD: "x"})
 
         self.assertEqual(updated.fetch(), (7, "x"))
 
     def test_subst_it_replaces_it_mark(self):
         carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, SELF))
 
-        updated = carrier.subst_self(LeafCarrier(INT, 9))
+        updated = subst_self(carrier, LeafCarrier(INT, 9))
 
         self.assertEqual(updated.fetch(), (1, 9))
 
@@ -129,14 +130,16 @@ class TestCarrierSubstitution(unittest.TestCase):
         self.assertEqual(type(ELLIPSIS).__name__, "EllipsisMark")
 
 class TestResultCarrier(unittest.TestCase):
-    def test_result_make_requires_explicit_variant(self):
-        result_int = Qual.of(INT, Spec.of("std.qualifiers.Result", STR))
+    def test_result_make_accepts_plain_success_payload(self):
+        result_int = Qual(Result.qualifier(val(STR)), INT)
 
-        with self.assertRaises(TypeError):
-            result_int.make(1)
+        carrier = cast(Result, result_int.make(1))
+
+        self.assertTrue(carrier.is_ok)
+        self.assertEqual(carrier.value_carrier().fetch(), 1)
 
     def test_result_err_uses_result_error_type(self):
-        result_int = Qual.of(INT, Spec.of("std.qualifiers.Result", STR))
+        result_int = Qual(Result.qualifier(val(STR)), INT)
 
         carrier = cast(Result, result_int.make(Err("bad")))
 
@@ -165,14 +168,6 @@ class TestResultCarrier(unittest.TestCase):
     def test_result_ok_constructor_rejects_non_carrier(self):
         with self.assertRaises(TypeError):
             cast(Any, Result.ok)(1)
-
-    def test_result_make_accepts_explicit_ok_variant(self):
-        result_int = Qual.of(INT, Spec.of("std.qualifiers.Result", STR))
-
-        carrier = cast(Result, result_int.make(Ok(1)))
-
-        self.assertTrue(carrier.is_ok)
-        self.assertEqual(carrier.value_carrier().fetch(), 1)
 
     def test_unwrap_returns_ok_carrier(self):
         carrier = Result.ok(LeafCarrier(INT, 1))
@@ -285,13 +280,15 @@ class TestResultCarrier(unittest.TestCase):
 
     def test_manual_result_requires_result_qualified_descriptor(self):
         with self.assertRaises(AssertionError):
-            Result(cast(Any, INT), Ok(1))
+            Result(cast(Any, INT), 1)
 
-    def test_manual_result_requires_explicit_variant_content(self):
-        result_int = Qual.of(INT, Spec.of("std.qualifiers.Result", STR))
+    def test_manual_result_allows_plain_success_content(self):
+        result_int = Qual(Result.qualifier(val(STR)), INT)
 
-        with self.assertRaises(AssertionError):
-            Result(result_int, cast(Any, 1))
+        carrier = Result(result_int, 1)
+
+        self.assertTrue(carrier.is_ok)
+        self.assertEqual(carrier.value_carrier().fetch(), 1)
 
 
 class TestOptionCarrier(unittest.TestCase):
@@ -304,13 +301,13 @@ class TestOptionCarrier(unittest.TestCase):
         self.assertEqual(carrier.value_carrier().descriptor, INT)
         self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[-1].fetch()).anchor, "std.qualifiers.Optional")
 
-    def test_option_none_projects_python_annotation(self):
-        carrier = Option.none(dict[str, int])
+    # def test_option_none_projects_python_annotation(self): OLD FUNCTIONALITY, NEED TO BE DELETED
+    #     carrier = Option.none(dict[str, int])
 
-        self.assertTrue(carrier.is_none)
-        self.assertEqual(carrier.descriptor.underlying, INT)
-        self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[0].fetch()).anchor, "std.qualifiers.Map")
-        self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[-1].fetch()).anchor, "std.qualifiers.Optional")
+    #     self.assertTrue(carrier.is_none)
+    #     #self.assertEqual(carrier.descriptor.underlying, INT)
+    #     self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[0].fetch()).anchor, "std.qualifiers.Map")
+    #     self.assertEqual(cast(Spec, carrier.descriptor.qualifiers[-1].fetch()).anchor, "std.qualifiers.Optional")
 
     def test_optional_make_defaults_to_some(self):
         optional_int = Qual.of(INT, Spec.of("std.qualifiers.Optional"))
@@ -395,6 +392,48 @@ class TestOptionCarrier(unittest.TestCase):
         with self.assertRaises(TypeError):
             carrier.and_then(lambda value: cast(Any, value.fetch()) + 1)
 
+    def test_option_reconstruct_rebuilds_structured_some(self):
+        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+
+        rebuilt = cast(
+            Option,
+            carrier.reconstruct(
+                (
+                    Option.some(LeafCarrier(INT, 2)),
+                    Option.some(LeafCarrier(STR, "b")),
+                )
+            ),
+        )
+
+        self.assertTrue(rebuilt.is_some)
+        self.assertEqual(rebuilt.unwrap().fetch(), (2, "b"))
+
+    def test_option_reconstruct_rebuilds_structured_none(self):
+        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+
+        rebuilt = cast(
+            Option,
+            carrier.reconstruct(
+                (
+                    Option.none(),
+                    Option.none(),
+                )
+            ),
+        )
+
+        self.assertTrue(rebuilt.is_none)
+
+    def test_option_reconstruct_rejects_mixed_some_and_none(self):
+        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+
+        with self.assertRaises(TypeError):
+            carrier.reconstruct(
+                (
+                    Option.some(LeafCarrier(INT, 2)),
+                    Option.none(),
+                )
+            )
+
     def test_option_ok_or_converts_some_to_result_ok(self):
         carrier = Option.some(LeafCarrier(INT, 1))
 
@@ -449,19 +488,19 @@ class TestTypeSchema(unittest.TestCase):
             tuple(ANY)
 
     def test_spec_schema_returns_known_schema(self):
-        spec = Spec.of("std.types.Result.Ok", INT)
+        spec = Spec.of("std.types.Result.Err", INT)
         schema = spec.schema
 
         assert schema is not None
-        self.assertEqual(schema.attr(Id("value")).fetch(), INT)
+        self.assertEqual(schema.attr(Id("payload")).fetch(), INT)
 
     def test_qual_schema_projects_one_level(self):
-        qual = Qual.of(Spec.of("std.types.Result.Ok", INT), Spec.of("std.qualifiers.Optional"))
+        qual = Qual.of(Spec.of("std.types.Result.Err", INT), Spec.of("std.qualifiers.Optional"))
         schema = qual.schema
 
         assert schema is not None
         self.assertEqual(
-            schema.attr(Id("value")).fetch(),
+            schema.attr(Id("payload")).fetch(),
             Qual.of(INT, Spec.of("std.qualifiers.Optional")),
         )
 
@@ -483,17 +522,36 @@ class TestTypeSchema(unittest.TestCase):
 
 
 class TestProjectedCarrierTraversal(unittest.TestCase):
-    def test_option_structural_traversal_is_not_implemented(self):
+    def test_option_logical_children_project_payload(self):
         carrier = Option.some(LeafCarrier(INT, 1))
 
-        with self.assertRaises(TypeError):
-            len(carrier)
+        self.assertEqual(len(carrier), 0)
 
-    def test_result_structural_traversal_is_not_implemented(self):
+    def test_result_logical_children_project_payload(self):
         carrier = Result.ok(LeafCarrier(INT, 1))
 
-        with self.assertRaises(TypeError):
-            len(carrier)
+        self.assertEqual(len(carrier), 0)
+
+    def test_option_logical_children_project_structured_payload(self):
+        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+
+        self.assertEqual([child.fetch() for child in carrier], [1, "a"])
+        self.assertEqual(
+            [child.descriptor for child in carrier],
+            [
+                Qual.of(INT, Spec.of("std.qualifiers.Optional")),
+                Qual.of(STR, Spec.of("std.qualifiers.Optional")),
+            ],
+        )
+
+    def test_result_logical_children_project_structured_payload(self):
+        carrier = Result.ok(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+
+        projected = [cast(Result, child) for child in carrier]
+
+        self.assertTrue(all(isinstance(child, Result) for child in projected))
+        self.assertTrue(all(child.is_ok for child in projected))
+        self.assertEqual([child.unwrap().fetch() for child in projected], [1, "a"])
 
 
 class TestContainerCarriers(unittest.TestCase):
@@ -502,24 +560,36 @@ class TestContainerCarriers(unittest.TestCase):
 
         carrier = cast(Map, map_type.make({Id("a"): 1, Id("b"): 2}))
 
-        self.assertEqual({child.fetch() for child in carrier.elements()}, {1, 2})
+        self.assertEqual({child.fetch() for child in carrier.values()}, {1, 2})
 
     def test_set_iterates_payload_content(self):
         set_type = Qual.of(INT, Spec.of("std.qualifiers.Set"))
 
         carrier = cast(Set, set_type.make({1, 2, 3}))
 
-        self.assertEqual([child.fetch() for child in carrier.elements()], [1, 2, 3])
+        self.assertEqual([child.fetch() for child in carrier.values()], [1, 2, 3])
 
-    def test_set_elements_are_deterministic(self):
+    def test_set_values_are_deterministic(self):
         set_type = Qual.of(INT, Spec.of("std.qualifiers.Set"))
         left = cast(Set, set_type.make({3, 1, 2}))
         right = cast(Set, set_type.make({2, 3, 1}))
 
         self.assertEqual(
-            [child.fetch() for child in left.elements()],
-            [child.fetch() for child in right.elements()],
+            [child.fetch() for child in left.values()],
+            [child.fetch() for child in right.values()],
         )
+
+    def test_map_logical_children_are_not_implemented(self):
+        carrier = cast(Map, Qual.of(INT, Spec.of("std.qualifiers.Map", STR)).make({Id("a"): 1}))
+
+        with self.assertRaises(NotImplementedError):
+            _ = carrier.children
+
+    def test_set_logical_children_are_not_implemented(self):
+        carrier = cast(Set, Qual.of(INT, Spec.of("std.qualifiers.Set")).make({1}))
+
+        with self.assertRaises(NotImplementedError):
+            _ = carrier.children
 
 
 class TestTupleMap(unittest.TestCase):

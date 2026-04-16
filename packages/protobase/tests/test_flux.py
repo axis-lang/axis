@@ -147,7 +147,7 @@ class FluxContextVarTest(unittest.TestCase):
         calls = {"value": 0}
         current = flux.contextvar("test.current", default=2)
 
-        @flux.functions
+        @flux.function
         def doubled() -> int:
             calls["value"] += 1
             return cast(int, current.get()) * 2
@@ -169,7 +169,7 @@ class FluxContextVarTest(unittest.TestCase):
     def test_contextvar_set_inside_query_raises(self):
         current = flux.contextvar("test.reentrant", default=1)
 
-        @flux.functions
+        @flux.function
         def bad() -> int:
             current.set(2)
             return 0
@@ -232,7 +232,7 @@ class FluxFunctionTest(unittest.TestCase):
     def test_global_function_cache(self):
         calls = {"add": 0}
 
-        @flux.functions
+        @flux.function
         def add(a: int, b: int) -> int:
             calls["add"] += 1
             return a + b
@@ -283,7 +283,7 @@ class FluxUnsupportedReturnTest(unittest.TestCase):
             _ = box.value
 
     def test_function_coroutine_object_raises(self):
-        @flux.functions
+        @flux.function
         def compute() -> object:
             async def inner() -> int:
                 return 1
@@ -385,7 +385,7 @@ class FluxEmitCollectTest(unittest.TestCase):
 
 class FluxMiscTest(unittest.TestCase):
     def test_unhashable_args_raise(self):
-        @flux.functions
+        @flux.function
         def total(values: list[int]) -> int:
             return sum(values)
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any as _Any
 
-import protomorph as _pm
+import protomorph.core as _pm
 from protobase import _
 
-from .builtin import Builtin as _Builtin
+from protomorph.core.foundation import Builtin as _Builtin
 from .type_ import Datum as _Datum
 from .type_ import Type as _Type
 
@@ -53,7 +53,14 @@ class PlaceholderMetatype(Placeholder):
         return type(self)(self.of, self.level + 1)
 
     def display_label(self) -> str | None:
-        base = placeholder_label(self.of)
+        base = self.of.display_label()
+        if base is None:
+            ident = getattr(self.of, "id", None)
+            if isinstance(ident, str):
+                base = ident
+            else:
+                slot = getattr(self.of, "slot", None)
+                base = str(slot) if isinstance(slot, int) else type(self.of).__name__
         if self.level <= 3:
             return base + ("'" * self.level)
         return f"{base}^{self.level}"
@@ -79,7 +86,7 @@ def var[C: _Builtin, I: _Datum](
 ) -> SimpleVar[C, I]:
     implicit_bound = bound is None
     if bound is None:
-        bound = _pm.Spec.of("std.types.Any")
+        bound = _pm.Spec.Any
     elif not isinstance(bound, _Type):
         bound = _pm.project_type(bound)
     return SimpleVar(id=id, bound=bound, ctx=ctx, implicit_bound=implicit_bound)
@@ -88,32 +95,3 @@ def var[C: _Builtin, I: _Datum](
 WILDCARD = WildcardMark()
 ELLIPSIS = EllipsisMark()
 SELF = SelfMark()
-
-
-def placeholder_name(value: Placeholder) -> str | None:
-    ident = getattr(value, "id", None)
-    return ident if isinstance(ident, str) else None
-
-
-def placeholder_context(value: Placeholder) -> _Any | None:
-    return getattr(value, "ctx", None)
-
-
-def placeholder_slot(value: Placeholder) -> int | None:
-    slot = getattr(value, "slot", None)
-    return slot if isinstance(slot, int) else None
-
-
-def placeholder_label(value: Placeholder) -> str:
-    label_fn = getattr(value, "display_label", None)
-    if callable(label_fn):
-        label = label_fn()
-        if isinstance(label, str):
-            return label
-    ident = placeholder_name(value)
-    if ident is not None:
-        return ident
-    slot = placeholder_slot(value)
-    if slot is not None:
-        return str(slot)
-    return type(value).__name__

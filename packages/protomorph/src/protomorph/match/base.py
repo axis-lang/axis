@@ -6,7 +6,7 @@ from typing import Any as _Any, Generic as _Generic, TypeVar as _TypeVar, cast a
 from protobase import frozendict, _
 
 import protomorph as pm
-from ..domain import Builtin
+from ..core.foundation import Builtin
 
 P = _TypeVar("P")
 
@@ -22,6 +22,18 @@ def _default_var_merge(var: pm.Val, binding: Binding) -> pm.Val:
     if len(captures) != 1:
         raise ValueError(f"Cannot merge captures for {var!r}: {captures!r}")
     return next(iter(captures))
+
+
+def _is_pattern_value(value: pm.Val) -> bool:
+    stack: list[pm.Val] = [value]
+    while stack:
+        node = stack.pop()
+        fetched = node.fetch()
+        if isinstance(fetched, Node | pm.Placeholder | pm.Var):
+            return True
+        if len(node.children) > 0:
+            stack.extend(node.children)
+    return False
 
 
 class Node(Builtin, abstract=True):
@@ -258,7 +270,7 @@ class Walker(_Generic[P]):
                     pending=_cast(list[_State[_Any]], pending),
                 )
                 continue
-            if not pattern_carrier._has_structural_children() and isinstance(pattern_value, pm.Placeholder):
+            if len(pattern_carrier.children) == 0 and isinstance(pattern_value, pm.Placeholder):
                 self.step_placeholder(pattern_carrier, subject_carrier, state, pending)
                 continue
             self.step_structural(pattern_carrier, subject_carrier, state, pending)
@@ -299,18 +311,18 @@ class Walker(_Generic[P]):
             pending.append(state)
             return
         if isinstance(value, pm.PlaceholderMetatype):
-            if not subject._has_structural_children() and subject.fetch() == value:
+            if len(subject.children) == 0 and subject.fetch() == value:
                 pending.append(state)
             return
-        if not subject._has_structural_children() and subject.fetch() == value:
+        if len(subject.children) == 0 and subject.fetch() == value:
             pending.append(state)
 
     def _structurally_compatible(self, pattern: pm.Val, subject: pm.Val) -> bool:
-        if pm.compatible_structure(pattern.descriptor, subject.descriptor):
+        if pm.compatible(pattern.descriptor, subject.descriptor):
             return True
-        if pattern._has_structural_children() and subject._has_structural_children() and type(pattern) is type(subject):
+        if len(pattern.children) > 0 and len(subject.children) > 0 and type(pattern) is type(subject):
             return True
-        if pm.val(pattern.descriptor).is_pattern:
+        if _is_pattern_value(pm.val(pattern.descriptor)):
             return True
         pattern_value = pattern.fetch()
         subject_value = subject.fetch()
@@ -320,7 +332,7 @@ class Walker(_Generic[P]):
 
     def _reify_pattern_with_env(self, pattern: pm.Val, env: Env) -> pm.Val:
         subst = env.merge(is_var=self.is_var, var_merge=self.var_merge)
-        reified_type = pattern.type.subst(subst)
+        reified_type = pm.walk_subst(pattern.type, subst)
         reified_descriptor = _cast(pm.Type, reified_type.fetch())
         return reified_descriptor.make(pattern.fetch())
 
@@ -333,7 +345,7 @@ class Walker(_Generic[P]):
     ) -> None:
         branch = state.clone()
         pattern_value = pattern.fetch()
-        if self.meta_levels > 0 and pattern.type.is_pattern and not isinstance(pattern_value, pm.Type):
+        if self.meta_levels > 0 and _is_pattern_value(pattern.type) and not isinstance(pattern_value, pm.Type):
             subresult = type(self)(is_var=self.is_var, meta_levels=self.meta_levels - 1, var_merge=self.var_merge).run(pattern.type, subject.type)
             if subresult is None:
                 return
@@ -342,8 +354,8 @@ class Walker(_Generic[P]):
             if not self._structurally_compatible(pattern, subject):
                 return
             subsolutions = (Solution(env=Env(), payloads=frozenset(), case_ids=frozenset()),)
-        if not pattern._has_structural_children():
-            if subject._has_structural_children():
+        if len(pattern.children) == 0:
+            if len(subject.children) > 0:
                 return
             if isinstance(pattern_value, pm.Type):
                 if not self._structurally_compatible(pattern, subject):
@@ -358,7 +370,7 @@ class Walker(_Generic[P]):
                 subbranch.defaults.extend(subsolution.defaults)
                 pending.append(subbranch)
             return
-        if (not subject._has_structural_children()) or len(pattern) != len(subject):
+        if len(subject.children) == 0 or len(pattern) != len(subject):
             return
         for subsolution in subsolutions:
             subbranch = branch.clone()
@@ -367,7 +379,7 @@ class Walker(_Generic[P]):
             subbranch.case_ids.update(subsolution.case_ids)
             subbranch.defaults.extend(subsolution.defaults)
             active_pattern = pattern
-            if self.meta_levels > 0 and pattern.type.is_pattern and not isinstance(pattern_value, pm.Type):
+            if self.meta_levels > 0 and _is_pattern_value(pattern.type) and not isinstance(pattern_value, pm.Type):
                 active_pattern = self._reify_pattern_with_env(pattern, self.freeze_env(subbranch.env))
                 if not self._structurally_compatible(active_pattern, subject):
                     continue
@@ -385,7 +397,7 @@ class Walker(_Generic[P]):
     def _subject_shape(self, subject: pm.Val) -> tuple[int, frozenset[pm.Id]]:
         positional_count = 0
         keys: set[pm.Id] = set()
-        if not subject._has_structural_children():
+        if len(subject.children) == 0:
             return positional_count, frozenset()
         for offset in range(len(subject)):
             item = subject.payload_item_at(offset)
@@ -416,7 +428,7 @@ class Walker(_Generic[P]):
         suffix_len: int,
     ) -> tuple[pm.Type, ...] | None:
         target = self.resolve_path(subject, path)
-        if not target._has_structural_children():
+        if len(target.children) == 0:
             return None
         if len(target) < prefix_len + suffix_len:
             return None
@@ -437,7 +449,7 @@ class Walker(_Generic[P]):
         keys: tuple[pm.Id, ...],
     ) -> tuple[pm.Type, ...] | None:
         target = self.resolve_path(subject, path)
-        if not target._has_structural_children():
+        if len(target.children) == 0:
             return None
         result: list[pm.Type] = []
         for key in keys:

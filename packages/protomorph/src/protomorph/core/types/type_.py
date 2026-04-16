@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Iterator as _Iterator
 
-import protomorph as _pm
+import protomorph.core as _pm
 from protobase import frozendict as _frozendict
 
-from .builtin import Builtin as _Builtin
+from protomorph.core.foundation import Builtin as _Builtin
 
 
 type Datum = (
@@ -41,16 +41,31 @@ class Type[T](_Builtin, abstract=True):
     def __len__(self) -> int:
         schema = self.schema
         if schema is None:
-            raise TypeError(f"Leaf type has no structural length: {type(self).__name__}")
+            raise TypeError(
+                f"Leaf type has no structural length: {type(self).__name__}"
+            )
         return len(schema)
 
     def __iter__(self) -> _Iterator:
         schema = self.schema
         if schema is None:
-            raise TypeError(f"Leaf type has no structural iteration: {type(self).__name__}")
+            raise TypeError(
+                f"Leaf type has no structural iteration: {type(self).__name__}"
+            )
         for child in schema:
             yield child.fetch()
 
+    def __getitem__(self, key: int) -> _pm.Val[Type]:
+        schema = self.schema
+        if schema is None:
+            raise TypeError(
+                f"Leaf type has no structural indexing: {type(self).__name__}"
+            )
+        return schema[key]
 
-def compatible_structure(left: Type, right: Type) -> bool:
+
+def compatible(left: Type, right: Type) -> bool:
+    if left is right:
+        return True
+
     return bool(_pm.current_realm().compatible_structure(left, right))

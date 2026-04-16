@@ -6,8 +6,8 @@ from typing import Any, Self, cast
 from weakref import WeakKeyDictionary
 
 from protobase import flux, frozendict, cached_property
-import protomorph as pm
-from .domain import Anchor, Builtin
+import protomorph.core as _pm
+from .foundation import Anchor, Builtin
 
 
 class Realm(Builtin, abstract=True):
@@ -16,7 +16,7 @@ class Realm(Builtin, abstract=True):
         raise NotImplementedError(f"{type(self).__name__}.eval() is not implemented")
 
     @flux.method
-    def schema_for(self, spec: pm.Spec) -> pm.Schema | None:
+    def schema_for(self, spec: _pm.Spec) -> _pm.Schema | None:
         _ = spec
         return None
 
@@ -32,26 +32,6 @@ class Realm(Builtin, abstract=True):
     ) -> Any | None:
         _ = (operator, goal, session)
         return None
-
-    def val_is_leaf(self, meta: Any, data: Any) -> bool:
-        _ = (meta, data)
-        return True
-
-    def val_children(
-        self,
-        meta: Any,
-        data: Any,
-    ) -> tuple[Any, ...]:
-        _ = (meta, data)
-        return ()
-
-    def val_reconstruct(
-        self,
-        meta: Any,
-        children: tuple[Any, ...],
-    ) -> Any:
-        _ = (meta, children)
-        raise NotImplementedError
 
     @flux.property
     def anchors(self) -> frozenset[Anchor]:
@@ -128,23 +108,6 @@ class OverlayRealm(Realm):
     def compatible_structure(self, left: Any, right: Any) -> bool:
         return self.base.compatible_structure(left, right)
 
-    def val_is_leaf(self, meta: Any, data: Any) -> bool:
-        return self.base.val_is_leaf(meta, data)
-
-    def val_children(
-        self,
-        meta: Any,
-        data: Any,
-    ) -> tuple[Any, ...]:
-        return self.base.val_children(meta, data)
-
-    def val_reconstruct(
-        self,
-        meta: Any,
-        children: tuple[Any, ...],
-    ) -> Any:
-        return self.base.val_reconstruct(meta, children)
-
     def eval_logic_op(
         self,
         operator: Any,
@@ -183,19 +146,19 @@ class OverlayRealm(Realm):
 
 
 def _logic_assertion(item: Builtin):
-    import protomorph as pm
+    import protomorph.core as _pm
     from protomorph import logic
 
     if isinstance(item, logic.Assertion):
         return item
-    if isinstance(item, pm.Val):
+    if isinstance(item, _pm.Val):
         return logic.Assertion(item)
     value = cast(Any, item)
     if hasattr(value, "head") and hasattr(value, "body"):
         raise TypeError(
-            "Realm.logic_assertions no longer adapts legacy Rule-like objects; provide pm.logic.Assertion values explicitly"
+            "Realm.logic_assertions no longer adapts legacy Rule-like objects; provide _pm.logic.Assertion values explicitly"
         )
-    return logic.Assertion(item if isinstance(item, pm.Val) else pm.val(item))
+    return logic.Assertion(item if isinstance(item, _pm.Val) else _pm.val(item))
 
 
 def current_realm() -> Realm:

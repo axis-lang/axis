@@ -7,7 +7,7 @@ from protobase import _
 import protomorph as pm
 
 
-_ANY = pm.Spec.of("std.types.Any")
+_ANY = pm.Spec.Any
 
 
 class Match(pm.Builtin):
@@ -98,7 +98,7 @@ def _compile_match_templates(
             return local_slot
 
         local_pattern = pm.Pattern(
-            pattern=branch.deep_map(replace),
+            pattern=pm.walk_map(branch, replace),
             slots=tuple(local_slots),
             ctx=(side, branch),
         )
@@ -134,7 +134,7 @@ def _compile_match_templates(
         elif left_slot:
             if not _descriptors_compatible(left_node.descriptor, right_node.descriptor):
                 return None
-            if not right_node._has_structural_children():
+            if len(right_node.children) == 0:
                 fw_whole = right_node
                 bw_whole = right_node
             else:
@@ -146,7 +146,7 @@ def _compile_match_templates(
         elif right_slot:
             if not _descriptors_compatible(left_node.descriptor, right_node.descriptor):
                 return None
-            if not left_node._has_structural_children():
+            if len(left_node.children) == 0:
                 fw_whole = left_node
                 bw_whole = left_node
             else:
@@ -156,14 +156,14 @@ def _compile_match_templates(
                 record_branch_projections(bw_occurrences, bw_whole, mapping)
 
         else:
-            if (not left_node._has_structural_children()) or (not right_node._has_structural_children()):
+            if len(left_node.children) == 0 or len(right_node.children) == 0:
                 if left_node != right_node:
                     return None
                 fw_whole = left_node
                 bw_whole = right_node
             else:
                 if (
-                    not pm.compatible_structure(left_node.descriptor, right_node.descriptor)
+                    not pm.compatible(left_node.descriptor, right_node.descriptor)
                     or len(left_node) != len(right_node)
                 ):
                     return None
@@ -263,7 +263,7 @@ def _ir_subst(value: pm.Val, mapping: dict[pm.Val, pm.Val]) -> pm.Val:
         proj = value.fetch()
         return pm.val(pm.Proj(value=_ir_subst(proj.value, mapping), target=proj.target))
 
-    if not value._has_structural_children():
+    if len(value.children) == 0:
         return value
 
     children = tuple(_ir_subst(child, mapping) for child in value)
@@ -289,7 +289,7 @@ def _slot_known(descriptor: pm.Type) -> pm.Morph:
 
 
 def _expr_from_pattern(node: pm.Val) -> pm.Val:
-    if _is_pattern_slot(node) or not node._has_structural_children():
+    if _is_pattern_slot(node) or len(node.children) == 0:
         return node
     return node.reconstruct(tuple(_expr_from_pattern(child) for child in node))
 
@@ -305,9 +305,9 @@ def _bucket_compatible(exprs: tuple[pm.Val, ...]) -> bool:
 def _exprs_compatible(left: pm.Val, right: pm.Val) -> bool:
     if _is_soft_expr(left) or _is_soft_expr(right):
         return True
-    if (not left._has_structural_children()) or (not right._has_structural_children()):
+    if len(left.children) == 0 or len(right.children) == 0:
         return left == right
-    if not pm.compatible_structure(left.descriptor, right.descriptor) or len(left) != len(right):
+    if not pm.compatible(left.descriptor, right.descriptor) or len(left) != len(right):
         return False
     return all(
         _exprs_compatible(left_child, right_child)
@@ -316,15 +316,15 @@ def _exprs_compatible(left: pm.Val, right: pm.Val) -> bool:
 
 
 def _is_soft_expr(node: pm.Val) -> bool:
-    return not node._has_structural_children() and isinstance(node.fetch(), pm.Placeholder)
+    return len(node.children) == 0 and isinstance(node.fetch(), pm.Placeholder)
 
 
 def _is_pattern_slot(node: pm.Val) -> bool:
-    return not node._has_structural_children() and isinstance(node.fetch(), pm.Pattern.Slot)
+    return len(node.children) == 0 and isinstance(node.fetch(), pm.Pattern.Slot)
 
 
 def _is_match_hole(node: pm.Val) -> bool:
-    return not node._has_structural_children() and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
 
 
 def _descriptors_compatible(left: pm.Type, right: pm.Type) -> bool:
@@ -332,8 +332,8 @@ def _descriptors_compatible(left: pm.Type, right: pm.Type) -> bool:
 
 
 def _is_fuse_value(node: pm.Val) -> bool:
-    return not node._has_structural_children() and isinstance(node.fetch(), pm.Fuse)
+    return len(node.children) == 0 and isinstance(node.fetch(), pm.Fuse)
 
 
 def _is_proj_value(node: pm.Val) -> bool:
-    return not node._has_structural_children() and isinstance(node.fetch(), pm.Proj)
+    return len(node.children) == 0 and isinstance(node.fetch(), pm.Proj)

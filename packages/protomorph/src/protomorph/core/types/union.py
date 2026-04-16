@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any as _Any
 
-import protomorph as _pm
+import protomorph.core as _pm
 
 from .type_ import Type as _Type
 

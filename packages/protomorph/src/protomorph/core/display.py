@@ -12,7 +12,8 @@ Convention:
 from __future__ import annotations
 
 from typing import Any, cast
-from .domain import Builtin, Op
+from .foundation import Builtin
+from .types import Op
 
 _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 
@@ -22,11 +23,11 @@ _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 
 def repr_any(obj: Any) -> str:
     """Single dispatch repr for any core object (Type, Val, Builtin)."""
-    from .domain import Placeholder, placeholder_label
-    from .domain import UniformType, UnionType, VaryingType, IndexedType
-    from .domain import Spread, Spec, Qual
-    from .canonical import Morph, Fuse, Proj
-    from .logic.match import Match
+    from .types import Placeholder
+    from .types import UniformType, UnionType, VaryingType, IndexedType, Spec, Qual
+    from .foundation import Spread
+    from ..canonical import Morph, Fuse, Proj
+    from ..logic.match import Match
     from .values import Val, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
 
     if isinstance(obj, Fuse):
@@ -44,7 +45,16 @@ def repr_any(obj: Any) -> str:
 
     # ── Concrete Types (check before generic Type) ──
     if isinstance(obj, Placeholder):
-        return placeholder_label(obj)
+        label = obj.display_label()
+        if isinstance(label, str):
+            return label
+        ident = getattr(obj, "id", None)
+        if isinstance(ident, str):
+            return ident
+        slot = getattr(obj, "slot", None)
+        if isinstance(slot, int):
+            return str(slot)
+        return type(obj).__name__
     if isinstance(obj, VaryingType):
         return _repr_varying(obj)
     if isinstance(obj, IndexedType):
@@ -103,7 +113,9 @@ def _repr_builtin(value: Any) -> str:
 
 
 def _repr_morph(morph) -> str:
-    reified = morph.descriptor.pattern.subst({
+    import protomorph.core as _pm
+
+    reified = _pm.walk_subst(morph.descriptor.pattern, {
         slot: binding
         for slot, binding in morph.binding_items()
         if _is_simple_morph_binding(binding)
@@ -140,7 +152,7 @@ def _repr_proj(proj) -> str:
 
 
 def _is_simple_morph_binding(binding) -> bool:
-    return not binding._has_structural_children() and not isinstance(binding.fetch(), Op)
+    return len(binding.children) == 0 and not isinstance(binding.fetch(), Op)
 
 
 def _trim_anchor(anchor: str) -> str:
@@ -162,7 +174,7 @@ def _repr_spec(spec) -> str:
 
 
 def _repr_qual(qual) -> str:
-    from .domain import Spec
+    from .types import Spec
     
     qualifiers = tuple(cast(Spec, child.fetch()) for child in qual.qualifiers)
     if not qualifiers:
