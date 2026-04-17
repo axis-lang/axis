@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Id, Index, IndexedType, Item, Option, Spread, Spec, Tuple, VaryingType
+from protomorph import Id, Index, IndexedType, Option, Spec, Tuple, UniformType, VaryingType
 
 
 INT = Spec.of("std.types.Integer")
@@ -24,38 +24,41 @@ class TestIndex(unittest.TestCase):
         self.assertEqual(idx.offset_of(Id("z")), 2)
 
 
-class TestSpread(unittest.TestCase):
-    def test_creation(self):
-        s = Spread((1, 2, 3))
-        self.assertEqual(s.values, (1, 2, 3))
-
-
 class TestIndexedType(unittest.TestCase):
     def test_schema_access(self):
         descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
         schema = descriptor.schema
 
-        self.assertEqual(schema.payload_item_at(0), Item(0, None, INT))
-        self.assertEqual(schema.payload_item_at(1), Item(1, Id("y"), STR))
-        self.assertIs(schema.attr(Id("y")).fetch(), STR)
+        self.assertIsNone(schema.entry_at(0).key)
+        self.assertIs(schema.entry_at(0).value.content, INT)
+        self.assertEqual(list(schema.entries())[1].key, Id("y"))
+        self.assertIs(schema.attr(Id("y")).content, STR)
 
     def test_tuple_attr(self):
         descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
         carrier = Tuple(descriptor, (1, "hello"))
-        self.assertEqual(carrier.attr(Id("y")).fetch(), "hello")
+        self.assertEqual(carrier.attr(Id("y")).content, "hello")
 
-    def test_splice_resynthesizes_index(self):
-        descriptor = IndexedType(
-            VaryingType(cast(tuple, (INT, Spread((STR, FLOAT)), INT))),
-            Index.of(Id("a"), None, Id("c")),
-        )
-        spliced = cast(IndexedType, descriptor.splice())
-        schema = spliced.schema
+    def test_tuple_slice_preserves_indexed_descriptor(self):
+        descriptor = cast(IndexedType, IndexedType.of(INT, y=STR, z=FLOAT))
+        carrier = Tuple(descriptor, (1, "hello", 2.0))
 
-        self.assertEqual(schema.payload_item_at(0).key, Id("a"))
-        self.assertIsNone(schema.payload_item_at(1).key)
-        self.assertIsNone(schema.payload_item_at(2).key)
-        self.assertEqual(schema.payload_item_at(3).key, Id("c"))
+        sliced = cast(Tuple, carrier[1:])
+
+        self.assertEqual([child.content for child in sliced], ["hello", 2.0])
+        self.assertIsInstance(sliced.descriptor, IndexedType)
+        self.assertEqual(cast(IndexedType, sliced.descriptor).index.content, (Id("y"), Id("z")))
+
+    def test_tuple_slice_preserves_indexed_uniform_slots(self):
+        descriptor = IndexedType(UniformType(INT), Index.of(Id("a"), Id("b"), Id("c")))
+        carrier = Tuple(descriptor, (1, 2, 3))
+
+        sliced = cast(Tuple, carrier[1:])
+
+        self.assertEqual([child.content for child in sliced], [2, 3])
+        self.assertIsInstance(sliced.descriptor, IndexedType)
+        self.assertIsInstance(cast(IndexedType, sliced.descriptor).slots, UniformType)
+        self.assertEqual(cast(IndexedType, sliced.descriptor).index.content, (Id("b"), Id("c")))
 
 
 class TestIndexElementDescriptor(unittest.TestCase):
@@ -67,7 +70,7 @@ class TestIndexElementDescriptor(unittest.TestCase):
 
     def test_dense_element_fetch(self):
         idx = Index.of(Id("x"))
-        self.assertEqual(idx[0].fetch(), Id("x"))
+        self.assertEqual(idx[0].content, Id("x"))
 
     def test_sparse_element_descriptor_is_optional_id(self):
         from protomorph import Qual, Option
@@ -87,7 +90,34 @@ class TestIndexElementDescriptor(unittest.TestCase):
         carrier = cast(Option, idx[0])
         self.assertIsInstance(carrier, Option)
         self.assertTrue(carrier.is_some)
-        self.assertEqual(carrier.unwrap().fetch(), Id("x"))
+        self.assertEqual(carrier.unwrap().content, Id("x"))
+
+    def test_index_slice_returns_index(self):
+        idx = Index.of(Id("a"), None, Id("c"))
+
+        sliced = cast(Index, idx[1:])
+
+        self.assertIsInstance(sliced, Index)
+        self.assertEqual(sliced.content, (None, Id("c")))
+
+
+class TestTupleSlices(unittest.TestCase):
+    def test_varying_slice_preserves_varying_descriptor(self):
+        carrier = Tuple(VaryingType.of(INT, STR, FLOAT), (1, "a", 2.0))
+
+        sliced = cast(Tuple, carrier[1:])
+
+        self.assertEqual([child.content for child in sliced], ["a", 2.0])
+        self.assertIsInstance(sliced.descriptor, VaryingType)
+        self.assertEqual(cast(VaryingType, sliced.descriptor).values, (STR, FLOAT))
+
+    def test_uniform_slice_preserves_uniform_descriptor(self):
+        carrier = Tuple(UniformType(INT), (1, 2, 3))
+
+        sliced = cast(Tuple, carrier[1:])
+
+        self.assertEqual([child.content for child in sliced], [2, 3])
+        self.assertIsInstance(sliced.descriptor, UniformType)
 
 
 if __name__ == "__main__":

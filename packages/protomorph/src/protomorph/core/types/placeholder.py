@@ -5,8 +5,7 @@ from typing import Any as _Any
 import protomorph.core as _pm
 from protobase import _
 
-from protomorph.core.foundation import Builtin as _Builtin
-from .type_ import Datum as _Datum
+from protomorph.core.foundation import Builtin as _Builtin, AnyData as _AnyData
 from .type_ import Type as _Type
 
 
@@ -66,7 +65,7 @@ class PlaceholderMetatype(Placeholder):
         return f"{base}^{self.level}"
 
 
-class SimpleVar[C: _Builtin, I: _Datum = str](Var):
+class SimpleVar[C: _Builtin, I: _AnyData = str](Var):
     ctx: C | None = None
     id: I = _
     bound: _Type = _
@@ -81,7 +80,7 @@ class SimpleVar[C: _Builtin, I: _Datum = str](Var):
         return str(self.id)
 
 
-def var[C: _Builtin, I: _Datum](
+def var[C: _Builtin, I: _AnyData](
     id: I, bound: _Type | _Any = None, ctx: C | None = None
 ) -> SimpleVar[C, I]:
     implicit_bound = bound is None

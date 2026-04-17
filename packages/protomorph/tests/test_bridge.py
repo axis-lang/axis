@@ -7,23 +7,23 @@ from typing import cast
 from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, Tuple, UniformType, UnionType, Val, Var, VaryingType, project_type, val
 
 
-INT = val(int).fetch()
-STR = val(str).fetch()
-FLOAT = val(float).fetch()
-BOOL = val(bool).fetch()
-NONE = val(type(None)).fetch()
+INT = val(int).content
+STR = val(str).content
+FLOAT = val(float).content
+BOOL = val(bool).content
+NONE = val(type(None)).content
 
 
 class TestWrapProjection(unittest.TestCase):
     def test_scalars(self):
-        self.assertEqual(val(int).fetch(), INT)
-        self.assertEqual(val(str).fetch(), STR)
-        self.assertEqual(val(float).fetch(), FLOAT)
-        self.assertEqual(val(bool).fetch(), BOOL)
-        self.assertEqual(val(type(None)).fetch(), NONE)
+        self.assertEqual(val(int).content, INT)
+        self.assertEqual(val(str).content, STR)
+        self.assertEqual(val(float).content, FLOAT)
+        self.assertEqual(val(bool).content, BOOL)
+        self.assertEqual(val(type(None)).content, NONE)
 
     def test_type_passthrough(self):
-        self.assertIs(val(INT).fetch(), INT)
+        self.assertIs(val(INT).content, INT)
 
     def test_tuple_uniform(self):
         result = cast(UniformType, project_type(tuple[int, ...]))
@@ -79,10 +79,10 @@ class TestWrapProjection(unittest.TestCase):
 
 class TestWrap(unittest.TestCase):
     def test_wrap_annotation_returns_type_carrier(self):
-        self.assertEqual(val(int).fetch(), INT)
+        self.assertEqual(val(int).content, INT)
 
     def test_wrap_tuple_annotation_returns_type_carrier(self):
-        self.assertIsInstance(val(tuple[int, ...]).fetch(), UniformType)
+        self.assertIsInstance(val(tuple[int, ...]).content, UniformType)
 
     def test_wrap_tuple_varying_annotation_returns_type_value(self):
         descriptor = cast(VaryingType, cast(object, project_type(tuple[int, str, float])))
@@ -95,11 +95,11 @@ class TestWrap(unittest.TestCase):
             x: int
 
         carrier = val(Pt(5))
-        self.assertEqual(carrier.attr(Id("x")).fetch(), 5)
+        self.assertEqual(carrier.attr(Id("x")).content, 5)
 
     def test_wrap_scalar_value_returns_leaf_carrier(self):
         carrier = val(7)
-        self.assertEqual(carrier.fetch(), 7)
+        self.assertEqual(carrier.content, 7)
         self.assertIs(carrier.descriptor, INT)
 
     def test_list_projection_builds_qual(self):

@@ -19,8 +19,8 @@ from protomorph import (
 
 
 ANY = Spec.of("std.types.Any")
-INT = cast(Spec, val(int).fetch())
-STR = cast(Spec, val(str).fetch())
+INT = cast(Spec, val(int).content)
+STR = cast(Spec, val(str).content)
 
 
 class Point(Builtin):
@@ -70,7 +70,7 @@ class TestSimpleMatching(unittest.TestCase):
         self.assertIsNotNone(result)
         assert result is not None
         binding = result.solutions[0].env.values[pair[0]]
-        self.assertEqual({capture.fetch() for capture in binding.captures}, {1, 2})
+        self.assertEqual({capture.content for capture in binding.captures}, {1, 2})
 
     def test_matchenv_merge_raises_exceptiongroup_for_all_conflicts(self):
         T = LeafCarrier(ANY, var("T"))
@@ -116,7 +116,7 @@ class TestSummaryCompile(unittest.TestCase):
             shape=pm.match.ShapeSummary(min_positional_count=0, max_positional_count=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})
-        self.assertIsInstance(tree.fetch(), pm.match.Tree)
+        self.assertIsInstance(tree.content, pm.match.Tree)
 
     def test_shape_groups_compile_to_matchmany(self):
         no_args = pm.match.CaseSummary(
@@ -129,7 +129,7 @@ class TestSummaryCompile(unittest.TestCase):
         )
 
         tree = pm.match.compile({no_args: "zero", one_arg: "one"})
-        tree_val = cast(pm.match.Tree, tree.fetch())
+        tree_val = cast(pm.match.Tree, tree.content)
 
         self.assertIsInstance(tree_val.root, pm.match.Many)
 
@@ -139,7 +139,7 @@ class TestSummaryCompile(unittest.TestCase):
             shape=pm.match.ShapeSummary(min_positional_count=0, max_positional_count=0, allowed_keys=frozenset()),
         )
         tree = pm.match.compile({summary: "one"})
-        tree_val = cast(pm.match.Tree, tree.fetch())
+        tree_val = cast(pm.match.Tree, tree.content)
         self.assertIsInstance(tree_val.root, pm.match.GuardShape)
 
     def test_prefix_descriptor_switch_selected_first(self):
@@ -155,7 +155,7 @@ class TestSummaryCompile(unittest.TestCase):
         )
 
         tree = pm.match.compile({int_summary: "int", str_summary: "str"})
-        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.fetch()).root)
+        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.content).root)
         self.assertIsInstance(root.child, pm.match.SwitchFieldDescriptors)
 
     def test_nominal_descriptor_switch_used_when_positional_not_available(self):
@@ -182,7 +182,7 @@ class TestSummaryCompile(unittest.TestCase):
         )
 
         tree = pm.match.compile({int_summary: "int", str_summary: "str"})
-        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.fetch()).root)
+        root = cast(pm.match.GuardShape, cast(pm.match.Tree, tree.content).root)
         self.assertIsInstance(root.child, pm.match.SwitchNominalDescriptors)
 
     def test_ambiguity_residual_leaf(self):
@@ -197,7 +197,7 @@ class TestSummaryCompile(unittest.TestCase):
             prefix_descriptors=(None,),
         )
         tree = pm.match.compile({a: "left", b: "right"})
-        tree_val = cast(pm.match.Tree, tree.fetch())
+        tree_val = cast(pm.match.Tree, tree.content)
         root = cast(pm.match.GuardShape, tree_val.root)
         self.assertIsInstance(root.child, pm.match.Leaf)
         self.assertEqual(len(pm.match.diagnose(tree_val)), 1)

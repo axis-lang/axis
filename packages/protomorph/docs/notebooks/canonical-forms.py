@@ -340,8 +340,8 @@ def cell_projection(sample_morph):
 
     print("slot projection:", slot_projection)
     print("nest projection:", nest_projection)
-    print("slot op:", slot_projection.fetch())
-    print("nest op:", nest_projection.fetch())
+    print("slot op:", slot_projection.content)
+    print("nest op:", nest_projection.content)
     return
 
 

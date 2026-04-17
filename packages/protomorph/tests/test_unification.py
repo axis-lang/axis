@@ -12,13 +12,13 @@ from protomorph import (
 )
 
 ANY = Spec.of("std.types.Any")
-INT = cast(Spec, val(int).fetch())
-STR = cast(Spec, val(str).fetch())
-FLOAT = cast(Spec, val(float).fetch())
+INT = cast(Spec, val(int).content)
+STR = cast(Spec, val(str).content)
+FLOAT = cast(Spec, val(float).content)
 
 
 def is_var(carrier) -> bool:
-    return isinstance(carrier.fetch(), Placeholder)
+    return isinstance(carrier.content, Placeholder)
 
 
 class TestUnify(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestUnify(unittest.TestCase):
         b = LeafCarrier(INT, 42)
         result = unify(a, b, is_var=is_var)
         assert result is not None
-        self.assertEqual(result.fetch(), 42)
+        self.assertEqual(result.content, 42)
 
     def test_different_leaves_fail(self):
         a = LeafCarrier(INT, 42)
@@ -40,7 +40,7 @@ class TestUnify(unittest.TestCase):
         b = LeafCarrier(ANY, INT)
         result = unify(a, b, is_var=is_var)
         assert result is not None
-        self.assertIs(result.fetch(), INT)
+        self.assertIs(result.content, INT)
 
     def test_tuple_unification(self):
         vt = cast(VaryingType, VaryingType.of(ANY, ANY))
@@ -49,7 +49,7 @@ class TestUnify(unittest.TestCase):
         b = Tuple(vt, (INT, STR))
         result = unify(a, b, is_var=is_var)
         assert result is not None
-        self.assertEqual(repr(result.fetch()), repr((INT, STR)))
+        self.assertEqual(repr(result.content), repr((INT, STR)))
 
     def test_tuple_mismatch_fails(self):
         vt = cast(VaryingType, VaryingType.of(ANY, ANY))
@@ -99,7 +99,7 @@ class TestTransitiveResolution(unittest.TestCase):
         result2 = unify(b1, b2, subst=uf)
         self.assertIsNotNone(result2)
 
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), INT)
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, INT)
 
     def test_conflicting_binding_fails(self):
         """$T = int then $T = str should fail."""
@@ -131,12 +131,12 @@ class TestSnapshotRollback(unittest.TestCase):
         mark = uf.snapshot()
 
         unify(LeafCarrier(ANY, T), LeafCarrier(ANY, INT), subst=uf)
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), INT)
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, INT)
 
         uf.rollback(mark)
         # T should be unbound again
         resolved = uf.reify(LeafCarrier(ANY, T))
-        self.assertIsInstance(resolved.fetch(), Placeholder)
+        self.assertIsInstance(resolved.content, Placeholder)
 
     def test_rollback_nested(self):
         T = var("T")
@@ -149,12 +149,12 @@ class TestSnapshotRollback(unittest.TestCase):
 
         # Bind U
         unify(LeafCarrier(ANY, U), LeafCarrier(ANY, STR), subst=uf)
-        self.assertIs(uf.reify(LeafCarrier(ANY, U)).fetch(), STR)
+        self.assertIs(uf.reify(LeafCarrier(ANY, U)).content, STR)
 
         # Rollback only U
         uf.rollback(mark)
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), INT)  # T still bound
-        self.assertIsInstance(uf.reify(LeafCarrier(ANY, U)).fetch(), Placeholder)  # U unbound
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, INT)  # T still bound
+        self.assertIsInstance(uf.reify(LeafCarrier(ANY, U)).content, Placeholder)  # U unbound
 
     def test_rollback_allows_alternative(self):
         """Simulate impl selection: try one, rollback, try another."""
@@ -169,7 +169,7 @@ class TestSnapshotRollback(unittest.TestCase):
         # Try binding T = str instead
         r = unify(LeafCarrier(ANY, T), LeafCarrier(ANY, STR), subst=uf)
         self.assertIsNotNone(r)
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), STR)
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, STR)
 
 
 class TestSharedSubst(unittest.TestCase):
@@ -187,15 +187,15 @@ class TestSharedSubst(unittest.TestCase):
             subst=uf,
         )
         self.assertIsNotNone(r1)
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), INT)
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, INT)
 
         # Backward: from return type, we learn U = str
         r2 = unify(LeafCarrier(ANY, U), LeafCarrier(ANY, STR), subst=uf)
         self.assertIsNotNone(r2)
 
         # Both resolved
-        self.assertIs(uf.reify(LeafCarrier(ANY, T)).fetch(), INT)
-        self.assertIs(uf.reify(LeafCarrier(ANY, U)).fetch(), STR)
+        self.assertIs(uf.reify(LeafCarrier(ANY, T)).content, INT)
+        self.assertIs(uf.reify(LeafCarrier(ANY, U)).content, STR)
 
     def test_deep_reify(self):
         """Reify resolves variables inside bound terms."""
@@ -213,7 +213,7 @@ class TestSharedSubst(unittest.TestCase):
 
         # Reify T should give Tuple(str, int)
         result = uf.reify(LeafCarrier(ANY, T))
-        self.assertEqual(result.fetch(), (STR, INT))
+        self.assertEqual(result.content, (STR, INT))
 
 
 if __name__ == "__main__":

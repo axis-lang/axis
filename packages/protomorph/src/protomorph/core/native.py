@@ -35,6 +35,13 @@ _LIST_QUALIFIER = Anchor("std.qualifiers.List")
 _MAP_QUALIFIER = Anchor("std.qualifiers.Map")
 
 
+class _Spread[V]:
+    __slots__ = ("values",)
+
+    def __init__(self, values: tuple[V, ...]):
+        self.values = values
+
+
 def spec_name(cls: type[_pm.Builtin]) -> str:
     name = getattr(cls, "SPEC_NAME", None)
     if isinstance(name, str):
@@ -82,7 +89,7 @@ def _qualifier_arg_type(
 ) -> _pm.Type:
     if len(qualifier.args) <= index:
         raise TypeError(f"{name} qualifier must provide type argument {index}")
-    return cast(_pm.Type, qualifier.args[index].fetch())
+    return cast(_pm.Type, qualifier.args[index].content)
 
 
 def _type_params_of(builtin_cls: type[_pm.Builtin]) -> tuple[object, ...]:
@@ -110,7 +117,7 @@ def _make_schema(
 
 
 def _spec_arg_types(spec: _pm.Spec) -> tuple[_pm.Type, ...]:
-    return tuple(cast(_pm.Type, child.fetch()) for child in spec.args)
+    return tuple(cast(_pm.Type, child.content) for child in spec.args)
 
 
 def _type_param_name(param: object) -> str:
@@ -120,6 +127,56 @@ def _type_param_name(param: object) -> str:
 
 def _variadic_type(values: tuple[_pm.Type, ...]) -> _pm.VaryingType:
     return _pm.VaryingType(values)
+
+
+def normalize_spreads(value: Any) -> Any:
+    if isinstance(value, _Spread):
+        return _pm.VaryingType(cast(tuple[_pm.Type, ...], value.values))
+    if isinstance(value, _pm.Index):
+        normalized_index_values: list[_pm.Id | None] = []
+        for item in value.content:
+            if isinstance(item, _Spread):
+                normalized_index_values.extend(cast(tuple[_pm.Id | None, ...], item.values))
+            else:
+                normalized_index_values.append(item)
+        return _pm.Index.of(*normalized_index_values)
+    if isinstance(value, _pm.VaryingType):
+        normalized_slot_values: list[_pm.Type] = []
+        for item in value.values:
+            if isinstance(item, _Spread):
+                normalized_slot_values.extend(cast(tuple[_pm.Type, ...], item.values))
+            else:
+                normalized_slot_values.append(item)
+        return _pm.VaryingType(tuple(normalized_slot_values))
+    if isinstance(value, _pm.IndexedType):
+        slots = value.slots
+        if isinstance(slots, _pm.VaryingType):
+            raw_slots = slots.values
+        else:
+            raw_slots = (slots.element_type,) * len(value.index)
+
+        flat_slots: list[_pm.Type] = []
+        flat_keys: list[_pm.Id | None] = []
+        keys = tuple(value.index.content)
+        for key, slot in zip(keys, raw_slots, strict=True):
+            if isinstance(slot, _Spread):
+                spread_values = cast(tuple[_pm.Type, ...], slot.values)
+                flat_slots.extend(spread_values)
+                flat_keys.extend((None,) * len(spread_values))
+                continue
+            flat_slots.append(slot)
+            flat_keys.append(key)
+        return _pm.IndexedType(_pm.VaryingType(tuple(flat_slots)), _pm.Index.of(*flat_keys))
+    if isinstance(value, _pm.Tuple):
+        normalized_content: list[Any] = []
+        for item in value.content:
+            if isinstance(item, _Spread):
+                normalized_content.extend(item.values)
+            else:
+                normalized_content.append(item)
+        descriptor = normalize_spreads(value.descriptor)
+        return _pm.Tuple(descriptor, tuple(normalized_content))
+    return value
 
 
 def _single_value(args: tuple[object, ...]) -> object:
@@ -139,16 +196,16 @@ def _descriptor_item(
     )
     if wants_carrier:
         return tuple_args.attr(_pm.Id(name)) if has_named_item else tuple_args[offset]
-    item = tuple_args.payload_item_at(offset)
+    entry = tuple_args.entry_at(offset)
     return (
-        tuple_args[offset].fetch()
-        if item.key is None
-        else tuple_args.attr(_pm.Id(name)).fetch()
+        tuple_args[offset].content
+        if entry.key is None
+        else tuple_args.attr(_pm.Id(name)).content
     )
 
 
 def _descriptor_for_value(obj: object) -> _pm.Type:
-    return cast(_pm.Type, val(type(obj)).fetch())
+    return cast(_pm.Type, val(type(obj)).content)
 
 
 def _first_arg_type(args: tuple[Any, ...], *, template: Any | None) -> _pm.Type:
@@ -224,7 +281,7 @@ def _specialize_placeholder_type(
             else:
                 replaced_values.append(item_type)
         if changed:
-            return cast(_pm.Type, _variadic_type(tuple(replaced_values)).splice())
+            return cast(_pm.Type, normalize_spreads(_variadic_type(tuple(replaced_values))))
     return None
 
 
@@ -275,9 +332,7 @@ class NativeRealm(Realm, Consed):
         return frozendict({spec_name(cls): cls for cls in all_builtins()})
 
     @flux.method
-    def schema_for(
-        self, spec: Any
-    ) -> Any | None:  # pyright: ignore[reportIncompatibleVariableOverride]
+    def schema_for(self, spec: Any) -> Any | None:  # pyright: ignore[reportIncompatibleVariableOverride]
         return self._schema_for_cached(spec)
 
     @flux.method
@@ -346,7 +401,7 @@ class NativeRealm(Realm, Consed):
     ) -> _pm.Schema:
         descriptor = schema.descriptor
         if isinstance(descriptor, _pm.IndexedType):
-            index = descriptor.index.splice()
+            index = cast(_pm.Index, normalize_spreads(descriptor.index))
         else:
             index = None
 
@@ -358,31 +413,30 @@ class NativeRealm(Realm, Consed):
                 and ident.startswith("*")
                 and isinstance(replacement, _pm.VaryingType)
             ):
-                return _pm.Spread(replacement.values)
+                return _Spread(replacement.values)
             return replacement
 
         new_types: list[_pm.Type] = []
         for field in schema:
-            field_type = cast(_pm.Type, field.fetch())
+            field_type = cast(_pm.Type, field.content)
             specialized_type = _specialize_placeholder_type(
                 field_type, mapping, _make_replacement
             )
             if specialized_type is not None:
-                new_types.append(specialized_type)
+                new_types.append(cast(_pm.Type, normalize_spreads(specialized_type)))
                 continue
             field_carrier = val(field_type)
             carrier_mapping: dict[_pm.Val, _pm.Val] = {}
             for leaf in _pm.walk_leafs(field_carrier):
-                data = leaf.fetch()
+                data = leaf.content
                 if data in mapping:
                     carrier_mapping[leaf] = _pm.LeafCarrier(
                         leaf.descriptor,
                         _make_replacement(data),
                     )
             if carrier_mapping:
-                result = _pm.walk_subst(field_carrier, carrier_mapping).fetch()
-                if isinstance(result, _pm.TupleLikeType):
-                    result = result.splice()
+                result = _pm.walk_subst(field_carrier, carrier_mapping).content
+                result = normalize_spreads(result)
                 new_types.append(cast(_pm.Type, result))
             else:
                 new_types.append(field_type)
@@ -487,7 +541,7 @@ def project_type(
     if annotation is Any:
         return _any_type()
 
-    if annotation is _pm.Datum or repr(annotation) == "Datum":
+    if annotation is _pm.AnyData or repr(annotation) in {"Datum", "AnyData"}:
         return _any_type()
 
     if annotation is _pm.Tuple:
@@ -558,7 +612,7 @@ def val(*args, **kwargs) -> _pm.Val:
         return obj
 
     if isinstance(obj, _pm.Type):
-        if isinstance(obj, (_pm.Spec, _pm.Qual, _pm.VaryingType)):
+        if isinstance(obj, (_pm.Spec, _pm.Qual)):
             return _pm.NativeObjectCarrier(_project_type(type(obj)), obj)
         return obj.metatype().make(obj)
 

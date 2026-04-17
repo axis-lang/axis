@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from typing import TypeVarTuple
 from typing import cast
 
-from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, current_realm, var, val, spec_name
+from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, VaryingType, current_realm, var, val, spec_name
 
 
-INT = cast(Spec, val(int).fetch())
-STR = cast(Spec, val(str).fetch())
+INT = cast(Spec, val(int).content)
+STR = cast(Spec, val(str).content)
 
 
 class Point(Builtin):
@@ -27,21 +28,29 @@ class Pair[A, B](Builtin):
     second: B
 
 
+Ts = TypeVarTuple("Ts")
+
+
+class Variadic[*Ts](Builtin):
+    SPEC_NAME = "test.Variadic"
+    items: tuple[*Ts]
+
+
 class TestWrap(unittest.TestCase):
     def test_wrap_builtin_class_returns_type_carrier(self):
         carrier = val(Point)
-        self.assertIsInstance(carrier.fetch(), Spec)
-        self.assertEqual(carrier.fetch(), Spec.of(spec_name(Point)))
+        self.assertIsInstance(carrier.content, Spec)
+        self.assertEqual(carrier.content, Spec.of(spec_name(Point)))
 
     def test_wrap_scalar_annotation_returns_type_carrier(self):
         carrier = val(int)
-        self.assertEqual(carrier.fetch(), Spec.of("std.types.Integer"))
+        self.assertEqual(carrier.content, Spec.of("std.types.Integer"))
 
     def test_wrap_runtime_builtin_returns_native_carrier(self):
         carrier = val(Point(1, 2))
         self.assertIsInstance(carrier, NativeObjectCarrier)
-        self.assertEqual(carrier.attr(Id("x")).fetch(), 1)
-        self.assertEqual(carrier.attr(Id("y")).fetch(), 2)
+        self.assertEqual(carrier.attr(Id("x")).content, 1)
+        self.assertEqual(carrier.attr(Id("y")).content, 2)
 
 
 class TestNativeHostSchemaFor(unittest.TestCase):
@@ -57,14 +66,14 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 
         assert schema is not None
         self.assertIsInstance(schema.descriptor, IndexedType)
-        self.assertEqual(schema.payload_item_at(0).value, INT)
-        self.assertEqual(schema.payload_item_at(1).value, INT)
+        self.assertEqual(schema.entry_at(0).value.content, INT)
+        self.assertEqual(schema.entry_at(1).value.content, INT)
 
     def test_generic_unspecialized(self):
         schema = self.host.schema_for(Spec.of(spec_name(Container)))
 
         assert schema is not None
-        field_type = schema[0].fetch()
+        field_type = schema[0].content
         self.assertIsInstance(field_type, Placeholder)
         self.assertIsInstance(field_type, NativeVar)
 
@@ -72,14 +81,23 @@ class TestNativeHostSchemaFor(unittest.TestCase):
         schema = self.host.schema_for(Spec.of(spec_name(Container), INT))
 
         assert schema is not None
-        self.assertIs(schema.attr(Id("value")).fetch(), INT)
+        self.assertIs(schema.attr(Id("value")).content, INT)
 
     def test_pair_specialized(self):
         schema = self.host.schema_for(Spec.of(spec_name(Pair), INT, STR))
 
         assert schema is not None
-        self.assertIs(schema.attr(Id("first")).fetch(), INT)
-        self.assertIs(schema.attr(Id("second")).fetch(), STR)
+        self.assertIs(schema.attr(Id("first")).content, INT)
+        self.assertIs(schema.attr(Id("second")).content, STR)
+
+    def test_variadic_specialized(self):
+        schema = self.host.schema_for(Spec.of(spec_name(Variadic), INT, STR))
+
+        assert schema is not None
+        item_type = schema.attr(Id("items")).content
+        self.assertIsInstance(item_type, VaryingType)
+        self.assertEqual(cast(VaryingType, item_type).values, (INT, STR))
+        self.assertEqual([child.content for child in schema.attr(Id("items"))], [INT, STR])
 
 
 class TestDelegation(unittest.TestCase):
@@ -96,7 +114,7 @@ class TestDelegation(unittest.TestCase):
 
         schema = spec.schema
         assert schema is not None
-        self.assertEqual(schema.attr(Id("y")).fetch(), INT)
+        self.assertEqual(schema.attr(Id("y")).content, INT)
 
     def test_qual_schema_projects_one_level(self):
         spec = Spec.of(spec_name(Point))
@@ -105,7 +123,7 @@ class TestDelegation(unittest.TestCase):
         schema = qual.schema
         assert schema is not None
         self.assertEqual(
-            schema.attr(Id("y")).fetch(),
+            schema.attr(Id("y")).content,
             Qual.of(INT, Spec.of("std.qualifiers.List")),
         )
 

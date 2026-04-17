@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Item as Field, Id, Placeholder, SimpleVar, Spec, Type, Var, var
+from protomorph import Builtin, Id, Placeholder, SimpleVar, Spec, Type, Var, var
 
 
 class TestBuiltin(unittest.TestCase):
@@ -65,20 +65,6 @@ class TestPlaceholder(unittest.TestCase):
 
     def test_placeholder_is_var(self):
         self.assertIsInstance(var("T"), Var)
-
-
-class TestField(unittest.TestCase):
-    """Field is a NamedTuple(offset, key, type)."""
-
-    def test_creation(self):
-        f = Field(0, Id("x"), Spec.of("std.types.Any"))
-        self.assertEqual(f.offset, 0)
-        self.assertEqual(f.key, Id("x"))
-        self.assertEqual(f.value, Spec.of("std.types.Any"))
-
-    def test_no_key(self):
-        f = Field(1, None, Spec.of("std.types.Any"))
-        self.assertIsNone(f.key)
 
 
 class TestTypeDefaults(unittest.TestCase):

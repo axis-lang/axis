@@ -25,7 +25,6 @@ def repr_any(obj: Any) -> str:
     """Single dispatch repr for any core object (Type, Val, Builtin)."""
     from .types import Placeholder
     from .types import UniformType, UnionType, VaryingType, IndexedType, Spec, Qual
-    from .foundation import Spread
     from ..canonical import Morph, Fuse, Proj
     from ..logic.match import Match
     from .values import Val, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
@@ -81,10 +80,6 @@ def repr_any(obj: Any) -> str:
         return _repr_tuple_carrier(obj)
     if isinstance(obj, Val):
         return f"{type(obj).__name__}(...)"
-
-    # ── Spread ──
-    if isinstance(obj, Spread):
-        return f"..({', '.join(_format(v) for v in obj.values)})"
 
     # ── Builtin (must check before Consed fallback to avoid wrong class name) ──
     if isinstance(obj, Builtin):
@@ -152,7 +147,7 @@ def _repr_proj(proj) -> str:
 
 
 def _is_simple_morph_binding(binding) -> bool:
-    return len(binding.children) == 0 and not isinstance(binding.fetch(), Op)
+    return len(binding.children) == 0 and not isinstance(binding.content, Op)
 
 
 def _trim_anchor(anchor: str) -> str:
@@ -176,7 +171,7 @@ def _repr_spec(spec) -> str:
 def _repr_qual(qual) -> str:
     from .types import Spec
     
-    qualifiers = tuple(cast(Spec, child.fetch()) for child in qual.qualifiers)
+    qualifiers = tuple(cast(Spec, child.content) for child in qual.qualifiers)
     if not qualifiers:
         return repr_any(qual.underlying)
     parts = [repr_any(q) for q in reversed(qualifiers)]
@@ -192,11 +187,10 @@ def _repr_indexed(it) -> str:
     parts = []
     schema = it.schema
     assert schema is not None
-    for offset in range(len(schema)):
-        item = schema.payload_item_at(offset)
-        formatted = _format(item.value)
-        if item.key is not None:
-            parts.append(f"{item.key}: {formatted}")
+    for entry in schema.entries():
+        formatted = _format(entry.value.content)
+        if entry.key is not None:
+            parts.append(f"{entry.key}: {formatted}")
         else:
             parts.append(formatted)
     return f"[{', '.join(parts)}]"
@@ -222,15 +216,10 @@ def _repr_leaf(carrier) -> str:
 
 def _repr_tuple_carrier(carrier) -> str:
     parts = []
-    for i in range(len(carrier)):
-        child = carrier[i]
-        formatted = repr_any(child)
-        try:
-            item = carrier.payload_item_at(i)
-            if item.key is not None:
-                formatted = f"{item.key}={formatted}"
-        except (IndexError, TypeError):
-            pass
+    for entry in carrier.entries():
+        formatted = repr_any(entry.value)
+        if entry.key is not None:
+            formatted = f"{entry.key}={formatted}"
         parts.append(formatted)
     return f"({', '.join(parts)})"
 
@@ -241,10 +230,8 @@ def _repr_native_carrier(carrier) -> str:
     structure = carrier.descriptor.schema
     if structure is None:
         return f"{cls_name}()"
-    for i in range(len(carrier)):
-        child = carrier[i]
-        item = structure.payload_item_at(i)
-        parts.append(f"{item.key}={repr_any(child)}")
+    for entry in carrier.entries():
+        parts.append(f"{entry.key}={repr_any(entry.value)}")
     return f"{cls_name}({', '.join(parts)})"
 
 

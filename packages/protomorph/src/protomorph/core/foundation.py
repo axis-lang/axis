@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import NamedTuple
-
-from protobase import Consed, flux
+from protobase import Consed, flux, frozendict as _frozendict
 
 
 class Id(str):
@@ -12,12 +10,6 @@ class Id(str):
 
 
 type Path = tuple[Id, ...]
-
-
-class Item[K, V](NamedTuple):
-    offset: int
-    key: K | None
-    value: V
 
 
 class Anchor(str):
@@ -67,5 +59,14 @@ class Builtin(Consed, abstract=True):
         all_builtins.invalidate(None)
 
 
-class Spread[V](Builtin):
-    values: tuple[V, ...]
+type AnyData = (
+    int
+    | float
+    | str
+    | bool
+    | None
+    | tuple[AnyData, ...]
+    | frozenset[AnyData]
+    | _frozendict[AnyData, AnyData]
+    | Builtin
+)

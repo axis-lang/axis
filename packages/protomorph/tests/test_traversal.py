@@ -16,9 +16,9 @@ from protomorph import (
 )
 
 
-INT = cast(Spec, val(int).fetch())
-STR = cast(Spec, val(str).fetch())
-FLOAT = cast(Spec, val(float).fetch())
+INT = cast(Spec, val(int).content)
+STR = cast(Spec, val(str).content)
+FLOAT = cast(Spec, val(float).content)
 
 
 class TraversalPoint(Builtin):
@@ -76,7 +76,7 @@ class TestIter(unittest.TestCase):
         nodes = list(pm.walk(c))
         # pre-order: root first, then its children left-to-right
         self.assertIs(nodes[0], c)
-        self.assertEqual([n.fetch() for n in nodes[1:]], [1, "a"])
+        self.assertEqual([n.content for n in nodes[1:]], [1, "a"])
 
     def test_pure_leaf_yields_only_self(self):
         leaf = LeafCarrier(INT, 42)
@@ -92,7 +92,7 @@ class TestIter(unittest.TestCase):
         # outer, inner, 1, 2, 3
         self.assertIs(nodes[0], outer)
         self.assertIs(nodes[1], inner)
-        self.assertEqual([n.fetch() for n in nodes[2:]], [1, 2, 3])
+        self.assertEqual([n.content for n in nodes[2:]], [1, 2, 3])
 
 
 class TestValFlags(unittest.TestCase):
@@ -106,7 +106,7 @@ class TestIterLeafs(unittest.TestCase):
         vt = cast(VaryingType, VaryingType.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         leaves = list(pm.walk_leafs(c))
-        self.assertEqual([leaf.fetch() for leaf in leaves], [1, "a"])
+        self.assertEqual([leaf.content for leaf in leaves], [1, "a"])
 
     def test_nested(self):
         class Pt(Builtin):
@@ -114,13 +114,13 @@ class TestIterLeafs(unittest.TestCase):
             y: int
 
         c = val(Pt(1, 2))
-        values = [leaf.fetch() for leaf in pm.walk_leafs(c) if isinstance(leaf.fetch(), int)]
+        values = [leaf.content for leaf in pm.walk_leafs(c) if isinstance(leaf.content, int)]
         self.assertIn(1, values)
         self.assertIn(2, values)
 
     def test_pure_leaf_yields_self(self):
         leaf = LeafCarrier(INT, 42)
-        self.assertEqual([n.fetch() for n in pm.walk_leafs(leaf)], [42])
+        self.assertEqual([n.content for n in pm.walk_leafs(leaf)], [42])
 
 
 class TestIterBranches(unittest.TestCase):
@@ -148,13 +148,13 @@ class TestDeepMap(unittest.TestCase):
     def test_identity(self):
         vt = cast(VaryingType, VaryingType.of(INT, STR))
         c = Tuple(vt, (1, "a"))
-        self.assertEqual(pm.walk_map(c, lambda x: x).fetch(), (1, "a"))
+        self.assertEqual(pm.walk_map(c, lambda x: x).content, (1, "a"))
 
     def test_transform_leaves(self):
         vt = cast(VaryingType, VaryingType.of(INT, INT))
         c = Tuple(vt, (10, 20))
-        result = pm.walk_map(c, lambda leaf: LeafCarrier(leaf.descriptor, leaf.fetch() * 2))
-        self.assertEqual(result.fetch(), (20, 40))
+        result = pm.walk_map(c, lambda leaf: LeafCarrier(leaf.descriptor, leaf.content * 2))
+        self.assertEqual(result.content, (20, 40))
 
     def test_transform_result_ok_leaves(self):
         vt = cast(VaryingType, VaryingType.of(INT, INT))
@@ -165,22 +165,22 @@ class TestDeepMap(unittest.TestCase):
             pm.walk_map(
                 carrier,
                 lambda leaf: Result.ok(
-                    LeafCarrier(leaf.value_carrier().descriptor, leaf.value_carrier().fetch() * 2)
-                ) if isinstance(leaf, Result) else LeafCarrier(leaf.descriptor, leaf.fetch() * 2)
+                    LeafCarrier(leaf.value_carrier().descriptor, leaf.value_carrier().content * 2)
+                ) if isinstance(leaf, Result) else LeafCarrier(leaf.descriptor, leaf.content * 2)
             ),
         )
 
         self.assertTrue(result.is_ok)
-        self.assertEqual(result.unwrap().fetch(), (20, 40))
+        self.assertEqual(result.unwrap().content, (20, 40))
 
     def test_transform_option_some_leaves(self):
         vt = cast(VaryingType, VaryingType.of(INT, INT))
         carrier = Option.some(Tuple(vt, (10, 20)))
 
-        result = cast(Option, pm.walk_map(carrier, lambda leaf: LeafCarrier(leaf.descriptor, leaf.fetch() * 2)))
+        result = cast(Option, pm.walk_map(carrier, lambda leaf: LeafCarrier(leaf.descriptor, leaf.content * 2)))
 
         self.assertTrue(result.is_some)
-        self.assertEqual(result.unwrap().fetch(), (20, 40))
+        self.assertEqual(result.unwrap().content, (20, 40))
 
 
 class TestUnnest(unittest.TestCase):
@@ -193,7 +193,7 @@ class TestUnnest(unittest.TestCase):
         unnested_pattern = pm.canonical.unnest(pattern)
 
         self.assertEqual(len(unnested_pattern), 3)
-        self.assertTrue(all(nest.fetch().bound == nest.descriptor for nest in unnested_pattern))
+        self.assertTrue(all(nest.content.bound == nest.descriptor for nest in unnested_pattern))
         self.assertEqual(
             [repr(branch) for branch in unnested_pattern.values()],
             [
@@ -212,7 +212,7 @@ class TestPatternExtraction(unittest.TestCase):
 
         self.assertEqual(repr(pattern.pattern), "TraversalPoint(x=#0, y=2)")
         self.assertEqual(pattern.slot_count, 1)
-        self.assertEqual(pattern.slots[0].fetch().bound, pattern.slots[0].descriptor)
+        self.assertEqual(pattern.slots[0].content.bound, pattern.slots[0].descriptor)
 
     def test_extracts_wildcards_independently(self):
         pattern = Pattern.from_val(val(MatchPair(pm.Wildcard, pm.Wildcard)))
@@ -221,7 +221,7 @@ class TestPatternExtraction(unittest.TestCase):
         self.assertEqual(repr(pattern.pattern), "MatchPair(left=#0, right=#1)")
         self.assertEqual(pattern.slot_count, 2)
         self.assertTrue(all(slot.descriptor == pm.Spec.of("std.types.Any") for slot in pattern.slots))
-        self.assertTrue(all(slot.fetch().bound == slot.descriptor for slot in pattern.slots))
+        self.assertTrue(all(slot.content.bound == slot.descriptor for slot in pattern.slots))
         self.assertEqual(morph.content, (pm.Wildcard, pm.Wildcard))
         self.assertEqual(repr(morph.value), "MatchPair(left=#0, right=#1)")
 
@@ -318,17 +318,17 @@ class TestCanonicalMatch(unittest.TestCase):
 
         self.assertEqual(forwarded.descriptor, right_pattern)
         self.assertEqual(repr(forwarded.content[0]), "MatchA(left=X, right=Y)")
-        self.assertIsInstance(forwarded.content[1].fetch(), pm.Proj)
-        self.assertIsInstance(forwarded.content[2].fetch(), pm.Proj)
+        self.assertIsInstance(forwarded.content[1].content, pm.Proj)
+        self.assertIsInstance(forwarded.content[2].content, pm.Proj)
 
-        slot_1_proj = cast(pm.Proj, forwarded.content[1].fetch())
-        slot_2_proj = cast(pm.Proj, forwarded.content[2].fetch())
-        self.assertIsInstance(slot_1_proj.value.fetch(), pm.Fuse)
-        self.assertIsInstance(slot_2_proj.value.fetch(), pm.Fuse)
-        self.assertEqual(slot_1_proj.target.fetch().id, 0)
-        self.assertEqual(slot_2_proj.target.fetch().id, 1)
-        slot_1_fuse = cast(pm.Fuse, slot_1_proj.value.fetch())
-        slot_2_fuse = cast(pm.Fuse, slot_2_proj.value.fetch())
+        slot_1_proj = cast(pm.Proj, forwarded.content[1].content)
+        slot_2_proj = cast(pm.Proj, forwarded.content[2].content)
+        self.assertIsInstance(slot_1_proj.value.content, pm.Fuse)
+        self.assertIsInstance(slot_2_proj.value.content, pm.Fuse)
+        self.assertEqual(slot_1_proj.target.content.id, 0)
+        self.assertEqual(slot_2_proj.target.content.id, 1)
+        slot_1_fuse = cast(pm.Fuse, slot_1_proj.value.content)
+        slot_2_fuse = cast(pm.Fuse, slot_2_proj.value.content)
         self.assertEqual(repr(slot_1_fuse.known.descriptor.pattern), "MatchB(left=#0, right=#1)")
         self.assertEqual(slot_1_fuse.parts, frozenset({val(z)}))
         self.assertEqual(slot_2_fuse.parts, frozenset({val(z)}))
@@ -336,11 +336,11 @@ class TestCanonicalMatch(unittest.TestCase):
         backwarded = matched.backward(right)
 
         self.assertEqual(backwarded.descriptor, left_pattern)
-        self.assertIsInstance(backwarded.content[0].fetch(), pm.Proj)
-        self.assertIsInstance(backwarded.content[1].fetch(), pm.Proj)
+        self.assertIsInstance(backwarded.content[0].content, pm.Proj)
+        self.assertIsInstance(backwarded.content[1].content, pm.Proj)
         self.assertEqual(repr(backwarded.content[2]), "MatchB(left=U, right=V)")
-        slot_0_back_proj = cast(pm.Proj, backwarded.content[0].fetch())
-        slot_1_back_proj = cast(pm.Proj, backwarded.content[1].fetch())
+        slot_0_back_proj = cast(pm.Proj, backwarded.content[0].content)
+        slot_1_back_proj = cast(pm.Proj, backwarded.content[1].content)
         self.assertEqual(
             repr(slot_0_back_proj.value),
             "{ MatchA(left=X, right=Y) -> MatchA(left=_, right=_) }",
@@ -349,8 +349,8 @@ class TestCanonicalMatch(unittest.TestCase):
             repr(slot_1_back_proj.value),
             "{ MatchA(left=X, right=Y) -> MatchA(left=_, right=_) }",
         )
-        self.assertEqual(slot_0_back_proj.target.fetch().id, 0)
-        self.assertEqual(slot_1_back_proj.target.fetch().id, 1)
+        self.assertEqual(slot_0_back_proj.target.content.id, 0)
+        self.assertEqual(slot_1_back_proj.target.content.id, 1)
 
     def test_match_detects_repeated_slot_conflict(self):
         x = var("X", Any)
@@ -410,9 +410,9 @@ class TestMorphProjection(unittest.TestCase):
         projected = sample.project(sample.slots[0])
 
         self.assertEqual(projected.descriptor, sample.slots[0].descriptor)
-        self.assertIsInstance(projected.fetch(), pm.Proj)
-        self.assertIs(projected.fetch().value, sample)
-        self.assertEqual(projected.fetch().target, sample.slots[0])
+        self.assertIsInstance(projected.content, pm.Proj)
+        self.assertIs(projected.content.value, sample)
+        self.assertEqual(projected.content.target, sample.slots[0])
 
     def test_project_nest_preserves_source_context(self):
         x = var("X", int)
@@ -422,9 +422,9 @@ class TestMorphProjection(unittest.TestCase):
         projected = pm.canonical.project(sample, point_nest)
 
         self.assertEqual(projected.descriptor, point_nest.descriptor)
-        self.assertIsInstance(projected.fetch(), pm.Proj)
-        self.assertIs(projected.fetch().value, sample)
-        self.assertEqual(projected.fetch().target, point_nest)
+        self.assertIsInstance(projected.content, pm.Proj)
+        self.assertIs(projected.content.value, sample)
+        self.assertEqual(projected.content.target, point_nest)
 
 
 class TestNormalize(unittest.TestCase):
@@ -463,8 +463,8 @@ class TestNormalize(unittest.TestCase):
             pm.val(pm.Fuse(known=known, parts=frozenset({inner})))
         )
 
-        self.assertIsInstance(normalized.fetch(), pm.Fuse)
-        fuse = cast(pm.Fuse, normalized.fetch())
+        self.assertIsInstance(normalized.content, pm.Fuse)
+        fuse = cast(pm.Fuse, normalized.content)
         self.assertEqual(fuse.known, known)
         self.assertEqual(fuse.parts, frozenset({val(x)}))
 
@@ -476,15 +476,15 @@ class TestNormalize(unittest.TestCase):
 
         normalized = pm.canonical.normalize(projected)
 
-        self.assertIsInstance(normalized.fetch(), pm.Fuse)
-        fuse = cast(pm.Fuse, normalized.fetch())
+        self.assertIsInstance(normalized.content, pm.Fuse)
+        fuse = cast(pm.Fuse, normalized.content)
         self.assertEqual(repr(fuse.known.descriptor.pattern), "#0")
         self.assertEqual(fuse.known.content, (pm.Wildcard,))
         self.assertEqual(len(fuse.parts), 1)
         [part] = list(fuse.parts)
-        self.assertIsInstance(part.fetch(), pm.Proj)
-        self.assertEqual(cast(pm.Proj, part.fetch()).value, val(z))
-        self.assertEqual(cast(pm.Proj, part.fetch()).target, known.slots[0])
+        self.assertIsInstance(part.content, pm.Proj)
+        self.assertEqual(cast(pm.Proj, part.content).value, val(z))
+        self.assertEqual(cast(pm.Proj, part.content).target, known.slots[0])
 
 
 class TestDisplay(unittest.TestCase):
@@ -565,9 +565,9 @@ class TestSubst(unittest.TestCase):
         T = var("T", int)
         vt = VaryingType.of(INT, T, STR)
         c = val(vt)
-        ph_carrier = next(leaf for leaf in pm.walk_leafs(c) if leaf.fetch() is T)
+        ph_carrier = next(leaf for leaf in pm.walk_leafs(c) if leaf.content is T)
         replacement = LeafCarrier(ph_carrier.descriptor, FLOAT)
-        result = pm.walk_subst(c, {ph_carrier: replacement}).fetch()
+        result = pm.walk_subst(c, {ph_carrier: replacement}).content
         self.assertEqual(repr(result), repr(VaryingType.of(INT, FLOAT, STR)))
 
 

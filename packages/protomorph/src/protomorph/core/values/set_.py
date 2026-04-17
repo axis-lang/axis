@@ -32,7 +32,7 @@ class Set[T](Val[frozenset[T]]):
             yield _pm.make_value(self.descriptor.qualified, value)
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
-        return _cast(Self, type(self)(self.descriptor, frozenset(child.fetch() for child in children)))
+        return _cast(Self, type(self)(self.descriptor, frozenset(child.content for child in children)))
 
     def __invariants__(self) -> None:
         super().__invariants__()

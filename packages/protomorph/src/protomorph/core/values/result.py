@@ -23,7 +23,7 @@ class _ResultVarCtx(Builtin):
 _RESULT_VAR_CTX = _ResultVarCtx()
 
 
-class Result[E, V = _pm.Datum](Val[V | Err[E]]):
+class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
     """Carrier for Result[E, V] — holds either a value or Err[E]."""
 
     descriptor: _pm.Qual
@@ -51,7 +51,7 @@ class Result[E, V = _pm.Datum](Val[V | Err[E]]):
         if schema is None:
             return _pm.Tuple.Empty
         error = self.error_carrier()
-        return schema.map(lambda child: child.fetch().make(Err(error.fetch())))
+        return schema.map(lambda child: child.content.make(Err(error.content)))
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         if not children:
@@ -200,7 +200,7 @@ class Result[E, V = _pm.Datum](Val[V | Err[E]]):
 def _project_result_child(child: Val) -> Result:
     if isinstance(child, Result):
         return _cast(Result, child)
-    projected = child.descriptor.make(child.fetch())
+    projected = child.descriptor.make(child.content)
     if not isinstance(projected, Result):
         raise TypeError("Result children must project to Result values")
     return _cast(Result, projected)
@@ -213,4 +213,4 @@ def _result_qualifier(descriptor: _pm.Qual) -> _pm.Spec:
 
 
 def _error_descriptor(descriptor: _pm.Qual) -> _pm.Type:
-    return _cast(_pm.Type, _result_qualifier(descriptor).args[0].fetch())
+    return _cast(_pm.Type, _result_qualifier(descriptor).args[0].content)

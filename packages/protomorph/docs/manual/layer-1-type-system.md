@@ -32,7 +32,7 @@ import pm
 
 int_type = pm.Spec.of("std.types.Integer")
 carrier  = int_type.make(42)
-print(carrier.fetch())   # 42
+print(carrier.content)   # 42
 ```
 
 ### Metatype bootstrap

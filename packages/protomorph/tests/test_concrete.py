@@ -6,9 +6,9 @@ from typing import cast
 from protomorph import Id, Index, IndexedType, LeafCarrier, Spec, Tuple, UniformType, UnionType, VaryingType, val
 
 
-INT = cast(Spec, val(int).fetch())
-STR = cast(Spec, val(str).fetch())
-FLOAT = cast(Spec, val(float).fetch())
+INT = cast(Spec, val(int).content)
+STR = cast(Spec, val(str).content)
+FLOAT = cast(Spec, val(float).content)
 
 
 class TestAtomicSpecs(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestAtomicSpecs(unittest.TestCase):
     def test_make_leaf_carrier(self):
         carrier = INT.make(42)
         self.assertIsInstance(carrier, LeafCarrier)
-        self.assertEqual(carrier.fetch(), 42)
+        self.assertEqual(carrier.content, 42)
 
 
 class TestUniformType(unittest.TestCase):
@@ -29,8 +29,8 @@ class TestUniformType(unittest.TestCase):
         schema = UniformType(cast(VaryingType, VaryingType.of(INT, STR))).schema
 
         assert schema is not None
-        self.assertEqual(schema[0].fetch(), UniformType(INT))
-        self.assertEqual(schema[1].fetch(), UniformType(STR))
+        self.assertEqual(schema[0].content, UniformType(INT))
+        self.assertEqual(schema[1].content, UniformType(STR))
 
     def test_make(self):
         carrier = UniformType(INT).make((1, 2))
@@ -53,7 +53,7 @@ class TestVaryingType(unittest.TestCase):
 
     def test_indexed(self):
         vt = cast(IndexedType, IndexedType.of(x=INT, y=STR))
-        self.assertIs(vt.schema.attr(Id("x")).fetch(), INT)
+        self.assertIs(vt.schema.attr(Id("x")).content, INT)
 
     def test_carrier(self):
         vt = cast(VaryingType, VaryingType.of(INT))

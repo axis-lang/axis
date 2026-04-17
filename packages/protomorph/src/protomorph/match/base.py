@@ -14,7 +14,7 @@ type Frame = tuple[pm.Val, pm.Val]
 
 
 def _default_is_var(carrier: pm.Val) -> bool:
-    return isinstance(carrier.fetch(), pm.Var)
+    return isinstance(carrier.content, pm.Var)
 
 
 def _default_var_merge(var: pm.Val, binding: Binding) -> pm.Val:
@@ -28,7 +28,7 @@ def _is_pattern_value(value: pm.Val) -> bool:
     stack: list[pm.Val] = [value]
     while stack:
         node = stack.pop()
-        fetched = node.fetch()
+        fetched = node.content
         if isinstance(fetched, Node | pm.Placeholder | pm.Var):
             return True
         if len(node.children) > 0:
@@ -260,7 +260,7 @@ class Walker(_Generic[P]):
                 )
                 continue
             pattern_carrier, subject_carrier = state.frames.pop()
-            pattern_value = pattern_carrier.fetch()
+            pattern_value = pattern_carrier.content
             if isinstance(pattern_value, Node):
                 pattern_value.match_step(
                     pattern=pattern_carrier,
@@ -301,7 +301,7 @@ class Walker(_Generic[P]):
         state: _State[P],
         pending: list[_State[P]],
     ) -> None:
-        value = pattern.fetch()
+        value = pattern.content
         if self.is_var(pattern):
             branch = state.clone()
             branch.env.setdefault(pattern, set()).add(subject)
@@ -311,10 +311,10 @@ class Walker(_Generic[P]):
             pending.append(state)
             return
         if isinstance(value, pm.PlaceholderMetatype):
-            if len(subject.children) == 0 and subject.fetch() == value:
+            if len(subject.children) == 0 and subject.content == value:
                 pending.append(state)
             return
-        if len(subject.children) == 0 and subject.fetch() == value:
+        if len(subject.children) == 0 and subject.content == value:
             pending.append(state)
 
     def _structurally_compatible(self, pattern: pm.Val, subject: pm.Val) -> bool:
@@ -324,8 +324,8 @@ class Walker(_Generic[P]):
             return True
         if _is_pattern_value(pm.val(pattern.descriptor)):
             return True
-        pattern_value = pattern.fetch()
-        subject_value = subject.fetch()
+        pattern_value = pattern.content
+        subject_value = subject.content
         if isinstance(pattern_value, pm.Type) and isinstance(subject_value, pm.Type):
             return type(pattern_value) is type(subject_value)
         return False
@@ -333,8 +333,8 @@ class Walker(_Generic[P]):
     def _reify_pattern_with_env(self, pattern: pm.Val, env: Env) -> pm.Val:
         subst = env.merge(is_var=self.is_var, var_merge=self.var_merge)
         reified_type = pm.walk_subst(pattern.type, subst)
-        reified_descriptor = _cast(pm.Type, reified_type.fetch())
-        return reified_descriptor.make(pattern.fetch())
+        reified_descriptor = _cast(pm.Type, reified_type.content)
+        return reified_descriptor.make(pattern.content)
 
     def step_structural(
         self,
@@ -344,7 +344,7 @@ class Walker(_Generic[P]):
         pending: list[_State[P]],
     ) -> None:
         branch = state.clone()
-        pattern_value = pattern.fetch()
+        pattern_value = pattern.content
         if self.meta_levels > 0 and _is_pattern_value(pattern.type) and not isinstance(pattern_value, pm.Type):
             subresult = type(self)(is_var=self.is_var, meta_levels=self.meta_levels - 1, var_merge=self.var_merge).run(pattern.type, subject.type)
             if subresult is None:
@@ -360,7 +360,7 @@ class Walker(_Generic[P]):
             if isinstance(pattern_value, pm.Type):
                 if not self._structurally_compatible(pattern, subject):
                     return
-            elif pattern.fetch() != subject.fetch():
+            elif pattern.content != subject.content:
                 return
             for subsolution in subsolutions:
                 subbranch = branch.clone()
@@ -384,10 +384,10 @@ class Walker(_Generic[P]):
                 if not self._structurally_compatible(active_pattern, subject):
                     continue
             for offset in reversed(range(len(active_pattern))):
-                item = active_pattern.payload_item_at(offset)
-                pattern_child = active_pattern[offset]
+                entry = active_pattern.entry_at(offset)
+                pattern_child = entry.value
                 try:
-                    subject_child = subject.attr(item.key) if item.key is not None else subject[offset]
+                    subject_child = subject.attr(entry.key) if entry.key is not None else subject[offset]
                 except (KeyError, IndexError):
                     break
                 subbranch.frames.append((pattern_child, subject_child))
@@ -399,12 +399,11 @@ class Walker(_Generic[P]):
         keys: set[pm.Id] = set()
         if len(subject.children) == 0:
             return positional_count, frozenset()
-        for offset in range(len(subject)):
-            item = subject.payload_item_at(offset)
-            if item.key is None:
+        for entry in subject.entries():
+            if entry.key is None:
                 positional_count += 1
             else:
-                keys.add(_cast(pm.Id, item.key))
+                keys.add(_cast(pm.Id, entry.key))
         return positional_count, frozenset(keys)
 
     def _accepts_shape(self, subject: pm.Val, shape: ShapeSummary) -> bool:

@@ -42,7 +42,7 @@ def __(mo):
 
 @app.cell
 def __(Spec, protomorph, unify, val, var):
-    is_var = lambda c: isinstance(c.fetch(), protomorph.Placeholder)
+    is_var = lambda c: isinstance(c.content, protomorph.Placeholder)
     any_bound_basic = Spec.of("std.types.Any")
     x = var("X", any_bound_basic)
     y = var("Y", any_bound_basic)
@@ -106,10 +106,10 @@ def __(Spec, UnionFind, is_var, unify, val, var):
     snap = uf2.snapshot()
 
     unify(val(z), val(Spec.of("test.a")), subst=uf2)
-    print("before rollback:", uf2.find(val(z)).fetch())   # test.a
+    print("before rollback:", uf2.find(val(z)).content)   # test.a
 
     uf2.rollback(snap)
-    print("after rollback: ", uf2.find(val(z)).fetch())   # SimpleVar — unbound
+    print("after rollback: ", uf2.find(val(z)).content)   # SimpleVar — unbound
     return snap, uf2, z
 
 
@@ -151,8 +151,8 @@ def __(Spec, UnionFind, is_var, val, var):
     uf3.bind(c_var, gnd)
 
     root = uf3.find(a_var)
-    print("root              :", root.fetch())
-    print("A direct parent   :", uf3._parent.get(a_var, a_var).fetch())  # compressed to ground
+    print("root              :", root.content)
+    print("A direct parent   :", uf3._parent.get(a_var, a_var).content)  # compressed to ground
     return a_var, b_var, c_var, gnd, root, uf3
 
 

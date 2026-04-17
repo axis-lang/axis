@@ -19,7 +19,7 @@ pair_type = pm.VaryingType.of(int_type, int_type)
 carrier = pair_type.make((3, 5))
 
 print(list(carrier))           # [<LeafCarrier 3>, <LeafCarrier 5>]
-print(carrier[0].fetch())      # 3
+print(carrier[0].content)      # 3
 ```
 
 ## 2 — Unification
@@ -41,7 +41,7 @@ f_ab = Spec.of("test.f", Spec.of("test.a"), Spec.of("test.b"))
 result = unify(
     wrap(f_xy),
     wrap(f_ab),
-    is_var=lambda c: isinstance(c.fetch(), pm.Placeholder),
+    is_var=lambda c: isinstance(c.content, pm.Placeholder),
 )
 
 print(result)   # test.f(test.a, test.b)  — X→a, Y→b substituted

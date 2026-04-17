@@ -184,7 +184,7 @@ class Morph[Ctx](pm.Val[tuple[pm.Val, ...]]):
             return self.content[slot_or_offset]
 
         slot = slot_or_offset
-        offset = slot.fetch().id
+        offset = slot.content.id
         assert self.slots[offset] == slot, "Binding slot does not belong to Morph descriptor"
         return self.content[offset]
 
@@ -403,11 +403,11 @@ def _is_wildcard(node: pm.Val) -> bool:
 
 
 def _is_extractable_pattern_leaf(node: pm.Val) -> bool:
-    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.content, pm.Var))
 
 
 def _is_match_hole(node: pm.Val) -> bool:
-    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.content, pm.Var))
 
 
 def _shape_specializes(left: pm.Val, right: pm.Val) -> bool:
@@ -656,11 +656,11 @@ def _match_common_value(
 
 
 def _is_pattern_slot(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), Pattern.Slot)
+    return len(node.children) == 0 and isinstance(node.content, Pattern.Slot)
 
 
 def _is_pattern_nest(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), Base.Nest)
+    return len(node.children) == 0 and isinstance(node.content, Base.Nest)
 
 
 def _assert_projection_target(
@@ -747,11 +747,11 @@ def _slot_known(descriptor: pm.Type) -> Morph:
 
 
 def _is_fuse_value(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), Fuse)
+    return len(node.children) == 0 and isinstance(node.content, Fuse)
 
 
 def _is_proj_value(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), Proj)
+    return len(node.children) == 0 and isinstance(node.content, Proj)
 
 
 def _normalize_morph(value: Morph) -> pm.Val:
@@ -762,7 +762,7 @@ def _normalize_morph(value: Morph) -> pm.Val:
 
 
 def _normalize_fuse(value: pm.Val[Fuse]) -> pm.Val:
-    fuse = value.fetch()
+    fuse = value.content
     known = normalize(fuse.known)
     if not isinstance(known, Morph):
         raise TypeError(f"Fuse.known must normalize to Morph, got {known!r}")
@@ -771,7 +771,7 @@ def _normalize_fuse(value: pm.Val[Fuse]) -> pm.Val:
     for part in fuse.parts:
         normalized_part = normalize(part)
         if _is_fuse_value(normalized_part):
-            inner = normalized_part.fetch()
+            inner = normalized_part.content
             if inner.known == known:
                 parts.update(inner.parts)
             else:
@@ -792,14 +792,14 @@ def _normalize_fuse(value: pm.Val[Fuse]) -> pm.Val:
 
 
 def _normalize_proj(value: pm.Val[Proj]) -> pm.Val:
-    proj = value.fetch()
+    proj = value.content
     normalized_value = normalize(proj.value)
 
     if isinstance(normalized_value, Morph):
         return _project_from_morph_result(normalized_value, proj.target)
 
     if _is_fuse_value(normalized_value):
-        fuse = normalized_value.fetch()
+        fuse = normalized_value.content
         projected_known = _project_from_morph_known(fuse.known, proj.target)
         projected_parts = frozenset(
             normalize(pm.val(Proj(value=part, target=proj.target)))

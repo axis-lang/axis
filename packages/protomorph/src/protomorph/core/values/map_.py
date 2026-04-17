@@ -30,7 +30,7 @@ class Map[K, V](Val[frozendict[K, V]]):
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         keys = tuple(key for key, _ in self.ordered_items)
-        values = (child.fetch() for child in children)
+        values = (child.content for child in children)
         return _cast(Self, type(self)(self.descriptor, frozendict(zip(keys, values, strict=True))))
 
     def __invariants__(self) -> None:
@@ -40,7 +40,7 @@ class Map[K, V](Val[frozendict[K, V]]):
         assert qualifier is not None and qualifier.anchor == _MAP_QUALIFIER
         assert isinstance(self.content, frozendict)
 
-        key_descriptor = _cast(_pm.Type, qualifier.args[0].fetch())
+        key_descriptor = _cast(_pm.Type, qualifier.args[0].content)
         for key, value in self.content.items():
             _pm.make_value(key_descriptor, key)
             _pm.make_value(self.descriptor.qualified, value)

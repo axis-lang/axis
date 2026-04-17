@@ -120,9 +120,9 @@ def __(VaryingType, int_t, str_t, val):
     c2     = str_t.make("hello")
     c_pair = VaryingType.new(c1, c2)
 
-    print(type(c1).__name__, c1.fetch())
-    print(c_pair[0].fetch(), c_pair[1].fetch())
-    print(val(99).descriptor, val(99).fetch())
+    print(type(c1).__name__, c1.content)
+    print(c_pair[0].content, c_pair[1].content)
+    print(val(99).descriptor, val(99).content)
     return c1, c2, c_pair
 
 
@@ -137,7 +137,7 @@ def __(VaryingType, c_pair, val):
     nested = VaryingType.new(c_pair, val(True))
     print("Leaves:")
     for leaf in nested.iter_leafs():
-        print("  ", leaf.descriptor, "→", leaf.fetch())
+        print("  ", leaf.descriptor, "→", leaf.content)
     return (nested,)
 
 
@@ -154,10 +154,10 @@ def __(LeafCarrier, VaryingType, protomorph, val, var):
     c_w    = VaryingType.new(val(1), c_x)
     target = next(
         l for l in c_w.iter_leafs()
-        if isinstance(l.fetch(), protomorph.Placeholder)
+        if isinstance(l.content, protomorph.Placeholder)
     )
     result = c_w.subst({target: val(99)})
-    print([leaf.fetch() for leaf in result.iter_leafs()])
+    print([leaf.content for leaf in result.iter_leafs()])
     return c_w, c_x, result, target, x
 
 

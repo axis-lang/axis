@@ -50,7 +50,7 @@ class Option[V](Val[V | None]):
         schema = self.descriptor.schema
         if schema is None:
             return _pm.Tuple.Empty
-        return schema.map(lambda child: child.fetch().make(None))
+        return schema.map(lambda child: child.content.make(None))
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
         if not children:
@@ -128,7 +128,7 @@ class Option[V](Val[V | None]):
 def _project_option_child(child: Val) -> Option:
     if isinstance(child, Option):
         return child
-    projected = child.descriptor.make(child.fetch())
+    projected = child.descriptor.make(child.content)
     if not isinstance(projected, Option):
         raise TypeError("Option children must project to Option values")
     return projected

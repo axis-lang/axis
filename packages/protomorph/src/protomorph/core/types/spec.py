@@ -41,7 +41,7 @@ class Spec(_Type):
                 else (
                     value.metatype()
                     if isinstance(value, _Type)
-                    else _pm.val(type(value)).fetch()
+                    else _pm.val(type(value)).content
                 )
             )
             for value in values

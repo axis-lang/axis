@@ -12,7 +12,7 @@ This layer provides two fundamental algorithms: **paired tree traversal** (`deep
 from pm import deep_zip, ZipWalker
 
 for left, right in deep_zip(carrier_a, carrier_b):
-    print(left.fetch(), right.fetch())
+    print(left.content, right.content)
 ```
 
 The walker raises `_ZipMismatch` (internally) when the trees diverge structurally — different arities or leaf/non-leaf mismatch. Unification catches this to signal failure.
@@ -57,7 +57,7 @@ Rather than building a substitution as a plain `dict`, Protomorph uses a **Union
 ```python
 from pm import UnionFind, placeholder, wrap
 
-is_var = lambda c: isinstance(c.fetch(), pm.Placeholder)
+is_var = lambda c: isinstance(c.content, pm.Placeholder)
 uf = UnionFind(is_var)
 
 x_carrier = wrap(placeholder("X"))
@@ -66,7 +66,7 @@ a_carrier  = wrap(pm.Spec.of("test.a"))
 uf.bind(x_carrier, a_carrier)
 
 root = uf.find(x_carrier)
-print(root.fetch())    # test.a  — X is now bound to a
+print(root.content)    # test.a  — X is now bound to a
 ```
 
 #### Path compression
@@ -113,7 +113,7 @@ x = placeholder("X")
 result = unify(
     wrap(Spec.of("test.f", x, Spec.of("test.b"))),
     wrap(Spec.of("test.f", Spec.of("test.a"), placeholder("Y"))),
-    is_var=lambda c: isinstance(c.fetch(), pm.Placeholder),
+    is_var=lambda c: isinstance(c.content, pm.Placeholder),
 )
 # result = test.f(test.a, test.b)  — reified
 ```
@@ -166,7 +166,7 @@ The iterative stack replaces recursion — safe for deeply nested types.
 import pm
 from pm import UnionFind, unify, placeholder, wrap, Spec
 
-is_var = lambda c: isinstance(c.fetch(), pm.Placeholder)
+is_var = lambda c: isinstance(c.content, pm.Placeholder)
 subst  = UnionFind(is_var)
 
 x = placeholder("X")

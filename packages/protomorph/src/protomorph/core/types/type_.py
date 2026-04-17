@@ -8,20 +8,7 @@ from protobase import frozendict as _frozendict
 from protomorph.core.foundation import Builtin as _Builtin
 
 
-type Datum = (
-    int
-    | float
-    | str
-    | bool
-    | None
-    | tuple[Datum, ...]
-    | frozenset[Datum]
-    | _frozendict[Datum, Datum]
-    | _Builtin
-)
-
 type Schema = _pm.Tuple[*tuple[_pm.Type, ...]]
-
 
 class Type[T](_Builtin, abstract=True):
     def metatype(self) -> Type:
@@ -53,9 +40,9 @@ class Type[T](_Builtin, abstract=True):
                 f"Leaf type has no structural iteration: {type(self).__name__}"
             )
         for child in schema:
-            yield child.fetch()
+            yield child.content
 
-    def __getitem__(self, key: int) -> _pm.Val[Type]:
+    def __getitem__(self, key: int | slice) -> _pm.Val[Type] | _pm.Tuple:
         schema = self.schema
         if schema is None:
             raise TypeError(

@@ -22,7 +22,7 @@ class Qual(_Type):
         if qualified_schema is None:
             return None
         return qualified_schema.map(
-            lambda child: _pm.val(type(self)(self.qualifier, child.fetch()))
+            lambda child: _pm.val(type(self)(self.qualifier, child.content))
         )
 
     @_flux.property

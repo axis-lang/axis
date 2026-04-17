@@ -18,5 +18,5 @@ class UniformType[T](_TupleLikeType):
         if element_schema is None:
             return None
         return element_schema.map(
-            lambda child: _pm.val(type(self)(child.fetch(), unique=False))
+            lambda child: _pm.val(type(self)(child.content, unique=False))
         )

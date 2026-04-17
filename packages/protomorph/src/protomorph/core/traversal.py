@@ -137,24 +137,24 @@ def subst_where(
     return value if not mapping else walk_subst(value, mapping)
 
 
-def subst_marks(value: _pm.Val, mapping: _Mapping[_pm.Mark, _pm.Val | _pm.Datum]) -> _pm.Val:
-    def pred(leaf: _pm.Val) -> bool:
-        value = leaf.fetch()
-        return isinstance(value, _pm.Mark) and value in mapping
+# def subst_marks(value: _pm.Val, mapping: _Mapping[_pm.Mark, _pm.Val | _pm.AnyData]) -> _pm.Val:
+#     def pred(leaf: _pm.Val) -> bool:
+#         value = leaf.content
+#         return isinstance(value, _pm.Mark) and value in mapping
 
-    def replace(leaf: _pm.Val) -> _pm.Val:
-        value = _cast(_pm.Mark, leaf.fetch())
-        replacement = mapping[value]
-        if isinstance(replacement, _pm.Val):
-            return replacement
-        return _pm.val(replacement)
+#     def replace(leaf: _pm.Val) -> _pm.Val:
+#         value = _cast(_pm.Mark, leaf.content)
+#         replacement = mapping[value]
+#         if isinstance(replacement, _pm.Val):
+#             return replacement
+#         return _pm.val(replacement)
 
-    return subst_where(value, pred, replace)
+#     return subst_where(value, pred, replace)
 
 
-def subst_self(value: _pm.Val, subject: _pm.Val | _pm.Datum) -> _pm.Val:
-    replacement = subject if isinstance(subject, _pm.Val) else _pm.val(subject)
-    return subst_marks(value, {_pm.SELF: replacement})
+# def subst_self(value: _pm.Val, subject: _pm.Val | _pm.AnyData) -> _pm.Val:
+#     replacement = subject if isinstance(subject, _pm.Val) else _pm.val(subject)
+#     return subst_marks(value, {_pm.SELF: replacement})
 
 
 def walk_search(value: _pm.Val, target: _pm.Val) -> bool:

@@ -78,7 +78,7 @@ class OverlayRealm(Realm):
         buckets: dict[Anchor, list[Builtin]] = {}
         for rule in self.rules:
             item = cast(Any, rule)
-            buckets.setdefault(item.head.anchor, []).append(rule)
+            buckets.setdefault(item[0].content.anchor, []).append(rule)
         return frozendict((anchor, tuple(items)) for anchor, items in buckets.items())
 
     @flux.property

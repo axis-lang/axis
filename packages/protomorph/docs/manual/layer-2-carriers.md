@@ -24,7 +24,7 @@ len(carrier)          # arity (raises TypeError if unbounded)
 iter(carrier)         # iterate children
 
 carrier.is_leaf       # True if no children
-carrier.fetch()       # extract content
+carrier.content       # extract content
 ```
 
 ### Deep operations
@@ -54,7 +54,7 @@ from pm import LeafCarrier, Spec
 
 leaf = LeafCarrier(Spec.of("std.types.Integer"), 42)
 print(leaf.is_leaf)      # True
-print(leaf.fetch())      # 42
+print(leaf.content)      # 42
 ```
 
 ### `NativeObjectCarrier[T]`
@@ -64,7 +64,7 @@ Wraps a `Builtin` object; children are the object's declared fields as resolved 
 ```python
 # Given a Builtin with fields (x: int, y: int):
 carrier = pm.wrap(some_point_instance)
-carrier["x"].fetch()    # value of field x
+carrier["x"].content    # value of field x
 ```
 
 ### `Tuple`
@@ -74,8 +74,8 @@ Wraps tuple data for `TupleLikeType` descriptors (`VaryingType`, `UniformType`, 
 ```python
 pair_type = pm.VaryingType.of(int_t, int_t)
 t = pm.Tuple(pair_type, (pm.LeafCarrier(int_t, 1), pm.LeafCarrier(int_t, 2)))
-print(t[0].fetch())   # 1
-print(t.head.fetch()) # 1
+print(t[0].content)   # 1
+print(t.head.content) # 1
 print(t.tail)         # Tuple with (2,)
 ```
 
@@ -126,13 +126,13 @@ x     = pm.placeholder("X")
 pair = pm.VaryingType.of(int_t, x).make((pm.LeafCarrier(int_t, 1), pm.LeafCarrier(x, x)))
 
 leaves = list(pair.iter_leafs())
-print([l.fetch() for l in leaves])   # [1, SimpleVar(None, 'X')]
+print([l.content for l in leaves])   # [1, SimpleVar(None, 'X')]
 
 # Substitute X → 99
 replacement = pm.LeafCarrier(int_t, 99)
 subst_map   = {leaves[1]: replacement}
 new_pair    = pair.subst(subst_map)
-print([c.fetch() for c in new_pair.iter_leafs()])  # [1, 99]
+print([c.content for c in new_pair.iter_leafs()])  # [1, 99]
 ```
 
 ---

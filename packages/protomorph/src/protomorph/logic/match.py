@@ -251,7 +251,7 @@ def _ir_subst(value: pm.Val, mapping: dict[pm.Val, pm.Val]) -> pm.Val:
         )
 
     if _is_fuse_value(value):
-        fuse = value.fetch()
+        fuse = value.content
         return pm.val(
             pm.Fuse(
                 known=_ir_subst_known(fuse.known, mapping),
@@ -260,7 +260,7 @@ def _ir_subst(value: pm.Val, mapping: dict[pm.Val, pm.Val]) -> pm.Val:
         )
 
     if _is_proj_value(value):
-        proj = value.fetch()
+        proj = value.content
         return pm.val(pm.Proj(value=_ir_subst(proj.value, mapping), target=proj.target))
 
     if len(value.children) == 0:
@@ -316,15 +316,15 @@ def _exprs_compatible(left: pm.Val, right: pm.Val) -> bool:
 
 
 def _is_soft_expr(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), pm.Placeholder)
+    return len(node.children) == 0 and isinstance(node.content, pm.Placeholder)
 
 
 def _is_pattern_slot(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), pm.Pattern.Slot)
+    return len(node.children) == 0 and isinstance(node.content, pm.Pattern.Slot)
 
 
 def _is_match_hole(node: pm.Val) -> bool:
-    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.fetch(), pm.Var))
+    return len(node.children) == 0 and (node.is_wildcard or isinstance(node.content, pm.Var))
 
 
 def _descriptors_compatible(left: pm.Type, right: pm.Type) -> bool:
@@ -332,8 +332,8 @@ def _descriptors_compatible(left: pm.Type, right: pm.Type) -> bool:
 
 
 def _is_fuse_value(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), pm.Fuse)
+    return len(node.children) == 0 and isinstance(node.content, pm.Fuse)
 
 
 def _is_proj_value(node: pm.Val) -> bool:
-    return len(node.children) == 0 and isinstance(node.fetch(), pm.Proj)
+    return len(node.children) == 0 and isinstance(node.content, pm.Proj)

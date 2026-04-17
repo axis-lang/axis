@@ -17,6 +17,8 @@ def make_value(tp, dt) -> Val:
             return LeafCarrier(tp, dt)
         if tp.schema is None:
             return LeafCarrier(tp, dt)
+    if isinstance(dt, (_pm.UniformType, _pm.VaryingType, _pm.IndexedType)):
+        return LeafCarrier(dt.metatype(), dt)
     if isinstance(dt, _pm.Type):
         tp = dt.metatype()
     if isinstance(dt, _pm.Placeholder):
