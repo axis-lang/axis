@@ -17,16 +17,14 @@ from .result import Result, Err
 def some[T](value: Val[T]) -> Option[T]:
     if not isinstance(value, Val):
         raise TypeError("Option.some() expects a Carrier")
-    return Option(_pm.Qual(Option.qualifier, value.descriptor), value.content)
+    return Option(_pm.types.optional(value.descriptor), value.content)
 
 
 def none(_: _Any = None) -> Option[_Never]:
-    return Option(_pm.Qual(Option.qualifier, _pm.Spec.Never), None)
+    return Option(_pm.types.optional(_pm.types.never), None)
 
 
 class Option[V](Val[V | None]):
-    qualifier: _ClassVar[_pm.Spec]
-
     descriptor: _pm.Qual
     content: V | None
 
@@ -70,6 +68,15 @@ class Option[V](Val[V | None]):
             tuple(child.unwrap() for child in projected)
         )
         return _cast(Self, type(self).some(value))
+
+    def __invariants__(self) -> None:
+        super().__invariants__()
+        assert isinstance(self.descriptor, _pm.Qual)
+        qualifier = self.descriptor.qualifier
+        assert qualifier is not None and qualifier.anchor == _pm.anchors.optional
+        if self.content is None:
+            return
+        _pm.make_value(self.descriptor.qualified, self.content)
 
     def value_carrier(self) -> Val:
         assert self.content is not None
@@ -119,7 +126,7 @@ class Option[V](Val[V | None]):
     def ok_or[E](self, error: Val[E]) -> Result[E, V]:
         if not isinstance(error, Val):
             raise TypeError("Option.ok_or() expects a Carrier")
-        descriptor = _pm.Qual(Result.qualifier(error.type), self.descriptor.qualified)
+        descriptor = _pm.types.result(self.descriptor.qualified, err=error.type)
         if self.content is not None:
             return _cast(Result[E, V], Result(descriptor, self.content))
         return _cast(Result[E, V], Result(descriptor, Err(error.content)))

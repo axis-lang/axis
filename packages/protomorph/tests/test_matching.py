@@ -12,7 +12,7 @@ from protomorph import (
     LeafCarrier,
     PlaceholderMetatype,
     Spec,
-    VaryingType,
+    Varying,
     var,
     val,
 )
@@ -62,8 +62,8 @@ class TestSimpleMatching(unittest.TestCase):
 
     def test_multiple_captures_accumulate(self):
         T = var("T")
-        pair = pm.Tuple(cast(pm.Type[tuple], VaryingType((ANY, ANY))), (T, T))
-        subject = pm.Tuple(cast(pm.Type[tuple], VaryingType((ANY, ANY))), (1, 2))
+        pair = pm.Tuple(cast(pm.Type[tuple], Varying((ANY, ANY))), (T, T))
+        subject = pm.Tuple(cast(pm.Type[tuple], Varying((ANY, ANY))), (1, 2))
 
         result = pm.match.match(pair, subject)
 

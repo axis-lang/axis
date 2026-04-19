@@ -31,7 +31,7 @@ class Index(syn.Expr):
         if args_result is not None:
             args = cast(pm.Tuple, args_result.unwrap())
             descriptor = args.descriptor
-            if isinstance(descriptor, pm.IndexedType):
+            if isinstance(descriptor, pm.Indexed):
                 for key, value in zip(descriptor.index.content, args.content):
                     if key is None:
                         positional.append(value)

@@ -4,7 +4,7 @@ import unittest
 from typing import TypeVarTuple
 from typing import cast
 
-from protomorph import Builtin, Id, IndexedType, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, VaryingType, current_realm, var, val, spec_name
+from protomorph import Builtin, Id, Indexed, NATIVE_REALM, NativeObjectCarrier, NativeRealm, NativeVar, Qual, Placeholder, REALM, Spec, Varying, current_realm, var, val, spec_name
 
 
 INT = cast(Spec, val(int).content)
@@ -61,11 +61,16 @@ class TestNativeHostSchemaFor(unittest.TestCase):
     def test_unknown_spec_returns_none(self):
         self.assertIsNone(self.host.schema_for(Spec.of("unknown.Thing")))
 
+    def test_variants_of_defaults_to_singleton_spec(self):
+        spec = Spec.of(spec_name(Point))
+
+        self.assertEqual(self.host.variants_of(spec), frozenset({spec}))
+
     def test_simple_class_schema(self):
         schema = self.host.schema_for(Spec.of(spec_name(Point)))
 
         assert schema is not None
-        self.assertIsInstance(schema.descriptor, IndexedType)
+        self.assertIsInstance(schema.descriptor, Indexed)
         self.assertEqual(schema.entry_at(0).value.content, INT)
         self.assertEqual(schema.entry_at(1).value.content, INT)
 
@@ -95,8 +100,8 @@ class TestNativeHostSchemaFor(unittest.TestCase):
 
         assert schema is not None
         item_type = schema.attr(Id("items")).content
-        self.assertIsInstance(item_type, VaryingType)
-        self.assertEqual(cast(VaryingType, item_type).values, (INT, STR))
+        self.assertIsInstance(item_type, Varying)
+        self.assertEqual(cast(Varying, item_type).element_types, (INT, STR))
         self.assertEqual([child.content for child in schema.attr(Id("items"))], [INT, STR])
 
 
@@ -126,6 +131,11 @@ class TestDelegation(unittest.TestCase):
             schema.attr(Id("y")).content,
             Qual.of(INT, Spec.of("std.qualifiers.List")),
         )
+
+    def test_spec_variants_delegate_to_host(self):
+        spec = Spec.of(spec_name(Point))
+
+        self.assertEqual(spec.variants, frozenset({spec}))
 
 
 class TestRealmContext(unittest.TestCase):

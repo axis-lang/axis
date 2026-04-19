@@ -10,7 +10,7 @@ from protomorph import (
     Placeholder, var,
     Morph, Pattern, Shape, Wildcard,
     LeafCarrier, Option, Result, Spec, Tuple, Val,
-    VaryingType,
+    Varying,
     val,
     deep_zip,
 )
@@ -71,7 +71,7 @@ class MatchPair(Builtin):
 
 class TestIter(unittest.TestCase):
     def test_yields_root_then_children_pre_order(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         nodes = list(pm.walk(c))
         # pre-order: root first, then its children left-to-right
@@ -85,8 +85,8 @@ class TestIter(unittest.TestCase):
         self.assertIs(nodes[0], leaf)
 
     def test_nested_pre_order(self):
-        inner = Tuple(cast(VaryingType, VaryingType.of(INT, INT)), (1, 2))
-        outer_t = cast(VaryingType, VaryingType.of(inner.descriptor, INT))
+        inner = Tuple(cast(Varying, Varying.of(INT, INT)), (1, 2))
+        outer_t = cast(Varying, Varying.of(inner.descriptor, INT))
         outer = Tuple(outer_t, (inner, 3))
         nodes = list(pm.walk(outer))
         # outer, inner, 1, 2, 3
@@ -103,7 +103,7 @@ class TestValFlags(unittest.TestCase):
 
 class TestIterLeafs(unittest.TestCase):
     def test_flat_tuple(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         leaves = list(pm.walk_leafs(c))
         self.assertEqual([leaf.content for leaf in leaves], [1, "a"])
@@ -125,15 +125,15 @@ class TestIterLeafs(unittest.TestCase):
 
 class TestIterBranches(unittest.TestCase):
     def test_flat_tuple_yields_only_root(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         branches = list(pm.walk_branches(c))
         self.assertEqual(len(branches), 1)
         self.assertIs(branches[0], c)
 
     def test_nested_pre_order(self):
-        inner = Tuple(cast(VaryingType, VaryingType.of(INT, INT)), (1, 2))
-        outer_t = cast(VaryingType, VaryingType.of(inner.descriptor, INT))
+        inner = Tuple(cast(Varying, Varying.of(INT, INT)), (1, 2))
+        outer_t = cast(Varying, Varying.of(inner.descriptor, INT))
         outer = Tuple(outer_t, (inner, 3))
         branches = list(pm.walk_branches(outer))
         # pre-order: outer before inner; leaves (1, 2, 3) excluded
@@ -146,18 +146,18 @@ class TestIterBranches(unittest.TestCase):
 
 class TestDeepMap(unittest.TestCase):
     def test_identity(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         self.assertEqual(pm.walk_map(c, lambda x: x).content, (1, "a"))
 
     def test_transform_leaves(self):
-        vt = cast(VaryingType, VaryingType.of(INT, INT))
+        vt = cast(Varying, Varying.of(INT, INT))
         c = Tuple(vt, (10, 20))
         result = pm.walk_map(c, lambda leaf: LeafCarrier(leaf.descriptor, leaf.content * 2))
         self.assertEqual(result.content, (20, 40))
 
     def test_transform_result_ok_leaves(self):
-        vt = cast(VaryingType, VaryingType.of(INT, INT))
+        vt = cast(Varying, Varying.of(INT, INT))
         carrier = Result.ok(Tuple(vt, (10, 20)))
 
         result = cast(
@@ -174,7 +174,7 @@ class TestDeepMap(unittest.TestCase):
         self.assertEqual(result.unwrap().content, (20, 40))
 
     def test_transform_option_some_leaves(self):
-        vt = cast(VaryingType, VaryingType.of(INT, INT))
+        vt = cast(Varying, Varying.of(INT, INT))
         carrier = Option.some(Tuple(vt, (10, 20)))
 
         result = cast(Option, pm.walk_map(carrier, lambda leaf: LeafCarrier(leaf.descriptor, leaf.content * 2)))
@@ -563,29 +563,29 @@ class TestDisplay(unittest.TestCase):
 class TestSubst(unittest.TestCase):
     def test_varying_type_subst(self):
         T = var("T", int)
-        vt = VaryingType.of(INT, T, STR)
+        vt = Varying.of(INT, T, STR)
         c = val(vt)
         ph_carrier = next(leaf for leaf in pm.walk_leafs(c) if leaf.content is T)
         replacement = LeafCarrier(ph_carrier.descriptor, FLOAT)
         result = pm.walk_subst(c, {ph_carrier: replacement}).content
-        self.assertEqual(repr(result), repr(VaryingType.of(INT, FLOAT, STR)))
+        self.assertEqual(repr(result), repr(Varying.of(INT, FLOAT, STR)))
 
 
 class TestSearch(unittest.TestCase):
     def test_find_leaf(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         c = Tuple(vt, (1, "a"))
         self.assertTrue(pm.walk_search(c, c[1]))
 
     def test_find_leaf_inside_result_ok(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         inner = Tuple(vt, (1, "a"))
         carrier = Result.ok(inner)
 
         self.assertTrue(pm.walk_search(carrier, carrier[1]))
 
     def test_find_leaf_inside_option_some(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         inner = Tuple(vt, (1, "a"))
         carrier = Option.some(inner)
 
@@ -594,13 +594,13 @@ class TestSearch(unittest.TestCase):
 
 class TestDeepZip(unittest.TestCase):
     def test_matching_structure(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         a = Tuple(vt, (1, "a"))
         b = Tuple(vt, (2, "b"))
         self.assertEqual(len(list(deep_zip(a, b))), 3)
 
     def test_skip(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR))
+        vt = cast(Varying, Varying.of(INT, STR))
         a = Tuple(vt, (1, "a"))
         b = Tuple(vt, (2, "b"))
         walker = deep_zip(a, b)
@@ -611,8 +611,8 @@ class TestDeepZip(unittest.TestCase):
         self.assertEqual(len(results), 1)
 
     def test_mismatch_raises(self):
-        a = Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a"))
-        b = Tuple(cast(VaryingType, VaryingType.of(INT, FLOAT)), (2, 3.0))
+        a = Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a"))
+        b = Tuple(cast(Varying, Varying.of(INT, FLOAT)), (2, 3.0))
         with self.assertRaises(Exception):
             list(deep_zip(a, b))
 

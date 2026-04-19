@@ -120,7 +120,7 @@ def _tuple_result(*values: object) -> pm.Val:
         return pm.Tuple.Empty
     carriers = tuple(pm.val(value) for value in values)
     return pm.Tuple(
-        pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
+        pm.Varying.of(*(carrier.descriptor for carrier in carriers)),
         tuple(carrier.fetch() for carrier in carriers),
     )
 

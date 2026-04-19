@@ -4,5 +4,5 @@ from .canonical import *
 from . import canonical
 from . import match
 from . import logic
-from .constraint import Constraint
+#from .constraint import Constraint
 

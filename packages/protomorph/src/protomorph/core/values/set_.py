@@ -7,9 +7,6 @@ import protomorph.core as _pm
 from protobase import slot_cached_property
 
 from .base import Val
-from ..foundation import Anchor
-
-_SET_QUALIFIER = Anchor("std.qualifiers.Set")
 
 
 class Set[T](Val[frozenset[T]]):
@@ -38,7 +35,7 @@ class Set[T](Val[frozenset[T]]):
         super().__invariants__()
         assert isinstance(self.descriptor, _pm.Qual)
         qualifier = self.descriptor.qualifier
-        assert qualifier is not None and qualifier.anchor == _SET_QUALIFIER
+        assert qualifier is not None and qualifier.anchor == _pm.anchors.set
         assert isinstance(self.content, frozenset)
         for value in self.content:
             _pm.make_value(self.descriptor.qualified, value)

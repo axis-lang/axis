@@ -5,8 +5,8 @@ from typing import Any, cast
 
 from protobase import frozendict
 
-from protomorph import Builtin, ELLIPSIS, Err, Map, SELF, Id, Index, LeafCarrier, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Set, Spec, Tuple, UniformType, UnionType, VaryingType, WILDCARD, subst_where, var, val
-
+from protomorph import Builtin, ELLIPSIS, Err, Map, SELF, Id, Index, LeafCarrier, Option, OptionUnwrapError, Qual, Result, ResultUnwrapError, Set, Spec, Tuple, Uniform, Union, Varying, WILDCARD, subst_where, var, val
+import protomorph as pm
 
 INT = cast(Spec, val(int).content)
 STR = cast(Spec, val(str).content)
@@ -26,21 +26,21 @@ class TestLeafCarrier(unittest.TestCase):
 
 class TestTuple(unittest.TestCase):
     def test_uniform_iteration(self):
-        carrier = Tuple(UniformType(INT), (10, 20, 30))
+        carrier = Tuple(Uniform(INT), (10, 20, 30))
         self.assertEqual([child.content for child in carrier], [10, 20, 30])
 
     def test_varying_iteration(self):
-        carrier = Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (42, "hello"))
+        carrier = Tuple(cast(Varying, Varying.of(INT, STR)), (42, "hello"))
         self.assertEqual([child.content for child in carrier], [42, "hello"])
 
     def test_reconstruct(self):
-        carrier = Tuple(UniformType(INT), (10, 20))
+        carrier = Tuple(Uniform(INT), (10, 20))
         children = (LeafCarrier(INT, 100), LeafCarrier(INT, 200))
         self.assertEqual(carrier.reconstruct(children).content, (100, 200))
 
     def test_invalid_descriptor_length_raises(self):
         with self.assertRaises(AssertionError):
-            Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, 2, 3))
+            Tuple(cast(Varying, Varying.of(INT, STR)), (1, 2, 3))
 
 
 class TestIndexCarrier(unittest.TestCase):
@@ -98,7 +98,7 @@ class TestMakeValueRules(unittest.TestCase):
 
 class TestCarrierSubstitution(unittest.TestCase):
     def test_subst_where_replaces_matching_leaves(self):
-        carrier = Tuple(cast(VaryingType, VaryingType.of(ANY, ANY)), (1, 2))
+        carrier = Tuple(cast(Varying, Varying.of(ANY, ANY)), (1, 2))
 
         updated = subst_where(
             carrier,
@@ -131,7 +131,7 @@ class TestCarrierSubstitution(unittest.TestCase):
 
 class TestResultCarrier(unittest.TestCase):
     def test_result_make_accepts_plain_success_payload(self):
-        result_int = Qual(Result.qualifier(val(STR)), INT)
+        result_int = pm.types.result(INT, err=STR)
 
         carrier = cast(Result, result_int.make(1))
 
@@ -139,7 +139,7 @@ class TestResultCarrier(unittest.TestCase):
         self.assertEqual(carrier.value_carrier().content, 1)
 
     def test_result_err_uses_result_error_type(self):
-        result_int = Qual(Result.qualifier(val(STR)), INT)
+        result_int = pm.types.result(INT, err=STR)
 
         carrier = cast(Result, result_int.make(Err("bad")))
 
@@ -283,7 +283,7 @@ class TestResultCarrier(unittest.TestCase):
             Result(cast(Any, INT), 1)
 
     def test_manual_result_allows_plain_success_content(self):
-        result_int = Qual(Result.qualifier(val(STR)), INT)
+        result_int = pm.types.result(INT, err=STR)
 
         carrier = Result(result_int, 1)
 
@@ -393,7 +393,7 @@ class TestOptionCarrier(unittest.TestCase):
             carrier.and_then(lambda value: cast(Any, value.content) + 1)
 
     def test_option_reconstruct_rebuilds_structured_some(self):
-        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+        carrier = Option.some(Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a")))
 
         rebuilt = cast(
             Option,
@@ -409,7 +409,7 @@ class TestOptionCarrier(unittest.TestCase):
         self.assertEqual(rebuilt.unwrap().content, (2, "b"))
 
     def test_option_reconstruct_rebuilds_structured_none(self):
-        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+        carrier = Option.some(Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a")))
 
         rebuilt = cast(
             Option,
@@ -424,7 +424,7 @@ class TestOptionCarrier(unittest.TestCase):
         self.assertTrue(rebuilt.is_none)
 
     def test_option_reconstruct_rejects_mixed_some_and_none(self):
-        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+        carrier = Option.some(Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a")))
 
         with self.assertRaises(TypeError):
             carrier.reconstruct(
@@ -505,17 +505,17 @@ class TestTypeSchema(unittest.TestCase):
         )
 
     def test_uniform_schema_none_for_leaf_element(self):
-        self.assertIsNone(UniformType(INT).schema)
+        self.assertIsNone(Uniform(INT).schema)
 
     def test_uniform_schema_projects_one_level(self):
-        schema = UniformType(cast(VaryingType, VaryingType.of(INT, STR))).schema
+        schema = Uniform(cast(Varying, Varying.of(INT, STR))).schema
 
         assert schema is not None
-        self.assertEqual(schema[0].content, UniformType(INT))
-        self.assertEqual(schema[1].content, UniformType(STR))
+        self.assertEqual(schema[0].content, Uniform(INT))
+        self.assertEqual(schema[1].content, Uniform(STR))
 
     def test_union_schema_is_none(self):
-        union = cast(UnionType, UnionType.of(INT, STR))
+        union = cast(pm.types.Union, pm.types.Union.of(INT, STR))
 
         self.assertTrue(union.is_leaf)
         self.assertIsNone(union.schema)
@@ -533,7 +533,7 @@ class TestProjectedCarrierTraversal(unittest.TestCase):
         self.assertEqual(len(carrier), 0)
 
     def test_option_logical_children_project_structured_payload(self):
-        carrier = Option.some(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+        carrier = Option.some(Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a")))
 
         self.assertEqual([child.content for child in carrier], [1, "a"])
         self.assertEqual(
@@ -545,7 +545,7 @@ class TestProjectedCarrierTraversal(unittest.TestCase):
         )
 
     def test_result_logical_children_project_structured_payload(self):
-        carrier = Result.ok(Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a")))
+        carrier = Result.ok(Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a")))
 
         projected = [cast(Result, child) for child in carrier]
 
@@ -594,22 +594,22 @@ class TestContainerCarriers(unittest.TestCase):
 
 class TestTupleMap(unittest.TestCase):
     def test_map_updates_child_descriptors(self):
-        carrier = Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "hello"))
+        carrier = Tuple(cast(Varying, Varying.of(INT, STR)), (1, "hello"))
 
         mapped = carrier.map(lambda child: LeafCarrier(ANY, str(child.content)))
 
         self.assertEqual(mapped.content, ("1", "hello"))
-        self.assertEqual(mapped.descriptor, VaryingType.of(ANY, ANY))
+        self.assertEqual(mapped.descriptor, Varying.of(ANY, ANY))
 
     def test_map_degrades_uniform_to_varying_when_descriptors_diverge(self):
-        carrier = Tuple(UniformType(INT), (1, 2))
+        carrier = Tuple(Uniform(INT), (1, 2))
 
         mapped = carrier.map(
             lambda child: LeafCarrier(INT if child.content == 1 else STR, child.content)
         )
 
         self.assertEqual(mapped.content, (1, 2))
-        self.assertEqual(mapped.descriptor, VaryingType.of(INT, STR))
+        self.assertEqual(mapped.descriptor, Varying.of(INT, STR))
 
 
 class TestTypeProperty(unittest.TestCase):

@@ -14,7 +14,7 @@ class Qual(_Type):
     qualified: _pm.Type
 
     def metatype(self) -> _pm.Type:
-        return _Spec.of("std.metas.Qualifier")
+        return _Spec.of(_pm.anchors.qualification)
 
     @property
     def schema(self) -> _pm.Schema | None:
@@ -38,11 +38,11 @@ class Qual(_Type):
             return _pm.Tuple.extends(
                 self.qualified.qualifiers,
                 _pm.Tuple(
-                    _pm.VaryingType((self.qualifier.metatype(),)), (self.qualifier,)
+                    _pm.Varying((self.qualifier.metatype(),)), (self.qualifier,)
                 ),
             )
         return _pm.Tuple(
-            _pm.VaryingType((self.qualifier.metatype(),)), (self.qualifier,)
+            _pm.Varying((self.qualifier.metatype(),)), (self.qualifier,)
         )
 
     @classmethod

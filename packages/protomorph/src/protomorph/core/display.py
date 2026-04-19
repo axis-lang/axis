@@ -24,7 +24,7 @@ _SPEC_PREFIXES = ["std.qualifiers.", "std.", "std.metas.", "std.types."]
 def repr_any(obj: Any) -> str:
     """Single dispatch repr for any core object (Type, Val, Builtin)."""
     from .types import Placeholder
-    from .types import UniformType, UnionType, VaryingType, IndexedType, Spec, Qual
+    from .types import Uniform, Union, Varying, Indexed, Spec, Qual
     from ..canonical import Morph, Fuse, Proj
     from ..logic.match import Match
     from .values import Val, LeafCarrier, Tuple, NativeObjectCarrier, Index, Result, Option
@@ -54,13 +54,13 @@ def repr_any(obj: Any) -> str:
         if isinstance(slot, int):
             return str(slot)
         return type(obj).__name__
-    if isinstance(obj, VaryingType):
+    if isinstance(obj, Varying):
         return _repr_varying(obj)
-    if isinstance(obj, IndexedType):
+    if isinstance(obj, Indexed):
         return _repr_indexed(obj)
-    if isinstance(obj, UniformType):
+    if isinstance(obj, Uniform):
         return _repr_uniform(obj)
-    if isinstance(obj, UnionType):
+    if isinstance(obj, Union):
         return _repr_union(obj)
 
     # ── Carriers (check before generic fallback) ──
@@ -180,7 +180,7 @@ def _repr_qual(qual) -> str:
 
 
 def _repr_varying(vt) -> str:
-    return f"[{', '.join(_format(value) for value in vt.values)}]"
+    return f"[{', '.join(_format(value) for value in vt.element_types)}]"
 
 
 def _repr_indexed(it) -> str:

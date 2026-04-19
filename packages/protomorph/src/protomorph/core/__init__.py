@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins as _builtins
 from typing import cast
 
 from protobase import flux as _flux
@@ -7,34 +8,70 @@ from protobase import flux as _flux
 from decimal import Decimal
 from types import NoneType
 
+from . import anchors
 from .foundation import *
-from .types import *
+from . import types
+from .types import (
+    Schema,
+    Type,
+    compatible,
+    Placeholder,
+    Var,
+    Mark,
+    Op,
+    WildcardMark,
+    EllipsisMark,
+    SelfMark,
+    PlaceholderMetatype,
+    SimpleVar,
+    var,
+    WILDCARD,
+    ELLIPSIS,
+    SELF,
+    TupleLike,
+    Uniform,
+    Union,
+    Varying,
+    Indexed,
+    Shape,
+    Spec,
+    Qual,
+)
 from .values import *
 from .native import *
 from .realm import *
 from .traversal import *
 
 
-
-
 NATIVE_REALM = NativeRealm()
 REALM = _flux.contextvar("pm.REALM", default=cast(Realm, NATIVE_REALM))
 
 
-VaryingType.Empty = VaryingType(())
-Tuple.Empty = Tuple._new(VaryingType.Empty, ())
-Spec.Any = Spec.of("std.types.Any")
-Spec.Tuple = Spec.of("std.types.Tuple")
-Spec.Index = Spec.of("std.types.Index")
-Spec.Never = Spec.of("std.types.Never")
-Spec.Integer = Spec.of("std.types.Integer")
-Spec.Text = Spec.of("std.types.Text")
-Spec.Decimal = Spec.of("std.types.Decimal")
-Spec.Boolean = Spec.of("std.types.Boolean")
-Spec.Empty = Spec.of("std.types.Empty")
-Spec.Id = Spec.of("std.types.Id")
-Spec.Anchor = Spec.of("std.types.Anchor")
-Option.qualifier = Spec.of("std.qualifiers.Optional")
+Varying.Empty = Varying(())
+Tuple.Empty = Tuple._new(Varying.Empty, ())
+types.any = Spec.of(anchors.any)
+types.tuple = Spec.of(anchors.tuple)
+types.index = Spec.of(anchors.index)
+types.never = Spec.of(anchors.never)
+types.integer = Spec.of(anchors.integer)
+types.text = Spec.of(anchors.text)
+types.decimal = Spec.of(anchors.decimal)
+types.boolean = Spec.of(anchors.boolean)
+types.empty = Spec.of(anchors.empty)
+types.id = Spec.of(anchors.id)
+types.anchor = Spec.of(anchors.anchor)
+
+Spec.Any = types.any
+Spec.Tuple = types.tuple
+Spec.Index = types.index
+Spec.Never = types.never
+Spec.Integer = types.integer
+Spec.Text = types.text
+Spec.Decimal = types.decimal
+Spec.Boolean = types.boolean
+Spec.Empty = types.empty
+Spec.Id = types.id
+Spec.Anchor = types.anchor
 
 
 register_native_spec(int, Spec.Integer)
@@ -50,54 +87,48 @@ register_native_spec(Anchor, Spec.Anchor)
 def _set_transform(value_type: Type) -> Type:
     return cast(
         Type,
-        Qual.of(value_type, Spec.of("std.qualifiers.Set")),
+        types.set(value_type),
     )
 
 
 def _map_transform(key_type: Type, value_type: Type) -> Type:
-    return cast(
-        Type,
-        Qual.of(value_type, Spec.of("std.qualifiers.Map", key_type)),
-    )
+    return types.map(value_type, key=key_type)
 
 
-def _list_transform(value_type: Type) -> Type:
-    return cast(
-        Type,
-        Qual.of(value_type, Spec.of("std.qualifiers.List")),
-    )
+# def _list_transform(value_type: Type) -> Type:
+#     return types.list(value_type)
 
 
 def _frozenset_transform(value_type: Type) -> Type:
     return cast(
         Type,
-        Qual.of(value_type, Spec.of("std.qualifiers.Set")),
+        types.set(value_type),
     )
 
 
-def _tuple_transform(*types: Type | object) -> Type:
-    if len(types) == 2 and types[1] is Ellipsis:
-        return cast(Type, UniformType(cast(Type, types[0])))
-    if any(type_ is Ellipsis for type_ in types):
+def _tuple_transform(*items: Type | object) -> Type:
+    if len(items) == 2 and items[1] is Ellipsis:
+        return cast(Type, Uniform(cast(Type, items[0])))
+    if _builtins.any(type_ is Ellipsis for type_ in items):
         raise TypeError("Only tuple[T, ...] homogeneous tuples are supported")
     return cast(
         Type,
-        VaryingType(cast(tuple[Type, ...], types)),
+        Varying(cast(tuple, items)),
     )
 
 
 def _result_transform(err_type: Type, ok_type: Type) -> Type:
     return cast(
         Type,
-        Qual(Result.qualifier(val(err_type)), ok_type),
+        types.result(ok_type, err=err_type),
     )
 
 
-register_python_transform(dict, _map_transform)
-register_python_transform(list, _list_transform)
-register_python_transform(set, _set_transform)
-register_python_transform(frozenset, _frozenset_transform)
-register_python_transform(tuple, _tuple_transform)
+register_python_transform(_builtins.dict, _map_transform)
+#register_python_transform(_builtins.list, _list_transform)
+register_python_transform(_builtins.set, _set_transform)
+register_python_transform(_builtins.frozenset, _frozenset_transform)
+register_python_transform(_builtins.tuple, _tuple_transform)
 register_python_transform(Result, _result_transform)
 
 

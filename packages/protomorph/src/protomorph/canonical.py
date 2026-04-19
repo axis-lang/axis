@@ -87,7 +87,7 @@ class Pattern[Ctx](Base, pm.Type[tuple[pm.Val, ...]]):
         return pm.Tuple.new(*(pm.val(slot.descriptor) for slot in self.slots))
 
     def metatype(self) -> pm.Type:
-        return pm.Spec.of("std.metas.Type")
+        return pm.Spec.of(pm.anchors.type)
 
     def make(self, data: tuple[pm.Val | object, ...]) -> Morph[Ctx]:
         return Morph(

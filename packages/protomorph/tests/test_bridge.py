@@ -4,7 +4,8 @@ from typing import TypeVar
 import unittest
 from typing import cast
 
-from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, Tuple, UniformType, UnionType, Val, Var, VaryingType, project_type, val
+from protomorph import Builtin, Id, NativeVar, Placeholder, Qual, Spec, Tuple, Uniform, Union, Val, Var, Varying, project_type, val
+import protomorph as _pm
 
 
 INT = val(int).content
@@ -26,22 +27,22 @@ class TestWrapProjection(unittest.TestCase):
         self.assertIs(val(INT).content, INT)
 
     def test_tuple_uniform(self):
-        result = cast(UniformType, project_type(tuple[int, ...]))
-        self.assertIsInstance(result, UniformType)
+        result = cast(Uniform, project_type(tuple[int, ...]))
+        self.assertIsInstance(result, Uniform)
         self.assertIs(result.element_type, INT)
 
     def test_tuple_varying(self):
-        result = cast(VaryingType, project_type(tuple[int, str, float]))
-        self.assertIsInstance(result, VaryingType)
-        self.assertEqual(result.values, (INT, STR, FLOAT))
+        result = cast(Varying, project_type(tuple[int, str, float]))
+        self.assertIsInstance(result, Varying)
+        self.assertEqual(result.element_types, (INT, STR, FLOAT))
 
     def test_union(self):
-        result = cast(UnionType, project_type(int | str))
-        self.assertIsInstance(result, UnionType)
+        result = cast(_pm.types.Union, project_type(int | str))
+        self.assertIsInstance(result, _pm.types.Union)
         self.assertEqual(result.variants, frozenset({INT, STR}))
 
     def test_union_with_none(self):
-        result = cast(UnionType, project_type(int | None))
+        result = cast(_pm.types.Union, project_type(int | None))
         self.assertIn(INT, result.variants)
         self.assertIn(NONE, result.variants)
 
@@ -82,12 +83,12 @@ class TestWrap(unittest.TestCase):
         self.assertEqual(val(int).content, INT)
 
     def test_wrap_tuple_annotation_returns_type_carrier(self):
-        self.assertIsInstance(val(tuple[int, ...]).content, UniformType)
+        self.assertIsInstance(val(tuple[int, ...]).content, Uniform)
 
     def test_wrap_tuple_varying_annotation_returns_type_value(self):
-        descriptor = cast(VaryingType, cast(object, project_type(tuple[int, str, float])))
-        self.assertIsInstance(descriptor, VaryingType)
-        self.assertEqual(descriptor.values, (INT, STR, FLOAT))
+        descriptor = cast(Varying, cast(object, project_type(tuple[int, str, float])))
+        self.assertIsInstance(descriptor, Varying)
+        self.assertEqual(descriptor.element_types, (INT, STR, FLOAT))
 
     def test_wrap_runtime_builtin_returns_native_carrier(self):
         class Pt(Builtin):
@@ -102,8 +103,8 @@ class TestWrap(unittest.TestCase):
         self.assertEqual(carrier.content, 7)
         self.assertIs(carrier.descriptor, INT)
 
-    def test_list_projection_builds_qual(self):
-        projected = project_type(list[int])
+    def test_fset_projection_builds_qual(self):
+        projected = project_type(set[int])
         self.assertIsInstance(projected, Qual)
 
 

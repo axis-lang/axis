@@ -85,7 +85,7 @@ def var[C: _Builtin, I: _AnyData](
 ) -> SimpleVar[C, I]:
     implicit_bound = bound is None
     if bound is None:
-        bound = _pm.Spec.Any
+        bound = _pm.types.any
     elif not isinstance(bound, _Type):
         bound = _pm.project_type(bound)
     return SimpleVar(id=id, bound=bound, ctx=ctx, implicit_bound=implicit_bound)

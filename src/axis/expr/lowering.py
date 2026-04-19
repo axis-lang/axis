@@ -121,7 +121,7 @@ def build_fact(
             if args_result is not None:
                 args = cast(pm.Tuple, args_result.unwrap())
                 descriptor = args.descriptor
-                if isinstance(descriptor, pm.IndexedType):
+                if isinstance(descriptor, pm.Indexed):
                     for key, value in zip(descriptor.index.content, args.content):
                         if key is None:
                             positional.append(value)
@@ -175,7 +175,7 @@ def build_binding_pattern(bindings: BindingStruct, scope: syn.ScopeLike) -> Boun
             positional.append(value)
         else:
             nominal[key] = value
-    return _ok_result(pm.VaryingType.new(*positional, **nominal))
+    return _ok_result(pm.Varying.new(*positional, **nominal))
 
 
 def bound_as_type(
@@ -225,7 +225,7 @@ def build_spec_args(indices_expr: syn.Expr, scope: syn.ScopeLike) -> TupleResult
     if not positional and not nominal:
         return None
 
-    return _ok_result(pm.VaryingType.new(*positional, **nominal))
+    return _ok_result(pm.Varying.new(*positional, **nominal))
 
 
 def build_tuple_bound(
@@ -246,7 +246,7 @@ def build_tuple_bound(
             positional.append(value)
         else:
             nominal[key] = value
-    return _ok_result(pm.VaryingType.new(*positional, **nominal))
+    return _ok_result(pm.Varying.new(*positional, **nominal))
 
 
 def build_tuple_element_bound(

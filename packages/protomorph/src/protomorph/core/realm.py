@@ -20,8 +20,12 @@ class Realm(Builtin, abstract=True):
         _ = spec
         return None
 
-    def compatible_structure(self, left: Any, right: Any) -> bool:
-        return left == right
+    @flux.method
+    def variants_of(self, spec: _pm.Spec) -> frozenset[_pm.Type]:
+        return frozenset({spec})
+
+    def compatible_structure(self, left: _pm.Type, right: _pm.Type) -> bool:
+        return left is right
 
     def eval_logic_op(
         self,
@@ -102,10 +106,14 @@ class OverlayRealm(Realm):
         )
 
     @flux.method
-    def schema_for(self, spec: Any) -> Any | None:  # pyright: ignore[reportIncompatibleVariableOverride]
+    def schema_for(self, spec: _pm.Spec) -> _pm.Schema | None:  # pyright: ignore[reportIncompatibleVariableOverride]
         return self.base.schema_for(spec)
 
-    def compatible_structure(self, left: Any, right: Any) -> bool:
+    @flux.method
+    def variants_of(self, spec: _pm.Spec) -> frozenset[_pm.Type]:  # pyright: ignore[reportIncompatibleVariableOverride]
+        return self.base.variants_of(spec)
+
+    def compatible_structure(self, left: _pm.Type, right: _pm.Type) -> bool:
         return self.base.compatible_structure(left, right)
 
     def eval_logic_op(

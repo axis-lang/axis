@@ -4,7 +4,7 @@ import unittest
 
 import protomorph as pm
 
-from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, Tuple, UniformType, var, unify, val
+from protomorph import Id, LeafCarrier, Placeholder, Qual, Spec, Tuple, Uniform, var, unify, val
 
 
 INT = val(int).content
@@ -75,13 +75,13 @@ class TestTupleSlice(unittest.TestCase):
         self.assertEqual([child.content for child in tail], [STR, FLOAT])
 
     def test_uniform_tuple_slice_preserves_uniform_descriptor(self):
-        carrier = Tuple(UniformType(INT), (1, 2, 3))
+        carrier = Tuple(Uniform(INT), (1, 2, 3))
 
         sliced = carrier[1:]
 
         self.assertIsInstance(sliced, Tuple)
         self.assertEqual([child.content for child in sliced], [2, 3])
-        self.assertIsInstance(sliced.descriptor, UniformType)
+        self.assertIsInstance(sliced.descriptor, Uniform)
 
 
 

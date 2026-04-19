@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Id, Index, IndexedType, LeafCarrier, Spec, Tuple, UniformType, UnionType, VaryingType, val
+from protomorph import Id, Index, Indexed, LeafCarrier, Spec, Tuple, Uniform, Union, Varying, val
+import protomorph as pm
 
 
 INT = cast(Spec, val(int).content)
@@ -23,41 +24,64 @@ class TestAtomicSpecs(unittest.TestCase):
 
 class TestUniformType(unittest.TestCase):
     def test_leaf_element_schema_is_none(self):
-        self.assertIsNone(UniformType(INT).schema)
+        self.assertIsNone(Uniform(INT).schema)
 
     def test_schema_projects_structured_element(self):
-        schema = UniformType(cast(VaryingType, VaryingType.of(INT, STR))).schema
+        schema = Uniform(cast(Varying, Varying.of(INT, STR))).schema
 
         assert schema is not None
-        self.assertEqual(schema[0].content, UniformType(INT))
-        self.assertEqual(schema[1].content, UniformType(STR))
+        self.assertEqual(schema[0].content, Uniform(INT))
+        self.assertEqual(schema[1].content, Uniform(STR))
 
     def test_make(self):
-        carrier = UniformType(INT).make((1, 2))
+        carrier = Uniform(INT).make((1, 2))
         self.assertIsInstance(carrier, Tuple)
+
+    def test_contains_same_element_type(self):
+        self.assertIn(Uniform(INT), Uniform(INT))
+
+    def test_unique_false_contains_unique_true(self):
+        self.assertIn(Uniform(INT, unique=True), Uniform(INT, unique=False))
+
+    def test_unique_true_does_not_contain_non_unique(self):
+        self.assertNotIn(Uniform(INT, unique=False), Uniform(INT, unique=True))
 
 
 class TestUnionType(unittest.TestCase):
     def test_of_single_returns_type(self):
-        self.assertIs(UnionType.of(INT), INT)
+        self.assertIs(pm.types.Union.of(INT), INT)
 
     def test_of_multiple(self):
-        union = cast(UnionType, UnionType.of(INT, STR))
+        union = cast(pm.Union, pm.types.Union.of(INT, STR))
         self.assertEqual(union.variants, frozenset({INT, STR}))
+
+    def test_contains_member_variant(self):
+        union = cast(pm.Union, pm.types.Union.of(INT, STR))
+
+        self.assertIn(INT, union)
+
+    def test_contains_subset_union(self):
+        union = cast(pm.Union, pm.types.Union.of(INT, STR, FLOAT))
+        subset = cast(pm.Union, pm.types.Union.of(INT, STR))
+
+        self.assertIn(subset, union)
 
 
 class TestVaryingType(unittest.TestCase):
     def test_make_positional(self):
-        vt = cast(VaryingType, VaryingType.of(INT, STR, FLOAT))
-        self.assertEqual(vt.values, (INT, STR, FLOAT))
+        vt = cast(Varying, Varying.of(INT, STR, FLOAT))
+        self.assertEqual(vt.element_types, (INT, STR, FLOAT))
 
     def test_indexed(self):
-        vt = cast(IndexedType, IndexedType.of(x=INT, y=STR))
+        vt = cast(Indexed, Indexed.of(x=INT, y=STR))
         self.assertIs(vt.schema.attr(Id("x")).content, INT)
 
     def test_carrier(self):
-        vt = cast(VaryingType, VaryingType.of(INT))
+        vt = cast(Varying, Varying.of(INT))
         self.assertIsInstance(vt.make((42,)), Tuple)
+
+    def test_contains_element_by_element(self):
+        self.assertIn(Varying.of(INT, STR), Varying.of(INT, STR))
 
 
 if __name__ == "__main__":

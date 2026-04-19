@@ -9,7 +9,7 @@ from typing import (
     TypeAliasType,
     TypeVar,
     TypeVarTuple,
-    Union,
+    Union as _TypingUnion,
     Unpack,
     cast,
     get_args,
@@ -19,7 +19,7 @@ from typing import (
 import protomorph.core as _pm
 from protobase import Consed, attr_info_of, flux, frozendict
 
-from .foundation import Anchor, Id, all_builtins
+from .foundation import Id, all_builtins
 from .types import Var
 from .realm import OverlayRealm, Realm
 
@@ -27,13 +27,6 @@ type PythonTransform = Callable[..., _pm.Type]
 
 _NATIVE_SPECS: dict[Any, _pm.Spec] = {}
 _PYTHON_TRANSFORMS: dict[type, PythonTransform] = {}
-
-_OPTIONAL_QUALIFIER = Anchor("std.qualifiers.Optional")
-_RESULT_QUALIFIER = Anchor("std.qualifiers.Result")
-_SET_QUALIFIER = Anchor("std.qualifiers.Set")
-_LIST_QUALIFIER = Anchor("std.qualifiers.List")
-_MAP_QUALIFIER = Anchor("std.qualifiers.Map")
-
 
 class _Spread[V]:
     __slots__ = ("values",)
@@ -106,11 +99,11 @@ def _make_schema(
     index: _pm.Index | None = None,
 ) -> _pm.Schema:
     if index is None:
-        return cast(_pm.Schema, _pm.Tuple(_pm.VaryingType(types), types))
+        return cast(_pm.Schema, _pm.Tuple(_pm.Varying(types), types))
     return cast(
         _pm.Schema,
         _pm.Tuple(
-            _pm.IndexedType(_pm.VaryingType(types), index),
+            _pm.Indexed(_pm.Varying(types), index),
             types,
         ),
     )
@@ -125,13 +118,13 @@ def _type_param_name(param: object) -> str:
     return param.__name__
 
 
-def _variadic_type(values: tuple[_pm.Type, ...]) -> _pm.VaryingType:
-    return _pm.VaryingType(values)
+def _variadic_type(values: tuple[_pm.Type, ...]) -> _pm.Varying:
+    return _pm.Varying(values)
 
 
 def normalize_spreads(value: Any) -> Any:
     if isinstance(value, _Spread):
-        return _pm.VaryingType(cast(tuple[_pm.Type, ...], value.values))
+        return _pm.Varying(cast(tuple[_pm.Type, ...], value.values))
     if isinstance(value, _pm.Index):
         normalized_index_values: list[_pm.Id | None] = []
         for item in value.content:
@@ -140,18 +133,18 @@ def normalize_spreads(value: Any) -> Any:
             else:
                 normalized_index_values.append(item)
         return _pm.Index.of(*normalized_index_values)
-    if isinstance(value, _pm.VaryingType):
+    if isinstance(value, _pm.Varying):
         normalized_slot_values: list[_pm.Type] = []
-        for item in value.values:
+        for item in value.element_types:
             if isinstance(item, _Spread):
                 normalized_slot_values.extend(cast(tuple[_pm.Type, ...], item.values))
             else:
                 normalized_slot_values.append(item)
-        return _pm.VaryingType(tuple(normalized_slot_values))
-    if isinstance(value, _pm.IndexedType):
+        return _pm.Varying(tuple(normalized_slot_values))
+    if isinstance(value, _pm.Indexed):
         slots = value.slots
-        if isinstance(slots, _pm.VaryingType):
-            raw_slots = slots.values
+        if isinstance(slots, _pm.Varying):
+            raw_slots = slots.element_types
         else:
             raw_slots = (slots.element_type,) * len(value.index)
 
@@ -166,7 +159,7 @@ def normalize_spreads(value: Any) -> Any:
                 continue
             flat_slots.append(slot)
             flat_keys.append(key)
-        return _pm.IndexedType(_pm.VaryingType(tuple(flat_slots)), _pm.Index.of(*flat_keys))
+        return _pm.Indexed(_pm.Varying(tuple(flat_slots)), _pm.Index.of(*flat_keys))
     if isinstance(value, _pm.Tuple):
         normalized_content: list[Any] = []
         for item in value.content:
@@ -191,7 +184,7 @@ def _descriptor_item(
     tuple_args: _pm.Tuple, name: str, offset: int, *, wants_carrier: bool
 ) -> object:
     has_named_item = (
-        isinstance(tuple_args.descriptor, _pm.IndexedType)
+        isinstance(tuple_args.descriptor, _pm.Indexed)
         and _pm.Id(name) in tuple_args.descriptor.index.content
     )
     if wants_carrier:
@@ -210,28 +203,28 @@ def _descriptor_for_value(obj: object) -> _pm.Type:
 
 def _first_arg_type(args: tuple[Any, ...], *, template: Any | None) -> _pm.Type:
     if not args:
-        return _pm.Spec.Any
+        return _pm.types.any
     return project_type(args[0], template=template)
 
 
 def _tuple_generic_type(args: tuple[Any, ...], *, template: Any | None) -> _pm.Type:
     if not args:
-        return _pm.Spec.Any
+        return _pm.types.any
     if len(args) == 1:
         return project_type(args[0], template=template)
     return _tuple_annotation_type(args, template=template)
 
 
 def _any_type() -> _pm.Spec:
-    return _pm.Spec.Any
+    return _pm.types.any
 
 
 def _type_metatype() -> _pm.Spec:
-    return _pm.Spec.of("std.metas.Type")
+    return _pm.Spec.of(_pm.anchors.type)
 
 
 def _index_type() -> _pm.Spec:
-    return _pm.Spec.Index
+    return _pm.types.index
 
 
 def _is_variadic_placeholder(tp: _pm.Type) -> bool:
@@ -240,12 +233,12 @@ def _is_variadic_placeholder(tp: _pm.Type) -> bool:
     )
 
 def _optional_type(inner: _pm.Type) -> _pm.Type:
-    return cast(_pm.Type, _pm.Qual.of(inner, _pm.Spec.of("std.qualifiers.Optional")))
+    return cast(_pm.Type, _pm.types.optional(inner))
 
 
 def _tuple_annotation_type(args: tuple[Any, ...], *, template: Any | None) -> _pm.Type:
     if len(args) == 2 and args[1] is Ellipsis:
-        return _pm.UniformType(project_type(args[0], template=template))
+        return _pm.Uniform(project_type(args[0], template=template))
 
     converted = tuple(project_type(arg, template=template) for arg in args)
     if len(converted) == 1 and _is_variadic_placeholder(converted[0]):
@@ -260,21 +253,21 @@ def _specialize_placeholder_type(
 ) -> _pm.Type | None:
     if isinstance(field_type, _pm.Placeholder) and field_type in mapping:
         return cast(_pm.Type, make_replacement(field_type))
-    if isinstance(field_type, _pm.UniformType):
+    if isinstance(field_type, _pm.Uniform):
         element_type = field_type.element_type
         if isinstance(element_type, _pm.Placeholder) and element_type in mapping:
             replacement = mapping[element_type]
-            if isinstance(replacement, _pm.VaryingType):
+            if isinstance(replacement, _pm.Varying):
                 return replacement
-            return _pm.UniformType(replacement)
-    if isinstance(field_type, _pm.VaryingType):
+            return _pm.Uniform(replacement)
+    if isinstance(field_type, _pm.Varying):
         replaced_values: list[_pm.Type] = []
         changed = False
-        for item_type in field_type.values:
+        for item_type in field_type.element_types:
             if isinstance(item_type, _pm.Placeholder) and item_type in mapping:
                 replacement = mapping[item_type]
-                if isinstance(replacement, _pm.VaryingType):
-                    replaced_values.extend(replacement.values)
+                if isinstance(replacement, _pm.Varying):
+                    replaced_values.extend(replacement.element_types)
                 else:
                     replaced_values.append(replacement)
                 changed = True
@@ -386,7 +379,7 @@ class NativeRealm(Realm, Consed):
             if isinstance(param, TypeVarTuple):
                 remaining = arg_types[index:]
                 mapping[NativeVar(spec_name(builtin_cls), f"*{param.__name__}")] = cast(
-                    _pm.Type, _pm.VaryingType(remaining)
+                    _pm.Type, _pm.Varying(remaining)
                 )
                 break
             mapping[NativeVar(spec_name(builtin_cls), _type_param_name(param))] = (
@@ -400,7 +393,7 @@ class NativeRealm(Realm, Consed):
         mapping: dict[_pm.Placeholder, _pm.Type],
     ) -> _pm.Schema:
         descriptor = schema.descriptor
-        if isinstance(descriptor, _pm.IndexedType):
+        if isinstance(descriptor, _pm.Indexed):
             index = cast(_pm.Index, normalize_spreads(descriptor.index))
         else:
             index = None
@@ -411,9 +404,9 @@ class NativeRealm(Realm, Consed):
             if (
                 isinstance(ident, str)
                 and ident.startswith("*")
-                and isinstance(replacement, _pm.VaryingType)
+                and isinstance(replacement, _pm.Varying)
             ):
-                return _Spread(replacement.values)
+                return _Spread(replacement.element_types)
             return replacement
 
         new_types: list[_pm.Type] = []
@@ -430,7 +423,7 @@ class NativeRealm(Realm, Consed):
             for leaf in _pm.walk_leafs(field_carrier):
                 data = leaf.content
                 if data in mapping:
-                    carrier_mapping[leaf] = _pm.LeafCarrier(
+                    carrier_mapping[leaf] = _pm.make_value(
                         leaf.descriptor,
                         _make_replacement(data),
                     )
@@ -489,7 +482,7 @@ def instantiate_builtin(
     attrs = list(attr_info_of(builtin_cls).keys())
     index_keys = (
         tuple(tuple_args.descriptor.index.content)
-        if isinstance(tuple_args.descriptor, _pm.IndexedType)
+        if isinstance(tuple_args.descriptor, _pm.Indexed)
         else ()
     )
 
@@ -545,7 +538,7 @@ def project_type(
         return _any_type()
 
     if annotation is _pm.Tuple:
-        return _pm.Spec.Any
+        return _pm.types.any
 
     if annotation is _pm.Index:
         return _index_type()
@@ -560,15 +553,15 @@ def project_type(
     if scalar_spec is not None:
         return scalar_spec
 
-    if origin is Union:
+    if origin is _TypingUnion:
         # typing.Optional[T] == Union[T, None] with exactly two args → Optional qualifier
         if len(args) == 2 and NoneType in args:
             inner = next(a for a in args if a is not NoneType)
             return _optional_type(project_type(inner, template=template))
-        return _pm.UnionType.of(*(project_type(arg, template=template) for arg in args))
+        return _pm.types.Union.of(*(project_type(arg, template=template) for arg in args))
 
     if isinstance(annotation, PEP604Union):
-        return _pm.UnionType.of(*(project_type(arg, template=template) for arg in args))
+        return _pm.types.Union.of(*(project_type(arg, template=template) for arg in args))
 
     if origin is Unpack and len(args) == 1:
         return project_type(args[0], template=template)
@@ -589,7 +582,7 @@ def project_type(
         return _pm.Spec.of(spec_name(annotation))
 
     if isinstance(annotation, type) and issubclass(annotation, _pm.Tuple):
-        return _pm.Spec.Any
+        return _pm.types.any
 
     raise ValueError(f"Unsupported annotation: {annotation!r}")
 
@@ -601,7 +594,7 @@ def val(*args, **kwargs) -> _pm.Val:
         raise TypeError("wrap() requires at least one argument")
 
     if len(values) > 1 or kwargs:
-        return _pm.VaryingType.new(
+        return _pm.Varying.new(
             *(val(arg) for arg in values),
             **{key: val(value) for key, value in kwargs.items()},
         )
@@ -611,7 +604,7 @@ def val(*args, **kwargs) -> _pm.Val:
     if isinstance(obj, _pm.Val):
         return obj
 
-    if isinstance(obj, _pm.Type):
+    if isinstance(obj, _pm.types.Type):
         if isinstance(obj, (_pm.Spec, _pm.Qual)):
             return _pm.NativeObjectCarrier(_project_type(type(obj)), obj)
         return obj.metatype().make(obj)

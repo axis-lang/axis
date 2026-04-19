@@ -348,7 +348,7 @@ def _binding_pattern(bindings: LoweredBindingStruct) -> pm.Val:
         else:
             assert field.slot_key is not None
             nominal[field.slot_key] = value
-    return pm.VaryingType.new(*positional, **nominal)
+    return pm.Varying.new(*positional, **nominal)
 
 
 def lower_binding_struct(

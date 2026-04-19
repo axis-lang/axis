@@ -28,10 +28,10 @@ def __(mo):
 def __():
     import protomorph
     from protomorph import (
-        Spec, VaryingType, UniformType, UnionType, IndexedType, Qual,
+        Spec, Varying, Uniform, Union, Indexed, Qual,
         LeafCarrier, val, var, Id, project_type,
     )
-    return Id, IndexedType, LeafCarrier, Qual, Spec, UniformType, UnionType, VaryingType, project_type, var, protomorph, val
+    return Id, Indexed, LeafCarrier, Qual, Spec, Uniform, Union, Varying, project_type, var, protomorph, val
 
 
 @app.cell

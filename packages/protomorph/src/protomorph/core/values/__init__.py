@@ -1,3 +1,5 @@
+from typing import Any as _Any, Callable as _Callable
+
 from protobase import frozendict
 import protomorph.core as _pm
 
@@ -9,51 +11,124 @@ from .result import *
 from .option import *
 
 
-def make_value(tp, dt) -> Val:
+def make_value(tp: _pm.Type, dt: _Any) -> Val:
+    """Build the canonical carrier for `dt` under descriptor `tp`.
+
+    Dispatch stays shallow and systematic:
+
+    1. Existing carriers pass through unchanged.
+    2. Placeholder payloads remain leaf values.
+    3. Other runtime type-values dispatch through `make_type_value()`.
+    4. Descriptor dispatch is by family: placeholder/union, qualifier,
+       tuple-like, then spec.
+    5. This function only performs canonical coercions such as
+       `set -> frozenset` and `dict -> frozendict`.
+    6. Carrier-specific validity belongs to local `__invariants__` methods.
+    """
+
     if isinstance(dt, Val):
         return dt
-    if isinstance(dt, _pm.Var | _pm.Mark):
-        if not isinstance(tp, _pm.Spec):
-            return LeafCarrier(tp, dt)
-        if tp.schema is None:
-            return LeafCarrier(tp, dt)
-    if isinstance(dt, (_pm.UniformType, _pm.VaryingType, _pm.IndexedType)):
-        return LeafCarrier(dt.metatype(), dt)
-    if isinstance(dt, _pm.Type):
-        tp = dt.metatype()
+
     if isinstance(dt, _pm.Placeholder):
-        return LeafCarrier(tp, dt)
-    if isinstance(tp, (_pm.Placeholder, _pm.UnionType)):
-        return LeafCarrier(tp, dt)
-    if isinstance(tp, _pm.Qual):
-        qualifier = tp.qualifier
-        if qualifier is not None and qualifier.anchor == _pm.Anchor("std.qualifiers.Result"):
-            return Result(tp, dt)
-        if qualifier is not None and qualifier.anchor == _pm.Anchor("std.qualifiers.Optional"):
-            return Option(tp, dt)
-        if qualifier is not None and qualifier.anchor == _pm.Anchor("std.qualifiers.Set"):
-            if isinstance(dt, set):
-                dt = frozenset(dt)
-            if not isinstance(dt, frozenset):
-                raise TypeError("Set-qualified values require set(...) or frozenset(...)")
-            return Set(tp, dt)
-        if qualifier is not None and qualifier.anchor == _pm.Anchor("std.qualifiers.Map"):
-            if isinstance(dt, dict):
-                dt = frozendict(dt)
-            if not isinstance(dt, frozendict):
-                raise TypeError("Map-qualified values require dict(...) or frozendict(...)")
-            return Map(tp, dt)
+        return _make_leaf_value(tp, dt)
+
+    if isinstance(dt, _pm.Type):
+        return make_type_value(dt)
+
+    match tp:
+        case _pm.types.Placeholder() | _pm.types.Union():
+            return _make_leaf_value(tp, dt)
+        case _pm.types.Qual() as qual:
+            return _make_qualified_value(qual, dt)
+        case _pm.types.Uniform() | _pm.types.Varying() | _pm.types.Indexed():
+            return _make_tuple_value(tp, dt)
+        case _pm.types.Spec() as spec:
+            return _make_spec_value(spec, dt)
+        case _:
+            raise NotImplementedError(
+                f"No carrier factory for type {type(tp).__name__}"
+            )
+
+
+def make_type_value(dt: _pm.Type) -> Val:
+    """Build the canonical carrier for a runtime type-value payload.
+
+    `make_value()` keeps embedded type-values shallow and lets their metatype
+    describe them. Direct `val(spec)` / `val(qual)` still use the richer native
+    object wrapping path in `core.native.val()`.
+    """
+
+    return _make_leaf_value(dt.metatype(), dt)
+
+
+def _make_qualified_value(tp: _pm.Qual, dt: _Any) -> Val:
+    qualifier = tp.qualifier
+    if qualifier is None:
         return make_value(tp.qualified, dt)
-    if isinstance(tp, _pm.UniformType):
-        if not isinstance(dt, tuple):
-            raise TypeError(f"{type(tp).__name__} values require tuple content")
-        return Index(tp, dt) if tp.unique else Tuple(tp, dt)
-    if isinstance(tp, (_pm.IndexedType, _pm.VaryingType)):
-        if not isinstance(dt, tuple):
-            raise TypeError(f"{type(tp).__name__} values require tuple content")
-        return Tuple(tp, dt)
-    if isinstance(tp, _pm.Spec):
-        if tp.schema is None:
-            return LeafCarrier(tp, dt)
-        return NativeObjectCarrier(tp, dt)
-    raise NotImplementedError(f"No carrier factory for type {type(tp).__name__}")
+
+    builder = _QUALIFIER_BUILDERS.get(qualifier.anchor)
+    if builder is not None:
+        return builder(tp, dt)
+    return make_value(tp.qualified, dt)
+
+
+def _make_tuple_value(
+    tp: _pm.Uniform | _pm.Varying | _pm.Indexed,
+    dt: _Any,
+) -> Val:
+    match tp:
+        case _pm.Uniform() as uniform:
+            return Index(uniform, dt) if uniform.unique else Tuple(uniform, dt)
+        case _pm.Varying() | _pm.Indexed():
+            return Tuple(tp, dt)
+    raise TypeError(f"Unsupported tuple-like descriptor: {type(tp).__name__}")
+
+
+def _make_spec_value(tp: _pm.Spec, dt: _Any) -> Val:
+    if tp.schema is None:
+        return _make_leaf_value(tp, dt)
+    return _make_native_object_value(tp, dt)
+
+
+def _make_result_value(tp: _pm.Qual, dt: _Any) -> Val:
+    return Result(tp, dt)
+
+
+def _make_option_value(tp: _pm.Qual, dt: _Any) -> Val:
+    return Option(tp, dt)
+
+
+def _make_set_value(tp: _pm.Qual, dt: _Any) -> Val:
+    return Set(tp, _coerce_set_content(dt))
+
+
+def _make_map_value(tp: _pm.Qual, dt: _Any) -> Val:
+    return Map(tp, _coerce_map_content(dt))
+
+
+def _make_leaf_value(tp: _pm.Type, dt: _Any) -> Val:
+    return LeafCarrier(tp, dt)
+
+
+def _make_native_object_value(tp: _pm.Type, dt: _Any) -> Val:
+    return NativeObjectCarrier(tp, dt)
+
+
+def _coerce_set_content(dt: _Any) -> _Any:
+    if isinstance(dt, set):
+        return frozenset(dt)
+    return dt
+
+
+def _coerce_map_content(dt: _Any) -> _Any:
+    if isinstance(dt, dict):
+        return frozendict(dt)
+    return dt
+
+
+_QUALIFIER_BUILDERS: dict[_pm.Anchor, _Callable[[_pm.Qual, _Any], Val]] = {
+    _pm.anchors.result: _make_result_value,
+    _pm.anchors.optional: _make_option_value,
+    _pm.anchors.set: _make_set_value,
+    _pm.anchors.map: _make_map_value,
+}

@@ -7,9 +7,6 @@ import protomorph.core as _pm
 from protobase import frozendict, slot_cached_property
 
 from .base import Val
-from ..foundation import Anchor
-
-_MAP_QUALIFIER = Anchor("std.qualifiers.Map")
 
 
 class Map[K, V](Val[frozendict[K, V]]):
@@ -37,7 +34,7 @@ class Map[K, V](Val[frozendict[K, V]]):
         super().__invariants__()
         assert isinstance(self.descriptor, _pm.Qual)
         qualifier = self.descriptor.qualifier
-        assert qualifier is not None and qualifier.anchor == _MAP_QUALIFIER
+        assert qualifier is not None and qualifier.anchor == _pm.anchors.map
         assert isinstance(self.content, frozendict)
 
         key_descriptor = _cast(_pm.Type, qualifier.args[0].content)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from typing import cast
 
-from protomorph import Id, Index, IndexedType, Option, Spec, Tuple, UniformType, VaryingType
+from protomorph import Id, Index, Indexed, Option, Spec, Tuple, Uniform, Varying
 
 
 INT = Spec.of("std.types.Integer")
@@ -26,7 +26,7 @@ class TestIndex(unittest.TestCase):
 
 class TestIndexedType(unittest.TestCase):
     def test_schema_access(self):
-        descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
+        descriptor = cast(Indexed, Indexed.of(INT, y=STR))
         schema = descriptor.schema
 
         self.assertIsNone(schema.entry_at(0).key)
@@ -35,30 +35,40 @@ class TestIndexedType(unittest.TestCase):
         self.assertIs(schema.attr(Id("y")).content, STR)
 
     def test_tuple_attr(self):
-        descriptor = cast(IndexedType, IndexedType.of(INT, y=STR))
+        descriptor = cast(Indexed, Indexed.of(INT, y=STR))
         carrier = Tuple(descriptor, (1, "hello"))
         self.assertEqual(carrier.attr(Id("y")).content, "hello")
 
     def test_tuple_slice_preserves_indexed_descriptor(self):
-        descriptor = cast(IndexedType, IndexedType.of(INT, y=STR, z=FLOAT))
+        descriptor = cast(Indexed, Indexed.of(INT, y=STR, z=FLOAT))
         carrier = Tuple(descriptor, (1, "hello", 2.0))
 
         sliced = cast(Tuple, carrier[1:])
 
         self.assertEqual([child.content for child in sliced], ["hello", 2.0])
-        self.assertIsInstance(sliced.descriptor, IndexedType)
-        self.assertEqual(cast(IndexedType, sliced.descriptor).index.content, (Id("y"), Id("z")))
+        self.assertIsInstance(sliced.descriptor, Indexed)
+        self.assertEqual(cast(Indexed, sliced.descriptor).index.content, (Id("y"), Id("z")))
 
     def test_tuple_slice_preserves_indexed_uniform_slots(self):
-        descriptor = IndexedType(UniformType(INT), Index.of(Id("a"), Id("b"), Id("c")))
+        descriptor = Indexed(Uniform(INT), Index.of(Id("a"), Id("b"), Id("c")))
         carrier = Tuple(descriptor, (1, 2, 3))
 
         sliced = cast(Tuple, carrier[1:])
 
         self.assertEqual([child.content for child in sliced], [2, 3])
-        self.assertIsInstance(sliced.descriptor, IndexedType)
-        self.assertIsInstance(cast(IndexedType, sliced.descriptor).slots, UniformType)
-        self.assertEqual(cast(IndexedType, sliced.descriptor).index.content, (Id("b"), Id("c")))
+        self.assertIsInstance(sliced.descriptor, Indexed)
+        self.assertIsInstance(cast(Indexed, sliced.descriptor).slots, Uniform)
+        self.assertEqual(cast(Indexed, sliced.descriptor).index.content, (Id("b"), Id("c")))
+
+    def test_contains_requires_shared_index_identity(self):
+        index = Index.of(Id("y"))
+        left = Indexed(Uniform(INT), index)
+        right = Indexed(Uniform(INT), index)
+        other_index = Index.of(Id("z"))
+        other = Indexed(Uniform(INT), other_index)
+
+        self.assertIn(right, left)
+        self.assertNotIn(other, left)
 
 
 class TestIndexElementDescriptor(unittest.TestCase):
@@ -103,21 +113,21 @@ class TestIndexElementDescriptor(unittest.TestCase):
 
 class TestTupleSlices(unittest.TestCase):
     def test_varying_slice_preserves_varying_descriptor(self):
-        carrier = Tuple(VaryingType.of(INT, STR, FLOAT), (1, "a", 2.0))
+        carrier = Tuple(Varying.of(INT, STR, FLOAT), (1, "a", 2.0))
 
         sliced = cast(Tuple, carrier[1:])
 
         self.assertEqual([child.content for child in sliced], ["a", 2.0])
-        self.assertIsInstance(sliced.descriptor, VaryingType)
-        self.assertEqual(cast(VaryingType, sliced.descriptor).values, (STR, FLOAT))
+        self.assertIsInstance(sliced.descriptor, Varying)
+        self.assertEqual(cast(Varying, sliced.descriptor).element_types, (STR, FLOAT))
 
     def test_uniform_slice_preserves_uniform_descriptor(self):
-        carrier = Tuple(UniformType(INT), (1, 2, 3))
+        carrier = Tuple(Uniform(INT), (1, 2, 3))
 
         sliced = cast(Tuple, carrier[1:])
 
         self.assertEqual([child.content for child in sliced], [2, 3])
-        self.assertIsInstance(sliced.descriptor, UniformType)
+        self.assertIsInstance(sliced.descriptor, Uniform)
 
 
 if __name__ == "__main__":

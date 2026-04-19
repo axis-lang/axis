@@ -66,7 +66,7 @@ class Val[T](Consed, abstract=True):
 
 
 class NativeObjectCarrier[T](Val[T]):
-    def _schema(self) -> _pm.Schema:
+    def _schema(self) -> _pm.types.Schema:
         structure = self.descriptor.schema
         if structure is None:
             raise TypeError(f"{type(self).__name__} requires a structured descriptor")
@@ -112,7 +112,7 @@ class NativeObjectCarrier[T](Val[T]):
 class LeafCarrier[T](Val[T]):
     @property
     def children(self) -> _pm.Tuple:
-        if isinstance(self.content, (_pm.UniformType, _pm.VaryingType, _pm.IndexedType)):
+        if isinstance(self.content, (_pm.Uniform, _pm.Varying, _pm.Indexed)):
             schema = self.content.schema
             if schema is None:
                 return _pm.Tuple.Empty
@@ -120,19 +120,19 @@ class LeafCarrier[T](Val[T]):
         return _pm.Tuple.Empty
 
     def reconstruct(self, children: tuple[Val, ...]) -> Self:
-        if isinstance(self.content, _pm.VaryingType):
-            rebuilt = _pm.VaryingType(
+        if isinstance(self.content, _pm.Varying):
+            rebuilt = _pm.Varying(
                 tuple(_cast(_pm.Type, child.content) for child in children)
             )
             return _cast(Self, _leaf_with_content(self.descriptor, rebuilt))
-        if isinstance(self.content, _pm.UniformType):
-            rebuilt = _cast(_pm.UniformType, self.content)
+        if isinstance(self.content, _pm.Uniform):
+            rebuilt = _cast(_pm.Uniform, self.content)
             for child in children:
-                rebuilt = _pm.UniformType(_cast(_pm.Type, child.content), unique=rebuilt.unique)
+                rebuilt = _pm.Uniform(_cast(_pm.Type, child.content), unique=rebuilt.unique)
             return _cast(Self, _leaf_with_content(self.descriptor, rebuilt))
-        if isinstance(self.content, _pm.IndexedType):
-            rebuilt = _pm.IndexedType(
-                _pm.VaryingType(tuple(_cast(_pm.Type, child.content) for child in children)),
+        if isinstance(self.content, _pm.Indexed):
+            rebuilt = _pm.Indexed(
+                _pm.Varying(tuple(_cast(_pm.Type, child.content) for child in children)),
                 self.content.index,
             )
             return _cast(Self, _leaf_with_content(self.descriptor, rebuilt))
@@ -142,7 +142,7 @@ class LeafCarrier[T](Val[T]):
 
 def _schema_entries(schema: _pm.Schema) -> tuple[Entry[_pm.Id, _Any], ...]:
     keys: tuple[_pm.Id | None, ...]
-    if isinstance(schema.descriptor, _pm.IndexedType):
+    if isinstance(schema.descriptor, _pm.Indexed):
         keys = tuple(schema.descriptor.index.content)
     else:
         keys = (None,) * len(schema.content)

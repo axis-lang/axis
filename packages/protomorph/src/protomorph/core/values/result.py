@@ -3,11 +3,8 @@ from __future__ import annotations
 from typing import Any as _Any, Callable as _Callable, Self, cast as _cast
 
 import protomorph.core as _pm
-from ..foundation import Builtin, Anchor
+from ..foundation import Builtin
 from .base import Val, UnwrapError
-
-
-_RESULT_QUALIFIER = Anchor("std.qualifiers.Result")
 
 
 class Err[E](Builtin):
@@ -28,12 +25,6 @@ class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
 
     descriptor: _pm.Qual
     content: V | Err[E]
-
-    @staticmethod
-    def qualifier(error_type: Val | None = None) -> _pm.Spec:
-        if error_type is None:
-            error_type = _pm.val(_pm.Spec.Never)
-        return _pm.Spec.new(_RESULT_QUALIFIER, Err=error_type)
 
     @property
     def is_ok(self) -> bool:
@@ -79,7 +70,7 @@ class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
         super().__invariants__()
         assert isinstance(self.descriptor, _pm.Qual), "Result descriptor must be a Qual"
         qualifier = _result_qualifier(self.descriptor)
-        assert qualifier.anchor == _RESULT_QUALIFIER, "Result descriptor must end with std.qualifiers.Result"
+        assert qualifier.anchor == _pm.anchors.result, "Result descriptor must end with std.qualifiers.Result"
         assert len(qualifier.args) == 1, "Result qualifier must have exactly one error type argument"
         if isinstance(self.content, Err):
             _pm.make_value(_error_descriptor(self.descriptor), self.content.payload)
@@ -167,7 +158,7 @@ class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
     def ok(cls, value: Val) -> Result:
         if not isinstance(value, Val):
             raise TypeError("Result.ok() expects a Carrier")
-        descriptor = _pm.Qual(cls.qualifier(), value.descriptor)
+        descriptor = _pm.types.result(value.descriptor)
         return _cast(Result, cls(descriptor, value.content))
 
     @classmethod
@@ -175,14 +166,14 @@ class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
         if not isinstance(error, Val):
             raise TypeError("Result.err() expects a Carrier")
         ok_type = _cast(_pm.Type, _pm.SimpleVar(_RESULT_VAR_CTX, "V"))
-        descriptor = _pm.Qual(cls.qualifier(error.type), ok_type)
+        descriptor = _pm.types.result(ok_type, err=error.type)
         return _cast(Result, cls(descriptor, Err(error.content)))
 
     def _with_ok(self, value: Val) -> Result[_Any, _Any]:
         return _cast(
             Result[_Any, _Any],
             type(self)(
-                _pm.Qual(_result_qualifier(self.descriptor), value.descriptor),
+                _pm.types.result(value.descriptor, err=_error_descriptor(self.descriptor)),
                 value.content,
             ),
         )
@@ -191,7 +182,7 @@ class Result[E, V = _pm.AnyData](Val[V | Err[E]]):
         return _cast(
             Result[_Any, _Any],
             type(self)(
-                _pm.Qual(type(self).qualifier(error.type), self.descriptor.qualified),
+                _pm.types.result(self.descriptor.qualified, err=error.type),
                 Err(error.content),
             ),
         )

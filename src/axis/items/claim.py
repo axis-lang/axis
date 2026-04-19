@@ -230,7 +230,7 @@ def _tuple_carrier(*values: object) -> pm.Val:
         return pm.Tuple.Empty
     carriers = tuple(pm.val(value) for value in values)
     return pm.Tuple(
-        pm.VaryingType.of(*(carrier.descriptor for carrier in carriers)),
+        pm.Varying.of(*(carrier.descriptor for carrier in carriers)),
         tuple(carrier.fetch() for carrier in carriers),
     )
 
@@ -262,16 +262,16 @@ def _collect_logic_vars(value: object, claim: Claim, found: set[str]) -> None:
             _collect_logic_vars(item.fetch(), claim, found)
         return
 
-    if isinstance(value, pm.VaryingType):
-        for item in value.values:
+    if isinstance(value, pm.Varying):
+        for item in value.element_types:
             _collect_logic_vars(item, claim, found)
         return
 
-    if isinstance(value, pm.UniformType):
+    if isinstance(value, pm.Uniform):
         _collect_logic_vars(value.element_type, claim, found)
         return
 
-    if isinstance(value, pm.IndexedType):
+    if isinstance(value, pm.Indexed):
         indexed_value = cast(Any, value)
         _collect_logic_vars(indexed_value.inner, claim, found)
         for item in indexed_value.index.content:
@@ -285,6 +285,6 @@ def _collect_logic_vars(value: object, claim: Claim, found: set[str]) -> None:
                 _collect_logic_vars(item, claim, found)
         return
 
-    if isinstance(value, pm.UnionType):
+    if isinstance(value, pm.Union):
         for item in value.variants:
             _collect_logic_vars(item, claim, found)

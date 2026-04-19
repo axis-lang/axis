@@ -14,6 +14,9 @@ class Type[T](_Builtin, abstract=True):
     def metatype(self) -> Type:
         raise NotImplementedError(f"Metatype not implemented for {self!r}")
 
+    def __contains__(self, other: object) -> bool:
+        return self is other
+
     def make(self, data: T):
         return _pm.make_value(self, data)
 
@@ -52,7 +55,4 @@ class Type[T](_Builtin, abstract=True):
 
 
 def compatible(left: Type, right: Type) -> bool:
-    if left is right:
-        return True
-
-    return bool(_pm.current_realm().compatible_structure(left, right))
+    return left is right

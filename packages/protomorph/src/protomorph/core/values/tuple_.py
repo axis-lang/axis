@@ -37,7 +37,7 @@ class Tuple[*T](Val[tuple[*T]]):
         return _pm.make_value(_slot_descriptor_at(self.descriptor, key), self.content[key])
 
     def entry_at(self, offset: int) -> Entry[Id, _Any]:
-        key = self.descriptor.index.key_at(offset) if isinstance(self.descriptor, _pm.IndexedType) else None
+        key = self.descriptor.index.key_at(offset) if isinstance(self.descriptor, _pm.Indexed) else None
         return Entry(
             key,
             _pm.make_value(_slot_descriptor_at(self.descriptor, offset), self.content[offset]),
@@ -48,7 +48,7 @@ class Tuple[*T](Val[tuple[*T]]):
             yield self.entry_at(offset)
 
     def attr(self, id: Id) -> Val:
-        if not isinstance(self.descriptor, _pm.IndexedType):
+        if not isinstance(self.descriptor, _pm.Indexed):
             raise KeyError(id)
         offset = self.descriptor.index.offset_of(id)
         return _pm.make_value(_slot_descriptor_at(self.descriptor, offset), self.content[offset])
@@ -65,29 +65,29 @@ class Tuple[*T](Val[tuple[*T]]):
             raise TypeError("Tuple.map() callback must return Carrier values")
         carriers = _cast(tuple[Val, ...], mapped)
         content, child_descriptors = _mapped_tuple_parts(carriers)
-        if isinstance(self.descriptor, _pm.UniformType):
+        if isinstance(self.descriptor, _pm.Uniform):
             if not carriers:
-                descriptor = _cast(_pm.Type[tuple], _pm.VaryingType.Empty)
+                descriptor = _cast(_pm.Type[tuple], _pm.Varying.Empty)
             else:
                 first = child_descriptors[0]
                 if all(child_descriptor == first for child_descriptor in child_descriptors):
                     descriptor = _cast(
                         _pm.Type[tuple[*T]],
-                        _pm.UniformType(first, unique=self.descriptor.unique and len(carriers) == len(set(content))),
+                        _pm.Uniform(first, unique=self.descriptor.unique and len(carriers) == len(set(content))),
                     )
                 else:
-                    descriptor = _cast(_pm.Type[tuple[*T]], _pm.VaryingType(child_descriptors))
+                    descriptor = _cast(_pm.Type[tuple[*T]], _pm.Varying(child_descriptors))
             return _cast(Tuple, self._new(descriptor, content))
-        if isinstance(self.descriptor, _pm.IndexedType):
+        if isinstance(self.descriptor, _pm.Indexed):
             descriptor = _cast(
                 _pm.Type[tuple[*T]],
-                _pm.IndexedType(
-                    _pm.VaryingType(child_descriptors),
+                _pm.Indexed(
+                    _pm.Varying(child_descriptors),
                     self.descriptor.index,
                 ),
             )
             return _cast(Tuple, self._new(descriptor, content))
-        descriptor = _cast(_pm.Type[tuple[*T]], _pm.VaryingType(child_descriptors))
+        descriptor = _cast(_pm.Type[tuple[*T]], _pm.Varying(child_descriptors))
         return _cast(Tuple, self._new(descriptor, content))
 
     @classmethod
@@ -101,10 +101,10 @@ class Tuple[*T](Val[tuple[*T]]):
         if kwvals:
             all_vals = vals + tuple(kwvals.values())
             keys: tuple[Id | None, ...] = (None,) * len(vals) + tuple(Id(k) for k in kwvals)
-            inner = _pm.VaryingType(tuple(v.descriptor for v in all_vals))
-            descriptor = _pm.IndexedType(inner, Index.of(*keys))
+            inner = _pm.Varying(tuple(v.descriptor for v in all_vals))
+            descriptor = _pm.Indexed(inner, Index.of(*keys))
             return cls(descriptor, tuple(v.content for v in all_vals))
-        descriptor = _pm.VaryingType(tuple(v.descriptor for v in vals))
+        descriptor = _pm.Varying(tuple(v.descriptor for v in vals))
         return cls(descriptor, tuple(v.content for v in vals))
 
     @classmethod
@@ -126,39 +126,40 @@ class Tuple[*T](Val[tuple[*T]]):
         for tuple_ in tuples:
             values.extend(tuple_.content)
             descriptor = tuple_.descriptor
-            if isinstance(descriptor, _pm.IndexedType):
+            if isinstance(descriptor, _pm.Indexed):
                 has_index = True
                 type_values.extend(_slot_types(descriptor.slots, len(descriptor.index)))
                 index_parts.append(descriptor.index)
-            elif isinstance(descriptor, _pm.VaryingType):
-                type_values.extend(descriptor.values)
-                index_parts.append(Index.of(*((None,) * len(descriptor.values))))
-            elif isinstance(descriptor, _pm.UniformType):
+            elif isinstance(descriptor, _pm.Varying):
+                type_values.extend(descriptor.element_types)
+                index_parts.append(Index.of(*((None,) * len(descriptor.element_types))))
+            elif isinstance(descriptor, _pm.Uniform):
                 type_values.extend((descriptor.element_type,) * len(tuple_.content))
             else:
                 raise TypeError(f"Unsupported descriptor for Tuple.extends: {type(descriptor).__name__}")
-        combined_type = _pm.VaryingType(tuple(type_values))
+        combined_type = _pm.Varying(tuple(type_values))
         if has_index:
             index = Index.concat(*index_parts)
-            descriptor = _cast(_pm.Type[tuple], _pm.IndexedType(combined_type, index))
+            descriptor = _cast(_pm.Type[tuple], _pm.Indexed(combined_type, index))
         else:
             descriptor = _cast(_pm.Type[tuple], combined_type)
         return _cast(Tuple, cls._new(descriptor, tuple(values)))
 
     def __invariants__(self):
+        super().__invariants__()
         assert isinstance(self.content, tuple)
-        if isinstance(self.descriptor, _pm.UniformType):
+        if isinstance(self.descriptor, _pm.Uniform):
             return
-        if isinstance(self.descriptor, _pm.IndexedType):
+        if isinstance(self.descriptor, _pm.Indexed):
             expected = len(self.descriptor.index)
-        elif isinstance(self.descriptor, _pm.VaryingType):
-            expected = len(self.descriptor.values)
+        elif isinstance(self.descriptor, _pm.Varying):
+            expected = len(self.descriptor.element_types)
         else:
             expected = len(self.descriptor)
         assert len(self.content) == expected, "Tuple content must match descriptor length"
 
-class Index[K : Id](Tuple[*tuple[K | None, ...]]):
-    descriptor: _pm.UniformType[K | None]
+class Index[K: _pm.AnyData = Id](Tuple[*tuple[K | None, ...]]):
+    descriptor: _pm.Uniform[K | None]
     #content: tuple[K | None, ...]
 
     @property
@@ -189,10 +190,10 @@ class Index[K : Id](Tuple[*tuple[K | None, ...]]):
         sparse = any(k is None for k in keys)
         id_type = _pm.Spec.Id
         element_type = (
-            _cast(_pm.Type, _pm.Qual.of(id_type, _pm.Spec.of("std.qualifiers.Optional")))
+            _cast(_pm.Type, _pm.types.optional(id_type))
             if sparse else id_type
         )
-        return _cast(Index[K], cls(_pm.UniformType(element_type, unique=True), keys))
+        return _cast(Index[K], cls(_pm.Uniform(element_type, unique=True), keys))
     
     @classmethod
     def concat(cls, *indices: Index[K]) -> Index[K]:
@@ -208,19 +209,19 @@ class Index[K : Id](Tuple[*tuple[K | None, ...]]):
 
 
 def _slice_descriptor(descriptor: _pm.Type, key: slice) -> _pm.Type:
-    if isinstance(descriptor, _pm.UniformType):
+    if isinstance(descriptor, _pm.Uniform):
         return descriptor
-    if isinstance(descriptor, _pm.IndexedType):
+    if isinstance(descriptor, _pm.Indexed):
         fetched_slots = (
             descriptor.slots
-            if isinstance(descriptor.slots, _pm.UniformType)
-            else _pm.VaryingType(descriptor.slots.values[key])
+            if isinstance(descriptor.slots, _pm.Uniform)
+            else _pm.Varying(descriptor.slots.element_types[key])
         )
         index = descriptor.index[key]
         assert isinstance(index, _pm.Index)
-        return _pm.IndexedType(fetched_slots, index)
-    if isinstance(descriptor, _pm.VaryingType):
-        return _pm.VaryingType(descriptor.values[key])
+        return _pm.Indexed(fetched_slots, index)
+    if isinstance(descriptor, _pm.Varying):
+        return _pm.Varying(descriptor.element_types[key])
     schema = descriptor.schema
     if schema is None:
         raise TypeError(f"{type(descriptor).__name__} does not support slicing")
@@ -230,12 +231,12 @@ def _slice_descriptor(descriptor: _pm.Type, key: slice) -> _pm.Type:
 
 
 def _slot_descriptor_at(descriptor: _pm.Type, offset: int) -> _pm.Type:
-    if isinstance(descriptor, _pm.UniformType):
+    if isinstance(descriptor, _pm.Uniform):
         return descriptor.element_type
-    if isinstance(descriptor, _pm.IndexedType):
+    if isinstance(descriptor, _pm.Indexed):
         return _slot_descriptor_at(descriptor.slots, offset)
-    if isinstance(descriptor, _pm.VaryingType):
-        return _cast(_pm.Type, descriptor.values[offset])
+    if isinstance(descriptor, _pm.Varying):
+        return _cast(_pm.Type, descriptor.element_types[offset])
     schema = descriptor.schema
     if schema is None:
         raise TypeError(f"{type(descriptor).__name__} has no payload slot descriptors")
@@ -249,7 +250,7 @@ def _mapped_tuple_parts(carriers: tuple[Val, ...]) -> tuple[tuple[_Any, ...], tu
     )
 
 
-def _slot_types(descriptor: _pm.UniformType | _pm.VaryingType, size: int) -> tuple[_pm.Type, ...]:
-    if isinstance(descriptor, _pm.UniformType):
+def _slot_types(descriptor: _pm.Uniform | _pm.Varying, size: int) -> tuple[_pm.Type, ...]:
+    if isinstance(descriptor, _pm.Uniform):
         return (descriptor.element_type,) * size
-    return descriptor.values
+    return descriptor.element_types

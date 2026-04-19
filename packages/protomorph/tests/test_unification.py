@@ -7,7 +7,7 @@ from protomorph import (
     Builtin,
     Placeholder, var,
     LeafCarrier, NativeObjectCarrier, Tuple,
-    VaryingType, Spec,
+    Varying, Spec,
     UnionFind, unify, val,
 )
 
@@ -43,7 +43,7 @@ class TestUnify(unittest.TestCase):
         self.assertIs(result.content, INT)
 
     def test_tuple_unification(self):
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         T = var("T")
         a = Tuple(vt, (T, STR))
         b = Tuple(vt, (INT, STR))
@@ -52,14 +52,14 @@ class TestUnify(unittest.TestCase):
         self.assertEqual(repr(result.content), repr((INT, STR)))
 
     def test_tuple_mismatch_fails(self):
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         a = Tuple(vt, (INT, STR))
         b = Tuple(vt, (INT, FLOAT))
         self.assertIsNone(unify(a, b, is_var=is_var))
 
     def test_descriptor_mismatch_fails(self):
-        a = Tuple(cast(VaryingType, VaryingType.of(INT, STR)), (1, "a"))
-        b = Tuple(cast(VaryingType, VaryingType.of(INT, FLOAT)), (1, 2.0))
+        a = Tuple(cast(Varying, Varying.of(INT, STR)), (1, "a"))
+        b = Tuple(cast(Varying, Varying.of(INT, FLOAT)), (1, 2.0))
         self.assertIsNone(unify(a, b, is_var=is_var))
 
 
@@ -67,7 +67,7 @@ class TestOccursCheck(unittest.TestCase):
     def test_self_referential_fails(self):
         """$T = Tuple($T, int) should fail — prevents infinite types."""
         T = var("T")
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         a = LeafCarrier(ANY, T)
         b = Tuple(vt, (T, INT))
         self.assertIsNone(unify(a, b, is_var=is_var))
@@ -75,7 +75,7 @@ class TestOccursCheck(unittest.TestCase):
     def test_self_referential_allowed_without_check(self):
         """With occurs_check=False, self-referential binding succeeds."""
         T = var("T")
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         a = LeafCarrier(ANY, T)
         b = Tuple(vt, (T, INT))
         result = unify(a, b, is_var=is_var, occurs_check=False)
@@ -180,7 +180,7 @@ class TestSharedSubst(unittest.TestCase):
         uf = UnionFind(is_var)
 
         # Forward: from call site, we know T = int
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         r1 = unify(
             Tuple(vt, (T, U)),
             Tuple(vt, (INT, U)),  # U still unknown
@@ -204,7 +204,7 @@ class TestSharedSubst(unittest.TestCase):
         uf = UnionFind(is_var)
 
         # T = Tuple(U, int)
-        vt = cast(VaryingType, VaryingType.of(ANY, ANY))
+        vt = cast(Varying, Varying.of(ANY, ANY))
         inner = Tuple(vt, (U, INT))
         unify(LeafCarrier(ANY, T), inner, subst=uf)
 

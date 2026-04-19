@@ -8,6 +8,7 @@ from protomorph.core.foundation import Anchor as _Anchor
 from .type_ import Type as _Type
 
 
+
 class Spec(_Type):
     Any: _ClassVar[Spec]
     Tuple: _ClassVar[Spec]
@@ -25,11 +26,15 @@ class Spec(_Type):
     args: _pm.Tuple
 
     def metatype(self) -> _pm.Type:
-        return Spec.of("std.metas.Specialization")
+        return Spec.of(_pm.anchors.specialization)
 
     @property
     def schema(self) -> _pm.Schema | None:
         return _pm.current_realm().schema_for(self)
+
+    @property
+    def variants(self) -> frozenset[_pm.Type]:
+        return _pm.current_realm().variants_of(self)
 
     @classmethod
     def of(cls, anchor: _Anchor | str, *args: _Any, **kwargs: _Any) -> Spec:
@@ -47,7 +52,7 @@ class Spec(_Type):
             for value in values
         )
         descriptor = (
-            _pm.IndexedType.of(
+            _pm.Indexed.of(
                 *descriptors[: len(args)],
                 **{
                     key: descriptors[len(args) + index]
@@ -55,10 +60,10 @@ class Spec(_Type):
                 },
             )
             if kwargs
-            else _pm.VaryingType(descriptors)
+            else _pm.Varying(descriptors)
         )
         return cls(_Anchor(anchor), _pm.Tuple(descriptor, values))
 
     @classmethod
     def new(cls, anchor: _Anchor | str, *vals: _pm.Val, **kwvals: _pm.Val) -> Spec:
-        return cls(_Anchor(anchor), _pm.VaryingType.new(*vals, **kwvals))
+        return cls(_Anchor(anchor), _pm.Varying.new(*vals, **kwvals))
